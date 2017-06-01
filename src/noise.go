@@ -18,34 +18,38 @@ type (
 	NoiseNonce        uint64 // padded to 12-bytes
 )
 
-func (key *NoisePrivateKey) FromHex(s string) error {
-	slice, err := hex.DecodeString(s)
+func loadExactHex(dst []byte, src string) error {
+	slice, err := hex.DecodeString(src)
 	if err != nil {
 		return err
 	}
-	if len(slice) != NoisePrivateKeySize {
-		return errors.New("Invalid length of hex string for curve25519 point")
+	if len(slice) != len(dst) {
+		return errors.New("Hex string does not fit the slice")
 	}
-	copy(key[:], slice)
+	copy(dst, slice)
 	return nil
 }
 
-func (key *NoisePrivateKey) ToHex() string {
+func (key *NoisePrivateKey) FromHex(src string) error {
+	return loadExactHex(key[:], src)
+}
+
+func (key NoisePrivateKey) ToHex() string {
 	return hex.EncodeToString(key[:])
 }
 
-func (key *NoisePublicKey) FromHex(s string) error {
-	slice, err := hex.DecodeString(s)
-	if err != nil {
-		return err
-	}
-	if len(slice) != NoisePublicKeySize {
-		return errors.New("Invalid length of hex string for curve25519 scalar")
-	}
-	copy(key[:], slice)
-	return nil
+func (key *NoisePublicKey) FromHex(src string) error {
+	return loadExactHex(key[:], src)
 }
 
-func (key *NoisePublicKey) ToHex() string {
+func (key NoisePublicKey) ToHex() string {
+	return hex.EncodeToString(key[:])
+}
+
+func (key *NoiseSymmetricKey) FromHex(src string) error {
+	return loadExactHex(key[:], src)
+}
+
+func (key NoiseSymmetricKey) ToHex() string {
 	return hex.EncodeToString(key[:])
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"sync"
 )
 
@@ -15,4 +16,5 @@ type Peer struct {
 	mutex        sync.RWMutex
 	publicKey    NoisePublicKey
 	presharedKey NoiseSymmetricKey
+	endpoint     net.IP
 }

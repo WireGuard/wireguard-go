@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 )
 
 /* todo : use real error code
@@ -18,6 +19,7 @@ const (
 	ipcErrorInvalidPrivateKey = 3
 	ipcErrorInvalidPublicKey  = 4
 	ipcErrorInvalidPort       = 5
+	ipcErrorInvalidIPAddress  = 6
 )
 
 type IPCError struct {
@@ -104,6 +106,10 @@ func ipcSetOperation(dev *Device, socket *bufio.ReadWriter) *IPCError {
 			}
 
 		case "replace_peers":
+			if key == "true" {
+				dev.RemoveAllPeers()
+			}
+			// todo: else fail
 
 		default:
 			/* Peer configuration */
@@ -116,20 +122,27 @@ func ipcSetOperation(dev *Device, socket *bufio.ReadWriter) *IPCError {
 
 			case "remove":
 				peer.mutex.Lock()
-
+				dev.RemovePeer(peer.publicKey)
 				peer = nil
 
 			case "preshared_key":
-				func() {
+				err := func() error {
 					peer.mutex.Lock()
 					defer peer.mutex.Unlock()
+					return peer.presharedKey.FromHex(value)
 				}()
+				if err != nil {
+					return &IPCError{Code: ipcErrorInvalidPublicKey}
+				}
 
 			case "endpoint":
-				func() {
-					peer.mutex.Lock()
-					defer peer.mutex.Unlock()
-				}()
+				ip := net.ParseIP(value)
+				if ip == nil {
+					return &IPCError{Code: ipcErrorInvalidIPAddress}
+				}
+				peer.mutex.Lock()
+				peer.endpoint = ip
+				peer.mutex.Unlock()
 
 			case "persistent_keepalive_interval":
 				func() {
