@@ -12,7 +12,13 @@ const (
 	NumberOfTests     = 10000
 )
 
-type SlowRouter []*Trie
+type SlowNode struct {
+	peer *Peer
+	cidr uint
+	bits []byte
+}
+
+type SlowRouter []*SlowNode
 
 func (r SlowRouter) Len() int {
 	return len(r)
@@ -34,7 +40,7 @@ func (r SlowRouter) Insert(addr []byte, cidr uint, peer *Peer) SlowRouter {
 			return r
 		}
 	}
-	r = append(r, &Trie{
+	r = append(r, &SlowNode{
 		cidr: cidr,
 		bits: addr,
 		peer: peer,
@@ -81,7 +87,7 @@ func TestTrieRandomIPv4(t *testing.T) {
 		peer1 := slow.Lookup(addr[:])
 		peer2 := trie.Lookup(addr[:])
 		if peer1 != peer2 {
-			t.Error("Trie did not match niave implementation, for:", addr)
+			t.Error("Trie did not match naive implementation, for:", addr)
 		}
 	}
 }
@@ -114,7 +120,7 @@ func TestTrieRandomIPv6(t *testing.T) {
 		peer1 := slow.Lookup(addr[:])
 		peer2 := trie.Lookup(addr[:])
 		if peer1 != peer2 {
-			t.Error("Trie did not match niave implementation, for:", addr)
+			t.Error("Trie did not match naive implementation, for:", addr)
 		}
 	}
 }
