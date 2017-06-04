@@ -3,6 +3,7 @@ package main
 import (
 	"net"
 	"sync"
+	"time"
 )
 
 type KeyPair struct {
@@ -13,8 +14,9 @@ type KeyPair struct {
 }
 
 type Peer struct {
-	mutex        sync.RWMutex
-	publicKey    NoisePublicKey
-	presharedKey NoiseSymmetricKey
-	endpoint     net.IP
+	mutex                       sync.RWMutex
+	publicKey                   NoisePublicKey
+	presharedKey                NoiseSymmetricKey
+	endpoint                    net.IP
+	persistentKeepaliveInterval time.Duration
 }

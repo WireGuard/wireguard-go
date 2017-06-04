@@ -7,6 +7,8 @@ import (
 	"io"
 	"log"
 	"net"
+	"strconv"
+	"time"
 )
 
 /* todo : use real error code
@@ -16,6 +18,7 @@ const (
 	ipcErrorNoPeer            = 0
 	ipcErrorNoKeyValue        = 1
 	ipcErrorInvalidKey        = 2
+	ipcErrorInvalidValue      = 2
 	ipcErrorInvalidPrivateKey = 3
 	ipcErrorInvalidPublicKey  = 4
 	ipcErrorInvalidPort       = 5
@@ -34,18 +37,16 @@ func (s *IPCError) ErrorCode() int {
 	return s.Code
 }
 
-// Writes the configuration to the socket
 func ipcGetOperation(socket *bufio.ReadWriter, dev *Device) {
 
 }
 
-// Creates new config, from old and socket message
-func ipcSetOperation(dev *Device, socket *bufio.ReadWriter) *IPCError {
+func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 	scanner := bufio.NewScanner(socket)
 
-	dev.mutex.Lock()
-	defer dev.mutex.Unlock()
+	device.mutex.Lock()
+	defer device.mutex.Unlock()
 
 	for scanner.Scan() {
 		var key string
@@ -71,16 +72,16 @@ func ipcSetOperation(dev *Device, socket *bufio.ReadWriter) *IPCError {
 
 		case "private_key":
 			if value == "" {
-				dev.privateKey = NoisePrivateKey{}
+				device.privateKey = NoisePrivateKey{}
 			} else {
-				err := dev.privateKey.FromHex(value)
+				err := device.privateKey.FromHex(value)
 				if err != nil {
 					return &IPCError{Code: ipcErrorInvalidPrivateKey}
 				}
 			}
 
 		case "listen_port":
-			_, err := fmt.Sscanf(value, "%ud", &dev.listenPort)
+			_, err := fmt.Sscanf(value, "%ud", &device.listenPort)
 			if err != nil {
 				return &IPCError{Code: ipcErrorInvalidPort}
 			}
@@ -94,7 +95,7 @@ func ipcSetOperation(dev *Device, socket *bufio.ReadWriter) *IPCError {
 			if err != nil {
 				return &IPCError{Code: ipcErrorInvalidPublicKey}
 			}
-			found, ok := dev.peers[pubKey]
+			found, ok := device.peers[pubKey]
 			if ok {
 				peer = found
 			} else {
@@ -102,14 +103,16 @@ func ipcSetOperation(dev *Device, socket *bufio.ReadWriter) *IPCError {
 					publicKey: pubKey,
 				}
 				peer = newPeer
-				dev.peers[pubKey] = newPeer
+				device.peers[pubKey] = newPeer
 			}
 
 		case "replace_peers":
 			if key == "true" {
-				dev.RemoveAllPeers()
+				device.RemoveAllPeers()
+			} else if key == "false" {
+			} else {
+				return &IPCError{Code: ipcErrorInvalidValue}
 			}
-			// todo: else fail
 
 		default:
 			/* Peer configuration */
@@ -122,7 +125,7 @@ func ipcSetOperation(dev *Device, socket *bufio.ReadWriter) *IPCError {
 
 			case "remove":
 				peer.mutex.Lock()
-				dev.RemovePeer(peer.publicKey)
+				device.RemovePeer(peer.publicKey)
 				peer = nil
 
 			case "preshared_key":
@@ -145,15 +148,29 @@ func ipcSetOperation(dev *Device, socket *bufio.ReadWriter) *IPCError {
 				peer.mutex.Unlock()
 
 			case "persistent_keepalive_interval":
-				func() {
-					peer.mutex.Lock()
-					defer peer.mutex.Unlock()
-				}()
+				secs, err := strconv.ParseInt(value, 10, 64)
+				if secs < 0 || err != nil {
+					return &IPCError{Code: ipcErrorInvalidValue}
+				}
+				peer.mutex.Lock()
+				peer.persistentKeepaliveInterval = time.Duration(secs) * time.Second
+				peer.mutex.Unlock()
 
 			case "replace_allowed_ips":
-				// remove peer from trie
+				if key == "true" {
+					device.routingTable.RemovePeer(peer)
+				} else if key == "false" {
+				} else {
+					return &IPCError{Code: ipcErrorInvalidValue}
+				}
 
 			case "allowed_ip":
+				_, network, err := net.ParseCIDR(value)
+				if err != nil {
+					return &IPCError{Code: ipcErrorInvalidValue}
+				}
+				ones, _ := network.Mask.Size()
+				device.routingTable.Insert(network.IP, uint(ones), peer)
 
 			/* Invalid key */
 

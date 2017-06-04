@@ -1,6 +1,8 @@
 package main
 
 import (
+	"math/rand"
+	"net"
 	"testing"
 )
 
@@ -55,6 +57,49 @@ func TestCommonBits(t *testing.T) {
 	}
 }
 
+func benchmarkTrie(peerNumber int, addressNumber int, addressLength int, b *testing.B) {
+	var trie *Trie
+	var peers []*Peer
+
+	rand.Seed(1)
+
+	const AddressLength = 4
+
+	for n := 0; n < peerNumber; n += 1 {
+		peers = append(peers, &Peer{})
+	}
+
+	for n := 0; n < addressNumber; n += 1 {
+		var addr [AddressLength]byte
+		rand.Read(addr[:])
+		cidr := uint(rand.Uint32() % (AddressLength * 8))
+		index := rand.Int() % peerNumber
+		trie = trie.Insert(addr[:], cidr, peers[index])
+	}
+
+	for n := 0; n < b.N; n += 1 {
+		var addr [AddressLength]byte
+		rand.Read(addr[:])
+		trie.Lookup(addr[:])
+	}
+}
+
+func BenchmarkTrieIPv4Peers100Addresses1000(b *testing.B) {
+	benchmarkTrie(100, 1000, net.IPv4len, b)
+}
+
+func BenchmarkTrieIPv4Peers10Addresses10(b *testing.B) {
+	benchmarkTrie(10, 10, net.IPv4len, b)
+}
+
+func BenchmarkTrieIPv6Peers100Addresses1000(b *testing.B) {
+	benchmarkTrie(100, 1000, net.IPv6len, b)
+}
+
+func BenchmarkTrieIPv6Peers10Addresses10(b *testing.B) {
+	benchmarkTrie(10, 10, net.IPv6len, b)
+}
+
 /* Test ported from kernel implementation:
  * selftest/routingtable.h
  */
@@ -91,10 +136,10 @@ func TestTrieIPv4(t *testing.T) {
 	insert(b, 192, 168, 4, 4, 32)
 	insert(c, 192, 168, 0, 0, 16)
 	insert(d, 192, 95, 5, 64, 27)
-	insert(c, 192, 95, 5, 65, 27) /* replaces previous entry, and maskself is required */
+	insert(c, 192, 95, 5, 65, 27)
 	insert(e, 0, 0, 0, 0, 0)
 	insert(g, 64, 15, 112, 0, 20)
-	insert(h, 64, 15, 123, 211, 25) /* maskself is required */
+	insert(h, 64, 15, 123, 211, 25)
 	insert(a, 10, 0, 0, 0, 25)
 	insert(b, 10, 0, 0, 128, 25)
 	insert(a, 10, 1, 0, 0, 30)
@@ -185,20 +230,6 @@ func TestTrieIPv6(t *testing.T) {
 			t.Error("Assert EQ failed")
 		}
 	}
-
-	/*
-		assertNEQ := func(peer *Peer, a, b, c, d uint32) {
-			var addr []byte
-			addr = append(addr, expand(a)...)
-			addr = append(addr, expand(b)...)
-			addr = append(addr, expand(c)...)
-			addr = append(addr, expand(d)...)
-			p := trie.Lookup(addr)
-			if p == peer {
-				t.Error("Assert NEQ failed")
-			}
-		}
-	*/
 
 	insert(d, 0x26075300, 0x60006b00, 0, 0xc05f0543, 128)
 	insert(c, 0x26075300, 0x60006b00, 0, 0, 64)
