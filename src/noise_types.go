@@ -12,10 +12,8 @@ const (
 )
 
 type (
-	NoisePublicKey    [NoisePublicKeySize]byte
-	NoisePrivateKey   [NoisePrivateKeySize]byte
-	NoiseSymmetricKey [NoiseSymmetricKeySize]byte
-	NoiseNonce        uint64 // padded to 12-bytes
+	NoisePublicKey  [NoisePublicKeySize]byte
+	NoisePrivateKey [NoisePrivateKeySize]byte
 )
 
 func loadExactHex(dst []byte, src string) error {
