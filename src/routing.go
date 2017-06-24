@@ -13,6 +13,13 @@ type RoutingTable struct {
 	mutex sync.RWMutex
 }
 
+func (table *RoutingTable) Reset() {
+	table.mutex.Lock()
+	defer table.mutex.Unlock()
+	table.IPv4 = nil
+	table.IPv6 = nil
+}
+
 func (table *RoutingTable) RemovePeer(peer *Peer) {
 	table.mutex.Lock()
 	defer table.mutex.Unlock()

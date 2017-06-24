@@ -99,11 +99,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 			if ok {
 				peer = found
 			} else {
-				newPeer := &Peer{
-					publicKey: pubKey,
-				}
-				peer = newPeer
-				device.peers[pubKey] = newPeer
+				peer = device.NewPeer(pubKey)
 			}
 
 		case "replace_peers":
@@ -125,14 +121,14 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 			case "remove":
 				peer.mutex.Lock()
-				device.RemovePeer(peer.publicKey)
+				// device.RemovePeer(peer.publicKey)
 				peer = nil
 
 			case "preshared_key":
 				err := func() error {
 					peer.mutex.Lock()
 					defer peer.mutex.Unlock()
-					return peer.presharedKey.FromHex(value)
+					return peer.handshake.presharedKey.FromHex(value)
 				}()
 				if err != nil {
 					return &IPCError{Code: ipcErrorInvalidPublicKey}
@@ -144,7 +140,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					return &IPCError{Code: ipcErrorInvalidIPAddress}
 				}
 				peer.mutex.Lock()
-				peer.endpoint = ip
+				// peer.endpoint = ip FIX
 				peer.mutex.Unlock()
 
 			case "persistent_keepalive_interval":

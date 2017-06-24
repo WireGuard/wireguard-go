@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
 	"time"
 )
@@ -20,4 +21,8 @@ func Timestamp() TAI64N {
 	binary.BigEndian.PutUint64(tai64n[:], secs)
 	binary.BigEndian.PutUint32(tai64n[8:], nano)
 	return tai64n
+}
+
+func (t1 *TAI64N) After(t2 TAI64N) bool {
+	return bytes.Compare(t1[:], t2[:]) > 0
 }

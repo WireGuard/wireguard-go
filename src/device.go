@@ -1,17 +1,13 @@
 package main
 
 import (
-	"math/rand"
 	"sync"
 )
-
-/* TODO: Locking may be a little broad here
- */
 
 type Device struct {
 	mutex        sync.RWMutex
 	peers        map[NoisePublicKey]*Peer
-	sessions     map[uint32]*Handshake
+	indices      IndexTable
 	privateKey   NoisePrivateKey
 	publicKey    NoisePublicKey
 	fwMark       uint32
@@ -19,43 +15,66 @@ type Device struct {
 	routingTable RoutingTable
 }
 
-func (dev *Device) NewID(h *Handshake) uint32 {
-	dev.mutex.Lock()
-	defer dev.mutex.Unlock()
-	for {
-		id := rand.Uint32()
-		_, ok := dev.sessions[id]
-		if !ok {
-			dev.sessions[id] = h
-			return id
-		}
+func (device *Device) SetPrivateKey(sk NoisePrivateKey) {
+	device.mutex.Lock()
+	defer device.mutex.Unlock()
+
+	// update key material
+
+	device.privateKey = sk
+	device.publicKey = sk.publicKey()
+
+	// do precomputations
+
+	for _, peer := range device.peers {
+		h := &peer.handshake
+		h.mutex.Lock()
+		h.precomputedStaticStatic = device.privateKey.sharedSecret(h.remoteStatic)
+		h.mutex.Unlock()
 	}
 }
 
-func (dev *Device) RemovePeer(key NoisePublicKey) {
-	dev.mutex.Lock()
-	defer dev.mutex.Unlock()
-	peer, ok := dev.peers[key]
+func (device *Device) Init() {
+	device.mutex.Lock()
+	defer device.mutex.Unlock()
+
+	device.peers = make(map[NoisePublicKey]*Peer)
+	device.indices.Init()
+	device.listenPort = 0
+	device.routingTable.Reset()
+}
+
+func (device *Device) LookupPeer(pk NoisePublicKey) *Peer {
+	device.mutex.RLock()
+	defer device.mutex.RUnlock()
+	return device.peers[pk]
+}
+
+func (device *Device) RemovePeer(key NoisePublicKey) {
+	device.mutex.Lock()
+	defer device.mutex.Unlock()
+
+	peer, ok := device.peers[key]
 	if !ok {
 		return
 	}
 	peer.mutex.Lock()
-	dev.routingTable.RemovePeer(peer)
-	delete(dev.peers, key)
+	device.routingTable.RemovePeer(peer)
+	delete(device.peers, key)
 }
 
-func (dev *Device) RemoveAllAllowedIps(peer *Peer) {
+func (device *Device) RemoveAllAllowedIps(peer *Peer) {
 
 }
 
-func (dev *Device) RemoveAllPeers() {
-	dev.mutex.Lock()
-	defer dev.mutex.Unlock()
+func (device *Device) RemoveAllPeers() {
+	device.mutex.Lock()
+	defer device.mutex.Unlock()
 
-	for key, peer := range dev.peers {
+	for key, peer := range device.peers {
 		peer.mutex.Lock()
-		dev.routingTable.RemovePeer(peer)
-		delete(dev.peers, key)
+		device.routingTable.RemovePeer(peer)
+		delete(device.peers, key)
 		peer.mutex.Unlock()
 	}
 }
