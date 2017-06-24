@@ -7,12 +7,14 @@ import (
 
 /* Index=0 is reserved for unset indecies
  *
+ * TODO: Rethink map[id] -> peer VS map[id] -> handshake and handshake <ref> peer
+ *
  */
 
 type IndexTable struct {
 	mutex      sync.RWMutex
 	keypairs   map[uint32]*KeyPair
-	handshakes map[uint32]*Handshake
+	handshakes map[uint32]*Peer
 }
 
 func randUint32() (uint32, error) {
@@ -32,10 +34,10 @@ func (table *IndexTable) Init() {
 	table.mutex.Lock()
 	defer table.mutex.Unlock()
 	table.keypairs = make(map[uint32]*KeyPair)
-	table.handshakes = make(map[uint32]*Handshake)
+	table.handshakes = make(map[uint32]*Peer)
 }
 
-func (table *IndexTable) NewIndex(handshake *Handshake) (uint32, error) {
+func (table *IndexTable) NewIndex(peer *Peer) (uint32, error) {
 	table.mutex.Lock()
 	defer table.mutex.Unlock()
 	for {
@@ -60,11 +62,10 @@ func (table *IndexTable) NewIndex(handshake *Handshake) (uint32, error) {
 			continue
 		}
 
-		// update the index
+		// clean old index
 
-		delete(table.handshakes, handshake.localIndex)
-		handshake.localIndex = id
-		table.handshakes[id] = handshake
+		delete(table.handshakes, peer.handshake.localIndex)
+		table.handshakes[id] = peer
 		return id, nil
 	}
 }
@@ -75,7 +76,7 @@ func (table *IndexTable) LookupKeyPair(id uint32) *KeyPair {
 	return table.keypairs[id]
 }
 
-func (table *IndexTable) LookupHandshake(id uint32) *Handshake {
+func (table *IndexTable) LookupHandshake(id uint32) *Peer {
 	table.mutex.RLock()
 	defer table.mutex.RUnlock()
 	return table.handshakes[id]

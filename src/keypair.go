@@ -5,8 +5,8 @@ import (
 )
 
 type KeyPair struct {
-	recieveKey   cipher.AEAD
-	recieveNonce NoiseNonce
-	sendKey      cipher.AEAD
-	sendNonce    NoiseNonce
+	recv      cipher.AEAD
+	recvNonce NoiseNonce
+	send      cipher.AEAD
+	sendNonce NoiseNonce
 }

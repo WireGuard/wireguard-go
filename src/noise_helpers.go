@@ -45,22 +45,7 @@ func KDF3(key []byte, input []byte) (t0 [blake2s.Size]byte, t1 [blake2s.Size]byt
 	return
 }
 
-/*
- *
- */
-
-func addToChainKey(c [blake2s.Size]byte, data []byte) [blake2s.Size]byte {
-	return KDF1(c[:], data)
-}
-
-func addToHash(h [blake2s.Size]byte, data []byte) [blake2s.Size]byte {
-	return blake2s.Sum256(append(h[:], data...))
-}
-
-/* Curve25519 wrappers
- *
- * TODO: Rethink this
- */
+/* curve25519 wrappers */
 
 func newPrivateKey() (sk NoisePrivateKey, err error) {
 	// clamping: https://cr.yp.to/ecdh.html

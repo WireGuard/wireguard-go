@@ -63,7 +63,9 @@ func TestNoiseHandshake(t *testing.T) {
 
 	/* simulate handshake */
 
-	// Initiation message
+	// initiation message
+
+	t.Log("exchange initiation message")
 
 	msg1, err := dev1.CreateMessageInitial(peer2)
 	assertNil(t, err)
@@ -88,6 +90,68 @@ func TestNoiseHandshake(t *testing.T) {
 		peer2.handshake.hash[:],
 	)
 
-	// Response message
+	// response message
 
+	t.Log("exchange response message")
+
+	msg2, err := dev2.CreateMessageResponse(peer1)
+	assertNil(t, err)
+
+	peer = dev1.ConsumeMessageResponse(msg2)
+	if peer == nil {
+		t.Fatal("handshake failed at response message")
+	}
+
+	assertEqual(
+		t,
+		peer1.handshake.chainKey[:],
+		peer2.handshake.chainKey[:],
+	)
+
+	assertEqual(
+		t,
+		peer1.handshake.hash[:],
+		peer2.handshake.hash[:],
+	)
+
+	// key pairs
+
+	t.Log("deriving keys")
+
+	key1 := peer1.NewKeyPair()
+	key2 := peer2.NewKeyPair()
+
+	if key1 == nil {
+		t.Fatal("failed to dervice key-pair for peer 1")
+	}
+
+	if key2 == nil {
+		t.Fatal("failed to dervice key-pair for peer 2")
+	}
+
+	// encrypting / decryption test
+
+	t.Log("test key pairs")
+
+	func() {
+		testMsg := []byte("wireguard test message 1")
+		var err error
+		var out []byte
+		var nonce [12]byte
+		out = key1.send.Seal(out, nonce[:], testMsg, nil)
+		out, err = key2.recv.Open(out[:0], nonce[:], out, nil)
+		assertNil(t, err)
+		assertEqual(t, out, testMsg)
+	}()
+
+	func() {
+		testMsg := []byte("wireguard test message 2")
+		var err error
+		var out []byte
+		var nonce [12]byte
+		out = key2.send.Seal(out, nonce[:], testMsg, nil)
+		out, err = key1.recv.Open(out[:0], nonce[:], out, nil)
+		assertNil(t, err)
+		assertEqual(t, out, testMsg)
+	}()
 }
