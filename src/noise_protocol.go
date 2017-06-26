@@ -120,13 +120,15 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 		return nil, err
 	}
 
+	device.indices.ClearIndex(handshake.localIndex)
+	handshake.localIndex, err = device.indices.NewIndex(peer)
+
 	// assign index
 
 	var msg MessageInitiation
 
 	msg.Type = MessageInitiationType
 	msg.Ephemeral = handshake.localEphemeral.publicKey()
-	handshake.localIndex, err = device.indices.NewIndex(peer)
 
 	if err != nil {
 		return nil, err
@@ -249,6 +251,7 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 	// assign index
 
 	var err error
+	device.indices.ClearIndex(handshake.localIndex)
 	handshake.localIndex, err = device.indices.NewIndex(peer)
 	if err != nil {
 		return nil, err
@@ -299,11 +302,12 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 
 	// lookup handshake by reciever
 
-	peer := device.indices.LookupHandshake(msg.Reciever)
-	if peer == nil {
+	lookup := device.indices.Lookup(msg.Reciever)
+	handshake := lookup.handshake
+	if handshake == nil {
 		return nil
 	}
-	handshake := &peer.handshake
+
 	handshake.mutex.Lock()
 	defer handshake.mutex.Unlock()
 	if handshake.state != HandshakeInitiationCreated {
@@ -345,7 +349,7 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 	handshake.remoteIndex = msg.Sender
 	handshake.state = HandshakeResponseConsumed
 
-	return peer
+	return lookup.peer
 }
 
 func (peer *Peer) NewKeyPair() *KeyPair {
@@ -355,13 +359,16 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 
 	// derive keys
 
+	var isInitiator bool
 	var sendKey [chacha20poly1305.KeySize]byte
 	var recvKey [chacha20poly1305.KeySize]byte
 
 	if handshake.state == HandshakeResponseConsumed {
 		sendKey, recvKey = KDF2(handshake.chainKey[:], nil)
+		isInitiator = true
 	} else if handshake.state == HandshakeResponseCreated {
 		recvKey, sendKey = KDF2(handshake.chainKey[:], nil)
+		isInitiator = false
 	} else {
 		return nil
 	}
@@ -369,16 +376,40 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 	// create AEAD instances
 
 	var keyPair KeyPair
+
 	keyPair.send, _ = chacha20poly1305.New(sendKey[:])
 	keyPair.recv, _ = chacha20poly1305.New(recvKey[:])
 	keyPair.sendNonce = 0
 	keyPair.recvNonce = 0
+
+	// remap index
+
+	peer.device.indices.Insert(handshake.localIndex, IndexTableEntry{
+		peer:      peer,
+		keyPair:   &keyPair,
+		handshake: nil,
+	})
+	handshake.localIndex = 0
+
+	// rotate key pairs
+
+	func() {
+		kp := &peer.keyPairs
+		kp.mutex.Lock()
+		defer kp.mutex.Unlock()
+		if isInitiator {
+			kp.previous = peer.keyPairs.current
+			kp.current = &keyPair
+			kp.newKeyPair <- true
+		} else {
+			kp.next = &keyPair
+		}
+	}()
 
 	// zero handshake
 
 	handshake.chainKey = [blake2s.Size]byte{}
 	handshake.localEphemeral = NoisePrivateKey{}
 	peer.handshake.state = HandshakeZeroed
-
 	return &keyPair
 }

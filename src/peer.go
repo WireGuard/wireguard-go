@@ -14,8 +14,7 @@ const (
 
 type Peer struct {
 	mutex                       sync.RWMutex
-	endpointIP                  net.IP        //
-	endpointPort                uint16        //
+	endpoint                    *net.UDPAddr
 	persistentKeepaliveInterval time.Duration // 0 = disabled
 	keyPairs                    KeyPairs
 	handshake                   Handshake
@@ -35,6 +34,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 
 	peer.mutex.Lock()
 	peer.device = device
+	peer.keyPairs.Init()
 	peer.queueOutbound = make(chan *OutboundWorkQueueElement, OutboundQueueSize)
 
 	// map public key

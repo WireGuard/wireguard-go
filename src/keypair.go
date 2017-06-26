@@ -16,6 +16,18 @@ type KeyPairs struct {
 	mutex      sync.RWMutex
 	current    *KeyPair
 	previous   *KeyPair
-	next       *KeyPair
-	newKeyPair chan bool
+	next       *KeyPair  // not yet "confirmed by transport"
+	newKeyPair chan bool // signals when "current" has been updated
+}
+
+func (kp *KeyPairs) Init() {
+	kp.mutex.Lock()
+	kp.newKeyPair = make(chan bool, 5)
+	kp.mutex.Unlock()
+}
+
+func (kp *KeyPairs) Current() *KeyPair {
+	kp.mutex.RLock()
+	defer kp.mutex.RUnlock()
+	return kp.current
 }

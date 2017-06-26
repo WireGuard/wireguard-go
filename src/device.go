@@ -2,11 +2,14 @@ package main
 
 import (
 	"log"
+	"net"
 	"sync"
 )
 
 type Device struct {
 	mtu               int
+	source            *net.UDPAddr // UDP source address
+	conn              *net.UDPConn // UDP "connection"
 	mutex             sync.RWMutex
 	peers             map[NoisePublicKey]*Peer
 	indices           IndexTable
