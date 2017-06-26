@@ -67,13 +67,13 @@ func TestNoiseHandshake(t *testing.T) {
 
 	t.Log("exchange initiation message")
 
-	msg1, err := dev1.CreateMessageInitial(peer2)
+	msg1, err := dev1.CreateMessageInitiation(peer2)
 	assertNil(t, err)
 
 	packet := make([]byte, 0, 256)
 	writer := bytes.NewBuffer(packet)
 	err = binary.Write(writer, binary.LittleEndian, msg1)
-	peer := dev2.ConsumeMessageInitial(msg1)
+	peer := dev2.ConsumeMessageInitiation(msg1)
 	if peer == nil {
 		t.Fatal("handshake failed at initiation message")
 	}

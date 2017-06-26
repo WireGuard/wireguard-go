@@ -1,9 +1,15 @@
 package main
 
 import (
+	"errors"
+	"golang.org/x/crypto/blake2s"
 	"net"
 	"sync"
 	"time"
+)
+
+const (
+	OutboundQueueSize = 64
 )
 
 type Peer struct {
@@ -11,29 +17,48 @@ type Peer struct {
 	endpointIP                  net.IP        //
 	endpointPort                uint16        //
 	persistentKeepaliveInterval time.Duration // 0 = disabled
+	keyPairs                    KeyPairs
 	handshake                   Handshake
 	device                      *Device
+	macKey                      [blake2s.Size]byte // Hash(Label-Mac1 || publicKey)
+	cookie                      []byte             // cookie
+	cookieExpire                time.Time
+	queueInbound                chan []byte
+	queueOutbound               chan *OutboundWorkQueueElement
+	queueOutboundRouting        chan []byte
 }
 
 func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 	var peer Peer
 
-	// map public key
-
-	device.mutex.Lock()
-	device.peers[pk] = &peer
-	device.mutex.Unlock()
-
-	// precompute
+	// create peer
 
 	peer.mutex.Lock()
 	peer.device = device
-	func(h *Handshake) {
-		h.mutex.Lock()
-		h.remoteStatic = pk
-		h.precomputedStaticStatic = device.privateKey.sharedSecret(h.remoteStatic)
-		h.mutex.Unlock()
-	}(&peer.handshake)
+	peer.queueOutbound = make(chan *OutboundWorkQueueElement, OutboundQueueSize)
+
+	// map public key
+
+	device.mutex.Lock()
+	_, ok := device.peers[pk]
+	if ok {
+		panic(errors.New("bug: adding existing peer"))
+	}
+	device.peers[pk] = &peer
+	device.mutex.Unlock()
+
+	// precompute DH
+
+	handshake := &peer.handshake
+	handshake.mutex.Lock()
+	handshake.remoteStatic = pk
+	handshake.precomputedStaticStatic = device.privateKey.sharedSecret(handshake.remoteStatic)
+
+	// compute mac key
+
+	peer.macKey = blake2s.Sum256(append([]byte(WGLabelMAC1[:]), handshake.remoteStatic[:]...))
+
+	handshake.mutex.Unlock()
 	peer.mutex.Unlock()
 
 	return &peer

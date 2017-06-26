@@ -1,6 +1,8 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func main() {
 	fd, err := CreateTUN("test0")
@@ -8,9 +10,9 @@ func main() {
 
 	queue := make(chan []byte, 1000)
 
-	var device Device
+	// var device Device
 
-	go OutgoingRoutingWorker(&device, queue)
+	// go OutgoingRoutingWorker(&device, queue)
 
 	for {
 		tmp := make([]byte, 1<<16)

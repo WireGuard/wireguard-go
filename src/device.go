@@ -1,18 +1,22 @@
 package main
 
 import (
+	"log"
 	"sync"
 )
 
 type Device struct {
-	mutex        sync.RWMutex
-	peers        map[NoisePublicKey]*Peer
-	indices      IndexTable
-	privateKey   NoisePrivateKey
-	publicKey    NoisePublicKey
-	fwMark       uint32
-	listenPort   uint16
-	routingTable RoutingTable
+	mtu               int
+	mutex             sync.RWMutex
+	peers             map[NoisePublicKey]*Peer
+	indices           IndexTable
+	privateKey        NoisePrivateKey
+	publicKey         NoisePublicKey
+	fwMark            uint32
+	listenPort        uint16
+	routingTable      RoutingTable
+	logger            log.Logger
+	queueWorkOutbound chan *OutboundWorkQueueElement
 }
 
 func (device *Device) SetPrivateKey(sk NoisePrivateKey) {

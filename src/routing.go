@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"sync"
 )
@@ -51,26 +50,4 @@ func (table *RoutingTable) LookupIPv6(address []byte) *Peer {
 	table.mutex.RLock()
 	defer table.mutex.RUnlock()
 	return table.IPv6.Lookup(address)
-}
-
-func OutgoingRoutingWorker(device *Device, queue chan []byte) {
-	for {
-		packet := <-queue
-		switch packet[0] >> 4 {
-
-		case IPv4version:
-			dst := packet[IPv4offsetDst : IPv4offsetDst+net.IPv4len]
-			peer := device.routingTable.LookupIPv4(dst)
-			fmt.Println("IPv4", peer)
-
-		case IPv6version:
-			dst := packet[IPv6offsetDst : IPv6offsetDst+net.IPv6len]
-			peer := device.routingTable.LookupIPv6(dst)
-			fmt.Println("IPv6", peer)
-
-		default:
-			// todo: log
-			fmt.Println("Unknown IP version")
-		}
-	}
 }
