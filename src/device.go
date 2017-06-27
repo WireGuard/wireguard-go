@@ -1,25 +1,24 @@
 package main
 
 import (
-	"log"
 	"net"
 	"sync"
 )
 
 type Device struct {
 	mtu               int
-	source            *net.UDPAddr // UDP source address
+	fwMark            uint32
+	address           *net.UDPAddr // UDP source address
 	conn              *net.UDPConn // UDP "connection"
 	mutex             sync.RWMutex
-	peers             map[NoisePublicKey]*Peer
-	indices           IndexTable
 	privateKey        NoisePrivateKey
 	publicKey         NoisePublicKey
-	fwMark            uint32
-	listenPort        uint16
 	routingTable      RoutingTable
-	logger            log.Logger
+	indices           IndexTable
+	log               *Logger
 	queueWorkOutbound chan *OutboundWorkQueueElement
+	peers             map[NoisePublicKey]*Peer
+	mac               MacStateDevice
 }
 
 func (device *Device) SetPrivateKey(sk NoisePrivateKey) {
@@ -30,8 +29,9 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) {
 
 	device.privateKey = sk
 	device.publicKey = sk.publicKey()
+	device.mac.Init(device.publicKey)
 
-	// do precomputations
+	// do DH precomputations
 
 	for _, peer := range device.peers {
 		h := &peer.handshake
@@ -45,9 +45,9 @@ func (device *Device) Init() {
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
 
+	device.log = NewLogger()
 	device.peers = make(map[NoisePublicKey]*Peer)
 	device.indices.Init()
-	device.listenPort = 0
 	device.routingTable.Reset()
 }
 

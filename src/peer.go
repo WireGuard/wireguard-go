@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"golang.org/x/crypto/blake2s"
 	"net"
 	"sync"
 	"time"
@@ -19,12 +18,10 @@ type Peer struct {
 	keyPairs                    KeyPairs
 	handshake                   Handshake
 	device                      *Device
-	macKey                      [blake2s.Size]byte // Hash(Label-Mac1 || publicKey)
-	cookie                      []byte             // cookie
-	cookieExpire                time.Time
 	queueInbound                chan []byte
 	queueOutbound               chan *OutboundWorkQueueElement
 	queueOutboundRouting        chan []byte
+	mac                         MacStatePeer
 }
 
 func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
@@ -35,6 +32,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 	peer.mutex.Lock()
 	peer.device = device
 	peer.keyPairs.Init()
+	peer.mac.Init(pk)
 	peer.queueOutbound = make(chan *OutboundWorkQueueElement, OutboundQueueSize)
 
 	// map public key
@@ -53,11 +51,6 @@ func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 	handshake.mutex.Lock()
 	handshake.remoteStatic = pk
 	handshake.precomputedStaticStatic = device.privateKey.sharedSecret(handshake.remoteStatic)
-
-	// compute mac key
-
-	peer.macKey = blake2s.Sum256(append([]byte(WGLabelMAC1[:]), handshake.remoteStatic[:]...))
-
 	handshake.mutex.Unlock()
 	peer.mutex.Unlock()
 

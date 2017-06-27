@@ -81,7 +81,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 			}
 
 		case "listen_port":
-			_, err := fmt.Sscanf(value, "%ud", &device.listenPort)
+			_, err := fmt.Sscanf(value, "%ud", &device.address.Port)
 			if err != nil {
 				return &IPCError{Code: ipcErrorInvalidPort}
 			}

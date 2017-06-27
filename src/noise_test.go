@@ -18,6 +18,17 @@ func assertEqual(t *testing.T, a []byte, b []byte) {
 	}
 }
 
+func newDevice(t *testing.T) *Device {
+	var device Device
+	sk, err := newPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	device.Init()
+	device.SetPrivateKey(sk)
+	return &device
+}
+
 func TestCurveWrappers(t *testing.T) {
 	sk1, err := newPrivateKey()
 	assertNil(t, err)
@@ -34,17 +45,6 @@ func TestCurveWrappers(t *testing.T) {
 	if ss1 != ss2 {
 		t.Fatal("Failed to compute shared secet")
 	}
-}
-
-func newDevice(t *testing.T) *Device {
-	var device Device
-	sk, err := newPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	device.Init()
-	device.SetPrivateKey(sk)
-	return &device
 }
 
 func TestNoiseHandshake(t *testing.T) {

@@ -24,15 +24,20 @@ const (
 )
 
 const (
-	MessageInitiationType     = 1
-	MessageResponseType       = 2
-	MessageCookieResponseType = 3
-	MessageTransportType      = 4
+	MessageInitiationType  = 1
+	MessageResponseType    = 2
+	MessageCookieReplyType = 3
+	MessageTransportType   = 4
+)
+
+const (
+	MessageInitiationSize = 148
+	MessageResponseSize   = 92
 )
 
 /* Type is an 8-bit field, followed by 3 nul bytes,
  * by marshalling the messages in little-endian byteorder
- * we can treat these as a 32-bit int
+ * we can treat these as a 32-bit unsigned int (for now)
  *
  */
 
@@ -61,6 +66,13 @@ type MessageTransport struct {
 	Reciever uint32
 	Counter  uint64
 	Content  []byte
+}
+
+type MessageCookieReply struct {
+	Type     uint32
+	Receiver uint32
+	Nonce    [24]byte
+	Cookie   [blake2s.Size128 + poly1305.TagSize]byte
 }
 
 type Handshake struct {

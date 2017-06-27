@@ -3,13 +3,16 @@ package main
 import (
 	"crypto/cipher"
 	"sync"
+	"time"
 )
 
 type KeyPair struct {
-	recv      cipher.AEAD
-	recvNonce uint64
-	send      cipher.AEAD
-	sendNonce uint64
+	recv        cipher.AEAD
+	recvNonce   uint64
+	send        cipher.AEAD
+	sendNonce   uint64
+	isInitiator bool
+	created     time.Time
 }
 
 type KeyPairs struct {

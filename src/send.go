@@ -24,6 +24,10 @@ type OutboundWorkQueueElement struct {
 	keyPair *KeyPair
 }
 
+func (peer *Peer) HandshakeWorker(handshakeQueue []byte) {
+
+}
+
 func (device *Device) SendPacket(packet []byte) {
 
 	// lookup peer
@@ -39,7 +43,7 @@ func (device *Device) SendPacket(packet []byte) {
 		peer = device.routingTable.LookupIPv6(dst)
 
 	default:
-		device.logger.Println("unknown IP version")
+		device.log.Debug.Println("receieved packet with unknown IP version")
 		return
 	}
 
@@ -146,15 +150,13 @@ func (peer *Peer) RoutineOutboundNonceWorker() {
 func (peer *Peer) RoutineSequential() {
 	for work := range peer.queueOutbound {
 		work.wg.Wait()
-
-		// check if dropped ("ghost packet")
-
 		if work.packet == nil {
 			continue
 		}
-
-		//
-
+		if peer.endpoint == nil {
+			continue
+		}
+		peer.device.conn.WriteToUDP(work.packet, peer.endpoint)
 	}
 }
 
