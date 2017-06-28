@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-/* todo : use real error code
+/* TODO : use real error code
  * Many of which will be the same
  */
 const (
@@ -37,8 +37,55 @@ func (s *IPCError) ErrorCode() int {
 	return s.Code
 }
 
-func ipcGetOperation(socket *bufio.ReadWriter, dev *Device) {
+func ipcGetOperation(device *Device, socket *bufio.ReadWriter) error {
 
+	device.mutex.RLock()
+	defer device.mutex.RUnlock()
+
+	// create lines
+
+	lines := make([]string, 0, 100)
+	send := func(line string) {
+		lines = append(lines, line)
+	}
+
+	if !device.privateKey.IsZero() {
+		send("private_key=" + device.privateKey.ToHex())
+	}
+
+	if device.address != nil {
+		send(fmt.Sprintf("listen_port=%d", device.address.Port))
+	}
+
+	for _, peer := range device.peers {
+		func() {
+			peer.mutex.RLock()
+			defer peer.mutex.RUnlock()
+			send("public_key=" + peer.handshake.remoteStatic.ToHex())
+			send("preshared_key=" + peer.handshake.presharedKey.ToHex())
+			if peer.endpoint != nil {
+				send("endpoint=" + peer.endpoint.String())
+			}
+			send(fmt.Sprintf("tx_bytes=%d", peer.tx_bytes))
+			send(fmt.Sprintf("rx_bytes=%d", peer.rx_bytes))
+			send(fmt.Sprintf("persistent_keepalive_interval=%d", peer.persistentKeepaliveInterval))
+			for _, ip := range device.routingTable.AllowedIPs(peer) {
+				send("allowed_ip=" + ip.String())
+			}
+		}()
+	}
+
+	// send lines
+
+	for _, line := range lines {
+		device.log.Debug.Println("config:", line)
+		_, err := socket.WriteString(line + "\n")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
@@ -179,13 +226,15 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 	return nil
 }
 
-func ipcListen(dev *Device, socket io.ReadWriter) error {
+func ipcListen(device *Device, socket io.ReadWriter) error {
 
 	buffered := func(s io.ReadWriter) *bufio.ReadWriter {
 		reader := bufio.NewReader(s)
 		writer := bufio.NewWriter(s)
 		return bufio.NewReadWriter(reader, writer)
 	}(socket)
+
+	defer buffered.Flush()
 
 	for {
 		op, err := buffered.ReadString('\n')
@@ -197,17 +246,26 @@ func ipcListen(dev *Device, socket io.ReadWriter) error {
 		switch op {
 
 		case "set=1\n":
-			err := ipcSetOperation(dev, buffered)
+			err := ipcSetOperation(device, buffered)
 			if err != nil {
-				fmt.Fprintf(buffered, "errno=%d\n", err.ErrorCode())
+				fmt.Fprintf(buffered, "errno=%d\n\n", err.ErrorCode())
 				return err
 			} else {
-				fmt.Fprintf(buffered, "errno=0\n")
+				fmt.Fprintf(buffered, "errno=0\n\n")
 			}
 			buffered.Flush()
 
 		case "get=1\n":
+			err := ipcGetOperation(device, buffered)
+			if err != nil {
+				fmt.Fprintf(buffered, "errno=1\n\n") // fix
+				return err
+			} else {
+				fmt.Fprintf(buffered, "errno=0\n\n")
+			}
+			buffered.Flush()
 
+		case "\n":
 		default:
 			return errors.New("handle this please")
 		}

@@ -1,15 +1,20 @@
 package main
 
 import (
+	"errors"
 	"net"
 )
 
 /* Binary trie
  *
+ * The net.IPs used here are not formatted the
+ * same way as those created by the "net" functions.
+ * Here the IPs are slices of either 4 or 16 byte (not always 16)
+ *
  * Syncronization done seperatly
  * See: routing.go
  *
- * Todo: Better commenting
+ * TODO: Better commenting
  */
 
 type Trie struct {
@@ -24,7 +29,7 @@ type Trie struct {
 }
 
 /* Finds length of matching prefix
- * Maybe there is a faster way
+ * TODO: Make faster
  *
  * Assumption: len(ip1) == len(ip2)
  */
@@ -188,4 +193,26 @@ func (node *Trie) Count() uint {
 	l := node.child[0].Count()
 	r := node.child[1].Count()
 	return l + r
+}
+
+func (node *Trie) AllowedIPs(p *Peer, results []net.IPNet) {
+	if node.peer == p {
+		var mask net.IPNet
+		mask.Mask = net.CIDRMask(int(node.cidr), len(node.bits)*8)
+		if len(node.bits) == net.IPv4len {
+			mask.IP = net.IPv4(
+				node.bits[0],
+				node.bits[1],
+				node.bits[2],
+				node.bits[3],
+			)
+		} else if len(node.bits) == net.IPv6len {
+			mask.IP = node.bits
+		} else {
+			panic(errors.New("bug: unexpected address length"))
+		}
+		results = append(results, mask)
+	}
+	node.child[0].AllowedIPs(p, results)
+	node.child[1].AllowedIPs(p, results)
 }

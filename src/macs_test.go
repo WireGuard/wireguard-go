@@ -8,8 +8,8 @@ import (
 )
 
 func TestMAC1(t *testing.T) {
-	dev1 := newDevice(t)
-	dev2 := newDevice(t)
+	dev1 := randDevice(t)
+	dev2 := randDevice(t)
 
 	peer1 := dev2.NewPeer(dev1.privateKey.publicKey())
 	peer2 := dev1.NewPeer(dev2.privateKey.publicKey())
@@ -34,12 +34,10 @@ func TestMACs(t *testing.T) {
 		msg []byte,
 		receiver uint32,
 	) bool {
-		var device1 Device
-		device1.Init()
+		device1 := randDevice(t)
 		device1.SetPrivateKey(sk1)
 
-		var device2 Device
-		device2.Init()
+		device2 := randDevice(t)
 		device2.SetPrivateKey(sk2)
 
 		peer1 := device2.NewPeer(device1.privateKey.publicKey())

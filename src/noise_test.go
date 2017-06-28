@@ -6,29 +6,6 @@ import (
 	"testing"
 )
 
-func assertNil(t *testing.T, err error) {
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func assertEqual(t *testing.T, a []byte, b []byte) {
-	if bytes.Compare(a, b) != 0 {
-		t.Fatal(a, "!=", b)
-	}
-}
-
-func newDevice(t *testing.T) *Device {
-	var device Device
-	sk, err := newPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	device.Init()
-	device.SetPrivateKey(sk)
-	return &device
-}
-
 func TestCurveWrappers(t *testing.T) {
 	sk1, err := newPrivateKey()
 	assertNil(t, err)
@@ -49,8 +26,8 @@ func TestCurveWrappers(t *testing.T) {
 
 func TestNoiseHandshake(t *testing.T) {
 
-	dev1 := newDevice(t)
-	dev2 := newDevice(t)
+	dev1 := randDevice(t)
+	dev2 := randDevice(t)
 
 	peer1 := dev2.NewPeer(dev1.privateKey.publicKey())
 	peer2 := dev1.NewPeer(dev2.privateKey.publicKey())

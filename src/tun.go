@@ -1,6 +1,6 @@
 package main
 
-type TUN interface {
+type TUNDevice interface {
 	Read([]byte) (int, error)
 	Write([]byte) (int, error)
 	Name() string

@@ -12,9 +12,20 @@ type RoutingTable struct {
 	mutex sync.RWMutex
 }
 
+func (table *RoutingTable) AllowedIPs(peer *Peer) []net.IPNet {
+	table.mutex.RLock()
+	defer table.mutex.RUnlock()
+
+	allowed := make([]net.IPNet, 10)
+	table.IPv4.AllowedIPs(peer, allowed)
+	table.IPv6.AllowedIPs(peer, allowed)
+	return allowed
+}
+
 func (table *RoutingTable) Reset() {
 	table.mutex.Lock()
 	defer table.mutex.Unlock()
+
 	table.IPv4 = nil
 	table.IPv6 = nil
 }
@@ -22,6 +33,7 @@ func (table *RoutingTable) Reset() {
 func (table *RoutingTable) RemovePeer(peer *Peer) {
 	table.mutex.Lock()
 	defer table.mutex.Unlock()
+
 	table.IPv4 = table.IPv4.RemovePeer(peer)
 	table.IPv6 = table.IPv6.RemovePeer(peer)
 }

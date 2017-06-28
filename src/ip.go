@@ -5,9 +5,10 @@ import (
 )
 
 const (
-	IPv4version   = 4
-	IPv4offsetSrc = 12
-	IPv4offsetDst = IPv4offsetSrc + net.IPv4len
+	IPv4version    = 4
+	IPv4offsetSrc  = 12
+	IPv4offsetDst  = IPv4offsetSrc + net.IPv4len
+	IPv4headerSize = 20
 )
 
 const (

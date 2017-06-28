@@ -2,23 +2,26 @@ package main
 
 import (
 	"net"
+	"runtime"
 	"sync"
 )
 
 type Device struct {
-	mtu               int
-	fwMark            uint32
-	address           *net.UDPAddr // UDP source address
-	conn              *net.UDPConn // UDP "connection"
-	mutex             sync.RWMutex
-	privateKey        NoisePrivateKey
-	publicKey         NoisePublicKey
-	routingTable      RoutingTable
-	indices           IndexTable
-	log               *Logger
-	queueWorkOutbound chan *OutboundWorkQueueElement
-	peers             map[NoisePublicKey]*Peer
-	mac               MacStateDevice
+	mtu          int
+	fwMark       uint32
+	address      *net.UDPAddr // UDP source address
+	conn         *net.UDPConn // UDP "connection"
+	mutex        sync.RWMutex
+	privateKey   NoisePrivateKey
+	publicKey    NoisePublicKey
+	routingTable RoutingTable
+	indices      IndexTable
+	log          *Logger
+	queue        struct {
+		encryption chan *QueueOutboundElement // parallel work queue
+	}
+	peers map[NoisePublicKey]*Peer
+	mac   MacStateDevice
 }
 
 func (device *Device) SetPrivateKey(sk NoisePrivateKey) {
@@ -41,7 +44,9 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) {
 	}
 }
 
-func (device *Device) Init() {
+func NewDevice(tun TUNDevice) *Device {
+	device := new(Device)
+
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
 
@@ -49,6 +54,14 @@ func (device *Device) Init() {
 	device.peers = make(map[NoisePublicKey]*Peer)
 	device.indices.Init()
 	device.routingTable.Reset()
+
+	// start workers
+
+	for i := 0; i < runtime.NumCPU(); i += 1 {
+		go device.RoutineEncryption()
+	}
+	go device.RoutineReadFromTUN(tun)
+	return device
 }
 
 func (device *Device) LookupPeer(pk NoisePublicKey) *Peer {

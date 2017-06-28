@@ -9,9 +9,7 @@ import (
 	"unsafe"
 )
 
-/* Platform dependent functions for interacting with
- * TUN devices on linux systems
- *
+/* Implementation of the TUN device interface for linux
  */
 
 const CloneDevicePath = "/dev/net/tun"
@@ -45,7 +43,7 @@ func (tun *NativeTun) Read(d []byte) (int, error) {
 	return tun.fd.Read(d)
 }
 
-func CreateTUN(name string) (TUN, error) {
+func CreateTUN(name string) (TUNDevice, error) {
 	// Open clone device
 	fd, err := os.OpenFile(CloneDevicePath, os.O_RDWR, 0)
 	if err != nil {
@@ -53,7 +51,7 @@ func CreateTUN(name string) (TUN, error) {
 	}
 
 	// Prepare ifreq struct
-	var ifr [18]byte
+	var ifr [128]byte
 	var flags uint16 = IFF_TUN | IFF_NO_PI
 	nameBytes := []byte(name)
 	if len(nameBytes) >= IFNAMSIZ {
