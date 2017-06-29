@@ -61,9 +61,11 @@ func (peer *Peer) InsertOutbound(elem *QueueOutboundElement) {
  * Obs. Single instance per TUN device
  */
 func (device *Device) RoutineReadFromTUN(tun TUNDevice) {
+	device.log.Debug.Println("Routine, TUN Reader: started")
 	for {
 		// read packet
 
+		device.log.Debug.Println("Read")
 		packet := make([]byte, 1<<16) // TODO: Fix & avoid dynamic allocation
 		size, err := tun.Read(packet)
 		if err != nil {
@@ -76,8 +78,6 @@ func (device *Device) RoutineReadFromTUN(tun TUNDevice) {
 			continue
 		}
 
-		device.log.Debug.Println("New packet on TUN:", packet) // TODO: Slow debugging, remove.
-
 		// lookup peer
 
 		var peer *Peer
@@ -85,10 +85,12 @@ func (device *Device) RoutineReadFromTUN(tun TUNDevice) {
 		case IPv4version:
 			dst := packet[IPv4offsetDst : IPv4offsetDst+net.IPv4len]
 			peer = device.routingTable.LookupIPv4(dst)
+			device.log.Debug.Println("New IPv4 packet:", packet, dst)
 
 		case IPv6version:
 			dst := packet[IPv6offsetDst : IPv6offsetDst+net.IPv6len]
 			peer = device.routingTable.LookupIPv6(dst)
+			device.log.Debug.Println("New IPv6 packet:", packet, dst)
 
 		default:
 			device.log.Debug.Println("Receieved packet with unknown IP version")
@@ -97,7 +99,7 @@ func (device *Device) RoutineReadFromTUN(tun TUNDevice) {
 
 		if peer == nil {
 			device.log.Debug.Println("No peer configured for IP")
-			return
+			continue
 		}
 
 		// insert into nonce/pre-handshake queue

@@ -195,7 +195,10 @@ func (node *Trie) Count() uint {
 	return l + r
 }
 
-func (node *Trie) AllowedIPs(p *Peer, results []net.IPNet) {
+func (node *Trie) AllowedIPs(p *Peer, results []net.IPNet) []net.IPNet {
+	if node == nil {
+		return results
+	}
 	if node.peer == p {
 		var mask net.IPNet
 		mask.Mask = net.CIDRMask(int(node.cidr), len(node.bits)*8)
@@ -213,6 +216,7 @@ func (node *Trie) AllowedIPs(p *Peer, results []net.IPNet) {
 		}
 		results = append(results, mask)
 	}
-	node.child[0].AllowedIPs(p, results)
-	node.child[1].AllowedIPs(p, results)
+	results = node.child[0].AllowedIPs(p, results)
+	results = node.child[1].AllowedIPs(p, results)
+	return results
 }

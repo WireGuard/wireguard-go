@@ -16,9 +16,9 @@ func (table *RoutingTable) AllowedIPs(peer *Peer) []net.IPNet {
 	table.mutex.RLock()
 	defer table.mutex.RUnlock()
 
-	allowed := make([]net.IPNet, 10)
-	table.IPv4.AllowedIPs(peer, allowed)
-	table.IPv6.AllowedIPs(peer, allowed)
+	allowed := make([]net.IPNet, 0, 10)
+	allowed = table.IPv4.AllowedIPs(peer, allowed)
+	allowed = table.IPv6.AllowedIPs(peer, allowed)
 	return allowed
 }
 

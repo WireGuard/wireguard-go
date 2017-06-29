@@ -81,10 +81,7 @@ func (device *Device) RemovePeer(key NoisePublicKey) {
 	peer.mutex.Lock()
 	device.routingTable.RemovePeer(peer)
 	delete(device.peers, key)
-}
-
-func (device *Device) RemoveAllAllowedIps(peer *Peer) {
-
+	peer.Close()
 }
 
 func (device *Device) RemoveAllPeers() {
@@ -93,8 +90,7 @@ func (device *Device) RemoveAllPeers() {
 
 	for key, peer := range device.peers {
 		peer.mutex.Lock()
-		device.routingTable.RemovePeer(peer)
 		delete(device.peers, key)
-		peer.mutex.Unlock()
+		peer.Close()
 	}
 }
