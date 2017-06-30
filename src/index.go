@@ -41,7 +41,7 @@ func (table *IndexTable) Init() {
 	table.mutex.Unlock()
 }
 
-func (table *IndexTable) ClearIndex(index uint32) {
+func (table *IndexTable) Delete(index uint32) {
 	if index == 0 {
 		return
 	}

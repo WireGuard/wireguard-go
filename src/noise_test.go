@@ -25,9 +25,11 @@ func TestCurveWrappers(t *testing.T) {
 }
 
 func TestNoiseHandshake(t *testing.T) {
-
 	dev1 := randDevice(t)
 	dev2 := randDevice(t)
+
+	defer dev1.Close()
+	defer dev2.Close()
 
 	peer1 := dev2.NewPeer(dev1.privateKey.publicKey())
 	peer2 := dev1.NewPeer(dev2.privateKey.publicKey())

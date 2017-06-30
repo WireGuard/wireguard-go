@@ -31,8 +31,9 @@ const (
 )
 
 const (
-	MessageInitiationSize = 148
-	MessageResponseSize   = 92
+	MessageInitiationSize  = 148
+	MessageResponseSize    = 92
+	MessageCookieReplySize = 64
 )
 
 /* Type is an 8-bit field, followed by 3 nul bytes,
@@ -91,15 +92,10 @@ type Handshake struct {
 }
 
 var (
-	InitalChainKey [blake2s.Size]byte
-	InitalHash     [blake2s.Size]byte
-	ZeroNonce      [chacha20poly1305.NonceSize]byte
+	InitialChainKey [blake2s.Size]byte
+	InitialHash     [blake2s.Size]byte
+	ZeroNonce       [chacha20poly1305.NonceSize]byte
 )
-
-func init() {
-	InitalChainKey = blake2s.Sum256([]byte(NoiseConstruction))
-	InitalHash = blake2s.Sum256(append(InitalChainKey[:], []byte(WGIdentifier)...))
-}
 
 func mixKey(c [blake2s.Size]byte, data []byte) [blake2s.Size]byte {
 	return KDF1(c[:], data)
@@ -117,6 +113,13 @@ func (h *Handshake) mixKey(data []byte) {
 	h.chainKey = mixKey(h.chainKey, data)
 }
 
+/* Do basic precomputations
+ */
+func init() {
+	InitialChainKey = blake2s.Sum256([]byte(NoiseConstruction))
+	InitialHash = mixHash(InitialChainKey, []byte(WGIdentifier))
+}
+
 func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, error) {
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
@@ -125,28 +128,30 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 	// create ephemeral key
 
 	var err error
-	handshake.chainKey = InitalChainKey
-	handshake.hash = mixHash(InitalHash, handshake.remoteStatic[:])
+	handshake.hash = InitialHash
+	handshake.chainKey = InitialChainKey
 	handshake.localEphemeral, err = newPrivateKey()
 	if err != nil {
 		return nil, err
 	}
 
-	device.indices.ClearIndex(handshake.localIndex)
-	handshake.localIndex, err = device.indices.NewIndex(peer)
-
 	// assign index
 
-	var msg MessageInitiation
-
-	msg.Type = MessageInitiationType
-	msg.Ephemeral = handshake.localEphemeral.publicKey()
+	device.indices.Delete(handshake.localIndex)
+	handshake.localIndex, err = device.indices.NewIndex(peer)
 
 	if err != nil {
 		return nil, err
 	}
 
-	msg.Sender = handshake.localIndex
+	handshake.mixHash(handshake.remoteStatic[:])
+
+	msg := MessageInitiation{
+		Type:      MessageInitiationType,
+		Ephemeral: handshake.localEphemeral.publicKey(),
+		Sender:    handshake.localIndex,
+	}
+
 	handshake.mixKey(msg.Ephemeral[:])
 	handshake.mixHash(msg.Ephemeral[:])
 
@@ -185,9 +190,9 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 		return nil
 	}
 
-	hash := mixHash(InitalHash, device.publicKey[:])
+	hash := mixHash(InitialHash, device.publicKey[:])
 	hash = mixHash(hash, msg.Ephemeral[:])
-	chainKey := mixKey(InitalChainKey, msg.Ephemeral[:])
+	chainKey := mixKey(InitialChainKey, msg.Ephemeral[:])
 
 	// decrypt static key
 
@@ -278,7 +283,7 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 	// assign index
 
 	var err error
-	device.indices.ClearIndex(handshake.localIndex)
+	device.indices.Delete(handshake.localIndex)
 	handshake.localIndex, err = device.indices.NewIndex(peer)
 	if err != nil {
 		return nil, err
@@ -420,10 +425,15 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 		return nil
 	}
 
+	// zero handshake
+
+	handshake.chainKey = [blake2s.Size]byte{}
+	handshake.localEphemeral = NoisePrivateKey{}
+	peer.handshake.state = HandshakeZeroed
+
 	// create AEAD instances
 
-	var keyPair KeyPair
-
+	keyPair := new(KeyPair)
 	keyPair.send, _ = chacha20poly1305.New(sendKey[:])
 	keyPair.recv, _ = chacha20poly1305.New(recvKey[:])
 	keyPair.sendNonce = 0
@@ -433,30 +443,32 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 
 	peer.device.indices.Insert(handshake.localIndex, IndexTableEntry{
 		peer:      peer,
-		keyPair:   &keyPair,
+		keyPair:   keyPair,
 		handshake: nil,
 	})
 	handshake.localIndex = 0
 
+	// start timer for keypair
+
 	// rotate key pairs
 
+	kp := &peer.keyPairs
 	func() {
-		kp := &peer.keyPairs
 		kp.mutex.Lock()
 		defer kp.mutex.Unlock()
 		if isInitiator {
-			kp.previous = peer.keyPairs.current
-			kp.current = &keyPair
-			kp.newKeyPair <- true
+			if kp.previous != nil {
+				kp.previous.send = nil
+				kp.previous.recv = nil
+				peer.device.indices.Delete(kp.previous.id)
+			}
+			kp.previous = kp.current
+			kp.current = keyPair
+			sendSignal(peer.signal.newKeyPair)
 		} else {
-			kp.next = &keyPair
+			kp.next = keyPair
 		}
 	}()
 
-	// zero handshake
-
-	handshake.chainKey = [blake2s.Size]byte{}
-	handshake.localEphemeral = NoisePrivateKey{}
-	peer.handshake.state = HandshakeZeroed
-	return &keyPair
+	return keyPair
 }

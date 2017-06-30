@@ -13,20 +13,27 @@ type KeyPair struct {
 	sendNonce   uint64
 	isInitiator bool
 	created     time.Time
+	id          uint32
 }
 
 type KeyPairs struct {
-	mutex      sync.RWMutex
-	current    *KeyPair
-	previous   *KeyPair
-	next       *KeyPair  // not yet "confirmed by transport"
-	newKeyPair chan bool // signals when "current" has been updated
+	mutex    sync.RWMutex
+	current  *KeyPair
+	previous *KeyPair
+	next     *KeyPair // not yet "confirmed by transport"
 }
 
-func (kp *KeyPairs) Init() {
-	kp.mutex.Lock()
-	kp.newKeyPair = make(chan bool, 5)
-	kp.mutex.Unlock()
+/* Called during recieving to confirm the handshake
+ * was completed correctly
+ */
+func (kp *KeyPairs) Used(key *KeyPair) {
+	if key == kp.next {
+		kp.mutex.Lock()
+		kp.previous = kp.current
+		kp.current = key
+		kp.next = nil
+		kp.mutex.Unlock()
+	}
 }
 
 func (kp *KeyPairs) Current() *KeyPair {

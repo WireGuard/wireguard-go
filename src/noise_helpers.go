@@ -33,6 +33,7 @@ func KDF2(key []byte, input []byte) (t0 [blake2s.Size]byte, t1 [blake2s.Size]byt
 	HMAC(&prk, key, input)
 	HMAC(&t0, prk[:], []byte{0x1})
 	HMAC(&t1, prk[:], append(t0[:], 0x2))
+	prk = [blake2s.Size]byte{}
 	return
 }
 
@@ -42,6 +43,7 @@ func KDF3(key []byte, input []byte) (t0 [blake2s.Size]byte, t1 [blake2s.Size]byt
 	HMAC(&t0, prk[:], []byte{0x1})
 	HMAC(&t1, prk[:], append(t0[:], 0x2))
 	HMAC(&t2, prk[:], append(t1[:], 0x3))
+	prk = [blake2s.Size]byte{}
 	return
 }
 

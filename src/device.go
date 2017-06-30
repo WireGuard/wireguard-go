@@ -7,16 +7,21 @@ import (
 )
 
 type Device struct {
-	mtu          int
-	fwMark       uint32
-	address      *net.UDPAddr // UDP source address
-	conn         *net.UDPConn // UDP "connection"
+	mtu       int
+	log       *Logger // collection of loggers for levels
+	idCounter uint    // for assigning debug ids to peers
+	fwMark    uint32
+	net       struct {
+		// seperate for performance reasons
+		mutex sync.RWMutex
+		addr  *net.UDPAddr // UDP source address
+		conn  *net.UDPConn // UDP "connection"
+	}
 	mutex        sync.RWMutex
 	privateKey   NoisePrivateKey
 	publicKey    NoisePublicKey
 	routingTable RoutingTable
 	indices      IndexTable
-	log          *Logger
 	queue        struct {
 		encryption chan *QueueOutboundElement // parallel work queue
 	}
@@ -44,16 +49,28 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) {
 	}
 }
 
-func NewDevice(tun TUNDevice) *Device {
+func NewDevice(tun TUNDevice, logLevel int) *Device {
 	device := new(Device)
 
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
 
-	device.log = NewLogger()
+	device.log = NewLogger(logLevel)
 	device.peers = make(map[NoisePublicKey]*Peer)
 	device.indices.Init()
 	device.routingTable.Reset()
+
+	// listen
+
+	device.net.mutex.Lock()
+	device.net.conn, _ = net.ListenUDP("udp", device.net.addr)
+	addr := device.net.conn.LocalAddr()
+	device.net.addr, _ = net.ResolveUDPAddr(addr.Network(), addr.String())
+	device.net.mutex.Unlock()
+
+	// create queues
+
+	device.queue.encryption = make(chan *QueueOutboundElement, QueueOutboundSize)
 
 	// start workers
 
@@ -92,5 +109,11 @@ func (device *Device) RemoveAllPeers() {
 		peer.mutex.Lock()
 		delete(device.peers, key)
 		peer.Close()
+		peer.mutex.Unlock()
 	}
+}
+
+func (device *Device) Close() {
+	device.RemoveAllPeers()
+	close(device.queue.encryption)
 }

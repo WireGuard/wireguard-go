@@ -8,7 +8,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // #include <errno.h>
@@ -51,9 +50,7 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) error {
 		send("private_key=" + device.privateKey.ToHex())
 	}
 
-	if device.address != nil {
-		send(fmt.Sprintf("listen_port=%d", device.address.Port))
-	}
+	send(fmt.Sprintf("listen_port=%d", device.net.addr.Port))
 
 	for _, peer := range device.peers {
 		func() {
@@ -106,7 +103,6 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 		}
 		key := parts[0]
 		value := parts[1]
-		logger.Println("Key-value pair: (", key, ",", value, ")") // TODO: Remove, leaks private key to log
 
 		switch key {
 
@@ -118,13 +114,13 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				device.privateKey = NoisePrivateKey{}
 				device.mutex.Unlock()
 			} else {
-				device.mutex.Lock()
-				err := device.privateKey.FromHex(value)
-				device.mutex.Unlock()
+				var sk NoisePrivateKey
+				err := sk.FromHex(value)
 				if err != nil {
 					logger.Println("Failed to set private_key:", err)
 					return &IPCError{Code: ipcErrorInvalidValue}
 				}
+				device.SetPrivateKey(sk)
 			}
 
 		case "listen_port":
@@ -134,12 +130,10 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				logger.Println("Failed to set listen_port:", err)
 				return &IPCError{Code: ipcErrorInvalidValue}
 			}
-			device.mutex.Lock()
-			if device.address == nil {
-				device.address = &net.UDPAddr{}
-			}
-			device.address.Port = port
-			device.mutex.Unlock()
+			device.net.mutex.Lock()
+			device.net.addr.Port = port
+			device.net.conn, err = net.ListenUDP("udp", device.net.addr)
+			device.net.mutex.Unlock()
 
 		case "fwmark":
 			logger.Println("FWMark not handled yet")
@@ -200,13 +194,13 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				}
 
 			case "endpoint":
-				ip := net.ParseIP(value)
-				if ip == nil {
+				addr, err := net.ResolveUDPAddr("udp", value)
+				if err != nil {
 					logger.Println("Failed to set endpoint:", value)
 					return &IPCError{Code: ipcErrorInvalidValue}
 				}
 				peer.mutex.Lock()
-				// peer.endpoint = ip FIX
+				peer.endpoint = addr
 				peer.mutex.Unlock()
 
 			case "persistent_keepalive_interval":
@@ -216,7 +210,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					return &IPCError{Code: ipcErrorInvalidValue}
 				}
 				peer.mutex.Lock()
-				peer.persistentKeepaliveInterval = time.Duration(secs) * time.Second
+				peer.persistentKeepaliveInterval = uint64(secs)
 				peer.mutex.Unlock()
 
 			case "replace_allowed_ips":

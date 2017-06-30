@@ -28,7 +28,7 @@ func main() {
 		return
 	}
 
-	device := NewDevice(tun)
+	device := NewDevice(tun, LogLevelDebug)
 
 	// Start configuration lister
 

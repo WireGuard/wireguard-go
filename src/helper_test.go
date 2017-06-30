@@ -35,7 +35,7 @@ func (tun *DummyTUN) Read(d []byte) (int, error) {
 
 func CreateDummyTUN(name string) (TUNDevice, error) {
 	var dummy DummyTUN
-	dummy.mtu = 1024
+	dummy.mtu = 0
 	dummy.packets = make(chan []byte, 100)
 	return &dummy, nil
 }
@@ -58,7 +58,7 @@ func randDevice(t *testing.T) *Device {
 		t.Fatal(err)
 	}
 	tun, _ := CreateDummyTUN("dummy")
-	device := NewDevice(tun)
+	device := NewDevice(tun, LogLevelError)
 	device.SetPrivateKey(sk)
 	return device
 }

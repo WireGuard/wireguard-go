@@ -6,3 +6,10 @@ func min(a uint, b uint) uint {
 	}
 	return a
 }
+
+func sendSignal(c chan struct{}) {
+	select {
+	case c <- struct{}{}:
+	default:
+	}
+}

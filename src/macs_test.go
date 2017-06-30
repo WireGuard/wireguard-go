@@ -11,6 +11,9 @@ func TestMAC1(t *testing.T) {
 	dev1 := randDevice(t)
 	dev2 := randDevice(t)
 
+	defer dev1.Close()
+	defer dev2.Close()
+
 	peer1 := dev2.NewPeer(dev1.privateKey.publicKey())
 	peer2 := dev1.NewPeer(dev2.privateKey.publicKey())
 
@@ -39,6 +42,9 @@ func TestMACs(t *testing.T) {
 
 		device2 := randDevice(t)
 		device2.SetPrivateKey(sk2)
+
+		defer device1.Close()
+		defer device2.Close()
 
 		peer1 := device2.NewPeer(device1.privateKey.publicKey())
 		peer2 := device1.NewPeer(device2.privateKey.publicKey())
