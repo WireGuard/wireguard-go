@@ -65,16 +65,15 @@ func (peer *Peer) KeepKeyFreshSending() {
  *
  * Associated with this routine is the signal "handshakeBegin"
  * The routine will read from the "handshakeBegin" channel
- * at most every RekeyTimeout or with exponential backoff
- *
- * Implements exponential backoff for retries
+ * at most every RekeyTimeout seconds
  */
 func (peer *Peer) RoutineHandshakeInitiator() {
-	work := new(QueueOutboundElement)
 	device := peer.device
 	buffer := make([]byte, 1024)
 	logger := device.log.Debug
 	timeout := time.NewTimer(time.Hour)
+
+	var work *QueueOutboundElement
 
 	logger.Println("Routine, handshake initator, started for peer", peer.id)
 
@@ -83,6 +82,8 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 			var attempts uint
 			var deadline time.Time
 
+			// wait for signal
+
 			select {
 			case <-peer.signal.handshakeBegin:
 			case <-peer.signal.stop:
@@ -90,7 +91,7 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 			}
 
 		HandshakeLoop:
-			for run := true; run; {
+			for {
 				// clear completed signal
 
 				select {
@@ -100,32 +101,28 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 				default:
 				}
 
-				// queue handshake
+				// create initiation
 
-				err := func() error {
+				if work != nil {
 					work.mutex.Lock()
-					defer work.mutex.Unlock()
-
-					// create initiation
-
-					msg, err := device.CreateMessageInitiation(peer)
-					if err != nil {
-						return err
-					}
-
-					// marshal
-
-					writer := bytes.NewBuffer(buffer[:0])
-					binary.Write(writer, binary.LittleEndian, msg)
-					work.packet = writer.Bytes()
-					peer.mac.AddMacs(work.packet)
-					peer.InsertOutbound(work)
-					return nil
-				}()
+					work.packet = nil
+					work.mutex.Unlock()
+				}
+				work = new(QueueOutboundElement)
+				msg, err := device.CreateMessageInitiation(peer)
 				if err != nil {
 					device.log.Error.Println("Failed to create initiation message:", err)
 					break
 				}
+
+				// schedule for sending
+
+				writer := bytes.NewBuffer(buffer[:0])
+				binary.Write(writer, binary.LittleEndian, msg)
+				work.packet = writer.Bytes()
+				peer.mac.AddMacs(work.packet)
+				peer.InsertOutbound(work)
+
 				if attempts == 0 {
 					deadline = time.Now().Add(MaxHandshakeAttemptTime)
 				}
@@ -138,10 +135,9 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 					default:
 					}
 				}
-				timeout.Reset((1 << attempts) * RekeyTimeout)
 				attempts += 1
+				timeout.Reset(RekeyTimeout)
 				device.log.Debug.Println("Handshake initiation attempt", attempts, "queued for peer", peer.id)
-				time.Sleep(RekeyTimeout)
 
 				// wait for handshake or timeout
 
@@ -152,25 +148,13 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 				case <-peer.signal.handshakeCompleted:
 					break HandshakeLoop
 
-				default:
-					select {
-
-					case <-peer.signal.stop:
-						return
-
-					case <-peer.signal.handshakeCompleted:
-						break HandshakeLoop
-
-					case <-timeout.C:
-						nextTimeout := (1 << attempts) * RekeyTimeout
-						if deadline.Before(time.Now().Add(nextTimeout)) {
-							// we do not have time for another attempt
-							peer.signal.flushNonceQueue <- struct{}{}
-							if !peer.timer.sendKeepalive.Stop() {
-								<-peer.timer.sendKeepalive.C
-							}
-							break HandshakeLoop
+				case <-timeout.C:
+					if deadline.Before(time.Now().Add(RekeyTimeout)) {
+						peer.signal.flushNonceQueue <- struct{}{}
+						if !peer.timer.sendKeepalive.Stop() {
+							<-peer.timer.sendKeepalive.C
 						}
+						break HandshakeLoop
 					}
 				}
 			}
