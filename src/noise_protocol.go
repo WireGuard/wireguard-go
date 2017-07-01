@@ -6,6 +6,7 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/poly1305"
 	"sync"
+	"time"
 )
 
 const (
@@ -34,6 +35,13 @@ const (
 	MessageInitiationSize  = 148
 	MessageResponseSize    = 92
 	MessageCookieReplySize = 64
+	MessageTransportSize   = 16 + poly1305.TagSize // size of empty transport
+)
+
+const (
+	MessageTransportOffsetReceiver = 4
+	MessageTransportOffsetCounter  = 8
+	MessageTransportOffsetContent  = 16
 )
 
 /* Type is an 8-bit field, followed by 3 nul bytes,
@@ -55,7 +63,7 @@ type MessageInitiation struct {
 type MessageResponse struct {
 	Type      uint32
 	Sender    uint32
-	Reciever  uint32
+	Receiver  uint32
 	Ephemeral NoisePublicKey
 	Empty     [poly1305.TagSize]byte
 	Mac1      [blake2s.Size128]byte
@@ -64,7 +72,7 @@ type MessageResponse struct {
 
 type MessageTransport struct {
 	Type     uint32
-	Reciever uint32
+	Receiver uint32
 	Counter  uint64
 	Content  []byte
 }
@@ -292,7 +300,7 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 	var msg MessageResponse
 	msg.Type = MessageResponseType
 	msg.Sender = handshake.localIndex
-	msg.Reciever = handshake.remoteIndex
+	msg.Receiver = handshake.remoteIndex
 
 	// create ephemeral key
 
@@ -302,6 +310,7 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 	}
 	msg.Ephemeral = handshake.localEphemeral.publicKey()
 	handshake.mixHash(msg.Ephemeral[:])
+	handshake.mixKey(msg.Ephemeral[:])
 
 	func() {
 		ss := handshake.localEphemeral.sharedSecret(handshake.remoteEphemeral)
@@ -334,7 +343,7 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 
 	// lookup handshake by reciever
 
-	lookup := device.indices.Lookup(msg.Reciever)
+	lookup := device.indices.Lookup(msg.Receiver)
 	handshake := lookup.handshake
 	if handshake == nil {
 		return nil
@@ -359,7 +368,7 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 		// finish 3-way DH
 
 		hash = mixHash(handshake.hash, msg.Ephemeral[:])
-		chainKey = handshake.chainKey
+		chainKey = mixKey(handshake.chainKey, msg.Ephemeral[:])
 
 		func() {
 			ss := handshake.localEphemeral.sharedSecret(msg.Ephemeral)
@@ -380,6 +389,7 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 		aead, _ := chacha20poly1305.New(key[:])
 		_, err := aead.Open(nil, ZeroNonce[:], msg.Empty[:], hash[:])
 		if err != nil {
+			device.log.Debug.Println("failed to open")
 			return false
 		}
 		hash = mixHash(hash, msg.Empty[:])
@@ -438,6 +448,7 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 	keyPair.recv, _ = chacha20poly1305.New(recvKey[:])
 	keyPair.sendNonce = 0
 	keyPair.recvNonce = 0
+	keyPair.created = time.Now()
 
 	// remap index
 

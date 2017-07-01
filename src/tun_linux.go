@@ -24,14 +24,14 @@ const (
 type NativeTun struct {
 	fd   *os.File
 	name string
-	mtu  uint
+	mtu  int
 }
 
 func (tun *NativeTun) Name() string {
 	return tun.name
 }
 
-func (tun *NativeTun) MTU() uint {
+func (tun *NativeTun) MTU() int {
 	return tun.mtu
 }
 

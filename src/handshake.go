@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"net"
 	"sync/atomic"
 	"time"
 )
@@ -22,14 +21,6 @@ func (peer *Peer) SendKeepAlive() bool {
 		}
 	}
 	return true
-}
-
-func StoppedTimer() *time.Timer {
-	timer := time.NewTimer(time.Hour)
-	if !timer.Stop() {
-		<-timer.C
-	}
-	return timer
 }
 
 /* Called when a new authenticated message has been send
@@ -71,7 +62,7 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 	device := peer.device
 	buffer := make([]byte, 1024)
 	logger := device.log.Debug
-	timeout := time.NewTimer(time.Hour)
+	timeout := stoppedTimer()
 
 	var work *QueueOutboundElement
 
@@ -129,13 +120,8 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 
 				// set timeout
 
-				if !timeout.Stop() {
-					select {
-					case <-timeout.C:
-					default:
-					}
-				}
 				attempts += 1
+				stopTimer(timeout)
 				timeout.Reset(RekeyTimeout)
 				device.log.Debug.Println("Handshake initiation attempt", attempts, "queued for peer", peer.id)
 
@@ -162,46 +148,4 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 	}()
 
 	logger.Println("Routine, handshake initator, stopped for peer", peer.id)
-}
-
-/* Handles incomming packets related to handshake
- *
- *
- */
-func (device *Device) HandshakeWorker(queue chan struct {
-	msg     []byte
-	msgType uint32
-	addr    *net.UDPAddr
-}) {
-	for {
-		elem := <-queue
-
-		switch elem.msgType {
-		case MessageInitiationType:
-			if len(elem.msg) != MessageInitiationSize {
-				continue
-			}
-
-			// check for cookie
-
-			var msg MessageInitiation
-
-			binary.Read(nil, binary.LittleEndian, &msg)
-
-		case MessageResponseType:
-			if len(elem.msg) != MessageResponseSize {
-				continue
-			}
-
-			// check for cookie
-
-		case MessageCookieReplyType:
-			if len(elem.msg) != MessageCookieReplySize {
-				continue
-			}
-
-		default:
-			device.log.Error.Println("Invalid message type in handshake queue")
-		}
-	}
 }

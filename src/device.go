@@ -23,7 +23,13 @@ type Device struct {
 	routingTable RoutingTable
 	indices      IndexTable
 	queue        struct {
-		encryption chan *QueueOutboundElement // parallel work queue
+		encryption chan *QueueOutboundElement
+		decryption chan *QueueInboundElement
+		handshake  chan QueueHandshakeElement
+		inbound    chan []byte // inbound queue for TUN
+	}
+	signal struct {
+		stop chan struct{}
 	}
 	peers map[NoisePublicKey]*Peer
 	mac   MacStateDevice
@@ -56,6 +62,7 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	defer device.mutex.Unlock()
 
 	device.log = NewLogger(logLevel)
+	device.mtu = tun.MTU()
 	device.peers = make(map[NoisePublicKey]*Peer)
 	device.indices.Init()
 	device.routingTable.Reset()
@@ -71,13 +78,22 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	// create queues
 
 	device.queue.encryption = make(chan *QueueOutboundElement, QueueOutboundSize)
+	device.queue.handshake = make(chan QueueHandshakeElement, QueueHandshakeSize)
+	device.queue.decryption = make(chan *QueueInboundElement, QueueInboundSize)
+
+	// prepare signals
+
+	device.signal.stop = make(chan struct{})
 
 	// start workers
 
 	for i := 0; i < runtime.NumCPU(); i += 1 {
 		go device.RoutineEncryption()
+		go device.RoutineDecryption()
+		go device.RoutineHandshake()
 	}
 	go device.RoutineReadFromTUN(tun)
+	go device.RoutineReceiveIncomming()
 	return device
 }
 
@@ -115,5 +131,6 @@ func (device *Device) RemoveAllPeers() {
 
 func (device *Device) Close() {
 	device.RemoveAllPeers()
+	close(device.signal.stop)
 	close(device.queue.encryption)
 }

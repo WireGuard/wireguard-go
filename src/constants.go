@@ -17,5 +17,9 @@ const (
 )
 
 const (
-	QueueOutboundSize = 1024
+	QueueOutboundSize      = 1024
+	QueueInboundSize       = 1024
+	QueueHandshakeSize     = 1024
+	QueueHandshakeBusySize = QueueHandshakeSize / 8
+	MinMessageSize         = MessageTransportSize
 )

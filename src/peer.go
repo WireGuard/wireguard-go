@@ -37,6 +37,7 @@ type Peer struct {
 	queue struct {
 		nonce    chan []byte                // nonce / pre-handshake queue
 		outbound chan *QueueOutboundElement // sequential ordering of work
+		inbound  chan *QueueInboundElement  // sequential ordering of work
 	}
 	mac MacStatePeer
 }
@@ -47,11 +48,10 @@ func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 	peer := new(Peer)
 	peer.mutex.Lock()
 	defer peer.mutex.Unlock()
-	peer.device = device
+
 	peer.mac.Init(pk)
-	peer.queue.outbound = make(chan *QueueOutboundElement, QueueOutboundSize)
-	peer.queue.nonce = make(chan []byte, QueueOutboundSize)
-	peer.timer.sendKeepalive = StoppedTimer()
+	peer.device = device
+	peer.timer.sendKeepalive = stoppedTimer()
 
 	// assign id for debugging
 
@@ -76,6 +76,12 @@ func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 	handshake.precomputedStaticStatic = device.privateKey.sharedSecret(handshake.remoteStatic)
 	handshake.mutex.Unlock()
 
+	// prepare queuing
+
+	peer.queue.nonce = make(chan []byte, QueueOutboundSize)
+	peer.queue.inbound = make(chan *QueueInboundElement, QueueInboundSize)
+	peer.queue.outbound = make(chan *QueueOutboundElement, QueueOutboundSize)
+
 	// prepare signaling
 
 	peer.signal.stop = make(chan struct{})
@@ -89,6 +95,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 	go peer.RoutineNonce()
 	go peer.RoutineHandshakeInitiator()
 	go peer.RoutineSequentialSender()
+	go peer.RoutineSequentialReceiver()
 
 	return peer
 }
