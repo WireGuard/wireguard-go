@@ -75,6 +75,7 @@ func (device *Device) RoutineReceiveIncomming() {
 		// handle packet
 
 		packet = packet[:size]
+		debugLog.Println("GOT:", packet)
 		msgType := binary.LittleEndian.Uint32(packet[:4])
 
 		func() {
@@ -371,6 +372,8 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 		// check for replay
 
+		// strip padding
+
 		// check for keep-alive
 
 		if len(elem.packet) == 0 {
@@ -392,8 +395,6 @@ func (device *Device) RoutineWriteToTUN(tun TUNDevice) {
 		case <-device.signal.stop:
 		case packet = <-device.queue.inbound:
 		}
-
-		device.log.Debug.Println("GOT:", packet)
 
 		size, err := tun.Write(packet)
 		device.log.Debug.Println("DEBUG:", size, err)

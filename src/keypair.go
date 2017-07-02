@@ -13,7 +13,8 @@ type KeyPair struct {
 	sendNonce   uint64
 	isInitiator bool
 	created     time.Time
-	id          uint32
+	localIndex  uint32
+	remoteIndex uint32
 }
 
 type KeyPairs struct {

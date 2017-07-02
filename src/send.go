@@ -171,8 +171,6 @@ func (peer *Peer) RoutineNonce() {
 				}
 			}
 
-			logger.Println("PACKET:", packet)
-
 			// wait for key pair
 
 			for {
@@ -221,8 +219,6 @@ func (peer *Peer) RoutineNonce() {
 				work.peer = peer
 				work.mutex.Lock()
 
-				logger.Println("WORK:", work)
-
 				packet = nil
 
 				// drop packets until there is space
@@ -263,7 +259,7 @@ func (device *Device) RoutineEncryption() {
 
 		// pad packet
 
-		padding := device.mtu - len(work.packet)
+		padding := device.mtu - len(work.packet) - MessageTransportSize
 		if padding < 0 {
 			work.Drop()
 			continue
@@ -272,18 +268,29 @@ func (device *Device) RoutineEncryption() {
 		for n := 0; n < padding; n += 1 {
 			work.packet = append(work.packet, 0)
 		}
-		device.log.Debug.Println(work.packet)
+		content := work.packet[MessageTransportHeaderSize:]
+		copy(content, work.packet)
 
-		// encrypt
+		// prepare header
+
+		binary.LittleEndian.PutUint32(work.packet[:4], MessageTransportType)
+		binary.LittleEndian.PutUint32(work.packet[4:8], work.keyPair.remoteIndex)
+		binary.LittleEndian.PutUint64(work.packet[8:16], work.nonce)
+
+		device.log.Debug.Println(work.packet, work.nonce)
+
+		// encrypt content
 
 		binary.LittleEndian.PutUint64(nonce[4:], work.nonce)
-		work.packet = work.keyPair.send.Seal(
-			work.packet[:0],
+		work.keyPair.send.Seal(
+			content[:0],
 			nonce[:],
-			work.packet,
+			content,
 			nil,
 		)
 		work.mutex.Unlock()
+
+		device.log.Debug.Println(work.packet, work.nonce)
 
 		// initiate new handshake
 

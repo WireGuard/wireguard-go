@@ -32,10 +32,11 @@ const (
 )
 
 const (
-	MessageInitiationSize  = 148
-	MessageResponseSize    = 92
-	MessageCookieReplySize = 64
-	MessageTransportSize   = 16 + poly1305.TagSize // size of empty transport
+	MessageInitiationSize      = 148
+	MessageResponseSize        = 92
+	MessageCookieReplySize     = 64
+	MessageTransportHeaderSize = 16
+	MessageTransportSize       = MessageTransportHeaderSize + poly1305.TagSize // size of empty transport
 )
 
 const (
@@ -449,6 +450,8 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 	keyPair.sendNonce = 0
 	keyPair.recvNonce = 0
 	keyPair.created = time.Now()
+	keyPair.localIndex = peer.handshake.localIndex
+	keyPair.remoteIndex = peer.handshake.remoteIndex
 
 	// remap index
 
@@ -471,7 +474,7 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 			if kp.previous != nil {
 				kp.previous.send = nil
 				kp.previous.recv = nil
-				peer.device.indices.Delete(kp.previous.id)
+				peer.device.indices.Delete(kp.previous.localIndex)
 			}
 			kp.previous = kp.current
 			kp.current = keyPair

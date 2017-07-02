@@ -10,7 +10,7 @@ import (
 
 type DummyTUN struct {
 	name    string
-	mtu     uint
+	mtu     int
 	packets chan []byte
 }
 
@@ -18,7 +18,7 @@ func (tun *DummyTUN) Name() string {
 	return tun.name
 }
 
-func (tun *DummyTUN) MTU() uint {
+func (tun *DummyTUN) MTU() int {
 	return tun.mtu
 }
 
