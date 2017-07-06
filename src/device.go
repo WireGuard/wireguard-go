@@ -32,7 +32,7 @@ type Device struct {
 		stop chan struct{}
 	}
 	peers map[NoisePublicKey]*Peer
-	mac   MacStateDevice
+	mac   MACStateDevice
 }
 
 func (device *Device) SetPrivateKey(sk NoisePrivateKey) {

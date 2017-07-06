@@ -57,8 +57,8 @@ type MessageInitiation struct {
 	Ephemeral NoisePublicKey
 	Static    [NoisePublicKeySize + poly1305.TagSize]byte
 	Timestamp [TAI64NSize + poly1305.TagSize]byte
-	Mac1      [blake2s.Size128]byte
-	Mac2      [blake2s.Size128]byte
+	MAC1      [blake2s.Size128]byte
+	MAC2      [blake2s.Size128]byte
 }
 
 type MessageResponse struct {
@@ -67,8 +67,8 @@ type MessageResponse struct {
 	Receiver  uint32
 	Ephemeral NoisePublicKey
 	Empty     [poly1305.TagSize]byte
-	Mac1      [blake2s.Size128]byte
-	Mac2      [blake2s.Size128]byte
+	MAC1      [blake2s.Size128]byte
+	MAC2      [blake2s.Size128]byte
 }
 
 type MessageTransport struct {

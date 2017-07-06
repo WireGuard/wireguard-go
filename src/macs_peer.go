@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-type MacStatePeer struct {
+type MACStatePeer struct {
 	mutex     sync.RWMutex
 	cookieSet time.Time
 	cookie    [blake2s.Size128]byte
@@ -18,7 +18,7 @@ type MacStatePeer struct {
 	xaead     cipher.AEAD
 }
 
-func (state *MacStatePeer) Init(pk NoisePublicKey) {
+func (state *MACStatePeer) Init(pk NoisePublicKey) {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
 	func() {
@@ -31,7 +31,7 @@ func (state *MacStatePeer) Init(pk NoisePublicKey) {
 	state.cookieSet = time.Time{} // never
 }
 
-func (state *MacStatePeer) AddMacs(msg []byte) {
+func (state *MACStatePeer) AddMacs(msg []byte) {
 	size := len(msg)
 
 	if size < blake2s.Size128*2 {

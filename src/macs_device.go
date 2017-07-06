@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-type MacStateDevice struct {
+type MACStateDevice struct {
 	mutex     sync.RWMutex
 	refreshed time.Time
 	secret    [blake2s.Size]byte
@@ -19,7 +19,7 @@ type MacStateDevice struct {
 	xaead     cipher.AEAD
 }
 
-func (state *MacStateDevice) Init(pk NoisePublicKey) {
+func (state *MACStateDevice) Init(pk NoisePublicKey) {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
 	func() {
@@ -32,7 +32,7 @@ func (state *MacStateDevice) Init(pk NoisePublicKey) {
 	state.refreshed = time.Time{} // never
 }
 
-func (state *MacStateDevice) CheckMAC1(msg []byte) bool {
+func (state *MACStateDevice) CheckMAC1(msg []byte) bool {
 	size := len(msg)
 	startMac1 := size - (blake2s.Size128 * 2)
 	startMac2 := size - blake2s.Size128
@@ -47,7 +47,7 @@ func (state *MacStateDevice) CheckMAC1(msg []byte) bool {
 	return hmac.Equal(mac1[:], msg[startMac1:startMac2])
 }
 
-func (state *MacStateDevice) CheckMAC2(msg []byte, addr *net.UDPAddr) bool {
+func (state *MACStateDevice) CheckMAC2(msg []byte, addr *net.UDPAddr) bool {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 
