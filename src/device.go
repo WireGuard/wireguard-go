@@ -80,6 +80,7 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	device.queue.encryption = make(chan *QueueOutboundElement, QueueOutboundSize)
 	device.queue.handshake = make(chan QueueHandshakeElement, QueueHandshakeSize)
 	device.queue.decryption = make(chan *QueueInboundElement, QueueInboundSize)
+	device.queue.inbound = make(chan []byte, QueueInboundSize)
 
 	// prepare signals
 
@@ -94,6 +95,7 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	}
 	go device.RoutineReadFromTUN(tun)
 	go device.RoutineReceiveIncomming()
+	go device.RoutineWriteToTUN(tun)
 	return device
 }
 

@@ -21,5 +21,6 @@ const (
 	QueueInboundSize       = 1024
 	QueueHandshakeSize     = 1024
 	QueueHandshakeBusySize = QueueHandshakeSize / 8
-	MinMessageSize         = MessageTransportSize
+	MinMessageSize         = MessageTransportSize // keep-alive
+	MaxMessageSize         = 4096
 )

@@ -12,9 +12,11 @@ import (
  * Used by initiator of handshake and with active keep-alive
  */
 func (peer *Peer) SendKeepAlive() bool {
+	elem := peer.device.NewOutboundElement()
+	elem.packet = nil
 	if len(peer.queue.nonce) == 0 {
 		select {
-		case peer.queue.nonce <- []byte{}:
+		case peer.queue.nonce <- elem:
 			return true
 		default:
 			return false
@@ -60,11 +62,10 @@ func (peer *Peer) KeepKeyFreshSending() {
  */
 func (peer *Peer) RoutineHandshakeInitiator() {
 	device := peer.device
-	buffer := make([]byte, 1024)
 	logger := device.log.Debug
 	timeout := stoppedTimer()
 
-	var work *QueueOutboundElement
+	var elem *QueueOutboundElement
 
 	logger.Println("Routine, handshake initator, started for peer", peer.id)
 
@@ -94,25 +95,25 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 
 				// create initiation
 
-				if work != nil {
-					work.mutex.Lock()
-					work.packet = nil
-					work.mutex.Unlock()
+				if elem != nil {
+					elem.Drop()
 				}
-				work = new(QueueOutboundElement)
+				elem = device.NewOutboundElement()
+
 				msg, err := device.CreateMessageInitiation(peer)
 				if err != nil {
 					device.log.Error.Println("Failed to create initiation message:", err)
 					break
 				}
 
-				// schedule for sending
+				// marshal & schedule for sending
 
-				writer := bytes.NewBuffer(buffer[:0])
+				writer := bytes.NewBuffer(elem.data[:0])
 				binary.Write(writer, binary.LittleEndian, msg)
-				work.packet = writer.Bytes()
-				peer.mac.AddMacs(work.packet)
-				peer.InsertOutbound(work)
+				elem.packet = writer.Bytes()
+				peer.mac.AddMacs(elem.packet)
+				println(elem)
+				addToOutboundQueue(peer.queue.outbound, elem)
 
 				if attempts == 0 {
 					deadline = time.Now().Add(MaxHandshakeAttemptTime)
@@ -132,9 +133,11 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 					return
 
 				case <-peer.signal.handshakeCompleted:
+					device.log.Debug.Println("Handshake complete")
 					break HandshakeLoop
 
 				case <-timeout.C:
+					device.log.Debug.Println("Timeout")
 					if deadline.Before(time.Now().Add(RekeyTimeout)) {
 						peer.signal.flushNonceQueue <- struct{}{}
 						if !peer.timer.sendKeepalive.Stop() {

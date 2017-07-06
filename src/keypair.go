@@ -7,8 +7,7 @@ import (
 )
 
 type KeyPair struct {
-	recv        cipher.AEAD
-	recvNonce   uint64
+	receive     cipher.AEAD
 	send        cipher.AEAD
 	sendNonce   uint64
 	isInitiator bool

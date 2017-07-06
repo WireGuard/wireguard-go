@@ -35,7 +35,7 @@ type Peer struct {
 		handshakeTimeout *time.Timer
 	}
 	queue struct {
-		nonce    chan []byte                // nonce / pre-handshake queue
+		nonce    chan *QueueOutboundElement // nonce / pre-handshake queue
 		outbound chan *QueueOutboundElement // sequential ordering of work
 		inbound  chan *QueueInboundElement  // sequential ordering of work
 	}
@@ -78,9 +78,9 @@ func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 
 	// prepare queuing
 
-	peer.queue.nonce = make(chan []byte, QueueOutboundSize)
-	peer.queue.inbound = make(chan *QueueInboundElement, QueueInboundSize)
+	peer.queue.nonce = make(chan *QueueOutboundElement, QueueOutboundSize)
 	peer.queue.outbound = make(chan *QueueOutboundElement, QueueOutboundSize)
+	peer.queue.inbound = make(chan *QueueInboundElement, QueueInboundSize)
 
 	// prepare signaling
 

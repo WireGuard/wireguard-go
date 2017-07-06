@@ -446,10 +446,10 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 
 	keyPair := new(KeyPair)
 	keyPair.send, _ = chacha20poly1305.New(sendKey[:])
-	keyPair.recv, _ = chacha20poly1305.New(recvKey[:])
+	keyPair.receive, _ = chacha20poly1305.New(recvKey[:])
 	keyPair.sendNonce = 0
-	keyPair.recvNonce = 0
 	keyPair.created = time.Now()
+	keyPair.isInitiator = isInitiator
 	keyPair.localIndex = peer.handshake.localIndex
 	keyPair.remoteIndex = peer.handshake.remoteIndex
 
@@ -462,7 +462,7 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 	})
 	handshake.localIndex = 0
 
-	// start timer for keypair
+	// TODO: start timer for keypair (clearing)
 
 	// rotate key pairs
 
@@ -473,7 +473,7 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 		if isInitiator {
 			if kp.previous != nil {
 				kp.previous.send = nil
-				kp.previous.recv = nil
+				kp.previous.receive = nil
 				peer.device.indices.Delete(kp.previous.localIndex)
 			}
 			kp.previous = kp.current
