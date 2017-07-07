@@ -12,7 +12,7 @@ const (
 	RejectAfterTime         = time.Second * 180
 	RejectAfterMessages     = (1 << 64) - (1 << 4) - 1
 	KeepaliveTimeout        = time.Second * 10
-	CookieRefreshTime       = time.Second * 2
+	CookieRefreshTime       = time.Minute * 2
 	MaxHandshakeAttemptTime = time.Second * 90
 )
 

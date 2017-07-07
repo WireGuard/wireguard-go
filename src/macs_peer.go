@@ -13,21 +13,31 @@ type MACStatePeer struct {
 	mutex     sync.RWMutex
 	cookieSet time.Time
 	cookie    [blake2s.Size128]byte
-	lastMac1  [blake2s.Size128]byte
-	keyMac1   [blake2s.Size]byte
+	lastMAC1  [blake2s.Size128]byte
+	keyMAC1   [blake2s.Size]byte
+	keyMAC2   [blake2s.Size]byte
 	xaead     cipher.AEAD
 }
 
 func (state *MACStatePeer) Init(pk NoisePublicKey) {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
+
 	func() {
 		hsh, _ := blake2s.New256(nil)
 		hsh.Write([]byte(WGLabelMAC1))
 		hsh.Write(pk[:])
-		hsh.Sum(state.keyMac1[:0])
+		hsh.Sum(state.keyMAC1[:0])
 	}()
-	state.xaead, _ = chacha20poly1305.NewXCipher(state.keyMac1[:])
+
+	func() {
+		hsh, _ := blake2s.New256(nil)
+		hsh.Write([]byte(WGLabelCookie))
+		hsh.Write(pk[:])
+		hsh.Sum(state.keyMAC2[:0])
+	}()
+
+	state.xaead, _ = chacha20poly1305.NewXCipher(state.keyMAC2[:])
 	state.cookieSet = time.Time{} // never
 }
 
@@ -50,11 +60,11 @@ func (state *MACStatePeer) AddMacs(msg []byte) {
 	// set mac1
 
 	func() {
-		mac, _ := blake2s.New128(state.keyMac1[:])
+		mac, _ := blake2s.New128(state.keyMAC1[:])
 		mac.Write(msg[:startMac1])
-		mac.Sum(state.lastMac1[:0])
+		mac.Sum(state.lastMAC1[:0])
 	}()
-	copy(mac1, state.lastMac1[:])
+	copy(mac1, state.lastMAC1[:])
 
 	// set mac2
 

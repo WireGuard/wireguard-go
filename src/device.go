@@ -25,8 +25,8 @@ type Device struct {
 	queue        struct {
 		encryption chan *QueueOutboundElement
 		decryption chan *QueueInboundElement
+		inbound    chan *QueueInboundElement
 		handshake  chan QueueHandshakeElement
-		inbound    chan []byte // inbound queue for TUN
 	}
 	signal struct {
 		stop chan struct{}
@@ -77,10 +77,10 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 
 	// create queues
 
-	device.queue.encryption = make(chan *QueueOutboundElement, QueueOutboundSize)
 	device.queue.handshake = make(chan QueueHandshakeElement, QueueHandshakeSize)
+	device.queue.encryption = make(chan *QueueOutboundElement, QueueOutboundSize)
 	device.queue.decryption = make(chan *QueueInboundElement, QueueInboundSize)
-	device.queue.inbound = make(chan []byte, QueueInboundSize)
+	device.queue.inbound = make(chan *QueueInboundElement, QueueInboundSize)
 
 	// prepare signals
 

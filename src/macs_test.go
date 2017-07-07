@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"net"
 	"testing"
 	"testing/quick"
@@ -17,8 +16,8 @@ func TestMAC1(t *testing.T) {
 	peer1 := dev2.NewPeer(dev1.privateKey.publicKey())
 	peer2 := dev1.NewPeer(dev2.privateKey.publicKey())
 
-	assertEqual(t, peer1.mac.keyMac1[:], dev1.mac.keyMac1[:])
-	assertEqual(t, peer2.mac.keyMac1[:], dev2.mac.keyMac1[:])
+	assertEqual(t, peer1.mac.keyMAC1[:], dev1.mac.keyMAC1[:])
+	assertEqual(t, peer2.mac.keyMAC1[:], dev2.mac.keyMAC1[:])
 
 	msg1 := make([]byte, 256)
 	copy(msg1, []byte("some content"))
@@ -52,17 +51,15 @@ func TestMACs(t *testing.T) {
 		if addr.Port < 0 {
 			return true
 		}
+
 		addr.Port &= 0xffff
 
 		if len(msg) < 32 {
 			return true
 		}
-		if bytes.Compare(peer1.mac.keyMac1[:], device1.mac.keyMac1[:]) != 0 {
-			return false
-		}
-		if bytes.Compare(peer2.mac.keyMac1[:], device2.mac.keyMac1[:]) != 0 {
-			return false
-		}
+
+		assertEqual(t, peer1.mac.keyMAC1[:], device1.mac.keyMAC1[:])
+		assertEqual(t, peer2.mac.keyMAC1[:], device2.mac.keyMAC1[:])
 
 		device2.indices.Insert(receiver, IndexTableEntry{
 			peer:      peer1,
@@ -83,17 +80,17 @@ func TestMACs(t *testing.T) {
 			return false
 		}
 
-		if device2.ConsumeMessageCookieReply(cr) == false {
+		if !device2.ConsumeMessageCookieReply(cr) {
 			return false
 		}
 
 		// test MAC1 + MAC2
 
 		peer1.mac.AddMacs(msg)
-		if device1.mac.CheckMAC1(msg) == false {
+		if !device1.mac.CheckMAC1(msg) {
 			return false
 		}
-		if device1.mac.CheckMAC2(msg, &addr) == false {
+		if !device1.mac.CheckMAC2(msg, &addr) {
 			return false
 		}
 
@@ -106,6 +103,8 @@ func TestMACs(t *testing.T) {
 		if device1.mac.CheckMAC1(msg) {
 			return false
 		}
+
+		t.Log("Passed")
 
 		return true
 	}

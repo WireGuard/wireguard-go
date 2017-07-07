@@ -28,13 +28,13 @@ import (
  *
  * If the element is inserted into the "encryption queue",
  * the content is preceeded by enough "junk" to contain the header
- * (to allow the constuction of transport messages in-place)
+ * (to allow the construction of transport messages in-place)
  */
 type QueueOutboundElement struct {
 	state   uint32
 	mutex   sync.Mutex
 	data    [MaxMessageSize]byte
-	packet  []byte   // slice of packet (sending)
+	packet  []byte   // slice of "data" (always!)
 	nonce   uint64   // nonce for encryption
 	keyPair *KeyPair // key-pair for encryption
 	peer    *Peer    // related peer
@@ -51,8 +51,12 @@ func (peer *Peer) FlushNonceQueue() {
 	}
 }
 
+/*
+ * Assumption: The mutex of the returned element is released
+ */
 func (device *Device) NewOutboundElement() *QueueOutboundElement {
-	elem := new(QueueOutboundElement) // TODO: profile, consider sync.Pool
+	// TODO: profile, consider sync.Pool
+	elem := new(QueueOutboundElement)
 	return elem
 }
 
@@ -160,9 +164,8 @@ func (peer *Peer) RoutineNonce() {
 	var elem *QueueOutboundElement
 
 	device := peer.device
-	logger := device.log.Debug
-
-	logger.Println("Routine, nonce worker, started for peer", peer.id)
+	logDebug := device.log.Debug
+	logDebug.Println("Routine, nonce worker, started for peer", peer.id)
 
 	func() {
 
@@ -193,18 +196,18 @@ func (peer *Peer) RoutineNonce() {
 						break
 					}
 				}
-				logger.Println("Key pair:", keyPair)
+				logDebug.Println("Key pair:", keyPair)
 
 				sendSignal(peer.signal.handshakeBegin)
-				logger.Println("Waiting for key-pair, peer", peer.id)
+				logDebug.Println("Waiting for key-pair, peer", peer.id)
 
 				select {
 				case <-peer.signal.newKeyPair:
-					logger.Println("Key-pair negotiated for peer", peer.id)
+					logDebug.Println("Key-pair negotiated for peer", peer.id)
 					goto NextPacket
 
 				case <-peer.signal.flushNonceQueue:
-					logger.Println("Clearing queue for peer", peer.id)
+					logDebug.Println("Clearing queue for peer", peer.id)
 					peer.FlushNonceQueue()
 					elem = nil
 					goto NextPacket
@@ -233,8 +236,6 @@ func (peer *Peer) RoutineNonce() {
 			}
 		}
 	}()
-
-	logger.Println("Routine, nonce worker, stopped for peer", peer.id)
 }
 
 /* Encrypts the elements in the queue
@@ -265,20 +266,16 @@ func (device *Device) RoutineEncryption() {
 
 		// encrypt content
 
-		func() {
-			binary.LittleEndian.PutUint64(nonce[4:], work.nonce)
-			work.packet = work.keyPair.send.Seal(
-				work.packet[:0],
-				nonce[:],
-				work.packet,
-				nil,
-			)
-			work.mutex.Unlock()
-		}()
-
-		// reslice to include header
-
-		work.packet = work.data[:MessageTransportHeaderSize+len(work.packet)]
+		binary.LittleEndian.PutUint64(nonce[4:], work.nonce)
+		work.packet = work.keyPair.send.Seal(
+			work.packet[:0],
+			nonce[:],
+			work.packet,
+			nil,
+		)
+		length := MessageTransportHeaderSize + len(work.packet)
+		work.packet = work.data[:length]
+		work.mutex.Unlock()
 
 		// refresh key if necessary
 
@@ -292,15 +289,15 @@ func (device *Device) RoutineEncryption() {
  * The routine terminates then the outbound queue is closed.
  */
 func (peer *Peer) RoutineSequentialSender() {
-	logger := peer.device.log.Debug
-	logger.Println("Routine, sequential sender, started for peer", peer.id)
+	logDebug := peer.device.log.Debug
+	logDebug.Println("Routine, sequential sender, started for peer", peer.id)
 
 	device := peer.device
 
 	for {
 		select {
 		case <-peer.signal.stop:
-			logger.Println("Routine, sequential sender, stopped for peer", peer.id)
+			logDebug.Println("Routine, sequential sender, stopped for peer", peer.id)
 			return
 		case work := <-peer.queue.outbound:
 			if work.IsDropped() {
@@ -316,7 +313,7 @@ func (peer *Peer) RoutineSequentialSender() {
 				defer peer.mutex.RUnlock()
 
 				if peer.endpoint == nil {
-					logger.Println("No endpoint for peer:", peer.id)
+					logDebug.Println("No endpoint for peer:", peer.id)
 					return
 				}
 
@@ -324,7 +321,7 @@ func (peer *Peer) RoutineSequentialSender() {
 				defer device.net.mutex.RUnlock()
 
 				if device.net.conn == nil {
-					logger.Println("No source for device")
+					logDebug.Println("No source for device")
 					return
 				}
 

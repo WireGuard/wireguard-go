@@ -55,6 +55,23 @@ func addToInboundQueue(
 	}
 }
 
+func addToHandshakeQueue(
+	queue chan QueueHandshakeElement,
+	element QueueHandshakeElement,
+) {
+	for {
+		select {
+		case queue <- element:
+			return
+		default:
+			select {
+			case <-queue:
+			default:
+			}
+		}
+	}
+}
+
 func (device *Device) RoutineReceiveIncomming() {
 
 	debugLog := device.log.Debug
@@ -62,7 +79,7 @@ func (device *Device) RoutineReceiveIncomming() {
 
 	errorLog := device.log.Error
 
-	var buffer []byte // unsliced buffer
+	var buffer []byte
 
 	for {
 
@@ -116,7 +133,7 @@ func (device *Device) RoutineReceiveIncomming() {
 
 				busy := len(device.queue.handshake) > QueueHandshakeBusySize
 				if busy && !device.mac.CheckMAC2(packet, raddr) {
-					sender := binary.LittleEndian.Uint32(packet[4:8]) // "sender" follows "type"
+					sender := binary.LittleEndian.Uint32(packet[4:8]) // "sender" always follows "type"
 					reply, err := device.CreateMessageCookieReply(packet, sender, raddr)
 					if err != nil {
 						errorLog.Println("Failed to create cookie reply:", err)
@@ -134,12 +151,15 @@ func (device *Device) RoutineReceiveIncomming() {
 
 				// add to handshake queue
 
+				addToHandshakeQueue(
+					device.queue.handshake,
+					QueueHandshakeElement{
+						msgType: msgType,
+						packet:  packet,
+						source:  raddr,
+					},
+				)
 				buffer = nil
-				device.queue.handshake <- QueueHandshakeElement{
-					msgType: msgType,
-					packet:  packet,
-					source:  raddr,
-				}
 
 			case MessageCookieReplyType:
 
@@ -293,7 +313,21 @@ func (device *Device) RoutineHandshake() {
 					)
 					return
 				}
-				logDebug.Println("Recieved valid initiation message for peer", peer.id)
+
+				// create response
+
+				response, err := device.CreateMessageResponse(peer)
+				if err != nil {
+					logError.Println("Failed to create response message:", err)
+					return
+				}
+				outElem := device.NewOutboundElement()
+				writer := bytes.NewBuffer(outElem.data[:0])
+				binary.Write(writer, binary.LittleEndian, response)
+				elem.packet = writer.Bytes()
+				peer.mac.AddMacs(elem.packet)
+				device.log.Debug.Println(elem.packet)
+				addToOutboundQueue(peer.queue.outbound, outElem)
 
 			case MessageResponseType:
 
@@ -352,29 +386,53 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			return
 		case elem = <-peer.queue.inbound:
 		}
-
 		elem.mutex.Lock()
-		if elem.IsDropped() {
-			continue
-		}
 
-		// check for replay
+		// process IP packet
 
-		// update timers
+		func() {
+			if elem.IsDropped() {
+				return
+			}
 
-		// check for keep-alive
+			// check for replay
 
-		if len(elem.packet) == 0 {
-			continue
-		}
+			// update timers
 
-		// strip padding
+			// refresh key material
 
-		// insert into inbound TUN queue
+			// check for keep-alive
 
-		device.queue.inbound <- elem.packet
+			if len(elem.packet) == 0 {
+				return
+			}
 
-		// update key material
+			// strip padding
+
+			switch elem.packet[0] >> 4 {
+			case IPv4version:
+				if len(elem.packet) < IPv4headerSize {
+					return
+				}
+				field := elem.packet[IPv4offsetTotalLength : IPv4offsetTotalLength+2]
+				length := binary.BigEndian.Uint16(field)
+				elem.packet = elem.packet[:length]
+
+			case IPv6version:
+				if len(elem.packet) < IPv6headerSize {
+					return
+				}
+				field := elem.packet[IPv6offsetPayloadLength : IPv6offsetPayloadLength+2]
+				length := binary.BigEndian.Uint16(field)
+				length += IPv6headerSize
+				elem.packet = elem.packet[:length]
+
+			default:
+				device.log.Debug.Println("Receieved packet with unknown IP version")
+				return
+			}
+			addToInboundQueue(device.queue.inbound, elem)
+		}()
 	}
 }
 
@@ -387,8 +445,8 @@ func (device *Device) RoutineWriteToTUN(tun TUNDevice) {
 		select {
 		case <-device.signal.stop:
 			return
-		case packet := <-device.queue.inbound:
-			_, err := tun.Write(packet)
+		case elem := <-device.queue.inbound:
+			_, err := tun.Write(elem.packet)
 			if err != nil {
 				logError.Println("Failed to write packet to TUN device:", err)
 			}

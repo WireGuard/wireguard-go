@@ -74,6 +74,6 @@ func CreateTUN(name string) (TUNDevice, error) {
 	return &NativeTun{
 		fd:   fd,
 		name: newName,
-		mtu:  1500, // TODO: FIX
+		mtu:  0,
 	}, nil
 }

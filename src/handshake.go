@@ -112,7 +112,6 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 				binary.Write(writer, binary.LittleEndian, msg)
 				elem.packet = writer.Bytes()
 				peer.mac.AddMacs(elem.packet)
-				println(elem)
 				addToOutboundQueue(peer.queue.outbound, elem)
 
 				if attempts == 0 {

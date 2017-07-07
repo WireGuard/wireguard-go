@@ -15,21 +15,31 @@ type MACStateDevice struct {
 	mutex     sync.RWMutex
 	refreshed time.Time
 	secret    [blake2s.Size]byte
-	keyMac1   [blake2s.Size]byte
+	keyMAC1   [blake2s.Size]byte
+	keyMAC2   [blake2s.Size]byte
 	xaead     cipher.AEAD
 }
 
 func (state *MACStateDevice) Init(pk NoisePublicKey) {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
+
 	func() {
 		hsh, _ := blake2s.New256(nil)
 		hsh.Write([]byte(WGLabelMAC1))
 		hsh.Write(pk[:])
-		hsh.Sum(state.keyMac1[:0])
+		hsh.Sum(state.keyMAC1[:0])
 	}()
-	state.xaead, _ = chacha20poly1305.NewXCipher(state.keyMac1[:])
-	state.refreshed = time.Time{} // never
+
+	func() {
+		hsh, _ := blake2s.New256(nil)
+		hsh.Write([]byte(WGLabelCookie))
+		hsh.Write(pk[:])
+		hsh.Sum(state.keyMAC2[:0])
+	}()
+
+	state.xaead, _ = chacha20poly1305.NewXCipher(state.keyMAC2[:])
+	state.refreshed = time.Time{}
 }
 
 func (state *MACStateDevice) CheckMAC1(msg []byte) bool {
@@ -39,7 +49,7 @@ func (state *MACStateDevice) CheckMAC1(msg []byte) bool {
 
 	var mac1 [blake2s.Size128]byte
 	func() {
-		mac, _ := blake2s.New128(state.keyMac1[:])
+		mac, _ := blake2s.New128(state.keyMAC1[:])
 		mac.Write(msg[:startMac1])
 		mac.Sum(mac1[:0])
 	}()
@@ -117,7 +127,7 @@ func (device *Device) CreateMessageCookieReply(msg []byte, receiver uint32, addr
 	startMac1 := size - (blake2s.Size128 * 2)
 	startMac2 := size - blake2s.Size128
 
-	M := msg[startMac1:startMac2]
+	mac1 := msg[startMac1:startMac2]
 
 	reply := new(MessageCookieReply)
 	reply.Type = MessageCookieReplyType
@@ -127,7 +137,7 @@ func (device *Device) CreateMessageCookieReply(msg []byte, receiver uint32, addr
 		state.mutex.RUnlock()
 		return nil, err
 	}
-	state.xaead.Seal(reply.Cookie[:0], reply.Nonce[:], cookie[:], M)
+	state.xaead.Seal(reply.Cookie[:0], reply.Nonce[:], cookie[:], mac1)
 	state.mutex.RUnlock()
 	return reply, nil
 }
@@ -149,9 +159,11 @@ func (device *Device) ConsumeMessageCookieReply(msg *MessageCookieReply) bool {
 
 	var cookie [blake2s.Size128]byte
 	state := &lookup.peer.mac
+
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
-	_, err := state.xaead.Open(cookie[:0], msg.Nonce[:], msg.Cookie[:], state.lastMac1[:])
+
+	_, err := state.xaead.Open(cookie[:0], msg.Nonce[:], msg.Cookie[:], state.lastMAC1[:])
 	if err != nil {
 		return false
 	}
