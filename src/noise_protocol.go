@@ -478,7 +478,7 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 			}
 			kp.previous = kp.current
 			kp.current = keyPair
-			sendSignal(peer.signal.newKeyPair)
+			signalSend(peer.signal.newKeyPair)
 		} else {
 			kp.next = keyPair
 		}

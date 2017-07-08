@@ -31,15 +31,10 @@ type Device struct {
 	signal struct {
 		stop chan struct{}
 	}
-	congestionState int32 // used as an atomic bool
-	peers           map[NoisePublicKey]*Peer
-	mac             MACStateDevice
+	underLoad int32 // used as an atomic bool
+	peers     map[NoisePublicKey]*Peer
+	mac       MACStateDevice
 }
-
-const (
-	CongestionStateUnderLoad = iota
-	CongestionStateOkay
-)
 
 func (device *Device) SetPrivateKey(sk NoisePrivateKey) {
 	device.mutex.Lock()
@@ -99,10 +94,12 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 		go device.RoutineDecryption()
 		go device.RoutineHandshake()
 	}
+
 	go device.RoutineBusyMonitor()
 	go device.RoutineReadFromTUN(tun)
 	go device.RoutineReceiveIncomming()
 	go device.RoutineWriteToTUN(tun)
+
 	return device
 }
 

@@ -4,6 +4,14 @@ import (
 	"time"
 )
 
+/* We use int32 as atomic bools
+ * (since booleans are not natively supported by sync/atomic)
+ */
+const (
+	AtomicFalse = iota
+	AtomicTrue
+)
+
 func min(a uint, b uint) uint {
 	if a > b {
 		return b
@@ -11,14 +19,21 @@ func min(a uint, b uint) uint {
 	return a
 }
 
-func sendSignal(c chan struct{}) {
+func signalSend(c chan struct{}) {
 	select {
 	case c <- struct{}{}:
 	default:
 	}
 }
 
-func stopTimer(timer *time.Timer) {
+func signalClear(c chan struct{}) {
+	select {
+	case <-c:
+	default:
+	}
+}
+
+func timerStop(timer *time.Timer) {
 	if !timer.Stop() {
 		select {
 		case <-timer.C:
@@ -27,8 +42,8 @@ func stopTimer(timer *time.Timer) {
 	}
 }
 
-func stoppedTimer() *time.Timer {
+func NewStoppedTimer() *time.Timer {
 	timer := time.NewTimer(time.Hour)
-	stopTimer(timer)
+	timerStop(timer)
 	return timer
 }

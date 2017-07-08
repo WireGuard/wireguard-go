@@ -23,19 +23,6 @@ type KeyPairs struct {
 	next     *KeyPair // not yet "confirmed by transport"
 }
 
-/* Called during recieving to confirm the handshake
- * was completed correctly
- */
-func (kp *KeyPairs) Used(key *KeyPair) {
-	if key == kp.next {
-		kp.mutex.Lock()
-		kp.previous = kp.current
-		kp.current = key
-		kp.next = nil
-		kp.mutex.Unlock()
-	}
-}
-
 func (kp *KeyPairs) Current() *KeyPair {
 	kp.mutex.RLock()
 	defer kp.mutex.RUnlock()
