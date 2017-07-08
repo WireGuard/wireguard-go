@@ -329,7 +329,7 @@ func (peer *Peer) RoutineSequentialSender() {
 				if err != nil {
 					return
 				}
-				atomic.AddUint64(&peer.tx_bytes, uint64(len(work.packet)))
+				atomic.AddUint64(&peer.txBytes, uint64(len(work.packet)))
 
 				// shift keep-alive timer
 

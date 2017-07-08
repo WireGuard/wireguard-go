@@ -17,8 +17,8 @@ type Peer struct {
 	keyPairs                    KeyPairs
 	handshake                   Handshake
 	device                      *Device
-	tx_bytes                    uint64
-	rx_bytes                    uint64
+	txBytes                     uint64
+	rxBytes                     uint64
 	time                        struct {
 		lastSend      time.Time // last send message
 		lastHandshake time.Time // last completed handshake

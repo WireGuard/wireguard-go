@@ -61,8 +61,8 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) error {
 			if peer.endpoint != nil {
 				send("endpoint=" + peer.endpoint.String())
 			}
-			send(fmt.Sprintf("tx_bytes=%d", peer.tx_bytes))
-			send(fmt.Sprintf("rx_bytes=%d", peer.rx_bytes))
+			send(fmt.Sprintf("tx_bytes=%d", peer.txBytes))
+			send(fmt.Sprintf("rx_bytes=%d", peer.rxBytes))
 			send(fmt.Sprintf("persistent_keepalive_interval=%d", peer.persistentKeepaliveInterval))
 			for _, ip := range device.routingTable.AllowedIPs(peer) {
 				send("allowed_ip=" + ip.String())
@@ -73,7 +73,6 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) error {
 	// send lines
 
 	for _, line := range lines {
-		device.log.Debug.Println("Response:", line)
 		_, err := socket.WriteString(line + "\n")
 		if err != nil {
 			return err
