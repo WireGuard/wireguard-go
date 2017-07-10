@@ -18,9 +18,7 @@ func main() {
 	}
 	deviceName := os.Args[1]
 
-	// Open TUN device
-
-	// TODO: Fix capabilities
+	// open TUN device
 
 	tun, err := CreateTUN(deviceName)
 	log.Println(tun, err)
@@ -29,8 +27,9 @@ func main() {
 	}
 
 	device := NewDevice(tun, LogLevelDebug)
+	device.log.Info.Println("Starting device")
 
-	// Start configuration lister
+	// start configuration lister
 
 	socketPath := fmt.Sprintf("/var/run/wireguard/%s.sock", deviceName)
 	l, err := net.Listen("unix", socketPath)

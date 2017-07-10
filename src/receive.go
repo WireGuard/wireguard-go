@@ -358,11 +358,13 @@ func (device *Device) RoutineHandshake() {
 					return
 				}
 
+				logDebug.Println("Creating response...")
+
 				outElem := device.NewOutboundElement()
 				writer := bytes.NewBuffer(outElem.data[:0])
 				binary.Write(writer, binary.LittleEndian, response)
-				elem.packet = writer.Bytes()
-				peer.mac.AddMacs(elem.packet)
+				outElem.packet = writer.Bytes()
+				peer.mac.AddMacs(outElem.packet)
 				addToOutboundQueue(peer.queue.outbound, outElem)
 
 			case MessageResponseType:
