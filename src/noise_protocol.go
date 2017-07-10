@@ -415,6 +415,9 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 	return lookup.peer
 }
 
+/* Derives a new key-pair from the current handshake state
+ *
+ */
 func (peer *Peer) NewKeyPair() *KeyPair {
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
@@ -445,10 +448,11 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 	// create AEAD instances
 
 	keyPair := new(KeyPair)
+	keyPair.created = time.Now()
 	keyPair.send, _ = chacha20poly1305.New(sendKey[:])
 	keyPair.receive, _ = chacha20poly1305.New(recvKey[:])
 	keyPair.sendNonce = 0
-	keyPair.created = time.Now()
+	keyPair.replayFilter.Init()
 	keyPair.isInitiator = isInitiator
 	keyPair.localIndex = peer.handshake.localIndex
 	keyPair.remoteIndex = peer.handshake.remoteIndex
@@ -461,8 +465,6 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 		handshake: nil,
 	})
 	handshake.localIndex = 0
-
-	// TODO: start timer for keypair (clearing)
 
 	// rotate key pairs
 

@@ -7,13 +7,14 @@ import (
 )
 
 type KeyPair struct {
-	receive     cipher.AEAD
-	send        cipher.AEAD
-	sendNonce   uint64
-	isInitiator bool
-	created     time.Time
-	localIndex  uint32
-	remoteIndex uint32
+	receive      cipher.AEAD
+	replayFilter ReplayFilter
+	send         cipher.AEAD
+	sendNonce    uint64
+	isInitiator  bool
+	created      time.Time
+	localIndex   uint32
+	remoteIndex  uint32
 }
 
 type KeyPairs struct {

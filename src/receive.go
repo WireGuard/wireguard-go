@@ -432,6 +432,10 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 			// check for replay
 
+			if !elem.keyPair.replayFilter.ValidateCounter(elem.counter) {
+				return
+			}
+
 			// time (passive) keep-alive
 
 			peer.TimerStartKeepalive()

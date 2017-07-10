@@ -12,22 +12,15 @@ import (
  *
  */
 func (peer *Peer) KeepKeyFreshSending() {
-	send := func() bool {
-		peer.keyPairs.mutex.RLock()
-		defer peer.keyPairs.mutex.RUnlock()
-
-		kp := peer.keyPairs.current
-		if kp == nil {
-			return false
-		}
-
-		if !kp.isInitiator {
-			return false
-		}
-
-		nonce := atomic.LoadUint64(&kp.sendNonce)
-		return nonce > RekeyAfterMessages || time.Now().Sub(kp.created) > RekeyAfterTime
-	}()
+	kp := peer.keyPairs.Current()
+	if kp == nil {
+		return
+	}
+	if !kp.isInitiator {
+		return
+	}
+	nonce := atomic.LoadUint64(&kp.sendNonce)
+	send := nonce > RekeyAfterMessages || time.Now().Sub(kp.created) > RekeyAfterTime
 	if send {
 		signalSend(peer.signal.handshakeBegin)
 	}
@@ -37,22 +30,15 @@ func (peer *Peer) KeepKeyFreshSending() {
  *
  */
 func (peer *Peer) KeepKeyFreshReceiving() {
-	send := func() bool {
-		peer.keyPairs.mutex.RLock()
-		defer peer.keyPairs.mutex.RUnlock()
-
-		kp := peer.keyPairs.current
-		if kp == nil {
-			return false
-		}
-
-		if !kp.isInitiator {
-			return false
-		}
-
-		nonce := atomic.LoadUint64(&kp.sendNonce)
-		return nonce > RekeyAfterMessages || time.Now().Sub(kp.created) > RekeyAfterTimeReceiving
-	}()
+	kp := peer.keyPairs.Current()
+	if kp == nil {
+		return
+	}
+	if !kp.isInitiator {
+		return
+	}
+	nonce := atomic.LoadUint64(&kp.sendNonce)
+	send := nonce > RekeyAfterMessages || time.Now().Sub(kp.created) > RekeyAfterTimeReceiving
 	if send {
 		signalSend(peer.signal.handshakeBegin)
 	}
