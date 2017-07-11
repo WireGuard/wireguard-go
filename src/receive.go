@@ -319,6 +319,10 @@ func (device *Device) RoutineHandshake() {
 
 			// ratelimit
 
+			if !device.ratelimiter.Allow(elem.source.IP) {
+				return
+			}
+
 			// handle messages
 
 			switch elem.msgType {

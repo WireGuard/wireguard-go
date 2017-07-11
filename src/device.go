@@ -31,9 +31,10 @@ type Device struct {
 	signal struct {
 		stop chan struct{}
 	}
-	underLoad int32 // used as an atomic bool
-	peers     map[NoisePublicKey]*Peer
-	mac       MACStateDevice
+	underLoad   int32 // used as an atomic bool
+	ratelimiter Ratelimiter
+	peers       map[NoisePublicKey]*Peer
+	mac         MACStateDevice
 }
 
 func (device *Device) SetPrivateKey(sk NoisePrivateKey) {
@@ -66,6 +67,7 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	device.mtu = tun.MTU()
 	device.peers = make(map[NoisePublicKey]*Peer)
 	device.indices.Init()
+	device.ratelimiter.Init()
 	device.routingTable.Reset()
 
 	// listen
@@ -99,6 +101,7 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	go device.RoutineReadFromTUN(tun)
 	go device.RoutineReceiveIncomming()
 	go device.RoutineWriteToTUN(tun)
+	go device.ratelimiter.RoutineGarbageCollector(device.signal.stop)
 
 	return device
 }
