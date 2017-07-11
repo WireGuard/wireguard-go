@@ -14,25 +14,52 @@ import (
 
 const CloneDevicePath = "/dev/net/tun"
 
-const (
-	IFF_NO_PI = 0x1000
-	IFF_TUN   = 0x1
-	IFNAMSIZ  = 0x10
-	TUNSETIFF = 0x400454CA
-)
-
 type NativeTun struct {
 	fd   *os.File
 	name string
-	mtu  int
 }
 
 func (tun *NativeTun) Name() string {
 	return tun.name
 }
 
-func (tun *NativeTun) MTU() int {
-	return tun.mtu
+func (tun *NativeTun) MTU() (int, error) {
+
+	// open datagram socket
+
+	fd, err := syscall.Socket(
+		syscall.AF_INET,
+		syscall.SOCK_DGRAM,
+		0,
+	)
+
+	if err != nil {
+		return 0, err
+	}
+
+	// do ioctl call
+
+	var ifr [64]byte
+	var flags uint16
+	copy(ifr[:], tun.name)
+	binary.LittleEndian.PutUint16(ifr[16:], flags)
+	_, _, errno := syscall.Syscall(
+		syscall.SYS_IOCTL,
+		uintptr(fd),
+		uintptr(syscall.SIOCGIFMTU),
+		uintptr(unsafe.Pointer(&ifr[0])),
+	)
+	if errno != 0 {
+		return 0, errors.New("Failed to get MTU of TUN device")
+	}
+
+	// convert result to signed 32-bit int
+
+	val := binary.LittleEndian.Uint32(ifr[16:20])
+	if val >= (1 << 31) {
+		return int(val-(1<<31)) - (1 << 31), nil
+	}
+	return int(val), nil
 }
 
 func (tun *NativeTun) Write(d []byte) (int, error) {
@@ -44,36 +71,43 @@ func (tun *NativeTun) Read(d []byte) (int, error) {
 }
 
 func CreateTUN(name string) (TUNDevice, error) {
-	// Open clone device
+
+	// open clone device
+
 	fd, err := os.OpenFile(CloneDevicePath, os.O_RDWR, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	// Prepare ifreq struct
-	var ifr [128]byte
-	var flags uint16 = IFF_TUN | IFF_NO_PI
+	// prepare ifreq struct
+
+	var ifr [64]byte
+	var flags uint16 = syscall.IFF_TUN | syscall.IFF_NO_PI
 	nameBytes := []byte(name)
-	if len(nameBytes) >= IFNAMSIZ {
+	if len(nameBytes) >= syscall.IFNAMSIZ {
 		return nil, errors.New("Name size too long")
 	}
 	copy(ifr[:], nameBytes)
 	binary.LittleEndian.PutUint16(ifr[16:], flags)
 
-	// Create new device
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
-		uintptr(fd.Fd()), uintptr(TUNSETIFF),
-		uintptr(unsafe.Pointer(&ifr[0])))
+	// create new device
+
+	_, _, errno := syscall.Syscall(
+		syscall.SYS_IOCTL,
+		uintptr(fd.Fd()),
+		uintptr(syscall.TUNSETIFF),
+		uintptr(unsafe.Pointer(&ifr[0])),
+	)
 	if errno != 0 {
 		return nil, errors.New("Failed to create tun, ioctl call failed")
 	}
 
-	// Read name of interface
+	// read (new) name of interface
+
 	newName := string(ifr[:])
 	newName = newName[:strings.Index(newName, "\000")]
 	return &NativeTun{
 		fd:   fd,
 		name: newName,
-		mtu:  0,
 	}, nil
 }

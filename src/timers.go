@@ -229,6 +229,7 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 
 		run = func() bool {
 			for {
+
 				// clear completed signal
 
 				select {

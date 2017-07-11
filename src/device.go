@@ -64,7 +64,7 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	defer device.mutex.Unlock()
 
 	device.log = NewLogger(logLevel)
-	device.mtu = tun.MTU()
+	// device.mtu = tun.MTU()
 	device.peers = make(map[NoisePublicKey]*Peer)
 	device.indices.Init()
 	device.ratelimiter.Init()
