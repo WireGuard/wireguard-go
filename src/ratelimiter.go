@@ -1,9 +1,8 @@
 package main
 
-/* Implementation of the ratelimited form the linux kernel version
- *
- *
- *
+/* Copyright (C) 2015-2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved. */
+
+/* This file contains a port of the ratelimited from the linux kernel version
  */
 
 import (

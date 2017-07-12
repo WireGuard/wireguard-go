@@ -18,8 +18,8 @@ func (tun *DummyTUN) Name() string {
 	return tun.name
 }
 
-func (tun *DummyTUN) MTU() int {
-	return tun.mtu
+func (tun *DummyTUN) MTU() (int, error) {
+	return tun.mtu, nil
 }
 
 func (tun *DummyTUN) Write(d []byte) (int, error) {

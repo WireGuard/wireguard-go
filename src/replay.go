@@ -1,5 +1,7 @@
 package main
 
+/* Copyright (C) 2015-2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved. */
+
 /* Implementation of RFC6479
  * https://tools.ietf.org/html/rfc6479
  *
