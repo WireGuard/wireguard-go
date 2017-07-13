@@ -356,6 +356,12 @@ func (device *Device) RoutineHandshake() {
 					return
 				}
 
+				// update endpoint
+
+				peer.mutex.Lock()
+				peer.endpoint = elem.source
+				peer.mutex.Unlock()
+
 				// create response
 
 				response, err := device.CreateMessageResponse(peer)
