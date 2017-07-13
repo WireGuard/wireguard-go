@@ -29,6 +29,6 @@ const (
 	QueueInboundSize       = 1024
 	QueueHandshakeSize     = 1024
 	QueueHandshakeBusySize = QueueHandshakeSize / 8
-	MinMessageSize         = MessageTransportSize // keep-alive
-	MaxMessageSize         = 4096                 // TODO: make depend on the MTU?
+	MinMessageSize         = MessageTransportSize // size of keep-alive
+	MaxMessageSize         = (1 << 16) - 1
 )

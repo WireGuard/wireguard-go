@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -38,9 +40,9 @@ type Peer struct {
 		/* Both keep-alive timers acts as one (see timers.go)
 		 * They are kept seperate to simplify the implementation.
 		 */
-		keepalivePersistent      *time.Timer // set for persistent keepalives
-		keepaliveAcknowledgement *time.Timer // set upon recieving messages
-		zeroAllKeys              *time.Timer // zero all key material after RejectAfterTime*3
+		keepalivePersistent *time.Timer // set for persistent keepalives
+		keepalivePassive    *time.Timer // set upon recieving messages
+		zeroAllKeys         *time.Timer // zero all key material after RejectAfterTime*3
 	}
 	queue struct {
 		nonce    chan *QueueOutboundElement // nonce / pre-handshake queue
@@ -63,8 +65,8 @@ func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 	peer.mac.Init(pk)
 	peer.device = device
 
+	peer.timer.keepalivePassive = NewStoppedTimer()
 	peer.timer.keepalivePersistent = NewStoppedTimer()
-	peer.timer.keepaliveAcknowledgement = NewStoppedTimer()
 	peer.timer.zeroAllKeys = NewStoppedTimer()
 
 	peer.flags.keepaliveWaiting = AtomicFalse
@@ -113,6 +115,15 @@ func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 	go peer.RoutineSequentialReceiver()
 
 	return peer
+}
+
+func (peer *Peer) String() string {
+	return fmt.Sprintf(
+		"peer(%d %s %s)",
+		peer.id,
+		peer.endpoint.String(),
+		base64.StdEncoding.EncodeToString(peer.handshake.remoteStatic[:]),
+	)
 }
 
 func (peer *Peer) Close() {

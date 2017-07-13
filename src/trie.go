@@ -23,7 +23,8 @@ type Trie struct {
 	bits  []byte
 	peer  *Peer
 
-	// Index of "branching" bit
+	// index of "branching" bit
+
 	bit_at_byte  uint
 	bit_at_shift uint
 }
@@ -36,7 +37,7 @@ type Trie struct {
 func commonBits(ip1 net.IP, ip2 net.IP) uint {
 	var i uint
 	size := uint(len(ip1))
-	for i = 0; i < size; i += 1 {
+	for i = 0; i < size; i++ {
 		v := ip1[i] ^ ip2[i]
 		if v != 0 {
 			v >>= 1
@@ -84,7 +85,7 @@ func (node *Trie) RemovePeer(p *Peer) *Trie {
 		return node
 	}
 
-	// Walk recursivly
+	// walk recursivly
 
 	node.child[0] = node.child[0].RemovePeer(p)
 	node.child[1] = node.child[1].RemovePeer(p)
@@ -93,7 +94,7 @@ func (node *Trie) RemovePeer(p *Peer) *Trie {
 		return node
 	}
 
-	// Remove peer & merge
+	// remove peer & merge
 
 	node.peer = nil
 	if node.child[0] == nil {
@@ -108,7 +109,7 @@ func (node *Trie) choose(ip net.IP) byte {
 
 func (node *Trie) Insert(ip net.IP, cidr uint, peer *Peer) *Trie {
 
-	// At leaf
+	// at leaf
 
 	if node == nil {
 		return &Trie{
@@ -120,7 +121,7 @@ func (node *Trie) Insert(ip net.IP, cidr uint, peer *Peer) *Trie {
 		}
 	}
 
-	// Traverse deeper
+	// traverse deeper
 
 	common := commonBits(node.bits, ip)
 	if node.cidr <= cidr && common >= node.cidr {
@@ -133,7 +134,7 @@ func (node *Trie) Insert(ip net.IP, cidr uint, peer *Peer) *Trie {
 		return node
 	}
 
-	// Split node
+	// split node
 
 	newNode := &Trie{
 		bits:         ip,
@@ -145,7 +146,7 @@ func (node *Trie) Insert(ip net.IP, cidr uint, peer *Peer) *Trie {
 
 	cidr = min(cidr, common)
 
-	// Check for shorter prefix
+	// check for shorter prefix
 
 	if newNode.cidr == cidr {
 		bit := newNode.choose(node.bits)
@@ -153,7 +154,7 @@ func (node *Trie) Insert(ip net.IP, cidr uint, peer *Peer) *Trie {
 		return newNode
 	}
 
-	// Create new parent for node & newNode
+	// create new parent for node & newNode
 
 	parent := &Trie{
 		bits:         ip,

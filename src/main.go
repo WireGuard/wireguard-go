@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"runtime"
 )
 
 /* TODO: Fix logging
@@ -17,6 +18,10 @@ func main() {
 		return
 	}
 	deviceName := os.Args[1]
+
+	// increase number of go workers (for Go <1.5)
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// open TUN device
 
@@ -31,17 +36,21 @@ func main() {
 
 	// start configuration lister
 
-	socketPath := fmt.Sprintf("/var/run/wireguard/%s.sock", deviceName)
-	l, err := net.Listen("unix", socketPath)
-	if err != nil {
-		log.Fatal("listen error:", err)
-	}
-
-	for {
-		conn, err := l.Accept()
+	go func() {
+		socketPath := fmt.Sprintf("/var/run/wireguard/%s.sock", deviceName)
+		l, err := net.Listen("unix", socketPath)
 		if err != nil {
-			log.Fatal("accept error:", err)
+			log.Fatal("listen error:", err)
 		}
-		go ipcHandle(device, conn)
-	}
+
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				log.Fatal("accept error:", err)
+			}
+			go ipcHandle(device, conn)
+		}
+	}()
+
+	device.Wait()
 }

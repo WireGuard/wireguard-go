@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"golang.org/x/crypto/chacha20poly1305"
+	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -362,7 +364,7 @@ func (device *Device) RoutineHandshake() {
 					return
 				}
 
-				logDebug.Println("Creating response...")
+				logDebug.Println("Creating response message for", peer.String())
 
 				outElem := device.NewOutboundElement()
 				writer := bytes.NewBuffer(outElem.data[:0])
@@ -416,6 +418,8 @@ func (peer *Peer) RoutineSequentialReceiver() {
 	var elem *QueueInboundElement
 
 	device := peer.device
+
+	logInfo := device.log.Info
 	logDebug := device.log.Debug
 	logDebug.Println("Routine, sequential receiver, started for peer", peer.id)
 
@@ -450,7 +454,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 			peer.KeepKeyFreshReceiving()
 
-			// check if confirming handshake
+			// check if using new key-pair
 
 			kp := &peer.keyPairs
 			kp.mutex.Lock()
@@ -465,17 +469,18 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			// check for keep-alive
 
 			if len(elem.packet) == 0 {
+				logDebug.Println("Received keep-alive from", peer.String())
 				return
 			}
 
 			// verify source and strip padding
 
 			switch elem.packet[0] >> 4 {
-			case IPv4version:
+			case ipv4.Version:
 
 				// strip padding
 
-				if len(elem.packet) < IPv4headerSize {
+				if len(elem.packet) < ipv4.HeaderLen {
 					return
 				}
 
@@ -487,31 +492,33 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 				dst := elem.packet[IPv4offsetDst : IPv4offsetDst+net.IPv4len]
 				if device.routingTable.LookupIPv4(dst) != peer {
+					logInfo.Println("Packet with unallowed source IP from", peer.String())
 					return
 				}
 
-			case IPv6version:
+			case ipv6.Version:
 
 				// strip padding
 
-				if len(elem.packet) < IPv6headerSize {
+				if len(elem.packet) < ipv6.HeaderLen {
 					return
 				}
 
 				field := elem.packet[IPv6offsetPayloadLength : IPv6offsetPayloadLength+2]
 				length := binary.BigEndian.Uint16(field)
-				length += IPv6headerSize
+				length += ipv6.HeaderLen
 				elem.packet = elem.packet[:length]
 
 				// verify IPv6 source
 
 				dst := elem.packet[IPv6offsetDst : IPv6offsetDst+net.IPv6len]
 				if device.routingTable.LookupIPv6(dst) != peer {
+					logInfo.Println("Packet with unallowed source IP from", peer.String())
 					return
 				}
 
 			default:
-				logDebug.Println("Receieved packet with unknown IP version")
+				logInfo.Println("Packet with invalid IP version from", peer.String())
 				return
 			}
 
@@ -522,6 +529,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 }
 
 func (device *Device) RoutineWriteToTUN(tun TUNDevice) {
+
 	logError := device.log.Error
 	logDebug := device.log.Debug
 	logDebug.Println("Routine, sequential tun writer, started")

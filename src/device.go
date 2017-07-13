@@ -98,9 +98,9 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	}
 
 	go device.RoutineBusyMonitor()
+	go device.RoutineWriteToTUN(tun)
 	go device.RoutineReadFromTUN(tun)
 	go device.RoutineReceiveIncomming()
-	go device.RoutineWriteToTUN(tun)
 	go device.ratelimiter.RoutineGarbageCollector(device.signal.stop)
 
 	return device
@@ -141,5 +141,8 @@ func (device *Device) RemoveAllPeers() {
 func (device *Device) Close() {
 	device.RemoveAllPeers()
 	close(device.signal.stop)
-	close(device.queue.encryption)
+}
+
+func (device *Device) Wait() {
+	<-device.signal.stop
 }

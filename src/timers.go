@@ -50,7 +50,7 @@ func (peer *Peer) KeepKeyFreshReceiving() {
  * - First transport message under the "next" key
  */
 func (peer *Peer) EventHandshakeComplete() {
-	peer.device.log.Debug.Println("Handshake completed")
+	peer.device.log.Info.Println("Negotiated new handshake for", peer.String())
 	peer.timer.zeroAllKeys.Reset(RejectAfterTime * 3)
 	signalSend(peer.signal.handshakeCompleted)
 }
@@ -112,7 +112,7 @@ func (peer *Peer) TimerResetKeepalive() {
 
 	// stop acknowledgement timer
 
-	timerStop(peer.timer.keepaliveAcknowledgement)
+	timerStop(peer.timer.keepalivePassive)
 	atomic.StoreInt32(&peer.flags.keepaliveWaiting, AtomicFalse)
 }
 
@@ -140,7 +140,7 @@ func (peer *Peer) RoutineTimerHandler() {
 	device := peer.device
 
 	logDebug := device.log.Debug
-	logDebug.Println("Routine, timer handler, started for peer", peer.id)
+	logDebug.Println("Routine, timer handler, started for peer", peer.String())
 
 	for {
 		select {
@@ -152,14 +152,14 @@ func (peer *Peer) RoutineTimerHandler() {
 
 		case <-peer.timer.keepalivePersistent.C:
 
-			logDebug.Println("Sending persistent keep-alive to peer", peer.id)
+			logDebug.Println("Sending persistent keep-alive to", peer.String())
 
 			peer.SendKeepAlive()
 			peer.TimerResetKeepalive()
 
-		case <-peer.timer.keepaliveAcknowledgement.C:
+		case <-peer.timer.keepalivePassive.C:
 
-			logDebug.Println("Sending passive persistent keep-alive to peer", peer.id)
+			logDebug.Println("Sending passive persistent keep-alive to", peer.String())
 
 			peer.SendKeepAlive()
 			peer.TimerResetKeepalive()
@@ -168,7 +168,7 @@ func (peer *Peer) RoutineTimerHandler() {
 
 		case <-peer.timer.zeroAllKeys.C:
 
-			logDebug.Println("Clearing all key material for peer", peer.id)
+			logDebug.Println("Clearing all key material for", peer.String())
 
 			// zero out key pairs
 
@@ -208,14 +208,12 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 
 	var elem *QueueOutboundElement
 
+	logInfo := device.log.Info
 	logError := device.log.Error
 	logDebug := device.log.Debug
-	logDebug.Println("Routine, handshake initator, started for peer", peer.id)
+	logDebug.Println("Routine, handshake initator, started for", peer.String())
 
-	for run := true; run; {
-		var err error
-		var attempts uint
-		var deadline time.Time
+	for {
 
 		// wait for signal
 
@@ -227,15 +225,17 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 
 		// wait for handshake
 
-		run = func() bool {
-			for {
+		func() {
+			var err error
+			var deadline time.Time
+			for attempts := uint(1); ; attempts++ {
 
 				// clear completed signal
 
 				select {
 				case <-peer.signal.handshakeCompleted:
 				case <-peer.signal.stop:
-					return false
+					return
 				default:
 				}
 
@@ -246,43 +246,39 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 				}
 				elem, err = peer.BeginHandshakeInitiation()
 				if err != nil {
-					logError.Println("Failed to create initiation message:", err)
-					break
+					logError.Println("Failed to create initiation message", err, "for", peer.String())
+					return
 				}
 
 				// set timeout
 
-				attempts += 1
 				if attempts == 1 {
 					deadline = time.Now().Add(MaxHandshakeAttemptTime)
 				}
 				timeout := time.NewTimer(RekeyTimeout)
-				logDebug.Println("Handshake initiation attempt", attempts, "queued for peer", peer.id)
+				logDebug.Println("Handshake initiation attempt", attempts, "queued for", peer.String())
 
 				// wait for handshake or timeout
 
 				select {
+
 				case <-peer.signal.stop:
-					return true
+					return
 
 				case <-peer.signal.handshakeCompleted:
 					<-timeout.C
-					return true
+					return
 
 				case <-timeout.C:
-					logDebug.Println("Timeout")
-
-					// check if sufficient time for retry
-
 					if deadline.Before(time.Now().Add(RekeyTimeout)) {
+						logInfo.Println("Handshake negotiation timed out for", peer.String())
 						signalSend(peer.signal.flushNonceQueue)
 						timerStop(peer.timer.keepalivePersistent)
-						timerStop(peer.timer.keepaliveAcknowledgement)
-						return true
+						timerStop(peer.timer.keepalivePassive)
+						return
 					}
 				}
 			}
-			return true
 		}()
 
 		signalClear(peer.signal.handshakeBegin)
