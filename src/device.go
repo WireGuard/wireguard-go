@@ -11,7 +11,11 @@ type Device struct {
 	log       *Logger // collection of loggers for levels
 	idCounter uint    // for assigning debug ids to peers
 	fwMark    uint32
-	net       struct {
+	pool      struct {
+		// pools objects for reuse
+		messageBuffers sync.Pool
+	}
+	net struct {
 		// seperate for performance reasons
 		mutex sync.RWMutex
 		addr  *net.UDPAddr // UDP source address
@@ -57,6 +61,14 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) {
 	}
 }
 
+func (device *Device) GetMessageBuffer() *[MaxMessageSize]byte {
+	return device.pool.messageBuffers.Get().(*[MaxMessageSize]byte)
+}
+
+func (device *Device) PutMessageBuffer(msg *[MaxMessageSize]byte) {
+	device.pool.messageBuffers.Put(msg)
+}
+
 func NewDevice(tun TUNDevice, logLevel int) *Device {
 	device := new(Device)
 
@@ -77,6 +89,14 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	addr := device.net.conn.LocalAddr()
 	device.net.addr, _ = net.ResolveUDPAddr(addr.Network(), addr.String())
 	device.net.mutex.Unlock()
+
+	// setup pools
+
+	device.pool.messageBuffers = sync.Pool{
+		New: func() interface{} {
+			return new([MaxMessageSize]byte)
+		},
+	}
 
 	// create queues
 

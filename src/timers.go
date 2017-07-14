@@ -128,7 +128,7 @@ func (peer *Peer) BeginHandshakeInitiation() (*QueueOutboundElement, error) {
 
 	// marshal & schedule for sending
 
-	writer := bytes.NewBuffer(elem.data[:0])
+	writer := bytes.NewBuffer(elem.buffer[:0])
 	binary.Write(writer, binary.LittleEndian, msg)
 	elem.packet = writer.Bytes()
 	peer.mac.AddMacs(elem.packet)
