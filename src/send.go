@@ -281,17 +281,22 @@ func (device *Device) RoutineEncryption() {
 
 		// populate header fields
 
-		func() {
-			header := work.buffer[:MessageTransportHeaderSize]
+		header := work.buffer[:MessageTransportHeaderSize]
 
-			fieldType := header[0:4]
-			fieldReceiver := header[4:8]
-			fieldNonce := header[8:16]
+		fieldType := header[0:4]
+		fieldReceiver := header[4:8]
+		fieldNonce := header[8:16]
 
-			binary.LittleEndian.PutUint32(fieldType, MessageTransportType)
-			binary.LittleEndian.PutUint32(fieldReceiver, work.keyPair.remoteIndex)
-			binary.LittleEndian.PutUint64(fieldNonce, work.nonce)
-		}()
+		binary.LittleEndian.PutUint32(fieldType, MessageTransportType)
+		binary.LittleEndian.PutUint32(fieldReceiver, work.keyPair.remoteIndex)
+		binary.LittleEndian.PutUint64(fieldNonce, work.nonce)
+
+		// pad content to MTU size
+
+		mtu := int(atomic.LoadInt32(&device.mtu))
+		for i := len(work.packet); i < mtu; i++ {
+			work.packet = append(work.packet, 0)
+		}
 
 		// encrypt content
 

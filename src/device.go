@@ -4,10 +4,12 @@ import (
 	"net"
 	"runtime"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 type Device struct {
-	mtu       int
+	mtu       int32
 	log       *Logger // collection of loggers for levels
 	idCounter uint    // for assigning debug ids to peers
 	fwMark    uint32
@@ -118,12 +120,25 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	}
 
 	go device.RoutineBusyMonitor()
+	go device.RoutineMTUUpdater(tun)
 	go device.RoutineWriteToTUN(tun)
 	go device.RoutineReadFromTUN(tun)
 	go device.RoutineReceiveIncomming()
 	go device.ratelimiter.RoutineGarbageCollector(device.signal.stop)
 
 	return device
+}
+
+func (device *Device) RoutineMTUUpdater(tun TUNDevice) {
+	logError := device.log.Error
+	for ; ; time.Sleep(time.Second) {
+		mtu, err := tun.MTU()
+		if err != nil {
+			logError.Println("Failed to load updated MTU of device:", err)
+			continue
+		}
+		atomic.StoreInt32(&device.mtu, int32(mtu))
+	}
 }
 
 func (device *Device) LookupPeer(pk NoisePublicKey) *Peer {

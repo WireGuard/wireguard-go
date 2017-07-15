@@ -23,6 +23,39 @@ func (tun *NativeTun) Name() string {
 	return tun.name
 }
 
+func (tun *NativeTun) setMTU(n int) error {
+
+	// open datagram socket
+
+	fd, err := syscall.Socket(
+		syscall.AF_INET,
+		syscall.SOCK_DGRAM,
+		0,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	// do ioctl call
+
+	var ifr [64]byte
+	copy(ifr[:], tun.name)
+	binary.LittleEndian.PutUint32(ifr[16:20], uint32(n))
+	_, _, errno := syscall.Syscall(
+		syscall.SYS_IOCTL,
+		uintptr(fd),
+		uintptr(syscall.SIOCSIFMTU),
+		uintptr(unsafe.Pointer(&ifr[0])),
+	)
+
+	if errno != 0 {
+		return errors.New("Failed to set MTU of TUN device")
+	}
+
+	return nil
+}
+
 func (tun *NativeTun) MTU() (int, error) {
 
 	// open datagram socket
@@ -40,9 +73,7 @@ func (tun *NativeTun) MTU() (int, error) {
 	// do ioctl call
 
 	var ifr [64]byte
-	var flags uint16
 	copy(ifr[:], tun.name)
-	binary.LittleEndian.PutUint16(ifr[16:], flags)
 	_, _, errno := syscall.Syscall(
 		syscall.SYS_IOCTL,
 		uintptr(fd),
@@ -79,7 +110,7 @@ func CreateTUN(name string) (TUNDevice, error) {
 		return nil, err
 	}
 
-	// prepare ifreq struct
+	// create new device
 
 	var ifr [64]byte
 	var flags uint16 = syscall.IFF_TUN | syscall.IFF_NO_PI
@@ -89,8 +120,6 @@ func CreateTUN(name string) (TUNDevice, error) {
 	}
 	copy(ifr[:], nameBytes)
 	binary.LittleEndian.PutUint16(ifr[16:], flags)
-
-	// create new device
 
 	_, _, errno := syscall.Syscall(
 		syscall.SYS_IOCTL,
@@ -106,8 +135,13 @@ func CreateTUN(name string) (TUNDevice, error) {
 
 	newName := string(ifr[:])
 	newName = newName[:strings.Index(newName, "\000")]
-	return &NativeTun{
+	device := &NativeTun{
 		fd:   fd,
 		name: newName,
-	}, nil
+	}
+
+	// set default MTU
+
+	err = device.setMTU(DefaultMTU)
+	return device, err
 }
