@@ -1,23 +1,45 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"net"
 	"os"
 	"runtime"
 )
 
-/* TODO: Fix logging
- * TODO: Fix daemon
- */
-
 func main() {
 
-	if len(os.Args) != 2 {
+	// parse arguments
+
+	var foreground bool
+	var interfaceName string
+	if len(os.Args) < 2 || len(os.Args) > 3 {
 		return
 	}
-	deviceName := os.Args[1]
+
+	switch os.Args[1] {
+	case "-f", "--foreground":
+		foreground = true
+		if len(os.Args) != 3 {
+			return
+		}
+		interfaceName = os.Args[2]
+	default:
+		foreground = false
+		if len(os.Args) != 2 {
+			return
+		}
+		interfaceName = os.Args[1]
+	}
+
+	// daemonize the process
+
+	if !foreground {
+		err := Daemonize()
+		if err != nil {
+			log.Println("Failed to daemonize:", err)
+		}
+		return
+	}
 
 	// increase number of go workers (for Go <1.5)
 
@@ -25,32 +47,33 @@ func main() {
 
 	// open TUN device
 
-	tun, err := CreateTUN(deviceName)
+	tun, err := CreateTUN(interfaceName)
 	log.Println(tun, err)
 	if err != nil {
 		return
 	}
 
+	// create wireguard device
+
 	device := NewDevice(tun, LogLevelDebug)
-	device.log.Info.Println("Starting device")
+
+	logInfo := device.log.Info
+	logError := device.log.Error
+	logInfo.Println("Starting device")
 
 	// start configuration lister
 
-	go func() {
-		socketPath := fmt.Sprintf("/var/run/wireguard/%s.sock", deviceName)
-		l, err := net.Listen("unix", socketPath)
+	uapi, err := NewUAPIListener(interfaceName)
+	if err != nil {
+		logError.Fatal("UAPI listen error:", err)
+	}
+	defer uapi.Close()
+
+	for {
+		conn, err := uapi.Accept()
 		if err != nil {
-			log.Fatal("listen error:", err)
+			logError.Fatal("accept error:", err)
 		}
-
-		for {
-			conn, err := l.Accept()
-			if err != nil {
-				log.Fatal("accept error:", err)
-			}
-			go ipcHandle(device, conn)
-		}
-	}()
-
-	device.Wait()
+		go ipcHandle(device, conn)
+	}
 }
