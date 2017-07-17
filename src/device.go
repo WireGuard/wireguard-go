@@ -78,7 +78,6 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	defer device.mutex.Unlock()
 
 	device.log = NewLogger(logLevel)
-	// device.mtu = tun.MTU()
 	device.peers = make(map[NoisePublicKey]*Peer)
 	device.indices.Init()
 	device.ratelimiter.Init()
@@ -131,11 +130,20 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 
 func (device *Device) RoutineMTUUpdater(tun TUNDevice) {
 	logError := device.log.Error
-	for ; ; time.Sleep(time.Second) {
+	for ; ; time.Sleep(5 * time.Second) {
+
+		// load updated MTU
+
 		mtu, err := tun.MTU()
 		if err != nil {
 			logError.Println("Failed to load updated MTU of device:", err)
 			continue
+		}
+
+		// upper bound of mtu
+
+		if mtu+MessageTransportSize > MaxMessageSize {
+			mtu = MaxMessageSize - MessageTransportSize
 		}
 		atomic.StoreInt32(&device.mtu, int32(mtu))
 	}

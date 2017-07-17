@@ -459,7 +459,8 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 
 	// remap index
 
-	peer.device.indices.Insert(handshake.localIndex, IndexTableEntry{
+	indices := &peer.device.indices
+	indices.Insert(handshake.localIndex, IndexTableEntry{
 		peer:      peer,
 		keyPair:   keyPair,
 		handshake: nil,
@@ -476,7 +477,7 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 			if kp.previous != nil {
 				kp.previous.send = nil
 				kp.previous.receive = nil
-				peer.device.indices.Delete(kp.previous.localIndex)
+				indices.Delete(kp.previous.localIndex)
 			}
 			kp.previous = kp.current
 			kp.current = keyPair

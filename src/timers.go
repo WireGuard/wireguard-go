@@ -138,6 +138,7 @@ func (peer *Peer) BeginHandshakeInitiation() (*QueueOutboundElement, error) {
 
 func (peer *Peer) RoutineTimerHandler() {
 	device := peer.device
+	indices := &device.indices
 
 	logDebug := device.log.Debug
 	logDebug.Println("Routine, timer handler, started for peer", peer.String())
@@ -170,29 +171,42 @@ func (peer *Peer) RoutineTimerHandler() {
 
 			logDebug.Println("Clearing all key material for", peer.String())
 
-			// zero out key pairs
+			kp := &peer.keyPairs
+			kp.mutex.Lock()
 
-			func() {
-				kp := &peer.keyPairs
-				kp.mutex.Lock()
-				// best we can do is wait for GC :( ?
-				kp.current = nil
-				kp.previous = nil
-				kp.next = nil
-				kp.mutex.Unlock()
-			}()
+			hs := &peer.handshake
+			hs.mutex.Lock()
+
+			// unmap local indecies
+
+			indices.mutex.Lock()
+			if kp.previous != nil {
+				delete(indices.table, kp.previous.localIndex)
+			}
+			if kp.current != nil {
+				delete(indices.table, kp.current.localIndex)
+			}
+			if kp.next != nil {
+				delete(indices.table, kp.next.localIndex)
+			}
+			delete(indices.table, hs.localIndex)
+			indices.mutex.Unlock()
+
+			// zero out key pairs (TODO: better than wait for GC)
+
+			kp.current = nil
+			kp.previous = nil
+			kp.next = nil
+			kp.mutex.Unlock()
 
 			// zero out handshake
 
-			func() {
-				hs := &peer.handshake
-				hs.mutex.Lock()
-				hs.localEphemeral = NoisePrivateKey{}
-				hs.remoteEphemeral = NoisePublicKey{}
-				hs.chainKey = [blake2s.Size]byte{}
-				hs.hash = [blake2s.Size]byte{}
-				hs.mutex.Unlock()
-			}()
+			hs.localIndex = 0
+			hs.localEphemeral = NoisePrivateKey{}
+			hs.remoteEphemeral = NoisePublicKey{}
+			hs.chainKey = [blake2s.Size]byte{}
+			hs.hash = [blake2s.Size]byte{}
+			hs.mutex.Unlock()
 		}
 	}
 }

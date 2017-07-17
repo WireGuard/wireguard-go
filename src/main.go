@@ -17,12 +17,14 @@ func main() {
 	}
 
 	switch os.Args[1] {
+
 	case "-f", "--foreground":
 		foreground = true
 		if len(os.Args) != 3 {
 			return
 		}
 		interfaceName = os.Args[2]
+
 	default:
 		foreground = false
 		if len(os.Args) != 2 {
@@ -48,8 +50,8 @@ func main() {
 	// open TUN device
 
 	tun, err := CreateTUN(interfaceName)
-	log.Println(tun, err)
 	if err != nil {
+		log.Println("Failed to create tun device:", err)
 		return
 	}
 
@@ -69,11 +71,15 @@ func main() {
 	}
 	defer uapi.Close()
 
-	for {
-		conn, err := uapi.Accept()
-		if err != nil {
-			logError.Fatal("accept error:", err)
+	go func() {
+		for {
+			conn, err := uapi.Accept()
+			if err != nil {
+				logError.Fatal("UAPI accept error:", err)
+			}
+			go ipcHandle(device, conn)
 		}
-		go ipcHandle(device, conn)
-	}
+	}()
+
+	device.Wait()
 }

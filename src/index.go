@@ -7,8 +7,6 @@ import (
 
 /* Index=0 is reserved for unset indecies
  *
- * TODO: Rethink map[id] -> peer VS map[id] -> handshake and handshake <ref> peer
- *
  */
 
 type IndexTableEntry struct {
@@ -72,12 +70,12 @@ func (table *IndexTable) NewIndex(peer *Peer) (uint32, error) {
 
 		table.mutex.RLock()
 		_, ok := table.table[index]
+		table.mutex.RUnlock()
 		if ok {
 			continue
 		}
-		table.mutex.RUnlock()
 
-		// replace index
+		// map index to handshake
 
 		table.mutex.Lock()
 		_, found := table.table[index]

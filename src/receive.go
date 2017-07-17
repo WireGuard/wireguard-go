@@ -212,18 +212,18 @@ func (device *Device) RoutineReceiveIncomming() {
 				// add to peer queue
 
 				peer := value.peer
-				work := &QueueInboundElement{
+				elem := &QueueInboundElement{
 					packet:  packet,
 					buffer:  buffer,
 					keyPair: keyPair,
 					dropped: AtomicFalse,
 				}
-				work.mutex.Lock()
+				elem.mutex.Lock()
 
 				// add to decryption queues
 
-				device.addToInboundQueue(device.queue.decryption, work)
-				device.addToInboundQueue(peer.queue.inbound, work)
+				device.addToInboundQueue(device.queue.decryption, elem)
+				device.addToInboundQueue(peer.queue.inbound, elem)
 				buffer = nil
 
 			default:
