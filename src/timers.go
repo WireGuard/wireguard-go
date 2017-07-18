@@ -52,6 +52,10 @@ func (peer *Peer) KeepKeyFreshReceiving() {
 func (peer *Peer) EventHandshakeComplete() {
 	peer.device.log.Info.Println("Negotiated new handshake for", peer.String())
 	peer.timer.zeroAllKeys.Reset(RejectAfterTime * 3)
+	atomic.StoreInt64(
+		&peer.stats.lastHandshakeNano,
+		time.Now().UnixNano(),
+	)
 	signalSend(peer.signal.handshakeCompleted)
 }
 

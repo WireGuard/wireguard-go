@@ -540,7 +540,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				return
 			}
 
-			atomic.AddUint64(&peer.rxBytes, uint64(len(elem.packet)))
+			atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
 			device.addToInboundQueue(device.queue.inbound, elem)
 		}()
 	}

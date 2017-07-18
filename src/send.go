@@ -379,7 +379,8 @@ func (peer *Peer) RoutineSequentialSender() {
 				if err != nil {
 					return
 				}
-				atomic.AddUint64(&peer.txBytes, uint64(len(elem.packet)))
+
+				atomic.AddUint64(&peer.stats.txBytes, uint64(len(elem.packet)))
 				peer.TimerResetKeepalive()
 			}()
 

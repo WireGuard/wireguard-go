@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"syscall"
+	"time"
 )
 
 const (
@@ -58,8 +59,15 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 			if peer.endpoint != nil {
 				send("endpoint=" + peer.endpoint.String())
 			}
-			send(fmt.Sprintf("tx_bytes=%d", peer.txBytes))
-			send(fmt.Sprintf("rx_bytes=%d", peer.rxBytes))
+
+			nano := atomic.LoadInt64(&peer.stats.lastHandshakeNano)
+			secs := nano / time.Second.Nanoseconds()
+			nano %= time.Second.Nanoseconds()
+
+			send(fmt.Sprintf("last_handshake_time_sec=%d", secs))
+			send(fmt.Sprintf("last_handshake_time_nsec=%d", nano))
+			send(fmt.Sprintf("tx_bytes=%d", peer.stats.txBytes))
+			send(fmt.Sprintf("rx_bytes=%d", peer.stats.rxBytes))
 			send(fmt.Sprintf("persistent_keepalive_interval=%d",
 				atomic.LoadUint64(&peer.persistentKeepaliveInterval),
 			))
