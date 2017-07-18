@@ -313,17 +313,15 @@ func (device *Device) RoutineEncryption() {
 			elem.packet = append(elem.packet, 0)
 		}
 
-		// encrypt content
+		// encrypt content (append to header)
 
 		binary.LittleEndian.PutUint64(nonce[4:], elem.nonce)
 		elem.packet = elem.keyPair.send.Seal(
-			elem.packet[:0],
+			header,
 			nonce[:],
 			elem.packet,
 			nil,
 		)
-		length := MessageTransportHeaderSize + len(elem.packet)
-		elem.packet = elem.buffer[:length]
 		elem.mutex.Unlock()
 
 		// refresh key if necessary

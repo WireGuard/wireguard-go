@@ -37,6 +37,8 @@ func (tun *NativeTun) setMTU(n int) error {
 		return err
 	}
 
+	defer syscall.Close(fd)
+
 	// do ioctl call
 
 	var ifr [64]byte
@@ -69,6 +71,8 @@ func (tun *NativeTun) MTU() (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
+	defer syscall.Close(fd)
 
 	// do ioctl call
 
