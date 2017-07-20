@@ -2,9 +2,18 @@ package main
 
 import (
 	"fmt"
+	"golang.org/x/sys/unix"
 	"net"
 	"os"
 	"time"
+)
+
+const (
+	ipcErrorIO           = int64(unix.EIO)
+	ipcErrorNoPeer       = int64(unix.EPROTO)
+	ipcErrorNoKeyValue   = int64(unix.EPROTO)
+	ipcErrorInvalidKey   = int64(unix.EPROTO)
+	ipcErrorInvalidValue = int64(unix.EPROTO)
 )
 
 /* TODO:

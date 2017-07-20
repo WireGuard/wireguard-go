@@ -1,10 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"runtime"
 )
+
+func printUsage() {
+	fmt.Printf("usage:\n")
+	fmt.Printf("%s [-f/--foreground] INTERFACE-NAME\n", os.Args[0])
+}
 
 func main() {
 
@@ -13,6 +19,7 @@ func main() {
 	var foreground bool
 	var interfaceName string
 	if len(os.Args) < 2 || len(os.Args) > 3 {
+		printUsage()
 		return
 	}
 
@@ -21,6 +28,7 @@ func main() {
 	case "-f", "--foreground":
 		foreground = true
 		if len(os.Args) != 3 {
+			printUsage()
 			return
 		}
 		interfaceName = os.Args[2]
@@ -28,6 +36,7 @@ func main() {
 	default:
 		foreground = false
 		if len(os.Args) != 2 {
+			printUsage()
 			return
 		}
 		interfaceName = os.Args[1]

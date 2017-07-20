@@ -9,28 +9,19 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"time"
 )
 
-const (
-	ipcErrorIO           = syscall.EIO
-	ipcErrorNoPeer       = syscall.EPROTO
-	ipcErrorNoKeyValue   = syscall.EPROTO
-	ipcErrorInvalidKey   = syscall.EPROTO
-	ipcErrorInvalidValue = syscall.EPROTO
-)
-
 type IPCError struct {
-	Code syscall.Errno
+	Code int64
 }
 
 func (s *IPCError) Error() string {
 	return fmt.Sprintf("IPC error: %d", s.Code)
 }
 
-func (s *IPCError) ErrorCode() uintptr {
-	return uintptr(s.Code)
+func (s *IPCError) ErrorCode() int64 {
+	return s.Code
 }
 
 func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {

@@ -1,16 +1,16 @@
 package main
 
+/* Implementation of the TUN device interface for linux
+ */
+
 import (
 	"encoding/binary"
 	"errors"
+	"golang.org/x/sys/unix"
 	"os"
 	"strings"
-	"syscall"
 	"unsafe"
 )
-
-/* Implementation of the TUN device interface for linux
- */
 
 const CloneDevicePath = "/dev/net/tun"
 
@@ -27,9 +27,9 @@ func (tun *NativeTun) setMTU(n int) error {
 
 	// open datagram socket
 
-	fd, err := syscall.Socket(
-		syscall.AF_INET,
-		syscall.SOCK_DGRAM,
+	fd, err := unix.Socket(
+		unix.AF_INET,
+		unix.SOCK_DGRAM,
 		0,
 	)
 
@@ -37,17 +37,17 @@ func (tun *NativeTun) setMTU(n int) error {
 		return err
 	}
 
-	defer syscall.Close(fd)
+	defer unix.Close(fd)
 
 	// do ioctl call
 
 	var ifr [64]byte
 	copy(ifr[:], tun.name)
 	binary.LittleEndian.PutUint32(ifr[16:20], uint32(n))
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
 		uintptr(fd),
-		uintptr(syscall.SIOCSIFMTU),
+		uintptr(unix.SIOCSIFMTU),
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)
 
@@ -62,9 +62,9 @@ func (tun *NativeTun) MTU() (int, error) {
 
 	// open datagram socket
 
-	fd, err := syscall.Socket(
-		syscall.AF_INET,
-		syscall.SOCK_DGRAM,
+	fd, err := unix.Socket(
+		unix.AF_INET,
+		unix.SOCK_DGRAM,
 		0,
 	)
 
@@ -72,16 +72,16 @@ func (tun *NativeTun) MTU() (int, error) {
 		return 0, err
 	}
 
-	defer syscall.Close(fd)
+	defer unix.Close(fd)
 
 	// do ioctl call
 
 	var ifr [64]byte
 	copy(ifr[:], tun.name)
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
 		uintptr(fd),
-		uintptr(syscall.SIOCGIFMTU),
+		uintptr(unix.SIOCGIFMTU),
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)
 	if errno != 0 {
@@ -117,18 +117,18 @@ func CreateTUN(name string) (TUNDevice, error) {
 	// create new device
 
 	var ifr [64]byte
-	var flags uint16 = syscall.IFF_TUN | syscall.IFF_NO_PI
+	var flags uint16 = unix.IFF_TUN | unix.IFF_NO_PI
 	nameBytes := []byte(name)
-	if len(nameBytes) >= syscall.IFNAMSIZ {
+	if len(nameBytes) >= unix.IFNAMSIZ {
 		return nil, errors.New("Name size too long")
 	}
 	copy(ifr[:], nameBytes)
 	binary.LittleEndian.PutUint16(ifr[16:], flags)
 
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
 		uintptr(fd.Fd()),
-		uintptr(syscall.TUNSETIFF),
+		uintptr(unix.TUNSETIFF),
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)
 	if errno != 0 {
