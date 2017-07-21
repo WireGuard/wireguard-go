@@ -253,8 +253,6 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 		}
 		hash = mixHash(hash, msg.Timestamp[:])
 
-		// TODO: check for flood attack
-
 		// check for replay attack
 
 		return timestamp.After(handshake.lastTimestamp)
