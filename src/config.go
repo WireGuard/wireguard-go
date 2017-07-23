@@ -105,17 +105,17 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 		key := parts[0]
 		value := parts[1]
 
+		fmt.Println(key, value)
+
 		switch key {
 
 		/* interface configuration */
 
 		case "private_key":
+			var sk NoisePrivateKey
 			if value == "" {
-				device.mutex.Lock()
-				device.privateKey = NoisePrivateKey{}
-				device.mutex.Unlock()
+				device.SetPrivateKey(sk)
 			} else {
-				var sk NoisePrivateKey
 				err := sk.FromHex(value)
 				if err != nil {
 					logError.Println("Failed to set private_key:", err)
@@ -182,9 +182,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 			switch key {
 
 			case "remove":
-				peer.mutex.Lock()
 				device.RemovePeer(peer.handshake.remoteStatic)
-				peer.mutex.Unlock()
 				logDebug.Println("Removing", peer.String())
 				peer = nil
 
@@ -235,7 +233,6 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					return &IPCError{Code: ipcErrorInvalidValue}
 				}
 				ones, _ := network.Mask.Size()
-				logError.Println(network, ones, network.IP)
 				device.routingTable.Insert(network.IP, uint(ones), peer)
 
 			default:
