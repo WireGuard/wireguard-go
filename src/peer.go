@@ -40,20 +40,21 @@ type Peer struct {
 		stop               chan struct{} // (size 0) : close to stop all goroutines for peer
 	}
 	timer struct {
-		/* Both keep-alive timers acts as one (see timers.go)
-		 * They are kept seperate to simplify the implementation.
-		 */
 		keepalivePersistent *time.Timer // set for persistent keepalives
 		keepalivePassive    *time.Timer // set upon recieving messages
-		zeroAllKeys         *time.Timer // zero all key material after RejectAfterTime*3
+		newHandshake        *time.Timer // begin a new handshake (after Keepalive + RekeyTimeout)
+		zeroAllKeys         *time.Timer // zero all key material (after RejectAfterTime*3)
+
+		pendingKeepalivePassive bool
+		pendingNewHandshake     bool
+		pendingZeroAllKeys      bool
+
+		needAnotherKeepalive bool
 	}
 	queue struct {
 		nonce    chan *QueueOutboundElement // nonce / pre-handshake queue
 		outbound chan *QueueOutboundElement // sequential ordering of work
 		inbound  chan *QueueInboundElement  // sequential ordering of work
-	}
-	flags struct {
-		keepaliveWaiting int32
 	}
 	mac MACStatePeer
 }
@@ -68,11 +69,10 @@ func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 	peer.mac.Init(pk)
 	peer.device = device
 
-	peer.timer.keepalivePassive = NewStoppedTimer()
 	peer.timer.keepalivePersistent = NewStoppedTimer()
+	peer.timer.keepalivePassive = NewStoppedTimer()
+	peer.timer.newHandshake = NewStoppedTimer()
 	peer.timer.zeroAllKeys = NewStoppedTimer()
-
-	peer.flags.keepaliveWaiting = AtomicFalse
 
 	// assign id for debugging
 

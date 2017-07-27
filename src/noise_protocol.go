@@ -37,6 +37,7 @@ const (
 	MessageCookieReplySize     = 64
 	MessageTransportHeaderSize = 16
 	MessageTransportSize       = MessageTransportHeaderSize + poly1305.TagSize // size of empty transport
+	MessageKeepaliveSize       = MessageTransportSize
 )
 
 const (
@@ -252,8 +253,6 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 			return false
 		}
 		hash = mixHash(hash, msg.Timestamp[:])
-
-		// TODO: check for flood attack
 
 		// check for replay attack
 

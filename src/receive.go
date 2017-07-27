@@ -288,6 +288,7 @@ func (device *Device) RoutineHandshake() {
 	logDebug := device.log.Debug
 	logDebug.Println("Routine, handshake routine, started for device")
 
+	var temp [256]byte
 	var elem QueueHandshakeElement
 
 	for {
@@ -363,6 +364,7 @@ func (device *Device) RoutineHandshake() {
 					)
 					return
 				}
+				peer.TimerPacketReceived()
 
 				// update endpoint
 
@@ -378,17 +380,19 @@ func (device *Device) RoutineHandshake() {
 					return
 				}
 
+				peer.TimerEphemeralKeyCreated()
+
 				logDebug.Println("Creating response message for", peer.String())
 
-				outElem := device.NewOutboundElement()
-				writer := bytes.NewBuffer(outElem.buffer[:0])
+				writer := bytes.NewBuffer(temp[:0])
 				binary.Write(writer, binary.LittleEndian, response)
-				outElem.packet = writer.Bytes()
-				peer.mac.AddMacs(outElem.packet)
-				addToOutboundQueue(peer.queue.outbound, outElem)
+				packet := writer.Bytes()
+				peer.mac.AddMacs(packet)
 
-				// create new keypair
+				// send response
 
+				peer.SendBuffer(packet)
+				peer.TimerPacketSent()
 				peer.NewKeyPair()
 
 			case MessageResponseType:
@@ -418,12 +422,11 @@ func (device *Device) RoutineHandshake() {
 					)
 					return
 				}
-				kp := peer.NewKeyPair()
-				if kp == nil {
-					logDebug.Println("Failed to derieve key-pair")
-				}
+
+				peer.TimerPacketReceived()
+				peer.TimerHandshakeComplete()
+				peer.NewKeyPair()
 				peer.SendKeepAlive()
-				peer.EventHandshakeComplete()
 
 			default:
 				logError.Println("Invalid message type in handshake queue")
@@ -464,12 +467,8 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				return
 			}
 
-			// time (passive) keep-alive
-
-			peer.TimerStartKeepalive()
-
-			// refresh key material (rekey)
-
+			peer.TimerPacketReceived()
+			peer.TimerTransportReceived()
 			peer.KeepKeyFreshReceiving()
 
 			// check if using new key-pair
@@ -477,7 +476,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			kp := &peer.keyPairs
 			kp.mutex.Lock()
 			if kp.next == elem.keyPair {
-				peer.EventHandshakeComplete()
+				peer.TimerHandshakeComplete()
 				kp.previous = kp.current
 				kp.current = kp.next
 				kp.next = nil
@@ -490,6 +489,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				logDebug.Println("Received keep-alive from", peer.String())
 				return
 			}
+			peer.TimerDataReceived()
 
 			// verify source and strip padding
 

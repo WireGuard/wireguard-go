@@ -20,6 +20,7 @@ const (
 
 const (
 	RekeyAfterTimeReceiving = RekeyAfterTime - KeepaliveTimeout - RekeyTimeout
+	NewHandshakeTime        = KeepaliveTimeout + RekeyTimeout // upon failure to acknowledge transport message
 )
 
 /* Implementation specific constants */
