@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -110,12 +109,10 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 		/* interface configuration */
 
 		case "private_key":
+			var sk NoisePrivateKey
 			if value == "" {
-				device.mutex.Lock()
-				device.privateKey = NoisePrivateKey{}
-				device.mutex.Unlock()
+				device.SetPrivateKey(sk)
 			} else {
-				var sk NoisePrivateKey
 				err := sk.FromHex(value)
 				if err != nil {
 					logError.Println("Failed to set private_key:", err)
@@ -125,16 +122,21 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 			}
 
 		case "listen_port":
-			var port int
-			_, err := fmt.Sscanf(value, "%d", &port)
-			if err != nil || port > (1<<16) || port < 0 {
+			port, err := strconv.ParseUint(value, 10, 16)
+			if err != nil {
 				logError.Println("Failed to set listen_port:", err)
 				return &IPCError{Code: ipcErrorInvalidValue}
 			}
-			device.net.mutex.Lock()
-			device.net.addr.Port = port
-			device.net.conn, err = net.ListenUDP("udp", device.net.addr)
-			device.net.mutex.Unlock()
+			netc := &device.net
+			netc.mutex.Lock()
+			if netc.addr.Port != int(port) {
+				if netc.conn != nil {
+					netc.conn.Close()
+				}
+				netc.addr.Port = int(port)
+				netc.conn, err = net.ListenUDP("udp", netc.addr)
+			}
+			netc.mutex.Unlock()
 			if err != nil {
 				logError.Println("Failed to create UDP listener:", err)
 				return &IPCError{Code: ipcErrorInvalidValue}
@@ -151,15 +153,10 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				return &IPCError{Code: ipcErrorInvalidValue}
 			}
 			device.mutex.RLock()
-			found, ok := device.peers[pubKey]
+			peer, _ := device.peers[pubKey]
 			device.mutex.RUnlock()
-			if ok {
-				peer = found
-			} else {
-				peer = device.NewPeer(pubKey)
-			}
 			if peer == nil {
-				panic(errors.New("bug: failed to find / create peer"))
+				peer = device.NewPeer(pubKey)
 			}
 
 		case "replace_peers":
@@ -182,9 +179,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 			switch key {
 
 			case "remove":
-				peer.mutex.Lock()
 				device.RemovePeer(peer.handshake.remoteStatic)
-				peer.mutex.Unlock()
 				logDebug.Println("Removing", peer.String())
 				peer = nil
 
@@ -235,7 +230,6 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					return &IPCError{Code: ipcErrorInvalidValue}
 				}
 				ones, _ := network.Mask.Size()
-				logError.Println(network, ones, network.IP)
 				device.routingTable.Insert(network.IP, uint(ones), peer)
 
 			default:
