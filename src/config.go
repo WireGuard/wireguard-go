@@ -153,7 +153,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				return &IPCError{Code: ipcErrorInvalidValue}
 			}
 			device.mutex.RLock()
-			peer, _ := device.peers[pubKey]
+			peer, _ = device.peers[pubKey]
 			device.mutex.RUnlock()
 			if peer == nil {
 				peer = device.NewPeer(pubKey)
