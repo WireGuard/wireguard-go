@@ -508,8 +508,8 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 				// verify IPv4 source
 
-				dst := elem.packet[IPv4offsetDst : IPv4offsetDst+net.IPv4len]
-				if device.routingTable.LookupIPv4(dst) != peer {
+				src := elem.packet[IPv4offsetSrc : IPv4offsetSrc+net.IPv4len]
+				if device.routingTable.LookupIPv4(src) != peer {
 					logInfo.Println("Packet with unallowed source IP from", peer.String())
 					return
 				}
@@ -529,8 +529,8 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 				// verify IPv6 source
 
-				dst := elem.packet[IPv6offsetDst : IPv6offsetDst+net.IPv6len]
-				if device.routingTable.LookupIPv6(dst) != peer {
+				src := elem.packet[IPv6offsetSrc : IPv6offsetSrc+net.IPv6len]
+				if device.routingTable.LookupIPv6(src) != peer {
 					logInfo.Println("Packet with unallowed source IP from", peer.String())
 					return
 				}
