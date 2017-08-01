@@ -40,11 +40,11 @@ func NewLogger(level int) *Logger {
 
 	logger.Info = log.New(logInfo,
 		"INFO: ",
-		log.Ldate|log.Ltime|log.Lshortfile,
+		log.Ldate|log.Ltime,
 	)
 	logger.Error = log.New(logErr,
 		"ERROR: ",
-		log.Ldate|log.Ltime|log.Lshortfile,
+		log.Ldate|log.Ltime,
 	)
 	return logger
 }

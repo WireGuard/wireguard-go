@@ -186,6 +186,6 @@ func (device *Device) Close() {
 	close(device.signal.stop)
 }
 
-func (device *Device) Wait() {
-	<-device.signal.stop
+func (device *Device) WaitChannel() chan struct{} {
+	return device.signal.stop
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"runtime"
 )
 
@@ -78,17 +79,38 @@ func main() {
 	if err != nil {
 		logError.Fatal("UAPI listen error:", err)
 	}
-	defer uapi.Close()
+
+	errs := make(chan error)
+	term := make(chan os.Signal)
+	wait := device.WaitChannel()
 
 	go func() {
 		for {
 			conn, err := uapi.Accept()
 			if err != nil {
-				logError.Fatal("UAPI accept error:", err)
+				errs <- err
+				return
 			}
 			go ipcHandle(device, conn)
 		}
 	}()
 
-	device.Wait()
+	logInfo.Println("UAPI listener started")
+
+	// wait for program to terminate
+
+	signal.Notify(term, os.Kill)
+	signal.Notify(term, os.Interrupt)
+
+	select {
+	case <-wait:
+	case <-term:
+	case <-errs:
+	}
+
+	// clean up UAPI bind
+
+	uapi.Close()
+
+	logInfo.Println("Closing")
 }
