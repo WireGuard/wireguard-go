@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"golang.org/x/sys/unix"
 	"net"
@@ -48,12 +49,38 @@ func (l *UAPIListener) Addr() net.Addr {
 	return nil
 }
 
+func connectUnixSocket(path string) (net.Listener, error) {
+
+	// attempt inital connection
+
+	listener, err := net.Listen("unix", path)
+	if err == nil {
+		return listener, nil
+	}
+
+	// check if active
+
+	_, err = net.Dial("unix", path)
+	if err == nil {
+		return nil, errors.New("Unix socket in use")
+	}
+
+	// attempt cleanup
+
+	err = os.Remove(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return net.Listen("unix", path)
+}
+
 func NewUAPIListener(name string) (net.Listener, error) {
 
 	// open UNIX socket
 
 	socketPath := fmt.Sprintf("/var/run/wireguard/%s.sock", name)
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := connectUnixSocket(socketPath)
 	if err != nil {
 		return nil, err
 	}
