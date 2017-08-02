@@ -1,9 +1,12 @@
-BINARY=wireguard-go
+all: wireguard-go
 
-build:
-	go build -o ${BINARY}
+wireguard-go: $(wildcard *.go)
+	go build -o $@
 
 clean:
-	if [ -f ${BINARY} ]; then rm ${BINARY}; fi
+	rm -f wireguard-go
 
-.PHONY: clean
+cloc:
+	cloc $(filter-out xchacha20.go $(wildcard *_test.go), $(wildcard *.go))
+
+.PHONY: clean cloc
