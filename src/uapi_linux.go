@@ -6,6 +6,7 @@ import (
 	"golang.org/x/sys/unix"
 	"net"
 	"os"
+	"path"
 	"time"
 )
 
@@ -15,6 +16,8 @@ const (
 	ipcErrorNoKeyValue   = int64(unix.EPROTO)
 	ipcErrorInvalidKey   = int64(unix.EPROTO)
 	ipcErrorInvalidValue = int64(unix.EPROTO)
+	socketDirectory      = "/var/run/wireguard"
+	socketName           = "%s.sock"
 )
 
 /* TODO:
@@ -77,9 +80,20 @@ func connectUnixSocket(path string) (net.Listener, error) {
 
 func NewUAPIListener(name string) (net.Listener, error) {
 
+	// check if path exist
+
+	err := os.MkdirAll(socketDirectory, 077)
+	if err != nil && !os.IsExist(err) {
+		return nil, err
+	}
+
 	// open UNIX socket
 
-	socketPath := fmt.Sprintf("/var/run/wireguard/%s.sock", name)
+	socketPath := path.Join(
+		socketDirectory,
+		fmt.Sprintf(socketName, name),
+	)
+
 	listener, err := connectUnixSocket(socketPath)
 	if err != nil {
 		return nil, err
