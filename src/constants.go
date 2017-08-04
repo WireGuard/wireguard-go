@@ -16,6 +16,7 @@ const (
 	KeepaliveTimeout        = time.Second * 10
 	CookieRefreshTime       = time.Second * 120
 	MaxHandshakeAttemptTime = time.Second * 90
+	PaddingMultiple         = 16
 )
 
 const (
@@ -31,5 +32,5 @@ const (
 	QueueHandshakeSize     = 1024
 	QueueHandshakeBusySize = QueueHandshakeSize / 8
 	MinMessageSize         = MessageTransportSize // size of keep-alive
-	MaxMessageSize         = (1 << 16) - 1
+	MaxMessageSize         = ((1 << 16) - 1) + MessageTransportHeaderSize
 )

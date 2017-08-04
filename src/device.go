@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"net"
 	"runtime"
 	"sync"
@@ -10,6 +12,7 @@ import (
 
 type Device struct {
 	mtu       int32
+	tun       TUNDevice
 	log       *Logger // collection of loggers for levels
 	idCounter uint    // for assigning debug ids to peers
 	fwMark    uint32
@@ -43,24 +46,46 @@ type Device struct {
 	mac         MACStateDevice
 }
 
-func (device *Device) SetPrivateKey(sk NoisePrivateKey) {
+func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
+
+	// check if public key is matching any peer
+
+	publicKey := sk.publicKey()
+	for _, peer := range device.peers {
+		h := &peer.handshake
+		h.mutex.RLock()
+		if h.remoteStatic.Equals(publicKey) {
+			h.mutex.RUnlock()
+			return errors.New("Private key matches public key of peer")
+		}
+		h.mutex.RUnlock()
+	}
 
 	// update key material
 
 	device.privateKey = sk
-	device.publicKey = sk.publicKey()
-	device.mac.Init(device.publicKey)
+	device.publicKey = publicKey
+	device.mac.Init(publicKey)
 
 	// do DH precomputations
+
+	isZero := device.privateKey.IsZero()
 
 	for _, peer := range device.peers {
 		h := &peer.handshake
 		h.mutex.Lock()
-		h.precomputedStaticStatic = device.privateKey.sharedSecret(h.remoteStatic)
+		if isZero {
+			h.precomputedStaticStatic = [NoisePublicKeySize]byte{}
+		} else {
+			h.precomputedStaticStatic = device.privateKey.sharedSecret(h.remoteStatic)
+		}
+		fmt.Println(h.precomputedStaticStatic)
 		h.mutex.Unlock()
 	}
+
+	return nil
 }
 
 func (device *Device) GetMessageBuffer() *[MaxMessageSize]byte {
@@ -77,6 +102,7 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
 
+	device.tun = tun
 	device.log = NewLogger(logLevel)
 	device.peers = make(map[NoisePublicKey]*Peer)
 	device.indices.Init()
@@ -119,22 +145,22 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	}
 
 	go device.RoutineBusyMonitor()
-	go device.RoutineMTUUpdater(tun)
-	go device.RoutineWriteToTUN(tun)
-	go device.RoutineReadFromTUN(tun)
+	go device.RoutineMTUUpdater()
+	go device.RoutineWriteToTUN()
+	go device.RoutineReadFromTUN()
 	go device.RoutineReceiveIncomming()
 	go device.ratelimiter.RoutineGarbageCollector(device.signal.stop)
 
 	return device
 }
 
-func (device *Device) RoutineMTUUpdater(tun TUNDevice) {
+func (device *Device) RoutineMTUUpdater() {
 	logError := device.log.Error
 	for ; ; time.Sleep(5 * time.Second) {
 
 		// load updated MTU
 
-		mtu, err := tun.MTU()
+		mtu, err := device.tun.MTU()
 		if err != nil {
 			logError.Println("Failed to load updated MTU of device:", err)
 			continue

@@ -60,10 +60,8 @@ func (peer *Peer) SendKeepAlive() bool {
 	return true
 }
 
-/* Authenticated data packet send
- * Always called together with peer.EventPacketSend
- *
- * - Start new handshake timer
+/* Event:
+ * Sent non-empty (authenticated) transport message
  */
 func (peer *Peer) TimerDataSent() {
 	timerStop(peer.timer.keepalivePassive)
@@ -75,8 +73,6 @@ func (peer *Peer) TimerDataSent() {
 
 /* Event:
  * Received non-empty (authenticated) transport message
- *
- * - Start passive keep-alive timer
  */
 func (peer *Peer) TimerDataReceived() {
 	if peer.timer.pendingKeepalivePassive {
@@ -88,29 +84,21 @@ func (peer *Peer) TimerDataReceived() {
 }
 
 /* Event:
- * Any (authenticated) transport message received
- * (keep-alive or data)
+ * Any (authenticated) packet received
  */
-func (peer *Peer) TimerTransportReceived() {
+func (peer *Peer) TimerAnyAuthenticatedPacketReceived() {
 	timerStop(peer.timer.newHandshake)
 }
 
 /* Event:
- * Any packet send to the peer.
+ * Any authenticated packet send / received.
  */
-func (peer *Peer) TimerPacketSent() {
+func (peer *Peer) TimerAnyAuthenticatedPacketTraversal() {
 	interval := atomic.LoadUint64(&peer.persistentKeepaliveInterval)
 	if interval > 0 {
 		duration := time.Duration(interval) * time.Second
 		peer.timer.keepalivePersistent.Reset(duration)
 	}
-}
-
-/* Event:
- * Any authenticated packet received from peer
- */
-func (peer *Peer) TimerPacketReceived() {
-	peer.TimerPacketSent()
 }
 
 /* Called after succesfully completing a handshake.
@@ -129,7 +117,9 @@ func (peer *Peer) TimerHandshakeComplete() {
 	peer.device.log.Info.Println("Negotiated new handshake for", peer.String())
 }
 
-/* Called whenever an ephemeral key is generated
+/* Event:
+ * An ephemeral key is generated
+ *
  * i.e after:
  *
  * CreateMessageInitiation
@@ -257,7 +247,6 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 
 		select {
 		case <-peer.signal.handshakeBegin:
-			signalSend(peer.signal.handshakeBegin)
 		case <-peer.signal.stop:
 			return
 		}
@@ -303,7 +292,6 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 			binary.Write(writer, binary.LittleEndian, msg)
 			packet := writer.Bytes()
 			peer.mac.AddMacs(packet)
-			peer.TimerPacketSent()
 
 			_, err = peer.SendBuffer(packet)
 			if err != nil {
@@ -313,6 +301,8 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 				)
 				continue
 			}
+
+			peer.TimerAnyAuthenticatedPacketTraversal()
 
 			// set timeout
 
@@ -337,7 +327,6 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 				continue
 
 			}
-
 		}
 
 		// allow new signal to be set

@@ -135,6 +135,10 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 	handshake.mutex.Lock()
 	defer handshake.mutex.Unlock()
 
+	if isZero(handshake.precomputedStaticStatic[:]) {
+		return nil, errors.New("Static shared secret is zero")
+	}
+
 	// create ephemeral key
 
 	var err error
@@ -226,7 +230,11 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	if peer == nil {
 		return nil
 	}
+
 	handshake := &peer.handshake
+	if isZero(handshake.precomputedStaticStatic[:]) {
+		return nil
+	}
 
 	// verify identity
 
@@ -472,6 +480,7 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 	func() {
 		kp.mutex.Lock()
 		defer kp.mutex.Unlock()
+		// TODO: Adapt kernel behavior noise.c:161
 		if isInitiator {
 			if kp.previous != nil {
 				kp.previous.send = nil

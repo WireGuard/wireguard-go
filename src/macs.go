@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/hmac"
 	"crypto/rand"
-	"errors"
 	"golang.org/x/crypto/blake2s"
 	"net"
 	"sync"
@@ -15,14 +14,14 @@ type MACStateDevice struct {
 	refreshed time.Time
 	secret    [blake2s.Size]byte
 	keyMAC1   [blake2s.Size]byte
-	keyMAC2   [blake2s.Size]byte
+	keyMAC2   [blake2s.Size]byte // TODO: Change to more descriptive size constant, rename to something.
 }
 
 type MACStatePeer struct {
 	mutex     sync.RWMutex
 	cookieSet time.Time
 	cookie    [blake2s.Size128]byte
-	lastMAC1  [blake2s.Size128]byte
+	lastMAC1  [blake2s.Size128]byte // TODO: Check if set
 	keyMAC1   [blake2s.Size]byte
 	keyMAC2   [blake2s.Size]byte
 }
@@ -83,7 +82,7 @@ func (state *MACStateDevice) CheckMAC2(msg []byte, addr *net.UDPAddr) bool {
 		port := [2]byte{byte(addr.Port >> 8), byte(addr.Port)}
 		mac, _ := blake2s.New128(state.secret[:])
 		mac.Write(addr.IP)
-		mac.Write(port[:])
+		mac.Write(port[:]) // TODO: Be faster and more platform dependent?
 		mac.Sum(cookie[:0])
 	}()
 
@@ -130,7 +129,7 @@ func (device *Device) CreateMessageCookieReply(
 		port := [2]byte{byte(addr.Port >> 8), byte(addr.Port)}
 		mac, _ := blake2s.New128(state.secret[:])
 		mac.Write(addr.IP)
-		mac.Write(port[:])
+		mac.Write(port[:]) // TODO: Do whatever we did above
 		mac.Sum(cookie[:0])
 	}()
 
@@ -196,6 +195,7 @@ func (device *Device) ConsumeMessageCookieReply(msg *MessageCookieReply) bool {
 	if err != nil {
 		return false
 	}
+
 	state.cookieSet = time.Now()
 	state.cookie = cookie
 	return true
@@ -229,10 +229,6 @@ func (state *MACStatePeer) Init(pk NoisePublicKey) {
 func (state *MACStatePeer) AddMacs(msg []byte) {
 	size := len(msg)
 
-	if size < blake2s.Size128*2 {
-		panic(errors.New("bug: message too short"))
-	}
-
 	startMac1 := size - (blake2s.Size128 * 2)
 	startMac2 := size - blake2s.Size128
 
@@ -250,6 +246,7 @@ func (state *MACStatePeer) AddMacs(msg []byte) {
 		mac.Sum(mac1[:0])
 	}()
 	copy(state.lastMAC1[:], mac1)
+	// TODO: Set lastMac flag
 
 	// set mac2
 

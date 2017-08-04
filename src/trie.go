@@ -32,11 +32,14 @@ type Trie struct {
 /* Finds length of matching prefix
  * TODO: Make faster
  *
- * Assumption: len(ip1) == len(ip2)
+ * Assumption:
+ *	  len(ip1) == len(ip2)
+ *	  len(ip1) mod 4 = 0
  */
-func commonBits(ip1 net.IP, ip2 net.IP) uint {
+func commonBits(ip1 []byte, ip2 []byte) uint {
 	var i uint
-	size := uint(len(ip1))
+	size := uint(len(ip1)) / 4
+
 	for i = 0; i < size; i++ {
 		v := ip1[i] ^ ip2[i]
 		if v != 0 {

@@ -47,6 +47,14 @@ func KDF3(key []byte, input []byte) (t0 [blake2s.Size]byte, t1 [blake2s.Size]byt
 	return
 }
 
+func isZero(val []byte) bool {
+	var acc byte
+	for _, b := range val {
+		acc |= b
+	}
+	return acc == 0
+}
+
 /* curve25519 wrappers */
 
 func newPrivateKey() (sk NoisePrivateKey, err error) {

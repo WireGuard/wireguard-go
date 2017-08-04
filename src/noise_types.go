@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"encoding/hex"
 	"errors"
 	"golang.org/x/crypto/chacha20poly1305"
@@ -31,12 +32,12 @@ func loadExactHex(dst []byte, src string) error {
 }
 
 func (key NoisePrivateKey) IsZero() bool {
-	for _, b := range key[:] {
-		if b != 0 {
-			return false
-		}
-	}
-	return true
+	var zero NoisePrivateKey
+	return key.Equals(zero)
+}
+
+func (key NoisePrivateKey) Equals(tar NoisePrivateKey) bool {
+	return subtle.ConstantTimeCompare(key[:], tar[:]) == 1
 }
 
 func (key *NoisePrivateKey) FromHex(src string) error {
@@ -53,6 +54,15 @@ func (key *NoisePublicKey) FromHex(src string) error {
 
 func (key NoisePublicKey) ToHex() string {
 	return hex.EncodeToString(key[:])
+}
+
+func (key NoisePublicKey) IsZero() bool {
+	var zero NoisePublicKey
+	return key.Equals(zero)
+}
+
+func (key NoisePublicKey) Equals(tar NoisePublicKey) bool {
+	return subtle.ConstantTimeCompare(key[:], tar[:]) == 1
 }
 
 func (key *NoiseSymmetricKey) FromHex(src string) error {

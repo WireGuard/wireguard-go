@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"golang.org/x/sys/unix"
+	"net"
 	"os"
 	"strings"
 	"unsafe"
@@ -17,6 +18,11 @@ const CloneDevicePath = "/dev/net/tun"
 type NativeTun struct {
 	fd   *os.File
 	name string
+}
+
+func (tun *NativeTun) IsUp() (bool, error) {
+	inter, err := net.InterfaceByName(tun.name)
+	return inter.Flags&net.FlagUp != 0, err
 }
 
 func (tun *NativeTun) Name() string {

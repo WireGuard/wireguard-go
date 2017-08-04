@@ -11,13 +11,12 @@ import (
 )
 
 const (
-	ipcErrorIO           = int64(unix.EIO)
-	ipcErrorNoPeer       = int64(unix.EPROTO)
-	ipcErrorNoKeyValue   = int64(unix.EPROTO)
-	ipcErrorInvalidKey   = int64(unix.EPROTO)
-	ipcErrorInvalidValue = int64(unix.EPROTO)
-	socketDirectory      = "/var/run/wireguard"
-	socketName           = "%s.sock"
+	ipcErrorIO         = -int64(unix.EIO)
+	ipcErrorNotDefined = -int64(unix.ENODEV)
+	ipcErrorProtocol   = -int64(unix.EPROTO)
+	ipcErrorInvalid    = -int64(unix.EINVAL)
+	socketDirectory    = "/var/run/wireguard"
+	socketName         = "%s.sock"
 )
 
 /* TODO:

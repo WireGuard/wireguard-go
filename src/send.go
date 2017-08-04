@@ -110,17 +110,19 @@ func addToEncryptionQueue(
 }
 
 func (peer *Peer) SendBuffer(buffer []byte) (int, error) {
+	peer.device.net.mutex.RLock()
+	defer peer.device.net.mutex.RUnlock()
 
 	peer.mutex.RLock()
+	defer peer.mutex.RUnlock()
+
 	endpoint := peer.endpoint
-	peer.mutex.RUnlock()
+	conn := peer.device.net.conn
+
 	if endpoint == nil {
 		return 0, ErrorNoEndpoint
 	}
 
-	peer.device.net.mutex.RLock()
-	conn := peer.device.net.conn
-	peer.device.net.mutex.RUnlock()
 	if conn == nil {
 		return 0, ErrorNoConnection
 	}
@@ -133,13 +135,13 @@ func (peer *Peer) SendBuffer(buffer []byte) (int, error) {
  *
  * Obs. Single instance per TUN device
  */
-func (device *Device) RoutineReadFromTUN(tun TUNDevice) {
+func (device *Device) RoutineReadFromTUN() {
 
-	if tun == nil {
+	if device.tun == nil {
 		return
 	}
 
-	elem := device.NewOutboundElement()
+	var elem *QueueOutboundElement
 
 	logDebug := device.log.Debug
 	logError := device.log.Error
@@ -153,32 +155,38 @@ func (device *Device) RoutineReadFromTUN(tun TUNDevice) {
 			elem = device.NewOutboundElement()
 		}
 
+		// TODO: THIS!
 		elem.packet = elem.buffer[MessageTransportHeaderSize:]
-		size, err := tun.Read(elem.packet)
+		size, err := device.tun.Read(elem.packet)
 		if err != nil {
-
-			// stop process
-
 			logError.Println("Failed to read packet from TUN device:", err)
 			device.Close()
 			return
 		}
 
-		elem.packet = elem.packet[:size]
-		if len(elem.packet) < ipv4.HeaderLen {
-			logError.Println("Packet too short, length:", size)
+		if size == 0 {
 			continue
 		}
+
+		println(size, err)
+
+		elem.packet = elem.packet[:size]
 
 		// lookup peer
 
 		var peer *Peer
 		switch elem.packet[0] >> 4 {
 		case ipv4.Version:
+			if len(elem.packet) < ipv4.HeaderLen {
+				continue
+			}
 			dst := elem.packet[IPv4offsetDst : IPv4offsetDst+net.IPv4len]
 			peer = device.routingTable.LookupIPv4(dst)
 
 		case ipv6.Version:
+			if len(elem.packet) < ipv6.HeaderLen {
+				continue
+			}
 			dst := elem.packet[IPv6offsetDst : IPv6offsetDst+net.IPv6len]
 			peer = device.routingTable.LookupIPv6(dst)
 
@@ -190,10 +198,15 @@ func (device *Device) RoutineReadFromTUN(tun TUNDevice) {
 			continue
 		}
 
+		// check if known endpoint
+
+		peer.mutex.RLock()
 		if peer.endpoint == nil {
+			peer.mutex.RUnlock()
 			logDebug.Println("No known endpoint for peer", peer.String())
 			continue
 		}
+		peer.mutex.RUnlock()
 
 		// insert into nonce/pre-handshake queue
 
@@ -334,8 +347,12 @@ func (device *Device) RoutineEncryption() {
 		// pad content to MTU size
 
 		mtu := int(atomic.LoadInt32(&device.mtu))
-		for i := len(elem.packet); i < mtu; i++ {
-			elem.packet = append(elem.packet, 0)
+		pad := len(elem.packet) % PaddingMultiple
+		if pad > 0 {
+			for i := 0; i < PaddingMultiple-pad && len(elem.packet) < mtu; i++ {
+				elem.packet = append(elem.packet, 0)
+			}
+			// TODO: How good is this code
 		}
 
 		// encrypt content (append to header)
@@ -390,7 +407,7 @@ func (peer *Peer) RoutineSequentialSender() {
 
 			// update timers
 
-			peer.TimerPacketSent()
+			peer.TimerAnyAuthenticatedPacketTraversal()
 			if len(elem.packet) != MessageKeepaliveSize {
 				peer.TimerDataSent()
 			}
