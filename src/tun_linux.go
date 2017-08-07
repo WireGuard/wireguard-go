@@ -16,11 +16,12 @@ import (
 const CloneDevicePath = "/dev/net/tun"
 
 type NativeTun struct {
-	fd   *os.File
-	name string
+	fd     *os.File
+	name   string
+	events chan TUNEvent
 }
 
-func (tun *NativeTun) IsUp() (bool, error) {
+func (tun *NativeTun) isUp() (bool, error) {
 	inter, err := net.InterfaceByName(tun.name)
 	return inter.Flags&net.FlagUp != 0, err
 }
@@ -111,6 +112,14 @@ func (tun *NativeTun) Read(d []byte) (int, error) {
 	return tun.fd.Read(d)
 }
 
+func (tun *NativeTun) Events() chan TUNEvent {
+	return tun.events
+}
+
+func (tun *NativeTun) Close() error {
+	return nil
+}
+
 func CreateTUN(name string) (TUNDevice, error) {
 
 	// open clone device
@@ -146,9 +155,13 @@ func CreateTUN(name string) (TUNDevice, error) {
 	newName := string(ifr[:])
 	newName = newName[:strings.Index(newName, "\000")]
 	device := &NativeTun{
-		fd:   fd,
-		name: newName,
+		fd:     fd,
+		name:   newName,
+		events: make(chan TUNEvent, 5),
 	}
+
+	// TODO: Wait for device to be upped
+	device.events <- TUNEventUp
 
 	// set default MTU
 

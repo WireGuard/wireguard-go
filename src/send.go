@@ -168,8 +168,6 @@ func (device *Device) RoutineReadFromTUN() {
 			continue
 		}
 
-		println(size, err)
-
 		elem.packet = elem.packet[:size]
 
 		// lookup peer
@@ -210,6 +208,7 @@ func (device *Device) RoutineReadFromTUN() {
 
 		// insert into nonce/pre-handshake queue
 
+		signalSend(peer.signal.handshakeReset)
 		addToOutboundQueue(peer.queue.nonce, elem)
 		elem = nil
 

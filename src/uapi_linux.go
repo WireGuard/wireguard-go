@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"path"
-	"time"
 )
 
 const (
@@ -26,9 +25,10 @@ const (
  */
 
 type UAPIListener struct {
-	listener net.Listener // unix socket listener
-	connNew  chan net.Conn
-	connErr  chan error
+	listener  net.Listener // unix socket listener
+	connNew   chan net.Conn
+	connErr   chan error
+	inotifyFd int
 }
 
 func (l *UAPIListener) Accept() (net.Conn, error) {
@@ -106,9 +106,28 @@ func NewUAPIListener(name string) (net.Listener, error) {
 
 	// watch for deletion of socket
 
+	uapi.inotifyFd, err = unix.InotifyInit()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = unix.InotifyAddWatch(
+		uapi.inotifyFd,
+		socketPath,
+		unix.IN_ATTRIB|
+			unix.IN_DELETE|
+			unix.IN_DELETE_SELF,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
 	go func(l *UAPIListener) {
-		for ; ; time.Sleep(time.Second) {
-			if _, err := os.Stat(socketPath); os.IsNotExist(err) {
+		var buff [4096]byte
+		for {
+			unix.Read(uapi.inotifyFd, buff[:])
+			if _, err := os.Lstat(socketPath); os.IsNotExist(err) {
 				l.connErr <- err
 				return
 			}

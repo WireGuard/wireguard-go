@@ -18,12 +18,13 @@ type MACStateDevice struct {
 }
 
 type MACStatePeer struct {
-	mutex     sync.RWMutex
-	cookieSet time.Time
-	cookie    [blake2s.Size128]byte
-	lastMAC1  [blake2s.Size128]byte // TODO: Check if set
-	keyMAC1   [blake2s.Size]byte
-	keyMAC2   [blake2s.Size]byte
+	mutex       sync.RWMutex
+	cookieSet   time.Time
+	cookie      [blake2s.Size128]byte
+	lastMAC1Set bool
+	lastMAC1    [blake2s.Size128]byte
+	keyMAC1     [blake2s.Size]byte
+	keyMAC2     [blake2s.Size]byte
 }
 
 /* Methods for verifing MAC fields
@@ -184,6 +185,10 @@ func (device *Device) ConsumeMessageCookieReply(msg *MessageCookieReply) bool {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
 
+	if !state.lastMAC1Set {
+		return false
+	}
+
 	_, err := XChaCha20Poly1305Decrypt(
 		cookie[:0],
 		&msg.Nonce,
@@ -246,7 +251,7 @@ func (state *MACStatePeer) AddMacs(msg []byte) {
 		mac.Sum(mac1[:0])
 	}()
 	copy(state.lastMAC1[:], mac1)
-	// TODO: Set lastMac flag
+	state.lastMAC1Set = true
 
 	// set mac2
 

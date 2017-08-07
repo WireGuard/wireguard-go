@@ -7,6 +7,8 @@ import (
 /* Daemonizes the process on linux
  *
  * This is done by spawning and releasing a copy with the --foreground flag
+ *
+ * TODO: Use env variable to spawn in background
  */
 
 func Daemonize() error {

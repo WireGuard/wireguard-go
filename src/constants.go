@@ -7,16 +7,15 @@ import (
 /* Specification constants */
 
 const (
-	RekeyAfterMessages      = (1 << 64) - (1 << 16) - 1
-	RejectAfterMessages     = (1 << 64) - (1 << 4) - 1
-	RekeyAfterTime          = time.Second * 120
-	RekeyAttemptTime        = time.Second * 90
-	RekeyTimeout            = time.Second * 5
-	RejectAfterTime         = time.Second * 180
-	KeepaliveTimeout        = time.Second * 10
-	CookieRefreshTime       = time.Second * 120
-	MaxHandshakeAttemptTime = time.Second * 90
-	PaddingMultiple         = 16
+	RekeyAfterMessages  = (1 << 64) - (1 << 16) - 1
+	RejectAfterMessages = (1 << 64) - (1 << 4) - 1
+	RekeyAfterTime      = time.Second * 120
+	RekeyAttemptTime    = time.Second * 90
+	RekeyTimeout        = time.Second * 5
+	RejectAfterTime     = time.Second * 180
+	KeepaliveTimeout    = time.Second * 10
+	CookieRefreshTime   = time.Second * 120
+	PaddingMultiple     = 16
 )
 
 const (
@@ -33,4 +32,5 @@ const (
 	QueueHandshakeBusySize = QueueHandshakeSize / 8
 	MinMessageSize         = MessageTransportSize // size of keep-alive
 	MaxMessageSize         = ((1 << 16) - 1) + MessageTransportHeaderSize
+	MaxPeers               = 1 << 16
 )

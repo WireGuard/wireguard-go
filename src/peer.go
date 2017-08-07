@@ -9,16 +9,14 @@ import (
 	"time"
 )
 
-const ()
-
 type Peer struct {
 	id                          uint
 	mutex                       sync.RWMutex
-	endpoint                    *net.UDPAddr
 	persistentKeepaliveInterval uint64
 	keyPairs                    KeyPairs
 	handshake                   Handshake
 	device                      *Device
+	endpoint                    *net.UDPAddr
 	stats                       struct {
 		txBytes           uint64 // bytes send to peer (endpoint)
 		rxBytes           uint64 // bytes received from peer
@@ -34,6 +32,7 @@ type Peer struct {
 		newKeyPair         chan struct{} // (size 1) : a new key pair was generated
 		handshakeBegin     chan struct{} // (size 1) : request that a new handshake be started ("queue handshake")
 		handshakeCompleted chan struct{} // (size 1) : handshake completed
+		handshakeReset     chan struct{} // (size 1) : reset handshake negotiation state
 		flushNonceQueue    chan struct{} // (size 1) : empty queued packets
 		messageSend        chan struct{} // (size 1) : a message was send to the peer
 		messageReceived    chan struct{} // (size 1) : an authenticated message was received
@@ -44,6 +43,7 @@ type Peer struct {
 		keepalivePassive    *time.Timer // set upon recieving messages
 		newHandshake        *time.Timer // begin a new handshake (after Keepalive + RekeyTimeout)
 		zeroAllKeys         *time.Timer // zero all key material (after RejectAfterTime*3)
+		handshakeDeadline   *time.Timer // Current handshake must be completed
 
 		pendingKeepalivePassive bool
 		pendingNewHandshake     bool
@@ -59,7 +59,7 @@ type Peer struct {
 	mac MACStatePeer
 }
 
-func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
+func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	// create peer
 
 	peer := new(Peer)
@@ -80,11 +80,17 @@ func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 	peer.id = device.idCounter
 	device.idCounter += 1
 
+	// check if over limit
+
+	if len(device.peers) >= MaxPeers {
+		return nil, errors.New("Too many peers")
+	}
+
 	// map public key
 
 	_, ok := device.peers[pk]
 	if ok {
-		panic(errors.New("bug: adding existing peer"))
+		return nil, errors.New("Adding existing peer")
 	}
 	device.peers[pk] = peer
 	device.mutex.Unlock()
@@ -108,6 +114,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 	peer.signal.stop = make(chan struct{})
 	peer.signal.newKeyPair = make(chan struct{}, 1)
 	peer.signal.handshakeBegin = make(chan struct{}, 1)
+	peer.signal.handshakeReset = make(chan struct{}, 1)
 	peer.signal.handshakeCompleted = make(chan struct{}, 1)
 	peer.signal.flushNonceQueue = make(chan struct{}, 1)
 
@@ -117,7 +124,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) *Peer {
 	go peer.RoutineSequentialSender()
 	go peer.RoutineSequentialReceiver()
 
-	return peer
+	return peer, nil
 }
 
 func (peer *Peer) String() string {

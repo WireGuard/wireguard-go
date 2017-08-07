@@ -84,13 +84,47 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 	return nil
 }
 
+func updateUDPConn(device *Device) error {
+	var err error
+	netc := &device.net
+	netc.mutex.Lock()
+
+	// close existing connection
+
+	if netc.conn != nil {
+		netc.conn.Close()
+		netc.conn = nil
+	}
+
+	// open new existing connection
+
+	conn, err := net.ListenUDP("udp", netc.addr)
+	if err == nil {
+		netc.conn = conn
+		signalSend(device.signal.newUDPConn)
+	}
+
+	netc.mutex.Unlock()
+	return err
+}
+
+func closeUDPConn(device *Device) {
+	device.net.mutex.Lock()
+	device.net.conn = nil
+	device.net.mutex.Unlock()
+	println("send signal")
+	signalSend(device.signal.newUDPConn)
+}
+
 func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 	scanner := bufio.NewScanner(socket)
+	logInfo := device.log.Info
 	logError := device.log.Error
 	logDebug := device.log.Debug
 
 	var peer *Peer
 
+	dummy := false
 	deviceConfig := true
 
 	for scanner.Scan() {
@@ -135,17 +169,11 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				netc := &device.net
 				netc.mutex.Lock()
 				if netc.addr.Port != int(port) {
-					if netc.conn != nil {
-						netc.conn.Close()
-					}
 					netc.addr.Port = int(port)
-					netc.conn, err = net.ListenUDP("udp", netc.addr)
 				}
 				netc.mutex.Unlock()
-				if err != nil {
-					logError.Println("Failed to create UDP listener:", err)
-					return &IPCError{Code: ipcErrorIO}
-				}
+				updateUDPConn(device)
+
 				// TODO: Clear source address of all peers
 
 			case "fwmark":
@@ -189,17 +217,30 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 				device.mutex.RLock()
 				if device.publicKey.Equals(pubKey) {
+
+					// create dummy instance
+
+					peer = &Peer{}
+					dummy = true
 					device.mutex.RUnlock()
-					logError.Println("Public key of peer matches private key of device")
-					return &IPCError{Code: ipcErrorInvalid}
-				}
+					logInfo.Println("Ignoring peer with public key of device")
 
-				// find peer referenced
+				} else {
 
-				peer, _ = device.peers[pubKey]
-				device.mutex.RUnlock()
-				if peer == nil {
-					peer = device.NewPeer(pubKey)
+					// find peer referenced
+
+					peer, _ = device.peers[pubKey]
+					device.mutex.RUnlock()
+					if peer == nil {
+						peer, err = device.NewPeer(pubKey)
+						if err != nil {
+							logError.Println("Failed to create new peer:", err)
+							return &IPCError{Code: ipcErrorInvalid}
+						}
+					}
+					signalSend(peer.signal.handshakeReset)
+					dummy = false
+
 				}
 
 			case "remove":
@@ -207,16 +248,17 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					logError.Println("Failed to set remove, invalid value:", value)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
-				device.RemovePeer(peer.handshake.remoteStatic)
-				logDebug.Println("Removing", peer.String())
-				peer = nil
+				if !dummy {
+					logDebug.Println("Removing", peer.String())
+					device.RemovePeer(peer.handshake.remoteStatic)
+				}
+				peer = &Peer{}
+				dummy = true
 
 			case "preshared_key":
-				err := func() error {
-					peer.mutex.Lock()
-					defer peer.mutex.Unlock()
-					return peer.handshake.presharedKey.FromHex(value)
-				}()
+				peer.mutex.Lock()
+				err := peer.handshake.presharedKey.FromHex(value)
+				peer.mutex.Unlock()
 				if err != nil {
 					logError.Println("Failed to set preshared_key:", err)
 					return &IPCError{Code: ipcErrorInvalid}
@@ -232,6 +274,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				peer.mutex.Lock()
 				peer.endpoint = addr
 				peer.mutex.Unlock()
+				signalSend(peer.signal.handshakeReset)
 
 			case "persistent_keepalive_interval":
 
@@ -251,12 +294,11 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				// send immediate keep-alive
 
 				if old == 0 && secs != 0 {
-					up, err := device.tun.IsUp()
 					if err != nil {
 						logError.Println("Failed to get tun device status:", err)
 						return &IPCError{Code: ipcErrorIO}
 					}
-					if up {
+					if atomic.LoadInt32(&device.isUp) == AtomicTrue && !dummy {
 						peer.SendKeepAlive()
 					}
 				}
@@ -266,7 +308,9 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					logError.Println("Failed to set replace_allowed_ips, invalid value:", value)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
-				device.routingTable.RemovePeer(peer)
+				if !dummy {
+					device.routingTable.RemovePeer(peer)
+				}
 
 			case "allowed_ip":
 				_, network, err := net.ParseCIDR(value)
@@ -275,7 +319,9 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 				ones, _ := network.Mask.Size()
-				device.routingTable.Insert(network.IP, uint(ones), peer)
+				if !dummy {
+					device.routingTable.Insert(network.IP, uint(ones), peer)
+				}
 
 			default:
 				logError.Println("Invalid UAPI key (peer configuration):", key)

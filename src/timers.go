@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"golang.org/x/crypto/blake2s"
+	"math/rand"
 	"sync/atomic"
 	"time"
 )
@@ -16,12 +17,11 @@ func (peer *Peer) KeepKeyFreshSending() {
 	if kp == nil {
 		return
 	}
-	if !kp.isInitiator {
-		return
-	}
 	nonce := atomic.LoadUint64(&kp.sendNonce)
-	send := nonce > RekeyAfterMessages || time.Now().Sub(kp.created) > RekeyAfterTime
-	if send {
+	if nonce > RekeyAfterMessages {
+		signalSend(peer.signal.handshakeBegin)
+	}
+	if kp.isInitiator && time.Now().Sub(kp.created) > RekeyAfterTime {
 		signalSend(peer.signal.handshakeBegin)
 	}
 }
@@ -30,6 +30,7 @@ func (peer *Peer) KeepKeyFreshSending() {
  *
  */
 func (peer *Peer) KeepKeyFreshReceiving() {
+	// TODO: Add a guard, clear on handshake complete (clear in TimerHandshakeComplete)
 	kp := peer.keyPairs.Current()
 	if kp == nil {
 		return
@@ -108,7 +109,6 @@ func (peer *Peer) TimerAnyAuthenticatedPacketTraversal() {
  * - First transport message under the "next" key
  */
 func (peer *Peer) TimerHandshakeComplete() {
-	timerStop(peer.timer.zeroAllKeys)
 	atomic.StoreInt64(
 		&peer.stats.lastHandshakeNano,
 		time.Now().UnixNano(),
@@ -129,10 +129,7 @@ func (peer *Peer) TimerHandshakeComplete() {
  * upon failure to complete a handshake
  */
 func (peer *Peer) TimerEphemeralKeyCreated() {
-	if !peer.timer.pendingZeroAllKeys {
-		peer.timer.pendingZeroAllKeys = true
-		peer.timer.zeroAllKeys.Reset(RejectAfterTime * 3)
-	}
+	peer.timer.zeroAllKeys.Reset(RejectAfterTime * 3)
 }
 
 func (peer *Peer) RoutineTimerHandler() {
@@ -154,19 +151,19 @@ func (peer *Peer) RoutineTimerHandler() {
 
 			interval := atomic.LoadUint64(&peer.persistentKeepaliveInterval)
 			if interval > 0 {
-				logDebug.Println("Sending persistent keep-alive to", peer.String())
+				logDebug.Println("Sending keep-alive to", peer.String())
 				peer.SendKeepAlive()
 			}
 
 		case <-peer.timer.keepalivePassive.C:
 
-			logDebug.Println("Sending passive keep-alive to", peer.String())
+			logDebug.Println("Sending keep-alive to", peer.String())
 
 			peer.SendKeepAlive()
 
 			if peer.timer.needAnotherKeepalive {
 				peer.timer.keepalivePassive.Reset(KeepaliveTimeout)
-				peer.timer.needAnotherKeepalive = true
+				peer.timer.needAnotherKeepalive = false
 			}
 
 		// unresponsive session
@@ -188,8 +185,6 @@ func (peer *Peer) RoutineTimerHandler() {
 
 			kp := &peer.keyPairs
 			kp.mutex.Lock()
-
-			peer.timer.pendingZeroAllKeys = false
 
 			// unmap indecies
 
@@ -251,40 +246,41 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 			return
 		}
 
-		// wait for handshake
+		// set deadline
 
-		deadline := time.Now().Add(MaxHandshakeAttemptTime)
+	BeginHandshakes:
 
-	Loop:
+		signalClear(peer.signal.handshakeReset)
+		deadline := time.NewTimer(RekeyAttemptTime)
+
+	AttemptHandshakes:
+
 		for attempts := uint(1); ; attempts++ {
 
-			// clear completed signal
+			// check if deadline reached
 
 			select {
-			case <-peer.signal.handshakeCompleted:
+			case <-deadline.C:
+				logInfo.Println("Handshake negotiation timed out for:", peer.String())
+				signalSend(peer.signal.flushNonceQueue)
+				timerStop(peer.timer.keepalivePersistent)
+				break
 			case <-peer.signal.stop:
 				return
 			default:
 			}
 
-			// check if sufficient time for retry
-
-			if deadline.Before(time.Now().Add(RekeyTimeout)) {
-				logInfo.Println("Handshake negotiation timed out for", peer.String())
-				signalSend(peer.signal.flushNonceQueue)
-				timerStop(peer.timer.keepalivePersistent)
-				timerStop(peer.timer.keepalivePassive)
-				break Loop
-			}
+			signalClear(peer.signal.handshakeCompleted)
 
 			// create initiation message
 
 			msg, err := peer.device.CreateMessageInitiation(peer)
 			if err != nil {
 				logError.Println("Failed to create handshake initiation message:", err)
-				break Loop
+				break AttemptHandshakes
 			}
-			peer.TimerEphemeralKeyCreated()
+
+			jitter := time.Millisecond * time.Duration(rand.Uint32()%334)
 
 			// marshal and send
 
@@ -299,14 +295,14 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 					"Failed to send handshake initiation message to",
 					peer.String(), ":", err,
 				)
-				continue
+				break
 			}
 
 			peer.TimerAnyAuthenticatedPacketTraversal()
 
-			// set timeout
+			// set handshake timeout
 
-			timeout := time.NewTimer(RekeyTimeout)
+			timeout := time.NewTimer(RekeyTimeout + jitter)
 			logDebug.Println(
 				"Handshake initiation attempt",
 				attempts, "sent to", peer.String(),
@@ -321,15 +317,19 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 
 			case <-peer.signal.handshakeCompleted:
 				<-timeout.C
-				break Loop
+				break AttemptHandshakes
+
+			case <-peer.signal.handshakeReset:
+				<-timeout.C
+				goto BeginHandshakes
 
 			case <-timeout.C:
+				// TODO: Clear source address for peer
 				continue
-
 			}
 		}
 
-		// allow new signal to be set
+		// clear signal set in the meantime
 
 		signalClear(peer.signal.handshakeBegin)
 	}
