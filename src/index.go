@@ -2,8 +2,8 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"sync"
-	"unsafe"
 )
 
 /* Index=0 is reserved for unset indecies
@@ -24,7 +24,8 @@ type IndexTable struct {
 func randUint32() (uint32, error) {
 	var buff [4]byte
 	_, err := rand.Read(buff[:])
-	return *((*uint32)(unsafe.Pointer(&buff))), err
+	value := binary.LittleEndian.Uint32(buff[:])
+	return value, err
 }
 
 func (table *IndexTable) Init() {

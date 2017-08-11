@@ -31,8 +31,8 @@ func TestNoiseHandshake(t *testing.T) {
 	defer dev1.Close()
 	defer dev2.Close()
 
-	peer1 := dev2.NewPeer(dev1.privateKey.publicKey())
-	peer2 := dev1.NewPeer(dev2.privateKey.publicKey())
+	peer1, _ := dev2.NewPeer(dev1.privateKey.publicKey())
+	peer2, _ := dev1.NewPeer(dev2.privateKey.publicKey())
 
 	assertEqual(
 		t,

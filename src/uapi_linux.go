@@ -44,7 +44,12 @@ func (l *UAPIListener) Accept() (net.Conn, error) {
 }
 
 func (l *UAPIListener) Close() error {
-	return l.listener.Close()
+	err1 := unix.Close(l.inotifyFd)
+	err2 := l.listener.Close()
+	if err1 != nil {
+		return err1
+	}
+	return err2
 }
 
 func (l *UAPIListener) Addr() net.Addr {

@@ -137,10 +137,6 @@ func (peer *Peer) SendBuffer(buffer []byte) (int, error) {
  */
 func (device *Device) RoutineReadFromTUN() {
 
-	if device.tun == nil {
-		return
-	}
-
 	var elem *QueueOutboundElement
 
 	logDebug := device.log.Debug
@@ -155,9 +151,8 @@ func (device *Device) RoutineReadFromTUN() {
 			elem = device.NewOutboundElement()
 		}
 
-		// TODO: THIS!
 		elem.packet = elem.buffer[MessageTransportHeaderSize:]
-		size, err := device.tun.Read(elem.packet)
+		size, err := device.tun.device.Read(elem.packet)
 		if err != nil {
 			logError.Println("Failed to read packet from TUN device:", err)
 			device.Close()
@@ -345,7 +340,7 @@ func (device *Device) RoutineEncryption() {
 
 		// pad content to MTU size
 
-		mtu := int(atomic.LoadInt32(&device.mtu))
+		mtu := int(atomic.LoadInt32(&device.tun.mtu))
 		pad := len(elem.packet) % PaddingMultiple
 		if pad > 0 {
 			for i := 0; i < PaddingMultiple-pad && len(elem.packet) < mtu; i++ {

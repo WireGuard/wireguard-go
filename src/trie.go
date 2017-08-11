@@ -38,7 +38,7 @@ type Trie struct {
  */
 func commonBits(ip1 []byte, ip2 []byte) uint {
 	var i uint
-	size := uint(len(ip1)) / 4
+	size := uint(len(ip1))
 
 	for i = 0; i < size; i++ {
 		v := ip1[i] ^ ip2[i]

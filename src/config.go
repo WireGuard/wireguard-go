@@ -28,6 +28,7 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 	// create lines
 
 	device.mutex.RLock()
+	device.net.mutex.RLock()
 
 	lines := make([]string, 0, 100)
 	send := func(line string) {
@@ -38,7 +39,9 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 		send("private_key=" + device.privateKey.ToHex())
 	}
 
-	send(fmt.Sprintf("listen_port=%d", device.net.addr.Port))
+	if device.net.addr != nil {
+		send(fmt.Sprintf("listen_port=%d", device.net.addr.Port))
+	}
 
 	for _, peer := range device.peers {
 		func() {
@@ -68,6 +71,7 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 		}()
 	}
 
+	device.net.mutex.RUnlock()
 	device.mutex.RUnlock()
 
 	// send lines
@@ -82,38 +86,6 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 	}
 
 	return nil
-}
-
-func updateUDPConn(device *Device) error {
-	var err error
-	netc := &device.net
-	netc.mutex.Lock()
-
-	// close existing connection
-
-	if netc.conn != nil {
-		netc.conn.Close()
-		netc.conn = nil
-	}
-
-	// open new existing connection
-
-	conn, err := net.ListenUDP("udp", netc.addr)
-	if err == nil {
-		netc.conn = conn
-		signalSend(device.signal.newUDPConn)
-	}
-
-	netc.mutex.Unlock()
-	return err
-}
-
-func closeUDPConn(device *Device) {
-	device.net.mutex.Lock()
-	device.net.conn = nil
-	device.net.mutex.Unlock()
-	println("send signal")
-	signalSend(device.signal.newUDPConn)
 }
 
 func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
@@ -166,13 +138,22 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					logError.Println("Failed to set listen_port:", err)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
+
+				addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", port))
+				if err != nil {
+					logError.Println("Failed to set listen_port:", err)
+					return &IPCError{Code: ipcErrorInvalid}
+				}
+
 				netc := &device.net
 				netc.mutex.Lock()
-				if netc.addr.Port != int(port) {
-					netc.addr.Port = int(port)
-				}
+				netc.addr = addr
 				netc.mutex.Unlock()
-				updateUDPConn(device)
+				err = updateUDPConn(device)
+				if err != nil {
+					logError.Println("Failed to set listen_port:", err)
+					return &IPCError{Code: ipcErrorIO}
+				}
 
 				// TODO: Clear source address of all peers
 
@@ -298,7 +279,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 						logError.Println("Failed to get tun device status:", err)
 						return &IPCError{Code: ipcErrorIO}
 					}
-					if atomic.LoadInt32(&device.isUp) == AtomicTrue && !dummy {
+					if device.tun.isUp.Get() && !dummy {
 						peer.SendKeepAlive()
 					}
 				}

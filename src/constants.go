@@ -26,11 +26,15 @@ const (
 /* Implementation specific constants */
 
 const (
-	QueueOutboundSize      = 1024
-	QueueInboundSize       = 1024
-	QueueHandshakeSize     = 1024
-	QueueHandshakeBusySize = QueueHandshakeSize / 8
-	MinMessageSize         = MessageTransportSize // size of keep-alive
-	MaxMessageSize         = ((1 << 16) - 1) + MessageTransportHeaderSize
-	MaxPeers               = 1 << 16
+	QueueOutboundSize  = 1024
+	QueueInboundSize   = 1024
+	QueueHandshakeSize = 1024
+	MinMessageSize     = MessageTransportSize // size of keep-alive
+	MaxMessageSize     = ((1 << 16) - 1) + MessageTransportHeaderSize
+	MaxPeers           = 1 << 16
+)
+
+const (
+	UnderLoadQueueSize = QueueHandshakeSize / 8
+	UnderLoadAfterTime = time.Second // how long does the device remain under load after detected
 )

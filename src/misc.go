@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sync/atomic"
 	"time"
 )
 
@@ -8,9 +9,25 @@ import (
  * (since booleans are not natively supported by sync/atomic)
  */
 const (
-	AtomicFalse = iota
+	AtomicFalse = int32(iota)
 	AtomicTrue
 )
+
+type AtomicBool struct {
+	flag int32
+}
+
+func (a *AtomicBool) Get() bool {
+	return atomic.LoadInt32(&a.flag) == AtomicTrue
+}
+
+func (a *AtomicBool) Set(val bool) {
+	flag := AtomicFalse
+	if val {
+		flag = AtomicTrue
+	}
+	atomic.StoreInt32(&a.flag, flag)
+}
 
 func min(a uint, b uint) uint {
 	if a > b {

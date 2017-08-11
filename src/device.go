@@ -5,20 +5,22 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type Device struct {
-	mtu       int32
-	tun       TUNDevice
 	log       *Logger // collection of loggers for levels
 	idCounter uint    // for assigning debug ids to peers
 	fwMark    uint32
-	pool      struct {
-		// pools objects for reuse
+	tun       struct {
+		device TUNDevice
+		isUp   AtomicBool
+		mtu    int32
+	}
+	pool struct {
 		messageBuffers sync.Pool
 	}
 	net struct {
-		// seperate for performance reasons
 		mutex sync.RWMutex
 		addr  *net.UDPAddr // UDP source address
 		conn  *net.UDPConn // UDP "connection"
@@ -35,13 +37,12 @@ type Device struct {
 	}
 	signal struct {
 		stop       chan struct{} // halts all go routines
-		newUDPConn chan struct{} // a net.conn was set
+		newUDPConn chan struct{} // a net.conn was set (consumed by the receiver routine)
 	}
-	isUp        int32 // atomic bool: interface is up
-	underLoad   int32 // atomic bool: device is under load
-	ratelimiter Ratelimiter
-	peers       map[NoisePublicKey]*Peer
-	mac         MACStateDevice
+	underLoadUntil atomic.Value
+	ratelimiter    Ratelimiter
+	peers          map[NoisePublicKey]*Peer
+	mac            MACStateDevice
 }
 
 /* Warning:
@@ -56,6 +57,23 @@ func removePeerUnsafe(device *Device, key NoisePublicKey) {
 	device.routingTable.RemovePeer(peer)
 	delete(device.peers, key)
 	peer.Close()
+}
+
+func (device *Device) IsUnderLoad() bool {
+
+	// check if currently under load
+
+	now := time.Now()
+	underLoad := len(device.queue.handshake) >= UnderLoadQueueSize
+	if underLoad {
+		device.underLoadUntil.Store(now.Add(time.Second))
+		return true
+	}
+
+	// check if recently under load
+
+	until := device.underLoadUntil.Load().(time.Time)
+	return until.After(now)
 }
 
 func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
@@ -115,20 +133,13 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
 
-	device.tun = tun
-	device.log = NewLogger(logLevel)
+	device.log = NewLogger(logLevel, "("+tun.Name()+") ")
 	device.peers = make(map[NoisePublicKey]*Peer)
+	device.tun.device = tun
 	device.indices.Init()
 	device.ratelimiter.Init()
 	device.routingTable.Reset()
-
-	// listen
-
-	device.net.mutex.Lock()
-	device.net.conn, _ = net.ListenUDP("udp", device.net.addr)
-	addr := device.net.conn.LocalAddr()
-	device.net.addr, _ = net.ResolveUDPAddr(addr.Network(), addr.String())
-	device.net.mutex.Unlock()
+	device.underLoadUntil.Store(time.Time{})
 
 	// setup pools
 
@@ -157,42 +168,43 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 		go device.RoutineHandshake()
 	}
 
-	go device.RoutineBusyMonitor()
-	go device.RoutineReadFromTUN()
 	go device.RoutineTUNEventReader()
-	go device.RoutineReceiveIncomming()
 	go device.ratelimiter.RoutineGarbageCollector(device.signal.stop)
+	go device.RoutineReadFromTUN()
+	go device.RoutineReceiveIncomming()
 
 	return device
 }
 
 func (device *Device) RoutineTUNEventReader() {
-	events := device.tun.Events()
+	logInfo := device.log.Info
 	logError := device.log.Error
+
+	events := device.tun.device.Events()
 
 	for event := range events {
 		if event&TUNEventMTUUpdate != 0 {
-			mtu, err := device.tun.MTU()
+			mtu, err := device.tun.device.MTU()
 			if err != nil {
 				logError.Println("Failed to load updated MTU of device:", err)
 			} else {
 				if mtu+MessageTransportSize > MaxMessageSize {
 					mtu = MaxMessageSize - MessageTransportSize
 				}
-				atomic.StoreInt32(&device.mtu, int32(mtu))
+				atomic.StoreInt32(&device.tun.mtu, int32(mtu))
 			}
 		}
 
 		if event&TUNEventUp != 0 {
-			println("handle 1")
-			atomic.StoreInt32(&device.isUp, AtomicTrue)
+			device.tun.isUp.Set(true)
 			updateUDPConn(device)
-			println("handle 2", device.net.conn)
+			logInfo.Println("Interface set up")
 		}
 
 		if event&TUNEventDown != 0 {
-			atomic.StoreInt32(&device.isUp, AtomicFalse)
+			device.tun.isUp.Set(false)
 			closeUDPConn(device)
+			logInfo.Println("Interface set down")
 		}
 	}
 }
@@ -224,6 +236,7 @@ func (device *Device) RemoveAllPeers() {
 func (device *Device) Close() {
 	device.RemoveAllPeers()
 	close(device.signal.stop)
+	closeUDPConn(device)
 }
 
 func (device *Device) WaitChannel() chan struct{} {

@@ -19,7 +19,7 @@ type Logger struct {
 	Error *log.Logger
 }
 
-func NewLogger(level int) *Logger {
+func NewLogger(level int, prepend string) *Logger {
 	output := os.Stdout
 	logger := new(Logger)
 
@@ -34,16 +34,16 @@ func NewLogger(level int) *Logger {
 	}()
 
 	logger.Debug = log.New(logDebug,
-		"DEBUG: ",
+		"DEBUG: "+prepend,
 		log.Ldate|log.Ltime|log.Lshortfile,
 	)
 
 	logger.Info = log.New(logInfo,
-		"INFO: ",
+		"INFO: "+prepend,
 		log.Ldate|log.Ltime,
 	)
 	logger.Error = log.New(logErr,
-		"ERROR: ",
+		"ERROR: "+prepend,
 		log.Ldate|log.Ltime,
 	)
 	return logger

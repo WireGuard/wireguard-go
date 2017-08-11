@@ -13,8 +13,8 @@ func TestMAC1(t *testing.T) {
 	defer dev1.Close()
 	defer dev2.Close()
 
-	peer1 := dev2.NewPeer(dev1.privateKey.publicKey())
-	peer2 := dev1.NewPeer(dev2.privateKey.publicKey())
+	peer1, _ := dev2.NewPeer(dev1.privateKey.publicKey())
+	peer2, _ := dev1.NewPeer(dev2.privateKey.publicKey())
 
 	assertEqual(t, peer1.mac.keyMAC1[:], dev1.mac.keyMAC1[:])
 	assertEqual(t, peer2.mac.keyMAC1[:], dev2.mac.keyMAC1[:])
@@ -45,8 +45,8 @@ func TestMACs(t *testing.T) {
 		defer device1.Close()
 		defer device2.Close()
 
-		peer1 := device2.NewPeer(device1.privateKey.publicKey())
-		peer2 := device1.NewPeer(device2.privateKey.publicKey())
+		peer1, _ := device2.NewPeer(device1.privateKey.publicKey())
+		peer2, _ := device1.NewPeer(device2.privateKey.publicKey())
 
 		if addr.Port < 0 {
 			return true

@@ -12,6 +12,7 @@ type DummyTUN struct {
 	name    string
 	mtu     int
 	packets chan []byte
+	events  chan TUNEvent
 }
 
 func (tun *DummyTUN) Name() string {
@@ -25,6 +26,14 @@ func (tun *DummyTUN) MTU() (int, error) {
 func (tun *DummyTUN) Write(d []byte) (int, error) {
 	tun.packets <- d
 	return len(d), nil
+}
+
+func (tun *DummyTUN) Close() error {
+	return nil
+}
+
+func (tun *DummyTUN) Events() chan TUNEvent {
+	return tun.events
 }
 
 func (tun *DummyTUN) Read(d []byte) (int, error) {

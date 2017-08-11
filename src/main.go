@@ -65,9 +65,23 @@ func main() {
 		return
 	}
 
+	// get log level (default: info)
+
+	logLevel := func() int {
+		switch os.Getenv("LOG_LEVEL") {
+		case "debug":
+			return LogLevelDebug
+		case "info":
+			return LogLevelInfo
+		case "error":
+			return LogLevelError
+		}
+		return LogLevelInfo
+	}()
+
 	// create wireguard device
 
-	device := NewDevice(tun, LogLevelDebug)
+	device := NewDevice(tun, logLevel)
 
 	logInfo := device.log.Info
 	logError := device.log.Error
