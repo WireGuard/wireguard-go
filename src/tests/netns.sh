@@ -45,7 +45,6 @@ waitncatudp() { pretty "${1//*-}" "wait for udp:1111"; while [[ $(ss -N "$1" -ul
 waitiface() { pretty "${1//*-}" "wait for $2 to come up"; ip netns exec "$1" bash -c "while [[ \$(< \"/sys/class/net/$2/operstate\") != up ]]; do read -t .1 -N 0 || true; done;"; }
 
 cleanup() {
-    n0 wg show
     set +e
     exec 2>/dev/null
     printf "$orig_message_cost" > /proc/sys/net/core/message_cost
@@ -154,11 +153,14 @@ big_mtu=$(( 34816 - 1500 + $orig_mtu ))
 # Test using IPv4 as outer transport
 n0 wg set wg1 peer "$pub2" endpoint 127.0.0.1:20000
 n0 wg set wg2 peer "$pub1" endpoint 127.0.0.1:10000
-n0 wg show
+
 # Before calling tests, we first make sure that the stats counters are working
 n2 ping -c 10 -f -W 1 192.168.241.1
 { read _; read _; read _; read rx_bytes _; read _; read tx_bytes _; } < <(ip2 -stats link show dev wg2)
-[[ $rx_bytes -ge 932 && $tx_bytes -ge 1516 && $rx_bytes -lt 2500 && $rx_bytes -lt 2500 ]]
+ip2 -stats link show dev wg2
+n0 wg show
+[[ $rx_bytes -ge 840 && $tx_bytes -ge 880 && $rx_bytes -lt 2500 && $rx_bytes -lt 2500 ]]
+echo "counters working"
 tests
 ip1 link set wg1 mtu $big_mtu
 ip2 link set wg2 mtu $big_mtu
