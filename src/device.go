@@ -42,7 +42,7 @@ type Device struct {
 	underLoadUntil atomic.Value
 	ratelimiter    Ratelimiter
 	peers          map[NoisePublicKey]*Peer
-	mac            MACStateDevice
+	mac            CookieChecker
 }
 
 /* Warning:

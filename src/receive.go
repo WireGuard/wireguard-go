@@ -272,7 +272,9 @@ func (device *Device) RoutineHandshake() {
 
 		case MessageCookieReplyType:
 
-			// verify and update peer cookie state
+			// unmarshal packet
+
+			logDebug.Println("Process cookie reply from:", elem.source.String())
 
 			var reply MessageCookieReply
 			reader := bytes.NewReader(elem.packet)
@@ -281,7 +283,14 @@ func (device *Device) RoutineHandshake() {
 				logDebug.Println("Failed to decode cookie reply")
 				return
 			}
-			device.ConsumeMessageCookieReply(&reply)
+
+			// lookup peer and consume response
+
+			entry := device.indices.Lookup(reply.Receiver)
+			if entry.peer == nil {
+				return
+			}
+			entry.peer.mac.ConsumeReply(&reply)
 			continue
 
 		case MessageInitiationType, MessageResponseType:
@@ -298,12 +307,17 @@ func (device *Device) RoutineHandshake() {
 
 					// construct cookie reply
 
+					logDebug.Println("Sending cookie reply to:", elem.source.String())
+
 					sender := binary.LittleEndian.Uint32(elem.packet[4:8]) // "sender" always follows "type"
-					reply, err := device.CreateMessageCookieReply(elem.packet, sender, elem.source)
+					reply, err := device.mac.CreateReply(elem.packet, sender, elem.source)
 					if err != nil {
 						logError.Println("Failed to create cookie reply:", err)
 						return
 					}
+
+					// marshal and send reply
+
 					writer := bytes.NewBuffer(temp[:0])
 					binary.Write(writer, binary.LittleEndian, reply)
 					_, err = device.net.conn.WriteToUDP(
@@ -391,6 +405,8 @@ func (device *Device) RoutineHandshake() {
 			}
 
 		case MessageResponseType:
+
+			logDebug.Println("Process response")
 
 			// unmarshal
 

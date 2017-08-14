@@ -29,3 +29,9 @@ func (kp *KeyPairs) Current() *KeyPair {
 	defer kp.mutex.RUnlock()
 	return kp.current
 }
+
+func (device *Device) DeleteKeyPair(key *KeyPair) {
+	key.send = nil
+	key.receive = nil
+	device.indices.Delete(key.localIndex)
+}

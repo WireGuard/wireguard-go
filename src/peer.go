@@ -56,7 +56,7 @@ type Peer struct {
 		outbound chan *QueueOutboundElement // sequential ordering of work
 		inbound  chan *QueueInboundElement  // sequential ordering of work
 	}
-	mac MACStatePeer
+	mac CookieGenerator
 }
 
 func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
