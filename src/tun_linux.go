@@ -50,10 +50,10 @@ const (
 
 type NativeTun struct {
 	fd     *os.File
-	index  int
-	name   string
+	index  int32         // if index
+	name   string        // name of interface
 	errors chan error    // async error handling
-	events chan TUNEvent //
+	events chan TUNEvent // device related events
 }
 
 func (tun *NativeTun) RoutineNetlinkListener() {
@@ -86,6 +86,11 @@ func (tun *NativeTun) RoutineNetlinkListener() {
 			case unix.RTM_NEWLINK:
 				info := *(*unix.IfInfomsg)(unsafe.Pointer(&remain[unix.SizeofNlMsghdr]))
 
+				if info.Index != tun.index {
+					// not our interface
+					continue
+				}
+
 				if info.Flags&unix.IFF_RUNNING != 0 {
 					tun.events <- TUNEventUp
 				}
@@ -112,12 +117,12 @@ func (tun *NativeTun) Name() string {
 	return tun.name
 }
 
-func toInt32(val []byte) int {
+func toInt32(val []byte) int32 {
 	n := binary.LittleEndian.Uint32(val[:4])
 	if n >= (1 << 31) {
-		return int(n-(1<<31)) - (1 << 31)
+		return -int32(^n) - 1
 	}
-	return int(n)
+	return int32(n)
 }
 
 func getDummySock() (int, error) {
@@ -128,7 +133,7 @@ func getDummySock() (int, error) {
 	)
 }
 
-func getIFIndex(name string) (int, error) {
+func getIFIndex(name string) (int32, error) {
 	fd, err := getDummySock()
 	if err != nil {
 		return 0, err
@@ -288,7 +293,7 @@ func CreateTUN(name string) (TUNDevice, error) {
 		errors: make(chan error, 5),
 	}
 
-	// fetch IF index
+	// start event listener
 
 	device.index, err = getIFIndex(device.name)
 	if err != nil {
@@ -298,8 +303,6 @@ func CreateTUN(name string) (TUNDevice, error) {
 	go device.RoutineNetlinkListener()
 
 	// set default MTU
-
-	fmt.Println(device)
 
 	return device, device.setMTU(DefaultMTU)
 }

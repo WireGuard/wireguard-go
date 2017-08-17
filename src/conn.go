@@ -5,9 +5,9 @@ import (
 )
 
 func updateUDPConn(device *Device) error {
-	var err error
 	netc := &device.net
 	netc.mutex.Lock()
+	defer netc.mutex.Unlock()
 
 	// close existing connection
 
@@ -18,15 +18,23 @@ func updateUDPConn(device *Device) error {
 	// open new connection
 
 	if device.tun.isUp.Get() {
+
+		// listen on new address
+
 		conn, err := net.ListenUDP("udp", netc.addr)
-		if err == nil {
-			netc.conn = conn
-			signalSend(device.signal.newUDPConn)
+		if err != nil {
+			return err
 		}
+
+		// retrieve port (may have been chosen by kernel)
+
+		addr := conn.LocalAddr()
+		netc.conn = conn
+		netc.addr, _ = net.ResolveUDPAddr(addr.Network(), addr.String())
+		signalSend(device.signal.newUDPConn)
 	}
 
-	netc.mutex.Unlock()
-	return err
+	return nil
 }
 
 func closeUDPConn(device *Device) {
