@@ -34,28 +34,28 @@ func (device *Device) RoutineTUNEventReader() {
 			if err != nil {
 				logError.Println("Failed to load updated MTU of device:", err)
 			} else if int(old) != mtu {
-				atomic.StoreInt32(&device.tun.mtu, int32(mtu))
 				if mtu+MessageTransportSize > MaxMessageSize {
 					logInfo.Println("MTU updated:", mtu, "(too large)")
 				} else {
 					logInfo.Println("MTU updated:", mtu)
 				}
+				atomic.StoreInt32(&device.tun.mtu, int32(mtu))
 			}
 		}
 
 		if event&TUNEventUp != 0 {
 			if !device.tun.isUp.Get() {
+				logInfo.Println("Interface set up")
 				device.tun.isUp.Set(true)
 				updateUDPConn(device)
-				logInfo.Println("Interface set up")
 			}
 		}
 
 		if event&TUNEventDown != 0 {
 			if device.tun.isUp.Get() {
+				logInfo.Println("Interface set down")
 				device.tun.isUp.Set(false)
 				closeUDPConn(device)
-				logInfo.Println("Interface set down")
 			}
 		}
 	}

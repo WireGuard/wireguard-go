@@ -13,6 +13,7 @@ func updateUDPConn(device *Device) error {
 
 	if netc.conn != nil {
 		netc.conn.Close()
+		netc.conn = nil
 	}
 
 	// open new connection
@@ -26,11 +27,24 @@ func updateUDPConn(device *Device) error {
 			return err
 		}
 
+		// set fwmark
+
+		err = setMark(netc.conn, netc.fwmark)
+		if err != nil {
+			return err
+		}
+
 		// retrieve port (may have been chosen by kernel)
 
 		addr := conn.LocalAddr()
 		netc.conn = conn
-		netc.addr, _ = net.ResolveUDPAddr(addr.Network(), addr.String())
+		netc.addr, _ = net.ResolveUDPAddr(
+			addr.Network(),
+			addr.String(),
+		)
+
+		// notify goroutines
+
 		signalSend(device.signal.newUDPConn)
 	}
 

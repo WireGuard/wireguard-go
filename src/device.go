@@ -21,9 +21,10 @@ type Device struct {
 		messageBuffers sync.Pool
 	}
 	net struct {
-		mutex sync.RWMutex
-		addr  *net.UDPAddr // UDP source address
-		conn  *net.UDPConn // UDP "connection"
+		mutex  sync.RWMutex
+		addr   *net.UDPAddr // UDP source address
+		conn   *net.UDPConn // UDP "connection"
+		fwmark int
 	}
 	mutex        sync.RWMutex
 	privateKey   NoisePrivateKey

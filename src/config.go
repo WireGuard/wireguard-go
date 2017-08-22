@@ -145,10 +145,10 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 
-				netc := &device.net
-				netc.mutex.Lock()
-				netc.addr = addr
-				netc.mutex.Unlock()
+				device.net.mutex.Lock()
+				device.net.addr = addr
+				device.net.mutex.Unlock()
+
 				err = updateUDPConn(device)
 				if err != nil {
 					logError.Println("Failed to set listen_port:", err)
@@ -158,7 +158,24 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				// TODO: Clear source address of all peers
 
 			case "fwmark":
-				logError.Println("FWMark not handled yet")
+				fwmark, err := strconv.ParseInt(value, 10, 32)
+				if err != nil {
+					logError.Println("Invalid fwmark", err)
+					return &IPCError{Code: ipcErrorInvalid}
+				}
+
+				device.net.mutex.Lock()
+				device.net.fwmark = int(fwmark)
+				err = setMark(
+					device.net.conn,
+					device.net.fwmark,
+				)
+				device.net.mutex.Unlock()
+				if err != nil {
+					logError.Println("Failed to set fwmark:", err)
+					return &IPCError{Code: ipcErrorIO}
+				}
+
 				// TODO: Clear source address of all peers
 
 			case "public_key":
