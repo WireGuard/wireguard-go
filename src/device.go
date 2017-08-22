@@ -176,43 +176,6 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	return device
 }
 
-func (device *Device) RoutineTUNEventReader() {
-	logInfo := device.log.Info
-	logError := device.log.Error
-
-	events := device.tun.device.Events()
-
-	for event := range events {
-		if event&TUNEventMTUUpdate != 0 {
-			mtu, err := device.tun.device.MTU()
-			if err != nil {
-				logError.Println("Failed to load updated MTU of device:", err)
-			} else {
-				if mtu+MessageTransportSize > MaxMessageSize {
-					mtu = MaxMessageSize - MessageTransportSize
-				}
-				atomic.StoreInt32(&device.tun.mtu, int32(mtu))
-			}
-		}
-
-		if event&TUNEventUp != 0 {
-			if !device.tun.isUp.Get() {
-				device.tun.isUp.Set(true)
-				updateUDPConn(device)
-				logInfo.Println("Interface set up")
-			}
-		}
-
-		if event&TUNEventDown != 0 {
-			if device.tun.isUp.Get() {
-				device.tun.isUp.Set(false)
-				closeUDPConn(device)
-				logInfo.Println("Interface set down")
-			}
-		}
-	}
-}
-
 func (device *Device) LookupPeer(pk NoisePublicKey) *Peer {
 	device.mutex.RLock()
 	defer device.mutex.RUnlock()

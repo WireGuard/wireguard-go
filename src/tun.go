@@ -1,8 +1,8 @@
 package main
 
-/*
- * The default MTU of the new device must be 1420
- */
+import (
+	"sync/atomic"
+)
 
 const DefaultMTU = 1420
 
@@ -21,4 +21,42 @@ type TUNDevice interface {
 	Name() string              // returns the current name
 	Events() chan TUNEvent     // returns a constant channel of events related to the device
 	Close() error              // stops the device and closes the event channel
+}
+
+func (device *Device) RoutineTUNEventReader() {
+	logInfo := device.log.Info
+	logError := device.log.Error
+
+	for event := range device.tun.device.Events() {
+		if event&TUNEventMTUUpdate != 0 {
+			mtu, err := device.tun.device.MTU()
+			old := atomic.LoadInt32(&device.tun.mtu)
+			if err != nil {
+				logError.Println("Failed to load updated MTU of device:", err)
+			} else if int(old) != mtu {
+				atomic.StoreInt32(&device.tun.mtu, int32(mtu))
+				if mtu+MessageTransportSize > MaxMessageSize {
+					logInfo.Println("MTU updated:", mtu, "(too large)")
+				} else {
+					logInfo.Println("MTU updated:", mtu)
+				}
+			}
+		}
+
+		if event&TUNEventUp != 0 {
+			if !device.tun.isUp.Get() {
+				device.tun.isUp.Set(true)
+				updateUDPConn(device)
+				logInfo.Println("Interface set up")
+			}
+		}
+
+		if event&TUNEventDown != 0 {
+			if device.tun.isUp.Get() {
+				device.tun.isUp.Set(false)
+				closeUDPConn(device)
+				logInfo.Println("Interface set down")
+			}
+		}
+	}
 }

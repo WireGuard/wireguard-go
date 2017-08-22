@@ -85,6 +85,7 @@ func (tun *NativeTun) RoutineNetlinkListener() {
 
 			case unix.RTM_NEWLINK:
 				info := *(*unix.IfInfomsg)(unsafe.Pointer(&remain[unix.SizeofNlMsghdr]))
+				remain = remain[hdr.Len:]
 
 				if info.Index != tun.index {
 					// not our interface
@@ -99,7 +100,7 @@ func (tun *NativeTun) RoutineNetlinkListener() {
 					tun.events <- TUNEventDown
 				}
 
-				remain = remain[hdr.Len:]
+				tun.events <- TUNEventMTUUpdate
 
 			default:
 				remain = remain[hdr.Len:]
