@@ -101,6 +101,7 @@ func addToEncryptionQueue(
 		default:
 			select {
 			case old := <-queue:
+				// drop & release to potential consumer
 				old.Drop()
 				old.mutex.Unlock()
 			default:
@@ -137,19 +138,16 @@ func (peer *Peer) SendBuffer(buffer []byte) (int, error) {
  */
 func (device *Device) RoutineReadFromTUN() {
 
-	var elem *QueueOutboundElement
+	elem := device.NewOutboundElement()
 
 	logDebug := device.log.Debug
 	logError := device.log.Error
 
-	logDebug.Println("Routine, TUN Reader: started")
+	logDebug.Println("Routine, TUN Reader started")
 
 	for {
-		// read packet
 
-		if elem == nil {
-			elem = device.NewOutboundElement()
-		}
+		// read packet
 
 		elem.packet = elem.buffer[MessageTransportHeaderSize:]
 		size, err := device.tun.device.Read(elem.packet)
@@ -159,7 +157,7 @@ func (device *Device) RoutineReadFromTUN() {
 			return
 		}
 
-		if size == 0 {
+		if size == 0 || size > MaxContentSize {
 			continue
 		}
 
@@ -191,7 +189,7 @@ func (device *Device) RoutineReadFromTUN() {
 			continue
 		}
 
-		// check if known endpoint
+		// check if known endpoint (drop early)
 
 		peer.mutex.RLock()
 		if peer.endpoint == nil {
@@ -205,8 +203,7 @@ func (device *Device) RoutineReadFromTUN() {
 
 		signalSend(peer.signal.handshakeReset)
 		addToOutboundQueue(peer.queue.nonce, elem)
-		elem = nil
-
+		elem = device.NewOutboundElement()
 	}
 }
 

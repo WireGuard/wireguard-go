@@ -30,12 +30,14 @@ const (
 	QueueOutboundSize  = 1024
 	QueueInboundSize   = 1024
 	QueueHandshakeSize = 1024
-	MinMessageSize     = MessageTransportSize // size of keep-alive
-	MaxMessageSize     = ((1 << 16) - 1) + MessageTransportHeaderSize
-	MaxPeers           = 1 << 16
+	MaxSegmentSize     = (1 << 16) - 1                         // largest possible UDP datagram
+	MinMessageSize     = MessageKeepaliveSize                  // minimum size of transport message (keepalive)
+	MaxMessageSize     = MaxSegmentSize                        // maximum size of transport message
+	MaxContentSize     = MaxSegmentSize - MessageTransportSize // maximum size of transport message content
 )
 
 const (
 	UnderLoadQueueSize = QueueHandshakeSize / 8
 	UnderLoadAfterTime = time.Second // how long does the device remain under load after detected
+	MaxPeers           = 1 << 16     // maximum number of configured peers
 )

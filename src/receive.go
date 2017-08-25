@@ -54,6 +54,26 @@ func (device *Device) addToInboundQueue(
 	}
 }
 
+func (device *Device) addToDecryptionQueue(
+	queue chan *QueueInboundElement,
+	element *QueueInboundElement,
+) {
+	for {
+		select {
+		case queue <- element:
+			return
+		default:
+			select {
+			case old := <-queue:
+				// drop & release to potential consumer
+				old.Drop()
+				old.mutex.Unlock()
+			default:
+			}
+		}
+	}
+}
+
 func (device *Device) addToHandshakeQueue(
 	queue chan QueueHandshakeElement,
 	element QueueHandshakeElement,
@@ -167,7 +187,7 @@ func (device *Device) RoutineReceiveIncomming() {
 
 					// add to decryption queues
 
-					device.addToInboundQueue(device.queue.decryption, elem)
+					device.addToDecryptionQueue(device.queue.decryption, elem)
 					device.addToInboundQueue(peer.queue.inbound, elem)
 					buffer = device.GetMessageBuffer()
 					continue
@@ -218,7 +238,6 @@ func (device *Device) RoutineDecryption() {
 		// check if dropped
 
 		if elem.IsDropped() {
-			elem.mutex.Unlock() // TODO: Make consistent with send
 			continue
 		}
 
@@ -256,7 +275,7 @@ func (device *Device) RoutineHandshake() {
 	logDebug := device.log.Debug
 	logDebug.Println("Routine, handshake routine, started for device")
 
-	var temp [256]byte
+	var temp [MessageHandshakeSize]byte
 	var elem QueueHandshakeElement
 
 	for {
