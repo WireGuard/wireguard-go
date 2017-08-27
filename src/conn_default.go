@@ -6,6 +6,6 @@ import (
 	"net"
 )
 
-func setFwmark(conn *net.UDPConn, value int) error {
+func setMark(conn *net.UDPConn, value int) error {
 	return nil
 }

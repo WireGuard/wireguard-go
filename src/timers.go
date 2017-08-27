@@ -295,7 +295,7 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 					"Failed to send handshake initiation message to",
 					peer.String(), ":", err,
 				)
-				break
+				continue
 			}
 
 			peer.TimerAnyAuthenticatedPacketTraversal()
