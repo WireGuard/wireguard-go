@@ -13,37 +13,47 @@ import (
  * https://tools.ietf.org/html/rfc5869
  */
 
-func HMAC(sum *[blake2s.Size]byte, key []byte, input []byte) {
+func HMAC1(sum *[blake2s.Size]byte, key, in0 []byte) {
 	mac := hmac.New(func() hash.Hash {
 		h, _ := blake2s.New256(nil)
 		return h
 	}, key)
-	mac.Write(input)
+	mac.Write(in0)
 	mac.Sum(sum[:0])
 }
 
-func KDF1(key []byte, input []byte) (t0 [blake2s.Size]byte) {
-	HMAC(&t0, key, input)
-	HMAC(&t0, t0[:], []byte{0x1})
+func HMAC2(sum *[blake2s.Size]byte, key, in0, in1 []byte) {
+	mac := hmac.New(func() hash.Hash {
+		h, _ := blake2s.New256(nil)
+		return h
+	}, key)
+	mac.Write(in0)
+	mac.Write(in1)
+	mac.Sum(sum[:0])
+}
+
+func KDF1(t0 *[blake2s.Size]byte, key, input []byte) {
+	HMAC1(t0, key, input)
+	HMAC1(t0, t0[:], []byte{0x1})
 	return
 }
 
-func KDF2(key []byte, input []byte) (t0 [blake2s.Size]byte, t1 [blake2s.Size]byte) {
+func KDF2(t0, t1 *[blake2s.Size]byte, key, input []byte) {
 	var prk [blake2s.Size]byte
-	HMAC(&prk, key, input)
-	HMAC(&t0, prk[:], []byte{0x1})
-	HMAC(&t1, prk[:], append(t0[:], 0x2))
-	prk = [blake2s.Size]byte{}
+	HMAC1(&prk, key, input)
+	HMAC1(t0, prk[:], []byte{0x1})
+	HMAC2(t1, prk[:], t0[:], []byte{0x2})
+	setZero(prk[:])
 	return
 }
 
-func KDF3(key []byte, input []byte) (t0 [blake2s.Size]byte, t1 [blake2s.Size]byte, t2 [blake2s.Size]byte) {
+func KDF3(t0, t1, t2 *[blake2s.Size]byte, key, input []byte) {
 	var prk [blake2s.Size]byte
-	HMAC(&prk, key, input)
-	HMAC(&t0, prk[:], []byte{0x1})
-	HMAC(&t1, prk[:], append(t0[:], 0x2))
-	HMAC(&t2, prk[:], append(t1[:], 0x3))
-	prk = [blake2s.Size]byte{}
+	HMAC1(&prk, key, input)
+	HMAC1(t0, prk[:], []byte{0x1})
+	HMAC2(t1, prk[:], t0[:], []byte{0x2})
+	HMAC2(t2, prk[:], t1[:], []byte{0x3})
+	setZero(prk[:])
 	return
 }
 
@@ -53,6 +63,12 @@ func isZero(val []byte) bool {
 		acc |= b
 	}
 	return acc == 0
+}
+
+func setZero(arr []byte) {
+	for i := range arr {
+		arr[i] = 0
+	}
 }
 
 /* curve25519 wrappers */

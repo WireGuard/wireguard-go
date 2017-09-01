@@ -2,14 +2,39 @@ package main
 
 import (
 	"crypto/cipher"
+	"golang.org/x/crypto/chacha20poly1305"
+	"reflect"
 	"sync"
 	"time"
 )
 
+type safeAEAD struct {
+	mutex sync.RWMutex
+	aead  cipher.AEAD
+}
+
+func (con *safeAEAD) clear() {
+	// TODO: improve handling of key material
+	con.mutex.Lock()
+	if con.aead != nil {
+		val := reflect.ValueOf(con.aead)
+		elm := val.Elem()
+		typ := elm.Type()
+		elm.Set(reflect.Zero(typ))
+		con.aead = nil
+	}
+	con.mutex.Unlock()
+}
+
+func (con *safeAEAD) setKey(key *[chacha20poly1305.KeySize]byte) {
+	// TODO: improve handling of key material
+	con.aead, _ = chacha20poly1305.New(key[:])
+}
+
 type KeyPair struct {
-	receive      cipher.AEAD
+	send         safeAEAD
+	receive      safeAEAD
 	replayFilter ReplayFilter
-	send         cipher.AEAD
 	sendNonce    uint64
 	isInitiator  bool
 	created      time.Time
@@ -31,7 +56,7 @@ func (kp *KeyPairs) Current() *KeyPair {
 }
 
 func (device *Device) DeleteKeyPair(key *KeyPair) {
-	key.send = nil
-	key.receive = nil
+	key.send.clear()
+	key.receive.clear()
 	device.indices.Delete(key.localIndex)
 }

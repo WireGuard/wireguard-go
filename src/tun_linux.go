@@ -63,6 +63,8 @@ func (tun *NativeTun) RoutineNetlinkListener() {
 		return
 	}
 
+	tun.events <- TUNEventUp // TODO: Fix network namespace problem
+
 	for msg := make([]byte, 1<<16); ; {
 
 		msgn, _, _, _, err := unix.Recvmsg(sock, msg[:], nil, 0)

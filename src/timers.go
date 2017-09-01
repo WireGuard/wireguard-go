@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"golang.org/x/crypto/blake2s"
 	"math/rand"
 	"sync/atomic"
 	"time"
@@ -134,7 +133,6 @@ func (peer *Peer) TimerEphemeralKeyCreated() {
 
 func (peer *Peer) RoutineTimerHandler() {
 	device := peer.device
-	indices := &device.indices
 
 	logDebug := device.log.Debug
 	logDebug.Println("Routine, timer handler, started for peer", peer.String())
@@ -186,35 +184,31 @@ func (peer *Peer) RoutineTimerHandler() {
 			kp := &peer.keyPairs
 			kp.mutex.Lock()
 
-			// unmap indecies
+			// remove key-pairs
 
-			indices.mutex.Lock()
 			if kp.previous != nil {
-				delete(indices.table, kp.previous.localIndex)
+				device.DeleteKeyPair(kp.previous)
+				kp.previous = nil
 			}
 			if kp.current != nil {
-				delete(indices.table, kp.current.localIndex)
+				device.DeleteKeyPair(kp.current)
+				kp.current = nil
 			}
 			if kp.next != nil {
-				delete(indices.table, kp.next.localIndex)
+				device.DeleteKeyPair(kp.next)
+				kp.next = nil
 			}
-			delete(indices.table, hs.localIndex)
-			indices.mutex.Unlock()
-
-			// zero out key pairs (TODO: better than wait for GC)
-
-			kp.current = nil
-			kp.previous = nil
-			kp.next = nil
 			kp.mutex.Unlock()
 
 			// zero out handshake
 
+			device.indices.Delete(hs.localIndex)
+
 			hs.localIndex = 0
-			hs.localEphemeral = NoisePrivateKey{}
-			hs.remoteEphemeral = NoisePublicKey{}
-			hs.chainKey = [blake2s.Size]byte{}
-			hs.hash = [blake2s.Size]byte{}
+			setZero(hs.localEphemeral[:])
+			setZero(hs.remoteEphemeral[:])
+			setZero(hs.chainKey[:])
+			setZero(hs.hash[:])
 			hs.mutex.Unlock()
 		}
 	}

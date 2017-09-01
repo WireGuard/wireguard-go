@@ -251,15 +251,22 @@ func (device *Device) RoutineDecryption() {
 		var err error
 		copy(nonce[4:], counter)
 		elem.counter = binary.LittleEndian.Uint64(counter)
-		elem.packet, err = elem.keyPair.receive.Open(
-			elem.buffer[:0],
-			nonce[:],
-			content,
-			nil,
-		)
-		if err != nil {
+		elem.keyPair.receive.mutex.RLock()
+		if elem.keyPair.receive.aead == nil {
+			// very unlikely (the key was deleted during queuing)
 			elem.Drop()
+		} else {
+			elem.packet, err = elem.keyPair.receive.aead.Open(
+				elem.buffer[:0],
+				nonce[:],
+				content,
+				nil,
+			)
+			if err != nil {
+				elem.Drop()
+			}
 		}
+		elem.keyPair.receive.mutex.RUnlock()
 		elem.mutex.Unlock()
 	}
 }
@@ -507,6 +514,9 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		kp.mutex.Lock()
 		if kp.next == elem.keyPair {
 			peer.TimerHandshakeComplete()
+			if kp.previous != nil {
+				device.DeleteKeyPair(kp.previous)
+			}
 			kp.previous = kp.current
 			kp.current = kp.next
 			kp.next = nil
