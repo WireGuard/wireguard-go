@@ -117,8 +117,8 @@ func TestNoiseHandshake(t *testing.T) {
 		var err error
 		var out []byte
 		var nonce [12]byte
-		out = key1.send.Seal(out, nonce[:], testMsg, nil)
-		out, err = key2.receive.Open(out[:0], nonce[:], out, nil)
+		out = key1.send.aead.Seal(out, nonce[:], testMsg, nil)
+		out, err = key2.receive.aead.Open(out[:0], nonce[:], out, nil)
 		assertNil(t, err)
 		assertEqual(t, out, testMsg)
 	}()
@@ -128,8 +128,8 @@ func TestNoiseHandshake(t *testing.T) {
 		var err error
 		var out []byte
 		var nonce [12]byte
-		out = key2.send.Seal(out, nonce[:], testMsg, nil)
-		out, err = key1.receive.Open(out[:0], nonce[:], out, nil)
+		out = key2.send.aead.Seal(out, nonce[:], testMsg, nil)
+		out, err = key1.receive.aead.Open(out[:0], nonce[:], out, nil)
 		assertNil(t, err)
 		assertEqual(t, out, testMsg)
 	}()
