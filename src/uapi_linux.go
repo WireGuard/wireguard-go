@@ -18,12 +18,6 @@ const (
 	socketName         = "%s.sock"
 )
 
-/* TODO:
- * This code can be improved by using fsnotify once:
- * https://github.com/fsnotify/fsnotify/pull/205
- * Is merged
- */
-
 type UAPIListener struct {
 	listener  net.Listener // unix socket listener
 	connNew   chan net.Conn

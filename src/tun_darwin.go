@@ -14,8 +14,10 @@ import (
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
 	"io"
+	"net"
 	"os"
 	"sync"
+	"time"
 	"unsafe"
 )
 
@@ -32,6 +34,23 @@ type sockaddrCtl struct {
 	scID       uint32
 	scUnit     uint32
 	scReserved [5]uint32
+}
+
+// NativeTUN is a hack to work around the first 4 bytes "packet
+// information" because there doesn't seem to be an IFF_NO_PI for darwin.
+type NativeTUN struct {
+	name string
+	f    io.ReadWriteCloser
+	mtu  int
+
+	rMu  sync.Mutex
+	rBuf []byte
+
+	wMu  sync.Mutex
+	wBuf []byte
+
+	events chan TUNEvent
+	errors chan error
 }
 
 var sockaddrCtlSize uintptr = 32
@@ -110,11 +129,47 @@ func CreateTUN(name string) (ifce TUNDevice, err error) {
 		return nil, fmt.Errorf("error in unix.Syscall6(unix.SYS_GETSOCKOPT, ...): %v", err)
 	}
 
-	device := &tunReadCloser{
-		name: string(ifName.name[:ifNameSize-1 /* -1 is for \0 */]),
-		f:    os.NewFile(uintptr(fd), string(ifName.name[:])),
-		mtu:  1500,
+	device := &NativeTUN{
+		name:   string(ifName.name[:ifNameSize-1 /* -1 is for \0 */]),
+		f:      os.NewFile(uintptr(fd), string(ifName.name[:])),
+		mtu:    1500,
+		events: make(chan TUNEvent, 10),
+		errors: make(chan error, 1),
 	}
+
+	// start listener
+
+	go func(native *NativeTUN) {
+		// TODO: Fix this very niave implementation
+		var (
+			statusUp  bool
+			statusMTU int
+		)
+
+		for ; ; time.Sleep(time.Second) {
+			intr, err := net.InterfaceByName(device.name)
+			if err != nil {
+				native.errors <- err
+				return
+			}
+
+			// Up / Down event
+			up := (intr.Flags & net.FlagUp) != 0
+			if up != statusUp && up {
+				native.events <- TUNEventUp
+			}
+			if up != statusUp && !up {
+				native.events <- TUNEventDown
+			}
+			statusUp = up
+
+			// MTU changes
+			if intr.MTU != statusMTU {
+				native.events <- TUNEventMTUUpdate
+			}
+			statusMTU = intr.MTU
+		}
+	}(device)
 
 	// set default MTU
 
@@ -123,23 +178,13 @@ func CreateTUN(name string) (ifce TUNDevice, err error) {
 	return device, err
 }
 
-// tunReadCloser is a hack to work around the first 4 bytes "packet
-// information" because there doesn't seem to be an IFF_NO_PI for darwin.
-type tunReadCloser struct {
-	name string
-	f    io.ReadWriteCloser
-	mtu  int
+var _ io.ReadWriteCloser = (*NativeTUN)(nil)
 
-	rMu  sync.Mutex
-	rBuf []byte
-
-	wMu  sync.Mutex
-	wBuf []byte
+func (t *NativeTUN) Events() chan TUNEvent {
+	return t.events
 }
 
-var _ io.ReadWriteCloser = (*tunReadCloser)(nil)
-
-func (t *tunReadCloser) Read(to []byte) (int, error) {
+func (t *NativeTUN) Read(to []byte) (int, error) {
 	t.rMu.Lock()
 	defer t.rMu.Unlock()
 
@@ -153,7 +198,7 @@ func (t *tunReadCloser) Read(to []byte) (int, error) {
 	return n - 4, err
 }
 
-func (t *tunReadCloser) Write(from []byte) (int, error) {
+func (t *NativeTUN) Write(from []byte) (int, error) {
 
 	if len(from) == 0 {
 		return 0, unix.EIO
@@ -184,7 +229,7 @@ func (t *tunReadCloser) Write(from []byte) (int, error) {
 	return n - 4, err
 }
 
-func (t *tunReadCloser) Close() error {
+func (t *NativeTUN) Close() error {
 
 	// lock to make sure no read/write is in process.
 
@@ -197,11 +242,11 @@ func (t *tunReadCloser) Close() error {
 	return t.f.Close()
 }
 
-func (t *tunReadCloser) Name() string {
+func (t *NativeTUN) Name() string {
 	return t.name
 }
 
-func (t *tunReadCloser) setMTU(n int) error {
+func (t *NativeTUN) setMTU(n int) error {
 
 	// open datagram socket
 
@@ -238,7 +283,7 @@ func (t *tunReadCloser) setMTU(n int) error {
 	return nil
 }
 
-func (t *tunReadCloser) MTU() (int, error) {
+func (t *NativeTUN) MTU() (int, error) {
 
 	// open datagram socket
 

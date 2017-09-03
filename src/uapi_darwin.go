@@ -2,9 +2,20 @@ package main
 
 import (
 	"fmt"
+	"golang.org/x/sys/unix"
 	"net"
 	"os"
+	"path"
 	"time"
+)
+
+const (
+	ipcErrorIO         = -int64(unix.EIO)
+	ipcErrorNotDefined = -int64(unix.ENODEV)
+	ipcErrorProtocol   = -int64(unix.EPROTO)
+	ipcErrorInvalid    = -int64(unix.EINVAL)
+	socketDirectory    = "/var/run/wireguard"
+	socketName         = "%s.sock"
 )
 
 type UAPIListener struct {
@@ -35,9 +46,20 @@ func (l *UAPIListener) Addr() net.Addr {
 
 func NewUAPIListener(name string) (net.Listener, error) {
 
+	// check if path exist
+
+	err := os.MkdirAll(socketDirectory, 077)
+	if err != nil && !os.IsExist(err) {
+		return nil, err
+	}
+
 	// open UNIX socket
 
-	socketPath := fmt.Sprintf("/var/run/wireguard/%s.sock", name)
+	socketPath := path.Join(
+		socketDirectory,
+		fmt.Sprintf(socketName, name),
+	)
+
 	listener, err := net.Listen("unix", socketPath)
 	if err != nil {
 		return nil, err
