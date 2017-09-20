@@ -39,6 +39,8 @@ type Peer struct {
 		stop               chan struct{} // (size 0) : close to stop all goroutines for peer
 	}
 	timer struct {
+		// state related to WireGuard timers
+
 		keepalivePersistent *time.Timer // set for persistent keepalives
 		keepalivePassive    *time.Timer // set upon recieving messages
 		newHandshake        *time.Timer // begin a new handshake (after Keepalive + RekeyTimeout)
@@ -49,7 +51,8 @@ type Peer struct {
 		pendingNewHandshake     bool
 		pendingZeroAllKeys      bool
 
-		needAnotherKeepalive bool
+		needAnotherKeepalive    bool
+		sendLastMinuteHandshake bool
 	}
 	queue struct {
 		nonce    chan *QueueOutboundElement // nonce / pre-handshake queue

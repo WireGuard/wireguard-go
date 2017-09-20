@@ -303,27 +303,16 @@ func (device *Device) RoutineEncryption() {
 				}
 			}
 
-			// encrypt content (append to header)
+			// encrypt content and release to consumer
 
 			binary.LittleEndian.PutUint64(nonce[4:], elem.nonce)
-			elem.keyPair.send.mutex.RLock()
-			if elem.keyPair.send.aead == nil {
-				// very unlikely (the key was deleted during queuing)
-				elem.Drop()
-			} else {
-				elem.packet = elem.keyPair.send.aead.Seal(
-					header,
-					nonce[:],
-					elem.packet,
-					nil,
-				)
-			}
+			elem.packet = elem.keyPair.send.Seal(
+				header,
+				nonce[:],
+				elem.packet,
+				nil,
+			)
 			elem.mutex.Unlock()
-			elem.keyPair.send.mutex.RUnlock()
-
-			// refresh key if necessary
-
-			elem.peer.KeepKeyFreshSending()
 		}
 	}
 }

@@ -502,8 +502,8 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 	// create AEAD instances
 
 	keyPair := new(KeyPair)
-	keyPair.send.setKey(&sendKey)
-	keyPair.receive.setKey(&recvKey)
+	keyPair.send, _ = chacha20poly1305.New(sendKey[:])
+	keyPair.receive, _ = chacha20poly1305.New(recvKey[:])
 
 	setZero(sendKey[:])
 	setZero(recvKey[:])
@@ -530,30 +530,29 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 	// rotate key pairs
 
 	kp := &peer.keyPairs
-	func() {
-		kp.mutex.Lock()
-		defer kp.mutex.Unlock()
-		// TODO: Adapt kernel behavior noise.c:161
-		if isInitiator {
-			if kp.previous != nil {
-				device.DeleteKeyPair(kp.previous)
-				kp.previous = nil
-			}
+	kp.mutex.Lock()
 
-			if kp.next != nil {
-				kp.previous = kp.next
-				kp.next = keyPair
-			} else {
-				kp.previous = kp.current
-				kp.current = keyPair
-				signalSend(peer.signal.newKeyPair) // TODO: This more places (after confirming the key)
-			}
-
-		} else {
-			kp.next = keyPair
-			kp.previous = nil // TODO: Discuss why
+	// TODO: Adapt kernel behavior noise.c:161
+	if isInitiator {
+		if kp.previous != nil {
+			device.DeleteKeyPair(kp.previous)
+			kp.previous = nil
 		}
-	}()
+
+		if kp.next != nil {
+			kp.previous = kp.next
+			kp.next = keyPair
+		} else {
+			kp.previous = kp.current
+			kp.current = keyPair
+			signalSend(peer.signal.newKeyPair) // TODO: This more places (after confirming the key)
+		}
+
+	} else {
+		kp.next = keyPair
+		kp.previous = nil
+	}
+	kp.mutex.Unlock()
 
 	return keyPair
 }

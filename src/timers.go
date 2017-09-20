@@ -27,9 +27,12 @@ func (peer *Peer) KeepKeyFreshSending() {
 
 /* Called when a new authenticated message has been recevied
  *
+ * NOTE: Not thread safe (called by sequential receiver)
  */
 func (peer *Peer) KeepKeyFreshReceiving() {
-	// TODO: Add a guard, clear on handshake complete (clear in TimerHandshakeComplete)
+	if peer.timer.sendLastMinuteHandshake {
+		return
+	}
 	kp := peer.keyPairs.Current()
 	if kp == nil {
 		return
@@ -40,7 +43,9 @@ func (peer *Peer) KeepKeyFreshReceiving() {
 	nonce := atomic.LoadUint64(&kp.sendNonce)
 	send := nonce > RekeyAfterMessages || time.Now().Sub(kp.created) > RekeyAfterTimeReceiving
 	if send {
+		// do a last minute attempt at initiating a new handshake
 		signalSend(peer.signal.handshakeBegin)
+		peer.timer.sendLastMinuteHandshake = true
 	}
 }
 
@@ -311,6 +316,7 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 
 			case <-peer.signal.handshakeCompleted:
 				<-timeout.C
+				peer.timer.sendLastMinuteHandshake = false
 				break AttemptHandshakes
 
 			case <-peer.signal.handshakeReset:

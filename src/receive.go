@@ -247,28 +247,20 @@ func (device *Device) RoutineDecryption() {
 			counter := elem.packet[MessageTransportOffsetCounter:MessageTransportOffsetContent]
 			content := elem.packet[MessageTransportOffsetContent:]
 
-			// decrypt with key-pair
+			// decrypt and release to consumer
 
+			var err error
 			copy(nonce[4:], counter)
 			elem.counter = binary.LittleEndian.Uint64(counter)
-			elem.keyPair.receive.mutex.RLock()
-			if elem.keyPair.receive.aead == nil {
-				// very unlikely (the key was deleted during queuing)
+			elem.packet, err = elem.keyPair.receive.Open(
+				elem.buffer[:0],
+				nonce[:],
+				content,
+				nil,
+			)
+			if err != nil {
 				elem.Drop()
-			} else {
-				var err error
-				elem.packet, err = elem.keyPair.receive.aead.Open(
-					elem.buffer[:0],
-					nonce[:],
-					content,
-					nil,
-				)
-				if err != nil {
-					elem.Drop()
-				}
 			}
-
-			elem.keyPair.receive.mutex.RUnlock()
 			elem.mutex.Unlock()
 		}
 	}
@@ -433,8 +425,6 @@ func (device *Device) RoutineHandshake() {
 
 		case MessageResponseType:
 
-			logDebug.Println("Process response")
-
 			// unmarshal
 
 			var msg MessageResponse
@@ -456,6 +446,8 @@ func (device *Device) RoutineHandshake() {
 				)
 				continue
 			}
+
+			logDebug.Println("Received handshake initation from", peer)
 
 			peer.TimerEphemeralKeyCreated()
 
