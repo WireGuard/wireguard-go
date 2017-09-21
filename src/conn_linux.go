@@ -5,8 +5,8 @@ import (
 	"net"
 )
 
-func setMark(conn *net.UDPConn, value int) error {
-	if conn == nil || value == 0 {
+func setMark(conn *net.UDPConn, value uint32) error {
+	if conn == nil {
 		return nil
 	}
 
@@ -19,6 +19,6 @@ func setMark(conn *net.UDPConn, value int) error {
 		int(file.Fd()),
 		unix.SOL_SOCKET,
 		unix.SO_MARK,
-		value,
+		int(value),
 	)
 }

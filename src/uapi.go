@@ -42,6 +42,9 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 	if device.net.addr != nil {
 		send(fmt.Sprintf("listen_port=%d", device.net.addr.Port))
 	}
+	if device.net.fwmark != 0 {
+		send(fmt.Sprintf("fwmark=%d", device.net.fwmark))
+	}
 
 	for _, peer := range device.peers {
 		func() {
@@ -158,25 +161,32 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				// TODO: Clear source address of all peers
 
 			case "fwmark":
-				fwmark, err := strconv.ParseInt(value, 10, 32)
-				if err != nil {
-					logError.Println("Invalid fwmark", err)
-					return &IPCError{Code: ipcErrorInvalid}
+				var fwmark uint64 = 0
+				if value != "" {
+					var err error
+					fwmark, err = strconv.ParseUint(value, 10, 32)
+					if err != nil {
+						logError.Println("Invalid fwmark", err)
+						return &IPCError{Code: ipcErrorInvalid}
+					}
 				}
 
 				device.net.mutex.Lock()
-				device.net.fwmark = int(fwmark)
-				err = setMark(
-					device.net.conn,
-					device.net.fwmark,
-				)
-				device.net.mutex.Unlock()
-				if err != nil {
-					logError.Println("Failed to set fwmark:", err)
-					return &IPCError{Code: ipcErrorIO}
-				}
+				if fwmark > 0 || device.net.fwmark > 0 {
+					device.net.fwmark = uint32(fwmark)
+					err := setMark(
+						device.net.conn,
+						device.net.fwmark,
+					)
+					if err != nil {
+						logError.Println("Failed to set fwmark:", err)
+						device.net.mutex.Unlock()
+						return &IPCError{Code: ipcErrorIO}
+					}
 
-				// TODO: Clear source address of all peers
+					// TODO: Clear source address of all peers
+				}
+				device.net.mutex.Unlock()
 
 			case "public_key":
 
