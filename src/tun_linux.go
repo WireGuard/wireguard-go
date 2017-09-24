@@ -120,14 +120,6 @@ func (tun *NativeTun) Name() string {
 	return tun.name
 }
 
-func toInt32(val []byte) int32 {
-	n := binary.LittleEndian.Uint32(val[:4])
-	if n >= (1 << 31) {
-		return -int32(^n) - 1
-	}
-	return int32(n)
-}
-
 func getDummySock() (int, error) {
 	return unix.Socket(
 		unix.AF_INET,
@@ -157,7 +149,8 @@ func getIFIndex(name string) (int32, error) {
 		return 0, errno
 	}
 
-	return toInt32(ifr[unix.IFNAMSIZ:]), nil
+	index := binary.LittleEndian.Uint32(ifr[unix.IFNAMSIZ:])
+	return toInt32(index), nil
 }
 
 func (tun *NativeTun) setMTU(n int) error {

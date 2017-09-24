@@ -273,8 +273,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				}
 
 			case "endpoint":
-				// TODO: Only IP and port
-				addr, err := net.ResolveUDPAddr("udp", value)
+				addr, err := parseEndpoint(value)
 				if err != nil {
 					logError.Println("Failed to set endpoint:", value)
 					return &IPCError{Code: ipcErrorInvalid}

@@ -1,8 +1,30 @@
 package main
 
 import (
+	"errors"
 	"net"
 )
+
+func parseEndpoint(s string) (*net.UDPAddr, error) {
+
+	// ensure that the host is an IP address
+
+	host, _, err := net.SplitHostPort(s)
+	if err != nil {
+		return nil, err
+	}
+	if ip := net.ParseIP(host); ip == nil {
+		return nil, errors.New("Failed to parse IP address: " + host)
+	}
+
+	// parse address and port
+
+	addr, err := net.ResolveUDPAddr("udp", s)
+	if err != nil {
+		return nil, err
+	}
+	return addr, err
+}
 
 func updateUDPConn(device *Device) error {
 	netc := &device.net
