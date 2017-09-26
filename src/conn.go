@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net"
+	"time"
 )
 
 func parseEndpoint(s string) (*net.UDPAddr, error) {
@@ -36,6 +37,10 @@ func updateUDPConn(device *Device) error {
 	if netc.conn != nil {
 		netc.conn.Close()
 		netc.conn = nil
+
+		// We need for that fd to be closed in all other go routines, which
+		// means we have to wait. TODO: find less horrible way of doing this.
+		time.Sleep(time.Second / 2)
 	}
 
 	// open new connection
