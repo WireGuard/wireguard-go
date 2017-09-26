@@ -124,16 +124,12 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 			switch key {
 			case "private_key":
 				var sk NoisePrivateKey
-				if value == "" {
-					device.SetPrivateKey(sk)
-				} else {
-					err := sk.FromHex(value)
-					if err != nil {
-						logError.Println("Failed to set private_key:", err)
-						return &IPCError{Code: ipcErrorInvalid}
-					}
-					device.SetPrivateKey(sk)
+				err := sk.FromHex(value)
+				if err != nil {
+					logError.Println("Failed to set private_key:", err)
+					return &IPCError{Code: ipcErrorInvalid}
 				}
+				device.SetPrivateKey(sk)
 
 			case "listen_port":
 				port, err := strconv.ParseUint(value, 10, 16)
@@ -161,14 +157,10 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				// TODO: Clear source address of all peers
 
 			case "fwmark":
-				var fwmark uint64 = 0
-				if value != "" {
-					var err error
-					fwmark, err = strconv.ParseUint(value, 10, 32)
-					if err != nil {
-						logError.Println("Invalid fwmark", err)
-						return &IPCError{Code: ipcErrorInvalid}
-					}
+				fwmark, err := strconv.ParseUint(value, 10, 32)
+				if err != nil {
+					logError.Println("Invalid fwmark", err)
+					return &IPCError{Code: ipcErrorInvalid}
 				}
 
 				device.net.mutex.Lock()
