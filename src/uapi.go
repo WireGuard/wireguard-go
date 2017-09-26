@@ -151,7 +151,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				err = updateUDPConn(device)
 				if err != nil {
 					logError.Println("Failed to set listen_port:", err)
-					return &IPCError{Code: ipcErrorIO}
+					return &IPCError{Code: ipcErrorPortInUse}
 				}
 
 				// TODO: Clear source address of all peers

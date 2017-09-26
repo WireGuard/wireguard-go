@@ -12,9 +12,9 @@ import (
 
 const (
 	ipcErrorIO         = -int64(windows.ERROR_BROKEN_PIPE)
-	ipcErrorNotDefined = -int64(windows.ERROR_SERVICE_SPECIFIC_ERROR)
-	ipcErrorProtocol   = -int64(windows.ERROR_SERVICE_SPECIFIC_ERROR)
-	ipcErrorInvalid    = -int64(windows.ERROR_SERVICE_SPECIFIC_ERROR)
+	ipcErrorProtocol   = -int64(windows.ERROR_INVALID_NAME)
+	ipcErrorInvalid    = -int64(windows.ERROR_INVALID_PARAMETER)
+	ipcErrorPortInUse  = -int64(windows.ERROR_ALREADY_EXISTS)
 )
 
 const PipeNameFmt = "\\\\.\\pipe\\wireguard-ipc-%s"
