@@ -166,7 +166,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				device.net.mutex.Lock()
 				if fwmark > 0 || device.net.fwmark > 0 {
 					device.net.fwmark = uint32(fwmark)
-					err := setMark(
+					err := SetMark(
 						device.net.conn,
 						device.net.fwmark,
 					)

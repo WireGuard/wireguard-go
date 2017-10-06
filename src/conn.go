@@ -56,7 +56,7 @@ func updateUDPConn(device *Device) error {
 
 		// set fwmark
 
-		err = setMark(netc.conn, netc.fwmark)
+		err = SetMark(netc.conn, netc.fwmark)
 		if err != nil {
 			return err
 		}
