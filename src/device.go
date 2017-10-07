@@ -1,12 +1,17 @@
 package main
 
 import (
-	"net"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
+type Listener struct {
+	sock   Socket
+	active bool
+	update chan struct{}
+}
 
 type Device struct {
 	log       *Logger // collection of loggers for levels
@@ -22,8 +27,9 @@ type Device struct {
 	}
 	net struct {
 		mutex  sync.RWMutex
-		addr   *net.UDPAddr // UDP source address
-		conn   *net.UDPConn // UDP "connection"
+		ipv4   Listener
+		ipv6   Listener
+		port   uint16
 		fwmark uint32
 	}
 	mutex        sync.RWMutex
@@ -37,8 +43,9 @@ type Device struct {
 		handshake  chan QueueHandshakeElement
 	}
 	signal struct {
-		stop       chan struct{} // halts all go routines
-		newUDPConn chan struct{} // a net.conn was set (consumed by the receiver routine)
+		stop             chan struct{} // halts all go routines
+		updateIPv4Socket chan struct{} // a net.conn was set (consumed by the receiver routine)
+		updateIPv6Socket chan struct{} // a net.conn was set (consumed by the receiver routine)
 	}
 	underLoadUntil atomic.Value
 	ratelimiter    Ratelimiter
@@ -137,12 +144,16 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	device.log = NewLogger(logLevel, "("+tun.Name()+") ")
 	device.peers = make(map[NoisePublicKey]*Peer)
 	device.tun.device = tun
+
 	device.indices.Init()
+	device.net.ipv4.Init()
+	device.net.ipv6.Init()
 	device.ratelimiter.Init()
+
 	device.routingTable.Reset()
 	device.underLoadUntil.Store(time.Time{})
 
-	// setup pools
+	// setup buffer pool
 
 	device.pool.messageBuffers = sync.Pool{
 		New: func() interface{} {
@@ -159,7 +170,6 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	// prepare signals
 
 	device.signal.stop = make(chan struct{})
-	device.signal.newUDPConn = make(chan struct{}, 1)
 
 	// start workers
 
@@ -168,12 +178,11 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 		go device.RoutineDecryption()
 		go device.RoutineHandshake()
 	}
-
+	go device.RoutineReadFromTUN()
 	go device.RoutineTUNEventReader()
 	go device.ratelimiter.RoutineGarbageCollector(device.signal.stop)
-	go device.RoutineReadFromTUN()
-	go device.RoutineReceiveIncomming()
-
+	go device.RoutineReceiveIncomming(&device.net.ipv4)
+	go device.RoutineReceiveIncomming(&device.net.ipv6)
 	return device
 }
 
@@ -204,7 +213,7 @@ func (device *Device) RemoveAllPeers() {
 func (device *Device) Close() {
 	device.RemoveAllPeers()
 	close(device.signal.stop)
-	closeUDPConn(device)
+	ListeningClose(device)
 }
 
 func (device *Device) WaitChannel() chan struct{} {

@@ -28,6 +28,7 @@ import "fmt"
 type Endpoint struct {
 	// source (selected based on dst type)
 	// (could use RawSockaddrAny and unsafe)
+	// TODO: Merge
 	src6   unix.RawSockaddrInet6
 	src4   unix.RawSockaddrInet4
 	src4if int32
@@ -35,8 +36,14 @@ type Endpoint struct {
 	dst unix.RawSockaddrAny
 }
 
-type IPv4Socket int
-type IPv6Socket int
+type Socket int
+
+/* Returns a byte representation of the source field(s)
+ * for use in "under load" cookie computations.
+ */
+func (endpoint *Endpoint) Source() []byte {
+	return nil
+}
 
 func zoneToUint32(zone string) (uint32, error) {
 	if zone == "" {
@@ -49,7 +56,7 @@ func zoneToUint32(zone string) (uint32, error) {
 	return uint32(n), err
 }
 
-func CreateIPv4Socket(port int) (IPv4Socket, error) {
+func CreateIPv4Socket(port uint16) (Socket, uint16, error) {
 
 	// create socket
 
@@ -60,13 +67,16 @@ func CreateIPv4Socket(port int) (IPv4Socket, error) {
 	)
 
 	if err != nil {
-		return -1, err
+		return -1, 0, err
+	}
+
+	addr := unix.SockaddrInet4{
+		Port: int(port),
 	}
 
 	// set sockopts and bind
 
 	if err := func() error {
-
 		if err := unix.SetsockoptInt(
 			fd,
 			unix.SOL_SOCKET,
@@ -85,19 +95,23 @@ func CreateIPv4Socket(port int) (IPv4Socket, error) {
 			return err
 		}
 
-		addr := unix.SockaddrInet4{
-			Port: port,
-		}
 		return unix.Bind(fd, &addr)
-
 	}(); err != nil {
 		unix.Close(fd)
 	}
 
-	return IPv4Socket(fd), err
+	return Socket(fd), uint16(addr.Port), err
 }
 
-func CreateIPv6Socket(port int) (IPv6Socket, error) {
+func CloseIPv4Socket(sock Socket) error {
+	return unix.Close(int(sock))
+}
+
+func CloseIPv6Socket(sock Socket) error {
+	return unix.Close(int(sock))
+}
+
+func CreateIPv6Socket(port uint16) (Socket, uint16, error) {
 
 	// create socket
 
@@ -108,10 +122,14 @@ func CreateIPv6Socket(port int) (IPv6Socket, error) {
 	)
 
 	if err != nil {
-		return -1, err
+		return -1, 0, err
 	}
 
 	// set sockopts and bind
+
+	addr := unix.SockaddrInet6{
+		Port: int(port),
+	}
 
 	if err := func() error {
 
@@ -142,16 +160,13 @@ func CreateIPv6Socket(port int) (IPv6Socket, error) {
 			return err
 		}
 
-		addr := unix.SockaddrInet6{
-			Port: port,
-		}
 		return unix.Bind(fd, &addr)
 
 	}(); err != nil {
 		unix.Close(fd)
 	}
 
-	return IPv6Socket(fd), err
+	return Socket(fd), uint16(addr.Port), err
 }
 
 func (end *Endpoint) ClearSrc() {
@@ -311,7 +326,7 @@ func (end *Endpoint) Send(c *net.UDPConn, buff []byte) error {
 	return errors.New("Unknown address family of source")
 }
 
-func (end *Endpoint) ReceiveIPv4(sock IPv4Socket, buff []byte) (int, error) {
+func (end *Endpoint) ReceiveIPv4(sock Socket, buff []byte) (int, error) {
 
 	// contruct message header
 
@@ -360,7 +375,7 @@ func (end *Endpoint) ReceiveIPv4(sock IPv4Socket, buff []byte) (int, error) {
 	return int(size), nil
 }
 
-func (end *Endpoint) ReceiveIPv6(sock IPv6Socket, buff []byte) error {
+func (end *Endpoint) ReceiveIPv6(sock Socket, buff []byte) (int, error) {
 
 	// contruct message header
 
@@ -383,7 +398,7 @@ func (end *Endpoint) ReceiveIPv6(sock IPv6Socket, buff []byte) error {
 
 	// recvmsg(sock, &mskhdr, 0)
 
-	_, _, errno := unix.Syscall(
+	size, _, errno := unix.Syscall(
 		unix.SYS_RECVMSG,
 		uintptr(sock),
 		uintptr(unsafe.Pointer(&msg)),
@@ -391,7 +406,7 @@ func (end *Endpoint) ReceiveIPv6(sock IPv6Socket, buff []byte) error {
 	)
 
 	if errno != 0 {
-		return errno
+		return 0, errno
 	}
 
 	// update source cache
@@ -403,21 +418,12 @@ func (end *Endpoint) ReceiveIPv6(sock IPv6Socket, buff []byte) error {
 		end.src6.Scope_id = cmsg.pktinfo.Ifindex
 	}
 
-	return nil
+	return int(size), nil
 }
 
-func SetMark(conn *net.UDPConn, value uint32) error {
-	if conn == nil {
-		return nil
-	}
-
-	file, err := conn.File()
-	if err != nil {
-		return err
-	}
-
+func SetMark(sock Socket, value uint32) error {
 	return unix.SetsockoptInt(
-		int(file.Fd()),
+		int(sock),
 		unix.SOL_SOCKET,
 		unix.SO_MARK,
 		int(value),

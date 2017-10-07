@@ -14,6 +14,7 @@ func printUsage() {
 }
 
 func main() {
+	test()
 
 	// parse arguments
 

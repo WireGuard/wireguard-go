@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"net"
-	"time"
 )
 
 func parseEndpoint(s string) (*net.UDPAddr, error) {
@@ -27,63 +26,96 @@ func parseEndpoint(s string) (*net.UDPAddr, error) {
 	return addr, err
 }
 
-func updateUDPConn(device *Device) error {
+func ListenerClose(l *Listener) (err error) {
+	if l.active {
+		err = CloseIPv4Socket(l.sock)
+		l.active = false
+	}
+	return
+}
+
+func (l *Listener) Init() {
+	l.update = make(chan struct{}, 1)
+	ListenerClose(l)
+}
+
+func ListeningUpdate(device *Device) error {
 	netc := &device.net
 	netc.mutex.Lock()
 	defer netc.mutex.Unlock()
 
-	// close existing connection
+	// close existing sockets
 
-	if netc.conn != nil {
-		netc.conn.Close()
-		netc.conn = nil
-
-		// We need for that fd to be closed in all other go routines, which
-		// means we have to wait. TODO: find less horrible way of doing this.
-		time.Sleep(time.Second / 2)
+	if err := ListenerClose(&netc.ipv4); err != nil {
+		return err
 	}
 
-	// open new connection
+	if err := ListenerClose(&netc.ipv6); err != nil {
+		return err
+	}
+
+	// open new sockets
 
 	if device.tun.isUp.Get() {
 
-		// listen on new address
+		// listen on IPv4
 
-		conn, err := net.ListenUDP("udp", netc.addr)
-		if err != nil {
-			return err
+		{
+			list := &netc.ipv6
+			sock, port, err := CreateIPv4Socket(netc.port)
+			if err != nil {
+				return err
+			}
+			netc.port = port
+			list.sock = sock
+			list.active = true
+
+			if err := SetMark(list.sock, netc.fwmark); err != nil {
+				ListenerClose(list)
+				return err
+			}
+			signalSend(list.update)
 		}
 
-		// set fwmark
+		// listen on IPv6
 
-		err = SetMark(netc.conn, netc.fwmark)
-		if err != nil {
-			return err
+		{
+			list := &netc.ipv6
+			sock, port, err := CreateIPv6Socket(netc.port)
+			if err != nil {
+				return err
+			}
+			netc.port = port
+			list.sock = sock
+			list.active = true
+
+			if err := SetMark(list.sock, netc.fwmark); err != nil {
+				ListenerClose(list)
+				return err
+			}
+			signalSend(list.update)
 		}
 
-		// retrieve port (may have been chosen by kernel)
-
-		addr := conn.LocalAddr()
-		netc.conn = conn
-		netc.addr, _ = net.ResolveUDPAddr(
-			addr.Network(),
-			addr.String(),
-		)
-
-		// notify goroutines
-
-		signalSend(device.signal.newUDPConn)
+		// TODO: clear endpoint caches
 	}
 
 	return nil
 }
 
-func closeUDPConn(device *Device) {
+func ListeningClose(device *Device) error {
 	netc := &device.net
 	netc.mutex.Lock()
-	if netc.conn != nil {
-		netc.conn.Close()
+	defer netc.mutex.Unlock()
+
+	if err := ListenerClose(&netc.ipv4); err != nil {
+		return err
 	}
-	netc.mutex.Unlock()
-	signalSend(device.signal.newUDPConn)
+	signalSend(netc.ipv4.update)
+
+	if err := ListenerClose(&netc.ipv6); err != nil {
+		return err
+	}
+	signalSend(netc.ipv6.update)
+
+	return nil
 }
