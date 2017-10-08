@@ -1,17 +1,13 @@
 package main
 
 import (
+	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 )
-
-type Listener struct {
-	sock   Socket
-	active bool
-	update chan struct{}
-}
 
 type Device struct {
 	log       *Logger // collection of loggers for levels
@@ -27,8 +23,7 @@ type Device struct {
 	}
 	net struct {
 		mutex  sync.RWMutex
-		ipv4   Listener
-		ipv6   Listener
+		bind   UDPBind
 		port   uint16
 		fwmark uint32
 	}
@@ -43,9 +38,8 @@ type Device struct {
 		handshake  chan QueueHandshakeElement
 	}
 	signal struct {
-		stop             chan struct{} // halts all go routines
-		updateIPv4Socket chan struct{} // a net.conn was set (consumed by the receiver routine)
-		updateIPv6Socket chan struct{} // a net.conn was set (consumed by the receiver routine)
+		stop       chan struct{}
+		updateBind chan struct{}
 	}
 	underLoadUntil atomic.Value
 	ratelimiter    Ratelimiter
@@ -146,8 +140,6 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	device.tun.device = tun
 
 	device.indices.Init()
-	device.net.ipv4.Init()
-	device.net.ipv6.Init()
 	device.ratelimiter.Init()
 
 	device.routingTable.Reset()
@@ -181,8 +173,8 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	go device.RoutineReadFromTUN()
 	go device.RoutineTUNEventReader()
 	go device.ratelimiter.RoutineGarbageCollector(device.signal.stop)
-	go device.RoutineReceiveIncomming(&device.net.ipv4)
-	go device.RoutineReceiveIncomming(&device.net.ipv6)
+	go device.RoutineReceiveIncomming(ipv4.Version)
+	go device.RoutineReceiveIncomming(ipv6.Version)
 	return device
 }
 

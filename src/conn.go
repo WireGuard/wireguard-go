@@ -5,6 +5,14 @@ import (
 	"net"
 )
 
+type UDPBind interface {
+	SetMark(value uint32) error
+	ReceiveIPv6(buff []byte, end *Endpoint) (int, error)
+	ReceiveIPv4(buff []byte, end *Endpoint) (int, error)
+	Send(buff []byte, end *Endpoint) error
+	Close() error
+}
+
 func parseEndpoint(s string) (*net.UDPAddr, error) {
 
 	// ensure that the host is an IP address
@@ -26,19 +34,6 @@ func parseEndpoint(s string) (*net.UDPAddr, error) {
 	return addr, err
 }
 
-func ListenerClose(l *Listener) (err error) {
-	if l.active {
-		err = CloseIPv4Socket(l.sock)
-		l.active = false
-	}
-	return
-}
-
-func (l *Listener) Init() {
-	l.update = make(chan struct{}, 1)
-	ListenerClose(l)
-}
-
 func ListeningUpdate(device *Device) error {
 	netc := &device.net
 	netc.mutex.Lock()
@@ -46,11 +41,7 @@ func ListeningUpdate(device *Device) error {
 
 	// close existing sockets
 
-	if err := ListenerClose(&netc.ipv4); err != nil {
-		return err
-	}
-
-	if err := ListenerClose(&netc.ipv6); err != nil {
+	if err := device.net.bind.Close(); err != nil {
 		return err
 	}
 
@@ -58,45 +49,22 @@ func ListeningUpdate(device *Device) error {
 
 	if device.tun.isUp.Get() {
 
-		// listen on IPv4
+		// bind to new port
 
-		{
-			list := &netc.ipv6
-			sock, port, err := CreateIPv4Socket(netc.port)
-			if err != nil {
-				return err
-			}
-			netc.port = port
-			list.sock = sock
-			list.active = true
-
-			if err := SetMark(list.sock, netc.fwmark); err != nil {
-				ListenerClose(list)
-				return err
-			}
-			signalSend(list.update)
+		var err error
+		netc.bind, netc.port, err = CreateUDPBind(netc.port)
+		if err != nil {
+			return err
 		}
 
-		// listen on IPv6
+		// set mark
 
-		{
-			list := &netc.ipv6
-			sock, port, err := CreateIPv6Socket(netc.port)
-			if err != nil {
-				return err
-			}
-			netc.port = port
-			list.sock = sock
-			list.active = true
-
-			if err := SetMark(list.sock, netc.fwmark); err != nil {
-				ListenerClose(list)
-				return err
-			}
-			signalSend(list.update)
+		err = netc.bind.SetMark(netc.fwmark)
+		if err != nil {
+			return err
 		}
 
-		// TODO: clear endpoint caches
+		// TODO: clear endpoint (src) caches
 	}
 
 	return nil
@@ -106,16 +74,5 @@ func ListeningClose(device *Device) error {
 	netc := &device.net
 	netc.mutex.Lock()
 	defer netc.mutex.Unlock()
-
-	if err := ListenerClose(&netc.ipv4); err != nil {
-		return err
-	}
-	signalSend(netc.ipv4.update)
-
-	if err := ListenerClose(&netc.ipv6); err != nil {
-		return err
-	}
-	signalSend(netc.ipv6.update)
-
-	return nil
+	return netc.bind.Close()
 }

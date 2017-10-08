@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"net"
 	"sync"
 	"time"
 )
@@ -15,8 +14,8 @@ type Peer struct {
 	persistentKeepaliveInterval uint64
 	keyPairs                    KeyPairs
 	handshake                   Handshake
+	endpoint                    Endpoint
 	device                      *Device
-	endpoint                    *net.UDPAddr
 	stats                       struct {
 		txBytes           uint64 // bytes send to peer (endpoint)
 		rxBytes           uint64 // bytes received from peer
@@ -134,7 +133,7 @@ func (peer *Peer) String() string {
 	return fmt.Sprintf(
 		"peer(%d %s %s)",
 		peer.id,
-		peer.endpoint.String(),
+		peer.endpoint.DestinationToString(),
 		base64.StdEncoding.EncodeToString(peer.handshake.remoteStatic[:]),
 	)
 }

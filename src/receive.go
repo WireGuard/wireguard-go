@@ -97,17 +97,6 @@ func (device *Device) RoutineReceiveIncomming(IPVersion int) {
 	logDebug := device.log.Debug
 	logDebug.Println("Routine, receive incomming, started")
 
-	var listener *Listener
-
-	switch IPVersion {
-	case ipv4.Version:
-		listener = &device.net.ipv4
-	case ipv6.Version:
-		listener = &device.net.ipv6
-	default:
-		return
-	}
-
 	for {
 
 		// wait for new conn
@@ -118,15 +107,14 @@ func (device *Device) RoutineReceiveIncomming(IPVersion int) {
 		case <-device.signal.stop:
 			return
 
-		case <-listener.update:
+		case <-device.signal.updateBind:
 
 			// fetch new socket
 
 			device.net.mutex.RLock()
-			sock := listener.sock
-			okay := listener.active
+			bind := device.net.bind
 			device.net.mutex.RUnlock()
-			if !okay {
+			if bind == nil {
 				continue
 			}
 
@@ -145,10 +133,13 @@ func (device *Device) RoutineReceiveIncomming(IPVersion int) {
 
 				var endpoint Endpoint
 
-				if IPVersion == ipv6.Version {
-					size, err = endpoint.ReceiveIPv4(sock, buffer[:])
-				} else {
-					size, err = endpoint.ReceiveIPv6(sock, buffer[:])
+				switch IPVersion {
+				case ipv4.Version:
+					size, err = bind.ReceiveIPv4(buffer[:], &endpoint)
+				case ipv6.Version:
+					size, err = bind.ReceiveIPv6(buffer[:], &endpoint)
+				default:
+					return
 				}
 
 				if err != nil {
@@ -340,15 +331,19 @@ func (device *Device) RoutineHandshake() {
 				return
 			}
 
+			srcBytes := elem.endpoint.SourceToBytes()
 			if device.IsUnderLoad() {
-				if !device.mac.CheckMAC2(elem.packet, elem.source) {
+
+				// verify MAC2 field
+
+				if !device.mac.CheckMAC2(elem.packet, srcBytes) {
 
 					// construct cookie reply
 
-					logDebug.Println("Sending cookie reply to:", elem.source.String())
+					logDebug.Println("Sending cookie reply to:", elem.endpoint.SourceToString())
 
 					sender := binary.LittleEndian.Uint32(elem.packet[4:8]) // "sender" always follows "type"
-					reply, err := device.mac.CreateReply(elem.packet, sender, elem.source)
+					reply, err := device.mac.CreateReply(elem.packet, sender, srcBytes)
 					if err != nil {
 						logError.Println("Failed to create cookie reply:", err)
 						return
@@ -358,9 +353,9 @@ func (device *Device) RoutineHandshake() {
 
 					writer := bytes.NewBuffer(temp[:0])
 					binary.Write(writer, binary.LittleEndian, reply)
-					_, err = device.net.conn.WriteToUDP(
+					device.net.bind.Send(
 						writer.Bytes(),
-						elem.source,
+						&elem.endpoint,
 					)
 					if err != nil {
 						logDebug.Println("Failed to send cookie reply:", err)
@@ -368,7 +363,11 @@ func (device *Device) RoutineHandshake() {
 					continue
 				}
 
-				if !device.ratelimiter.Allow(elem.source.IP) {
+				// check ratelimiter
+
+				if !device.ratelimiter.Allow(
+					elem.endpoint.DestinationIP(),
+				) {
 					continue
 				}
 			}
@@ -399,8 +398,7 @@ func (device *Device) RoutineHandshake() {
 			if peer == nil {
 				logInfo.Println(
 					"Recieved invalid initiation message from",
-					elem.source.IP.String(),
-					elem.source.Port,
+					elem.endpoint.DestinationToString(),
 				)
 				continue
 			}
@@ -414,7 +412,7 @@ func (device *Device) RoutineHandshake() {
 			// TODO: Discover destination address also, only update on change
 
 			peer.mutex.Lock()
-			peer.endpoint = elem.source
+			peer.endpoint = elem.endpoint
 			peer.mutex.Unlock()
 
 			// create response
@@ -460,8 +458,7 @@ func (device *Device) RoutineHandshake() {
 			if peer == nil {
 				logInfo.Println(
 					"Recieved invalid response message from",
-					elem.source.IP.String(),
-					elem.source.Port,
+					elem.endpoint.DestinationToString(),
 				)
 				continue
 			}
