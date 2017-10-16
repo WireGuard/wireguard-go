@@ -14,9 +14,12 @@ type Peer struct {
 	persistentKeepaliveInterval uint64
 	keyPairs                    KeyPairs
 	handshake                   Handshake
-	endpoint                    Endpoint
 	device                      *Device
-	stats                       struct {
+	endpoint                    struct {
+		set   bool     // has a known endpoint been discovered
+		value Endpoint // source / destination cache
+	}
+	stats struct {
 		txBytes           uint64 // bytes send to peer (endpoint)
 		rxBytes           uint64 // bytes received from peer
 		lastHandshakeNano int64  // nano seconds since epoch
@@ -105,6 +108,12 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	handshake.precomputedStaticStatic = device.privateKey.sharedSecret(handshake.remoteStatic)
 	handshake.mutex.Unlock()
 
+	// reset endpoint
+
+	peer.endpoint.set = false
+	peer.endpoint.value.ClearDst()
+	peer.endpoint.value.ClearSrc()
+
 	// prepare queuing
 
 	peer.queue.nonce = make(chan *QueueOutboundElement, QueueOutboundSize)
@@ -129,11 +138,20 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	return peer, nil
 }
 
+/* Returns a short string identification for logging
+ */
 func (peer *Peer) String() string {
+	if !peer.endpoint.set {
+		return fmt.Sprintf(
+			"peer(%d unknown %s)",
+			peer.id,
+			base64.StdEncoding.EncodeToString(peer.handshake.remoteStatic[:]),
+		)
+	}
 	return fmt.Sprintf(
 		"peer(%d %s %s)",
 		peer.id,
-		peer.endpoint.DestinationToString(),
+		peer.endpoint.value.DstToString(),
 		base64.StdEncoding.EncodeToString(peer.handshake.remoteStatic[:]),
 	)
 }

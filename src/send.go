@@ -105,24 +105,15 @@ func addToEncryptionQueue(
 	}
 }
 
-func (peer *Peer) SendBuffer(buffer []byte) (int, error) {
+func (peer *Peer) SendBuffer(buffer []byte) error {
 	peer.device.net.mutex.RLock()
 	defer peer.device.net.mutex.RUnlock()
-
 	peer.mutex.RLock()
 	defer peer.mutex.RUnlock()
-
-	endpoint := peer.endpoint
-	if endpoint == nil {
-		return 0, errors.New("No known endpoint for peer")
+	if !peer.endpoint.set {
+		return errors.New("No known endpoint for peer")
 	}
-
-	conn := peer.device.net.conn
-	if conn == nil {
-		return 0, errors.New("No UDP socket for device")
-	}
-
-	return conn.WriteToUDP(buffer, endpoint)
+	return peer.device.net.bind.Send(buffer, &peer.endpoint.value)
 }
 
 /* Reads packets from the TUN and inserts
@@ -343,7 +334,7 @@ func (peer *Peer) RoutineSequentialSender() {
 			// send message and return buffer to pool
 
 			length := uint64(len(elem.packet))
-			_, err := peer.SendBuffer(elem.packet)
+			err := peer.SendBuffer(elem.packet)
 			device.PutMessageBuffer(elem.buffer)
 			if err != nil {
 				logDebug.Println("Failed to send authenticated packet to peer", peer.String())

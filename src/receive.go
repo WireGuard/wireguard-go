@@ -331,7 +331,7 @@ func (device *Device) RoutineHandshake() {
 				return
 			}
 
-			srcBytes := elem.endpoint.SourceToBytes()
+			srcBytes := elem.endpoint.SrcToBytes()
 			if device.IsUnderLoad() {
 
 				// verify MAC2 field
@@ -340,8 +340,7 @@ func (device *Device) RoutineHandshake() {
 
 					// construct cookie reply
 
-					logDebug.Println("Sending cookie reply to:", elem.endpoint.SourceToString())
-
+					logDebug.Println("Sending cookie reply to:", elem.endpoint.SrcToString())
 					sender := binary.LittleEndian.Uint32(elem.packet[4:8]) // "sender" always follows "type"
 					reply, err := device.mac.CreateReply(elem.packet, sender, srcBytes)
 					if err != nil {
@@ -365,9 +364,7 @@ func (device *Device) RoutineHandshake() {
 
 				// check ratelimiter
 
-				if !device.ratelimiter.Allow(
-					elem.endpoint.DestinationIP(),
-				) {
+				if !device.ratelimiter.Allow(elem.endpoint.DstIP()) {
 					continue
 				}
 			}
@@ -398,7 +395,7 @@ func (device *Device) RoutineHandshake() {
 			if peer == nil {
 				logInfo.Println(
 					"Recieved invalid initiation message from",
-					elem.endpoint.DestinationToString(),
+					elem.endpoint.DstToString(),
 				)
 				continue
 			}
@@ -412,7 +409,8 @@ func (device *Device) RoutineHandshake() {
 			// TODO: Discover destination address also, only update on change
 
 			peer.mutex.Lock()
-			peer.endpoint = elem.endpoint
+			peer.endpoint.set = true
+			peer.endpoint.value = elem.endpoint
 			peer.mutex.Unlock()
 
 			// create response
@@ -435,7 +433,7 @@ func (device *Device) RoutineHandshake() {
 
 			// send response
 
-			_, err = peer.SendBuffer(packet)
+			err = peer.SendBuffer(packet)
 			if err == nil {
 				peer.TimerAnyAuthenticatedPacketTraversal()
 			}
@@ -458,7 +456,7 @@ func (device *Device) RoutineHandshake() {
 			if peer == nil {
 				logInfo.Println(
 					"Recieved invalid response message from",
-					elem.endpoint.DestinationToString(),
+					elem.endpoint.DstToString(),
 				)
 				continue
 			}

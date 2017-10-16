@@ -34,15 +34,20 @@ func parseEndpoint(s string) (*net.UDPAddr, error) {
 	return addr, err
 }
 
-func ListeningUpdate(device *Device) error {
+func UpdateUDPListener(device *Device) error {
+	device.mutex.Lock()
+	defer device.mutex.Unlock()
+
 	netc := &device.net
 	netc.mutex.Lock()
 	defer netc.mutex.Unlock()
 
 	// close existing sockets
 
-	if err := device.net.bind.Close(); err != nil {
-		return err
+	if netc.bind != nil {
+		if err := netc.bind.Close(); err != nil {
+			return err
+		}
 	}
 
 	// open new sockets
@@ -64,13 +69,19 @@ func ListeningUpdate(device *Device) error {
 			return err
 		}
 
-		// TODO: clear endpoint (src) caches
+		// clear cached source addresses
+
+		for _, peer := range device.peers {
+			peer.mutex.Lock()
+			peer.endpoint.value.ClearSrc()
+			peer.mutex.Unlock()
+		}
 	}
 
 	return nil
 }
 
-func ListeningClose(device *Device) error {
+func CloseUDPListener(device *Device) error {
 	netc := &device.net
 	netc.mutex.Lock()
 	defer netc.mutex.Unlock()

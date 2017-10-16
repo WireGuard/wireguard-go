@@ -14,8 +14,6 @@ func printUsage() {
 }
 
 func main() {
-	test()
-
 	// parse arguments
 
 	var foreground bool

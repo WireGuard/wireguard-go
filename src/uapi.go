@@ -39,9 +39,10 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 		send("private_key=" + device.privateKey.ToHex())
 	}
 
-	if device.net.addr != nil {
-		send(fmt.Sprintf("listen_port=%d", device.net.addr.Port))
+	if device.net.port != 0 {
+		send(fmt.Sprintf("listen_port=%d", device.net.port))
 	}
+
 	if device.net.fwmark != 0 {
 		send(fmt.Sprintf("fwmark=%d", device.net.fwmark))
 	}
@@ -52,8 +53,8 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 			defer peer.mutex.RUnlock()
 			send("public_key=" + peer.handshake.remoteStatic.ToHex())
 			send("preshared_key=" + peer.handshake.presharedKey.ToHex())
-			if peer.endpoint != nil {
-				send("endpoint=" + peer.endpoint.String())
+			if peer.endpoint.set {
+				send("endpoint=" + peer.endpoint.value.DstToString())
 			}
 
 			nano := atomic.LoadInt64(&peer.stats.lastHandshakeNano)
@@ -137,24 +138,11 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					logError.Println("Failed to set listen_port:", err)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
-
-				addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", port))
-				if err != nil {
-					logError.Println("Failed to set listen_port:", err)
-					return &IPCError{Code: ipcErrorInvalid}
-				}
-
-				device.net.mutex.Lock()
-				device.net.addr = addr
-				device.net.mutex.Unlock()
-
-				err = updateUDPConn(device)
-				if err != nil {
+				device.net.port = uint16(port)
+				if err := UpdateUDPListener(device); err != nil {
 					logError.Println("Failed to set listen_port:", err)
 					return &IPCError{Code: ipcErrorPortInUse}
 				}
-
-				// TODO: Clear source address of all peers
 
 			case "fwmark":
 				fwmark, err := strconv.ParseUint(value, 10, 32)
@@ -162,28 +150,12 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					logError.Println("Invalid fwmark", err)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
-
 				device.net.mutex.Lock()
-				if fwmark > 0 || device.net.fwmark > 0 {
-					device.net.fwmark = uint32(fwmark)
-					err := SetMark(
-						device.net.conn,
-						device.net.fwmark,
-					)
-					if err != nil {
-						logError.Println("Failed to set fwmark:", err)
-						device.net.mutex.Unlock()
-						return &IPCError{Code: ipcErrorIO}
-					}
-
-					// TODO: Clear source address of all peers
-				}
+				device.net.fwmark = uint32(fwmark)
 				device.net.mutex.Unlock()
 
 			case "public_key":
-
 				// switch to peer configuration
-
 				deviceConfig = false
 
 			case "replace_peers":
@@ -218,7 +190,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				device.mutex.RLock()
 				if device.publicKey.Equals(pubKey) {
 
-					// create dummy instance
+					// create dummy instance (not added to device)
 
 					peer = &Peer{}
 					dummy = true
@@ -244,6 +216,9 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				}
 
 			case "remove":
+
+				// remove currently selected peer from device
+
 				if value != "true" {
 					logError.Println("Failed to set remove, invalid value:", value)
 					return &IPCError{Code: ipcErrorInvalid}
@@ -256,6 +231,9 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				dummy = true
 
 			case "preshared_key":
+
+				// update PSK
+
 				peer.mutex.Lock()
 				err := peer.handshake.presharedKey.FromHex(value)
 				peer.mutex.Unlock()
@@ -265,14 +243,17 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				}
 
 			case "endpoint":
-				addr, err := parseEndpoint(value)
+
+				// set endpoint destination and reset handshake timer
+
+				peer.mutex.Lock()
+				err := peer.endpoint.value.Set(value)
+				peer.endpoint.set = (err == nil)
+				peer.mutex.Unlock()
 				if err != nil {
 					logError.Println("Failed to set endpoint:", value)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
-				peer.mutex.Lock()
-				peer.endpoint = addr
-				peer.mutex.Unlock()
 				signalSend(peer.signal.handshakeReset)
 
 			case "persistent_keepalive_interval":

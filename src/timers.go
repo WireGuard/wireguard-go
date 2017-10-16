@@ -288,7 +288,7 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 			packet := writer.Bytes()
 			peer.mac.AddMacs(packet)
 
-			_, err = peer.SendBuffer(packet)
+			err = peer.SendBuffer(packet)
 			if err != nil {
 				logError.Println(
 					"Failed to send handshake initiation message to",

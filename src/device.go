@@ -205,7 +205,7 @@ func (device *Device) RemoveAllPeers() {
 func (device *Device) Close() {
 	device.RemoveAllPeers()
 	close(device.signal.stop)
-	ListeningClose(device)
+	CloseUDPListener(device)
 }
 
 func (device *Device) WaitChannel() chan struct{} {

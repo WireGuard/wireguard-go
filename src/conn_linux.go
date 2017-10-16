@@ -133,7 +133,7 @@ func sockaddrToString(addr unix.RawSockaddrInet6) string {
 	}
 }
 
-func (end *Endpoint) DestinationIP() net.IP {
+func (end *Endpoint) DstIP() net.IP {
 	switch end.dst.Family {
 	case unix.AF_INET6:
 		return end.dst.Addr[:]
@@ -150,18 +150,22 @@ func (end *Endpoint) DestinationIP() net.IP {
 	}
 }
 
-func (end *Endpoint) SourceToBytes() []byte {
+func (end *Endpoint) SrcToBytes() []byte {
 	ptr := unsafe.Pointer(&end.src)
 	arr := (*[unix.SizeofSockaddrInet6]byte)(ptr)
 	return arr[:]
 }
 
-func (end *Endpoint) SourceToString() string {
+func (end *Endpoint) SrcToString() string {
 	return sockaddrToString(end.src)
 }
 
-func (end *Endpoint) DestinationToString() string {
+func (end *Endpoint) DstToString() string {
 	return sockaddrToString(end.dst)
+}
+
+func (end *Endpoint) ClearDst() {
+	end.dst = unix.RawSockaddrInet6{}
 }
 
 func (end *Endpoint) ClearSrc() {
