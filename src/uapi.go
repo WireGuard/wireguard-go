@@ -247,7 +247,8 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				// set endpoint destination and reset handshake timer
 
 				peer.mutex.Lock()
-				err := peer.endpoint.value.Set(value)
+				err := peer.endpoint.value.SetDst(value)
+				fmt.Println(peer.endpoint.value.DstToString(), err)
 				peer.endpoint.set = (err == nil)
 				peer.mutex.Unlock()
 				if err != nil {

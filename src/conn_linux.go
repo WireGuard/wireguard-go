@@ -8,6 +8,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"golang.org/x/sys/unix"
 	"net"
 	"strconv"
@@ -31,14 +32,14 @@ type IPv4Source struct {
 	Ifindex int32
 }
 
-type Bind struct {
+type NativeBind struct {
 	sock4 int
 	sock6 int
 }
 
 func CreateUDPBind(port uint16) (UDPBind, uint16, error) {
 	var err error
-	var bind Bind
+	var bind NativeBind
 
 	bind.sock6, port, err = create6(port)
 	if err != nil {
@@ -52,7 +53,7 @@ func CreateUDPBind(port uint16) (UDPBind, uint16, error) {
 	return &bind, port, err
 }
 
-func (bind *Bind) SetMark(value uint32) error {
+func (bind *NativeBind) SetMark(value uint32) error {
 	err := unix.SetsockoptInt(
 		bind.sock6,
 		unix.SOL_SOCKET,
@@ -72,7 +73,7 @@ func (bind *Bind) SetMark(value uint32) error {
 	)
 }
 
-func (bind *Bind) Close() error {
+func (bind *NativeBind) Close() error {
 	err1 := unix.Close(bind.sock6)
 	err2 := unix.Close(bind.sock4)
 	if err1 != nil {
@@ -81,7 +82,7 @@ func (bind *Bind) Close() error {
 	return err2
 }
 
-func (bind *Bind) ReceiveIPv6(buff []byte, end *Endpoint) (int, error) {
+func (bind *NativeBind) ReceiveIPv6(buff []byte, end *Endpoint) (int, error) {
 	return receive6(
 		bind.sock6,
 		buff,
@@ -89,7 +90,7 @@ func (bind *Bind) ReceiveIPv6(buff []byte, end *Endpoint) (int, error) {
 	)
 }
 
-func (bind *Bind) ReceiveIPv4(buff []byte, end *Endpoint) (int, error) {
+func (bind *NativeBind) ReceiveIPv4(buff []byte, end *Endpoint) (int, error) {
 	return receive4(
 		bind.sock4,
 		buff,
@@ -97,14 +98,14 @@ func (bind *Bind) ReceiveIPv4(buff []byte, end *Endpoint) (int, error) {
 	)
 }
 
-func (bind *Bind) Send(buff []byte, end *Endpoint) error {
-	switch end.src.Family {
+func (bind *NativeBind) Send(buff []byte, end *Endpoint) error {
+	switch end.dst.Family {
 	case unix.AF_INET6:
 		return send6(bind.sock6, end, buff)
 	case unix.AF_INET:
 		return send4(bind.sock4, end, buff)
 	default:
-		return errors.New("Unknown address family of source")
+		return errors.New("Unknown address family of destination")
 	}
 }
 
@@ -288,10 +289,23 @@ func create6(port uint16) (int, uint16, error) {
 	return fd, uint16(addr.Port), err
 }
 
-func (end *Endpoint) Set(s string) error {
+func (end *Endpoint) SetDst(s string) error {
 	addr, err := parseEndpoint(s)
 	if err != nil {
 		return err
+	}
+
+	fmt.Println(addr, err)
+
+	ipv4 := addr.IP.To4()
+	if ipv4 != nil {
+		dst := (*unix.RawSockaddrInet4)(unsafe.Pointer(&end.dst))
+		dst.Family = unix.AF_INET
+		dst.Port = uint16(addr.Port)
+		dst.Zero = [8]byte{}
+		copy(dst.Addr[:], ipv4)
+		end.ClearSrc()
+		return nil
 	}
 
 	ipv6 := addr.IP.To16()
@@ -306,17 +320,6 @@ func (end *Endpoint) Set(s string) error {
 		dst.Flowinfo = 0
 		dst.Scope_id = zone
 		copy(dst.Addr[:], ipv6[:])
-		end.ClearSrc()
-		return nil
-	}
-
-	ipv4 := addr.IP.To4()
-	if ipv4 != nil {
-		dst := (*unix.RawSockaddrInet4)(unsafe.Pointer(&end.dst))
-		dst.Family = unix.AF_INET
-		dst.Port = uint16(addr.Port)
-		dst.Zero = [8]byte{}
-		copy(dst.Addr[:], ipv4)
 		end.ClearSrc()
 		return nil
 	}
@@ -372,6 +375,8 @@ func send6(sock int, end *Endpoint, buff []byte) error {
 }
 
 func send4(sock int, end *Endpoint, buff []byte) error {
+	println("send 4")
+	println(end.DstToString())
 
 	// construct message header
 
@@ -403,7 +408,6 @@ func send4(sock int, end *Endpoint, buff []byte) error {
 		Namelen: unix.SizeofSockaddrInet4,
 		Control: (*byte)(unsafe.Pointer(&cmsg)),
 	}
-
 	msghdr.SetControllen(int(unsafe.Sizeof(cmsg)))
 
 	// sendmsg(sock, &msghdr, 0)
@@ -414,9 +418,23 @@ func send4(sock int, end *Endpoint, buff []byte) error {
 		uintptr(unsafe.Pointer(&msghdr)),
 		0,
 	)
+
+	println(sock)
+	fmt.Println(errno)
+
+	// clear source cache and try again
+
 	if errno == unix.EINVAL {
 		end.ClearSrc()
+		cmsg.pktinfo = unix.Inet4Pktinfo{}
+		_, _, errno = unix.Syscall(
+			unix.SYS_SENDMSG,
+			uintptr(sock),
+			uintptr(unsafe.Pointer(&msghdr)),
+			0,
+		)
 	}
+
 	return errno
 }
 
