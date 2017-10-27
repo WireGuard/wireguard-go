@@ -135,7 +135,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 			case "listen_port":
 				port, err := strconv.ParseUint(value, 10, 16)
 				if err != nil {
-					logError.Println("Failed to set listen_port:", err)
+					logError.Println("Failed to parse listen_port:", err)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 				device.net.port = uint16(port)

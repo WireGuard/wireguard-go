@@ -84,7 +84,10 @@ func main() {
 
 	logInfo := device.log.Info
 	logError := device.log.Error
-	logInfo.Println("Starting device")
+	logDebug := device.log.Debug
+
+	logInfo.Println("Device started")
+	logDebug.Println("Debug log enabled")
 
 	// start configuration lister
 

@@ -138,6 +138,17 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	return peer, nil
 }
 
+func (peer *Peer) SendBuffer(buffer []byte) error {
+	peer.device.net.mutex.RLock()
+	defer peer.device.net.mutex.RUnlock()
+	peer.mutex.RLock()
+	defer peer.mutex.RUnlock()
+	if !peer.endpoint.set {
+		return errors.New("No known endpoint for peer")
+	}
+	return peer.device.net.bind.Send(buffer, &peer.endpoint.value)
+}
+
 /* Returns a short string identification for logging
  */
 func (peer *Peer) String() string {

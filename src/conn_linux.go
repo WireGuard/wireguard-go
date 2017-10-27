@@ -50,10 +50,12 @@ func CreateUDPBind(port uint16) (UDPBind, uint16, error) {
 	if err != nil {
 		unix.Close(bind.sock6)
 	}
-	return &bind, port, err
+	println(bind.sock6)
+	println(bind.sock4)
+	return bind, port, err
 }
 
-func (bind *NativeBind) SetMark(value uint32) error {
+func (bind NativeBind) SetMark(value uint32) error {
 	err := unix.SetsockoptInt(
 		bind.sock6,
 		unix.SOL_SOCKET,
@@ -73,7 +75,7 @@ func (bind *NativeBind) SetMark(value uint32) error {
 	)
 }
 
-func (bind *NativeBind) Close() error {
+func (bind NativeBind) Close() error {
 	err1 := unix.Close(bind.sock6)
 	err2 := unix.Close(bind.sock4)
 	if err1 != nil {
@@ -82,7 +84,7 @@ func (bind *NativeBind) Close() error {
 	return err2
 }
 
-func (bind *NativeBind) ReceiveIPv6(buff []byte, end *Endpoint) (int, error) {
+func (bind NativeBind) ReceiveIPv6(buff []byte, end *Endpoint) (int, error) {
 	return receive6(
 		bind.sock6,
 		buff,
@@ -90,7 +92,7 @@ func (bind *NativeBind) ReceiveIPv6(buff []byte, end *Endpoint) (int, error) {
 	)
 }
 
-func (bind *NativeBind) ReceiveIPv4(buff []byte, end *Endpoint) (int, error) {
+func (bind NativeBind) ReceiveIPv4(buff []byte, end *Endpoint) (int, error) {
 	return receive4(
 		bind.sock4,
 		buff,
@@ -98,7 +100,7 @@ func (bind *NativeBind) ReceiveIPv4(buff []byte, end *Endpoint) (int, error) {
 	)
 }
 
-func (bind *NativeBind) Send(buff []byte, end *Endpoint) error {
+func (bind NativeBind) Send(buff []byte, end *Endpoint) error {
 	switch end.dst.Family {
 	case unix.AF_INET6:
 		return send6(bind.sock6, end, buff)
@@ -236,7 +238,7 @@ func create6(port uint16) (int, uint16, error) {
 	// create socket
 
 	fd, err := unix.Socket(
-		unix.AF_INET,
+		unix.AF_INET6,
 		unix.SOCK_DGRAM,
 		0,
 	)
@@ -342,7 +344,7 @@ func send6(sock int, end *Endpoint, buff []byte) error {
 		unix.Cmsghdr{
 			Level: unix.IPPROTO_IPV6,
 			Type:  unix.IPV6_PKTINFO,
-			Len:   unix.SizeofInet6Pktinfo,
+			Len:   unix.SizeofInet6Pktinfo + unix.SizeofCmsghdr,
 		},
 		unix.Inet6Pktinfo{
 			Addr:    end.src.Addr,
@@ -368,15 +370,31 @@ func send6(sock int, end *Endpoint, buff []byte) error {
 		uintptr(unsafe.Pointer(&msghdr)),
 		0,
 	)
+
+	if errno == 0 {
+		return nil
+	}
+
+	// clear src and retry
+
 	if errno == unix.EINVAL {
 		end.ClearSrc()
+		cmsg.pktinfo = unix.Inet6Pktinfo{}
+		_, _, errno = unix.Syscall(
+			unix.SYS_SENDMSG,
+			uintptr(sock),
+			uintptr(unsafe.Pointer(&msghdr)),
+			0,
+		)
 	}
+
 	return errno
 }
 
 func send4(sock int, end *Endpoint, buff []byte) error {
 	println("send 4")
 	println(end.DstToString())
+	println(sock)
 
 	// construct message header
 
@@ -393,7 +411,7 @@ func send4(sock int, end *Endpoint, buff []byte) error {
 		unix.Cmsghdr{
 			Level: unix.IPPROTO_IP,
 			Type:  unix.IP_PKTINFO,
-			Len:   unix.SizeofInet4Pktinfo,
+			Len:   unix.SizeofInet4Pktinfo + unix.SizeofCmsghdr,
 		},
 		unix.Inet4Pktinfo{
 			Spec_dst: src4.src.Addr,
@@ -419,10 +437,11 @@ func send4(sock int, end *Endpoint, buff []byte) error {
 		0,
 	)
 
-	println(sock)
-	fmt.Println(errno)
+	if errno == 0 {
+		return nil
+	}
 
-	// clear source cache and try again
+	// clear source and try again
 
 	if errno == unix.EINVAL {
 		end.ClearSrc()

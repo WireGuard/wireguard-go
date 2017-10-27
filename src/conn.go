@@ -45,14 +45,19 @@ func UpdateUDPListener(device *Device) error {
 	// close existing sockets
 
 	if netc.bind != nil {
+		println("close bind")
 		if err := netc.bind.Close(); err != nil {
 			return err
 		}
+		netc.bind = nil
+		println("closed")
 	}
 
 	// open new sockets
 
 	if device.tun.isUp.Get() {
+
+		println("creat")
 
 		// bind to new port
 
@@ -68,6 +73,8 @@ func UpdateUDPListener(device *Device) error {
 		if err != nil {
 			return err
 		}
+
+		println("okay")
 
 		// clear cached source addresses
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/binary"
-	"errors"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -103,17 +102,6 @@ func addToEncryptionQueue(
 			}
 		}
 	}
-}
-
-func (peer *Peer) SendBuffer(buffer []byte) error {
-	peer.device.net.mutex.RLock()
-	defer peer.device.net.mutex.RUnlock()
-	peer.mutex.RLock()
-	defer peer.mutex.RUnlock()
-	if !peer.endpoint.set {
-		return errors.New("No known endpoint for peer")
-	}
-	return peer.device.net.bind.Send(buffer, &peer.endpoint.value)
 }
 
 /* Reads packets from the TUN and inserts
