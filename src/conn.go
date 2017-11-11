@@ -37,15 +37,14 @@ func parseEndpoint(s string) (*net.UDPAddr, error) {
 /* Must hold device and net lock
  */
 func unsafeCloseUDPListener(device *Device) error {
+	var err error
 	netc := &device.net
 	if netc.bind != nil {
-		if err := netc.bind.Close(); err != nil {
-			return err
-		}
+		err = netc.bind.Close()
 		netc.bind = nil
-		netc.update.Broadcast()
+		netc.update.Add(1)
 	}
-	return nil
+	return err
 }
 
 // must inform all listeners
@@ -63,7 +62,7 @@ func UpdateUDPListener(device *Device) error {
 		return err
 	}
 
-	// wait for reader
+	// assumption: netc.update WaitGroup should be exactly 1
 
 	// open new sockets
 
@@ -93,9 +92,10 @@ func UpdateUDPListener(device *Device) error {
 			peer.mutex.Unlock()
 		}
 
-		// inform readers of updated bind
+		// decrease waitgroup to 0
 
-		netc.update.Broadcast()
+		device.log.Debug.Println("UDP bind has been updated")
+		netc.update.Done()
 	}
 
 	return nil

@@ -23,10 +23,10 @@ type Device struct {
 	}
 	net struct {
 		mutex  sync.RWMutex
-		bind   UDPBind    // bind interface
-		port   uint16     // listening port
-		fwmark uint32     // mark value (0 = disabled)
-		update *sync.Cond // the bind was updated
+		bind   UDPBind        // bind interface
+		port   uint16         // listening port
+		fwmark uint32         // mark value (0 = disabled)
+		update sync.WaitGroup // the bind was updated (acting as a barrier)
 	}
 	mutex        sync.RWMutex
 	privateKey   NoisePrivateKey
@@ -167,7 +167,7 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 
 	device.net.port = 0
 	device.net.bind = nil
-	device.net.update = sync.NewCond(&device.net.mutex)
+	device.net.update.Add(1)
 
 	// start workers
 
@@ -209,9 +209,11 @@ func (device *Device) RemoveAllPeers() {
 }
 
 func (device *Device) Close() {
+	device.log.Info.Println("Closing device")
 	device.RemoveAllPeers()
 	close(device.signal.stop)
 	CloseUDPListener(device)
+	device.tun.device.Close()
 }
 
 func (device *Device) WaitChannel() chan struct{} {

@@ -95,22 +95,21 @@ func (device *Device) addToHandshakeQueue(
 func (device *Device) RoutineReceiveIncomming(IPVersion int) {
 
 	logDebug := device.log.Debug
-	logDebug.Println("Routine, receive incomming, started")
+	logDebug.Println("Routine, receive incomming, IP version:", IPVersion)
 
 	for {
 
 		// wait for bind
 
-		logDebug.Println("Waiting for udp bind")
-		device.net.mutex.Lock()
+		logDebug.Println("Waiting for UDP socket, IP version:", IPVersion)
+
 		device.net.update.Wait()
+		device.net.mutex.RLock()
 		bind := device.net.bind
-		device.net.mutex.Unlock()
+		device.net.mutex.RUnlock()
 		if bind == nil {
 			continue
 		}
-
-		logDebug.Println("LISTEN\n\n\n")
 
 		// receive datagrams until conn is closed
 
@@ -427,6 +426,8 @@ func (device *Device) RoutineHandshake() {
 			err = peer.SendBuffer(packet)
 			if err == nil {
 				peer.TimerAnyAuthenticatedPacketTraversal()
+			} else {
+				logError.Println("Failed to send response to:", peer.String(), err)
 			}
 
 		case MessageResponseType:

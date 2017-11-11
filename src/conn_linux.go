@@ -84,9 +84,15 @@ func (bind NativeBind) SetMark(value uint32) error {
 	)
 }
 
+func closeUnblock(fd int) error {
+	// shutdown to unblock readers
+	unix.Shutdown(fd, unix.SHUT_RD)
+	return unix.Close(fd)
+}
+
 func (bind NativeBind) Close() error {
-	err1 := unix.Close(bind.sock6)
-	err2 := unix.Close(bind.sock4)
+	err1 := closeUnblock(bind.sock6)
+	err2 := closeUnblock(bind.sock4)
 	if err1 != nil {
 		return err1
 	}
@@ -125,13 +131,13 @@ func sockaddrToString(addr unix.RawSockaddrInet6) string {
 
 	switch addr.Family {
 	case unix.AF_INET6:
-		udpAddr.Port = int(addr.Port)
+		udpAddr.Port = int(ntohs(addr.Port))
 		udpAddr.IP = addr.Addr[:]
 		return udpAddr.String()
 
 	case unix.AF_INET:
 		ptr := (*unix.RawSockaddrInet4)(unsafe.Pointer(&addr))
-		udpAddr.Port = int(ptr.Port)
+		udpAddr.Port = int(ntohs(ptr.Port))
 		udpAddr.IP = net.IPv4(
 			ptr.Addr[0],
 			ptr.Addr[1],
