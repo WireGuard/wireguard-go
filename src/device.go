@@ -205,6 +205,7 @@ func (device *Device) Close() {
 	device.RemoveAllPeers()
 	close(device.signal.stop)
 	closeUDPConn(device)
+	device.tun.device.Close()
 }
 
 func (device *Device) WaitChannel() chan struct{} {
