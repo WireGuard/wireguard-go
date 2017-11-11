@@ -23,9 +23,10 @@ type Device struct {
 	}
 	net struct {
 		mutex  sync.RWMutex
-		bind   UDPBind
-		port   uint16
-		fwmark uint32
+		bind   UDPBind    // bind interface
+		port   uint16     // listening port
+		fwmark uint32     // mark value (0 = disabled)
+		update *sync.Cond // the bind was updated
 	}
 	mutex        sync.RWMutex
 	privateKey   NoisePrivateKey
@@ -38,8 +39,7 @@ type Device struct {
 		handshake  chan QueueHandshakeElement
 	}
 	signal struct {
-		stop       chan struct{}
-		updateBind chan struct{}
+		stop chan struct{}
 	}
 	underLoadUntil atomic.Value
 	ratelimiter    Ratelimiter
@@ -162,6 +162,12 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	// prepare signals
 
 	device.signal.stop = make(chan struct{})
+
+	// prepare net
+
+	device.net.port = 0
+	device.net.bind = nil
+	device.net.update = sync.NewCond(&device.net.mutex)
 
 	// start workers
 

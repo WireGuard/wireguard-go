@@ -7,8 +7,8 @@
 package main
 
 import (
+	"encoding/binary"
 	"errors"
-	"fmt"
 	"golang.org/x/sys/unix"
 	"net"
 	"strconv"
@@ -37,6 +37,17 @@ type NativeBind struct {
 	sock6 int
 }
 
+func htons(val uint16) uint16 {
+	var out [unsafe.Sizeof(val)]byte
+	binary.BigEndian.PutUint16(out[:], val)
+	return *((*uint16)(unsafe.Pointer(&out[0])))
+}
+
+func ntohs(val uint16) uint16 {
+	tmp := ((*[unsafe.Sizeof(val)]byte)(unsafe.Pointer(&val)))
+	return binary.BigEndian.Uint16((*tmp)[:])
+}
+
 func CreateUDPBind(port uint16) (UDPBind, uint16, error) {
 	var err error
 	var bind NativeBind
@@ -50,8 +61,6 @@ func CreateUDPBind(port uint16) (UDPBind, uint16, error) {
 	if err != nil {
 		unix.Close(bind.sock6)
 	}
-	println(bind.sock6)
-	println(bind.sock4)
 	return bind, port, err
 }
 
@@ -297,13 +306,11 @@ func (end *Endpoint) SetDst(s string) error {
 		return err
 	}
 
-	fmt.Println(addr, err)
-
 	ipv4 := addr.IP.To4()
 	if ipv4 != nil {
 		dst := (*unix.RawSockaddrInet4)(unsafe.Pointer(&end.dst))
 		dst.Family = unix.AF_INET
-		dst.Port = uint16(addr.Port)
+		dst.Port = htons(uint16(addr.Port))
 		dst.Zero = [8]byte{}
 		copy(dst.Addr[:], ipv4)
 		end.ClearSrc()
@@ -318,7 +325,7 @@ func (end *Endpoint) SetDst(s string) error {
 		}
 		dst := &end.dst
 		dst.Family = unix.AF_INET6
-		dst.Port = uint16(addr.Port)
+		dst.Port = htons(uint16(addr.Port))
 		dst.Flowinfo = 0
 		dst.Scope_id = zone
 		copy(dst.Addr[:], ipv6[:])
@@ -392,9 +399,6 @@ func send6(sock int, end *Endpoint, buff []byte) error {
 }
 
 func send4(sock int, end *Endpoint, buff []byte) error {
-	println("send 4")
-	println(end.DstToString())
-	println(sock)
 
 	// construct message header
 
@@ -425,6 +429,7 @@ func send4(sock int, end *Endpoint, buff []byte) error {
 		Name:    (*byte)(unsafe.Pointer(&end.dst)),
 		Namelen: unix.SizeofSockaddrInet4,
 		Control: (*byte)(unsafe.Pointer(&cmsg)),
+		Flags:   0,
 	}
 	msghdr.SetControllen(int(unsafe.Sizeof(cmsg)))
 
@@ -437,10 +442,6 @@ func send4(sock int, end *Endpoint, buff []byte) error {
 		0,
 	)
 
-	if errno == 0 {
-		return nil
-	}
-
 	// clear source and try again
 
 	if errno == unix.EINVAL {
@@ -452,6 +453,12 @@ func send4(sock int, end *Endpoint, buff []byte) error {
 			uintptr(unsafe.Pointer(&msghdr)),
 			0,
 		)
+	}
+
+	// errno = 0 is still an error instance
+
+	if errno == 0 {
+		return nil
 	}
 
 	return errno

@@ -34,6 +34,21 @@ func parseEndpoint(s string) (*net.UDPAddr, error) {
 	return addr, err
 }
 
+/* Must hold device and net lock
+ */
+func unsafeCloseUDPListener(device *Device) error {
+	netc := &device.net
+	if netc.bind != nil {
+		if err := netc.bind.Close(); err != nil {
+			return err
+		}
+		netc.bind = nil
+		netc.update.Broadcast()
+	}
+	return nil
+}
+
+// must inform all listeners
 func UpdateUDPListener(device *Device) error {
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
@@ -44,26 +59,22 @@ func UpdateUDPListener(device *Device) error {
 
 	// close existing sockets
 
-	if netc.bind != nil {
-		println("close bind")
-		if err := netc.bind.Close(); err != nil {
-			return err
-		}
-		netc.bind = nil
-		println("closed")
+	if err := unsafeCloseUDPListener(device); err != nil {
+		return err
 	}
+
+	// wait for reader
 
 	// open new sockets
 
 	if device.tun.isUp.Get() {
-
-		println("creat")
 
 		// bind to new port
 
 		var err error
 		netc.bind, netc.port, err = CreateUDPBind(netc.port)
 		if err != nil {
+			netc.bind = nil
 			return err
 		}
 
@@ -74,8 +85,6 @@ func UpdateUDPListener(device *Device) error {
 			return err
 		}
 
-		println("okay")
-
 		// clear cached source addresses
 
 		for _, peer := range device.peers {
@@ -83,14 +92,20 @@ func UpdateUDPListener(device *Device) error {
 			peer.endpoint.value.ClearSrc()
 			peer.mutex.Unlock()
 		}
+
+		// inform readers of updated bind
+
+		netc.update.Broadcast()
 	}
 
 	return nil
 }
 
 func CloseUDPListener(device *Device) error {
-	netc := &device.net
-	netc.mutex.Lock()
-	defer netc.mutex.Unlock()
-	return netc.bind.Close()
+	device.mutex.Lock()
+	device.net.mutex.Lock()
+	err := unsafeCloseUDPListener(device)
+	device.net.mutex.Unlock()
+	device.mutex.Unlock()
+	return err
 }
