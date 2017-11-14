@@ -56,6 +56,11 @@ type NativeTun struct {
 	events chan TUNEvent // device related events
 }
 
+func (tun *NativeTun) File() *os.File {
+	println(tun.fd.Name())
+	return tun.fd
+}
+
 func (tun *NativeTun) RoutineNetlinkListener() {
 	sock := int(C.bind_rtmgrp())
 	if sock < 0 {
@@ -246,6 +251,29 @@ func (tun *NativeTun) Events() chan TUNEvent {
 
 func (tun *NativeTun) Close() error {
 	return nil
+}
+
+func CreateTUNFromFile(name string, fd *os.File) (TUNDevice, error) {
+	device := &NativeTun{
+		fd:     fd,
+		name:   name,
+		events: make(chan TUNEvent, 5),
+		errors: make(chan error, 5),
+	}
+
+	// start event listener
+
+	var err error
+	device.index, err = getIFIndex(device.name)
+	if err != nil {
+		return nil, err
+	}
+
+	go device.RoutineNetlinkListener()
+
+	// set default MTU
+
+	return device, device.setMTU(DefaultMTU)
 }
 
 func CreateTUN(name string) (TUNDevice, error) {

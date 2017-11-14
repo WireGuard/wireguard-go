@@ -28,7 +28,7 @@ netns0="wg-test-$$-0"
 netns1="wg-test-$$-1"
 netns2="wg-test-$$-2"
 program="../wireguard-go"
-export LOG_LEVEL="debug"
+export LOG_LEVEL="info"
 
 pretty() { echo -e "\x1b[32m\x1b[1m[+] ${1:+NS$1: }${2}\x1b[0m" >&3; }
 pp() { pretty "" "$*"; "$@"; }
@@ -72,13 +72,11 @@ pp ip netns add $netns2
 ip0 link set up dev lo
 
 # ip0 link add dev wg1 type wireguard
-n0 $program -f wg1 &
-sleep 1
+n0 $program wg1
 ip0 link set wg1 netns $netns1
 
 # ip0 link add dev wg1 type wireguard
-n0 $program -f wg2 &
-sleep 1
+n0 $program wg2
 ip0 link set wg2 netns $netns2
 
 key1="$(pp wg genkey)"
@@ -146,8 +144,6 @@ tests() {
     waitiperf $netns2
     n1 iperf3 -Z -n 1G -b 0 -u -c fd00::2
 }
-
-echo "4"
 
 [[ $(ip1 link show dev wg1) =~ mtu\ ([0-9]+) ]] && orig_mtu="${BASH_REMATCH[1]}"
 big_mtu=$(( 34816 - 1500 + $orig_mtu ))
@@ -234,9 +230,8 @@ ip2 link del wg2
 # ip1 link add dev wg1 type wireguard
 # ip2 link add dev wg1 type wireguard
 
-n1 $program -f wg1 &
-n2 $program -f wg2 &
-sleep 5
+n1 $program wg1
+n2 $program wg2
 
 configure_peers
 
@@ -291,9 +286,8 @@ ip2 link del wg2
 
 # ip1 link add dev wg1 type wireguard
 # ip2 link add dev wg1 type wireguard
-n1 $program -f wg1 &
-n2 $program -f wg2 &
-sleep 5
+n1 $program wg1
+n2 $program wg2
 
 configure_peers
 
@@ -354,4 +348,5 @@ n2 ping -W 1 -c 1 192.168.241.1
 ip1 link del veth1
 ip1 link del wg1
 ip2 link del wg2
+
 echo "done"

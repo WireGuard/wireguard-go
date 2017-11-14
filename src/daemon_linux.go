@@ -11,18 +11,9 @@ import (
  * TODO: Use env variable to spawn in background
  */
 
-func Daemonize() error {
+func Daemonize(attr *os.ProcAttr) error {
 	argv := []string{os.Args[0], "--foreground"}
 	argv = append(argv, os.Args[1:]...)
-	attr := &os.ProcAttr{
-		Dir: ".",
-		Env: os.Environ(),
-		Files: []*os.File{
-			os.Stdin,
-			nil,
-			nil,
-		},
-	}
 	process, err := os.StartProcess(
 		argv[0],
 		argv,

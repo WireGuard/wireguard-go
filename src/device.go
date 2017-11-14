@@ -126,13 +126,13 @@ func (device *Device) PutMessageBuffer(msg *[MaxMessageSize]byte) {
 	device.pool.messageBuffers.Put(msg)
 }
 
-func NewDevice(tun TUNDevice, logLevel int) *Device {
+func NewDevice(tun TUNDevice, logger *Logger) *Device {
 	device := new(Device)
 
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
 
-	device.log = NewLogger(logLevel, "("+tun.Name()+") ")
+	device.log = logger
 	device.peers = make(map[NoisePublicKey]*Peer)
 	device.tun.device = tun
 

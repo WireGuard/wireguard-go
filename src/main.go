@@ -2,10 +2,14 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
+)
+
+const (
+	EnvWGTunFD = "WG_TUN_FD"
 )
 
 func printUsage() {
@@ -43,28 +47,6 @@ func main() {
 		interfaceName = os.Args[1]
 	}
 
-	// daemonize the process
-
-	if !foreground {
-		err := Daemonize()
-		if err != nil {
-			log.Println("Failed to daemonize:", err)
-		}
-		return
-	}
-
-	// increase number of go workers (for Go <1.5)
-
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
-	// open TUN device
-
-	tun, err := CreateTUN(interfaceName)
-	if err != nil {
-		log.Println("Failed to create tun device:", err)
-		return
-	}
-
 	// get log level (default: info)
 
 	logLevel := func() int {
@@ -79,22 +61,76 @@ func main() {
 		return LogLevelInfo
 	}()
 
+	logger := NewLogger(
+		logLevel,
+		fmt.Sprintf("(%s) ", interfaceName),
+	)
+	logger.Debug.Println("Debug log enabled")
+
+	// open TUN device
+
+	tun, err := func() (TUNDevice, error) {
+		tunFdStr := os.Getenv(EnvWGTunFD)
+		if tunFdStr == "" {
+			return CreateTUN(interfaceName)
+		}
+
+		// construct tun device from supplied FD
+
+		fd, err := strconv.ParseUint(tunFdStr, 10, 32)
+		if err != nil {
+			return nil, err
+		}
+
+		file := os.NewFile(uintptr(fd), "/dev/net/tun")
+		return CreateTUNFromFile(interfaceName, file)
+	}()
+
+	if err != nil {
+		logger.Error.Println("Failed to create TUN device:", err)
+	}
+
+	// daemonize the process
+
+	if !foreground {
+		env := os.Environ()
+		_, ok := os.LookupEnv(EnvWGTunFD)
+		if !ok {
+			kvp := fmt.Sprintf("%s=3", EnvWGTunFD)
+			env = append(env, kvp)
+		}
+		attr := &os.ProcAttr{
+			Files: []*os.File{
+				nil, // stdin
+				nil, // stdout
+				nil, // stderr
+				tun.File(),
+			},
+			Dir: ".",
+			Env: env,
+		}
+		err = Daemonize(attr)
+		if err != nil {
+			logger.Error.Println("Failed to daemonize:", err)
+		}
+		return
+	}
+
+	// increase number of go workers (for Go <1.5)
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	// create wireguard device
 
-	device := NewDevice(tun, logLevel)
-
-	logInfo := device.log.Info
-	logError := device.log.Error
-	logDebug := device.log.Debug
-
-	logInfo.Println("Device started")
-	logDebug.Println("Debug log enabled")
+	device := NewDevice(tun, logger)
+	logger.Info.Println("Device started")
 
 	// start configuration lister
 
 	uapi, err := NewUAPIListener(interfaceName)
 	if err != nil {
-		logError.Fatal("UAPI listen error:", err)
+		logger.Error.Println("UAPI listen error:", err)
+		return
 	}
 
 	errs := make(chan error)
@@ -112,7 +148,7 @@ func main() {
 		}
 	}()
 
-	logInfo.Println("UAPI listener started")
+	logger.Info.Println("UAPI listener started")
 
 	// wait for program to terminate
 
@@ -129,5 +165,5 @@ func main() {
 
 	uapi.Close()
 
-	logInfo.Println("Closing")
+	logger.Info.Println("Shutting down")
 }
