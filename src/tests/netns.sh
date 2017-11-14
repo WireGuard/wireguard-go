@@ -28,7 +28,7 @@ netns0="wg-test-$$-0"
 netns1="wg-test-$$-1"
 netns2="wg-test-$$-2"
 program="../wireguard-go"
-export LOG_LEVEL="error"
+export LOG_LEVEL="debug"
 
 pretty() { echo -e "\x1b[32m\x1b[1m[+] ${1:+NS$1: }${2}\x1b[0m" >&3; }
 pp() { pretty "" "$*"; "$@"; }
@@ -147,6 +147,8 @@ tests() {
     n1 iperf3 -Z -n 1G -b 0 -u -c fd00::2
 }
 
+echo "4"
+
 [[ $(ip1 link show dev wg1) =~ mtu\ ([0-9]+) ]] && orig_mtu="${BASH_REMATCH[1]}"
 big_mtu=$(( 34816 - 1500 + $orig_mtu ))
 
@@ -185,14 +187,14 @@ ip0 -4 addr del 127.0.0.1/8 dev lo
 ip0 -4 addr add 127.212.121.99/8 dev lo
 n0 wg set wg1 listen-port 9999
 n0 wg set wg1 peer "$pub2" endpoint 127.0.0.1:20000
-n1 ping6 -W 1 -c 1 fd00::20000
-[[ $(n2 wg show wg2 endpoints) == "$pub1    127.212.121.99:9999" ]]
+n1 ping6 -W 1 -c 1 fd00::2
+[[ $(n2 wg show wg2 endpoints) == "$pub1	127.212.121.99:9999" ]]
 
 # Test using IPv6 that roaming works
 n1 wg set wg1 listen-port 9998
 n1 wg set wg1 peer "$pub2" endpoint [::1]:20000
 n1 ping -W 1 -c 1 192.168.241.2
-[[ $(n2 wg show wg2 endpoints) == "$pub1    [::1]:9998" ]]
+[[ $(n2 wg show wg2 endpoints) == "$pub1	[::1]:9998" ]]
 
 # Test that crypto-RP filter works
 n1 wg set wg1 peer "$pub2" allowed-ips 192.168.241.0/24
@@ -212,7 +214,7 @@ n2 ncat -u 192.168.241.1 1111 <<<"X"
 ! read -r -N 1 -t 1 out <&4
 kill $nmap_pid
 n0 wg set wg1 peer "$more_specific_key" remove
-[[ $(n1 wg show wg1 endpoints) == "$pub2    [::1]:9997" ]]
+[[ $(n1 wg show wg1 endpoints) == "$pub2	[::1]:9997" ]]
 
 ip1 link del wg1
 ip2 link del wg2
@@ -232,8 +234,9 @@ ip2 link del wg2
 # ip1 link add dev wg1 type wireguard
 # ip2 link add dev wg1 type wireguard
 
-n1 $program wg1
-n2 $program wg2
+n1 $program -f wg1 &
+n2 $program -f wg2 &
+sleep 5
 
 configure_peers
 
@@ -263,7 +266,7 @@ n0 iptables -t nat -A POSTROUTING -s 192.168.1.0/24 -d 10.0.0.0/24 -j SNAT --to 
 n0 wg set wg1 peer "$pub2" endpoint 10.0.0.100:20000 persistent-keepalive 1
 n1 ping -W 1 -c 1 192.168.241.2
 n2 ping -W 1 -c 1 192.168.241.1
-[[ $(n2 wg show wg2 endpoints) == "$pub1    10.0.0.1:10000" ]]
+[[ $(n2 wg show wg2 endpoints) == "$pub1	10.0.0.1:10000" ]]
 # Demonstrate n2 can still send packets to n1, since persistent-keepalive will prevent connection tracking entry from expiring (to see entries: `n0 conntrack -L`).
 pp sleep 3
 n2 ping -W 1 -c 1 192.168.241.1
@@ -288,8 +291,9 @@ ip2 link del wg2
 
 # ip1 link add dev wg1 type wireguard
 # ip2 link add dev wg1 type wireguard
-n1 $program wg1
-n2 $program wg1
+n1 $program -f wg1 &
+n2 $program -f wg2 &
+sleep 5
 
 configure_peers
 
@@ -336,17 +340,18 @@ waitiface $netns1 veth1
 waitiface $netns2 veth2
 n0 wg set wg2 peer "$pub1" endpoint 10.0.0.1:10000
 n2 ping -W 1 -c 1 192.168.241.1
-[[ $(n0 wg show wg2 endpoints) == "$pub1    10.0.0.1:10000" ]]
+[[ $(n0 wg show wg2 endpoints) == "$pub1	10.0.0.1:10000" ]]
 n0 wg set wg2 peer "$pub1" endpoint [fd00:aa::1]:10000
 n2 ping -W 1 -c 1 192.168.241.1
-[[ $(n0 wg show wg2 endpoints) == "$pub1    [fd00:aa::1]:10000" ]]
+[[ $(n0 wg show wg2 endpoints) == "$pub1	[fd00:aa::1]:10000" ]]
 n0 wg set wg2 peer "$pub1" endpoint 10.0.0.2:10000
 n2 ping -W 1 -c 1 192.168.241.1
-[[ $(n0 wg show wg2 endpoints) == "$pub1    10.0.0.2:10000" ]]
+[[ $(n0 wg show wg2 endpoints) == "$pub1	10.0.0.2:10000" ]]
 n0 wg set wg2 peer "$pub1" endpoint [fd00:aa::2]:10000
 n2 ping -W 1 -c 1 192.168.241.1
-[[ $(n0 wg show wg2 endpoints) == "$pub1    [fd00:aa::2]:10000" ]]
+[[ $(n0 wg show wg2 endpoints) == "$pub1	[fd00:aa::2]:10000" ]]
 
 ip1 link del veth1
 ip1 link del wg1
 ip2 link del wg2
+echo "done"

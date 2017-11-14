@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 	"net"
 )
 
@@ -42,7 +44,6 @@ func unsafeCloseUDPListener(device *Device) error {
 	if netc.bind != nil {
 		err = netc.bind.Close()
 		netc.bind = nil
-		netc.update.Add(1)
 	}
 	return err
 }
@@ -67,6 +68,8 @@ func UpdateUDPListener(device *Device) error {
 	// open new sockets
 
 	if device.tun.isUp.Get() {
+
+		device.log.Debug.Println("UDP bind updating")
 
 		// bind to new port
 
@@ -94,8 +97,10 @@ func UpdateUDPListener(device *Device) error {
 
 		// decrease waitgroup to 0
 
+		go device.RoutineReceiveIncomming(ipv4.Version, netc.bind)
+		go device.RoutineReceiveIncomming(ipv6.Version, netc.bind)
+
 		device.log.Debug.Println("UDP bind has been updated")
-		netc.update.Done()
 	}
 
 	return nil

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"golang.org/x/net/ipv4"
-	"golang.org/x/net/ipv6"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -23,10 +21,9 @@ type Device struct {
 	}
 	net struct {
 		mutex  sync.RWMutex
-		bind   UDPBind        // bind interface
-		port   uint16         // listening port
-		fwmark uint32         // mark value (0 = disabled)
-		update sync.WaitGroup // the bind was updated (acting as a barrier)
+		bind   UDPBind // bind interface
+		port   uint16  // listening port
+		fwmark uint32  // mark value (0 = disabled)
 	}
 	mutex        sync.RWMutex
 	privateKey   NoisePrivateKey
@@ -167,7 +164,6 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 
 	device.net.port = 0
 	device.net.bind = nil
-	device.net.update.Add(1)
 
 	// start workers
 
@@ -179,8 +175,6 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	go device.RoutineReadFromTUN()
 	go device.RoutineTUNEventReader()
 	go device.ratelimiter.RoutineGarbageCollector(device.signal.stop)
-	go device.RoutineReceiveIncomming(ipv4.Version)
-	go device.RoutineReceiveIncomming(ipv6.Version)
 	return device
 }
 
