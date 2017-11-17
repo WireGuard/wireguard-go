@@ -20,6 +20,14 @@
 # wireguard peers in $ns1 and $ns2. Note that $ns0 is the endpoint for the wg1
 # interfaces in $ns1 and $ns2. See https://www.wireguard.com/netns/ for further
 # details on how this is accomplished.
+
+# This code is ported to the WireGuard-Go directly from the kernel project.
+#
+# Please ensure that you have installed the newest version of the WireGuard
+# tools from the WireGuard project and before running these tests as:
+#
+# ./netns.sh <path to wireguard-go>
+
 set -e
 
 exec 3>&1
@@ -27,7 +35,7 @@ export WG_HIDE_KEYS=never
 netns0="wg-test-$$-0"
 netns1="wg-test-$$-1"
 netns2="wg-test-$$-2"
-program="../wireguard-go"
+program=$1
 export LOG_LEVEL="info"
 
 pretty() { echo -e "\x1b[32m\x1b[1m[+] ${1:+NS$1: }${2}\x1b[0m" >&3; }
@@ -349,4 +357,68 @@ ip1 link del veth1
 ip1 link del wg1
 ip2 link del wg2
 
-echo "done"
+# Test that Netlink/IPC is working properly by doing things that usually cause split responses
+
+n0 $program wg0
+sleep 5
+config=( "[Interface]" "PrivateKey=$(wg genkey)" "[Peer]" "PublicKey=$(wg genkey)" )
+for a in {1..255}; do
+    for b in {0..255}; do
+        config+=( "AllowedIPs=$a.$b.0.0/16,$a::$b/128" )
+    done
+done
+n0 wg setconf wg0 <(printf '%s\n' "${config[@]}")
+i=0
+for ip in $(n0 wg show wg0 allowed-ips); do
+    ((++i))
+done
+((i == 255*256*2+1))
+ip0 link del wg0
+
+n0 $program wg0
+config=( "[Interface]" "PrivateKey=$(wg genkey)" )
+for a in {1..40}; do
+    config+=( "[Peer]" "PublicKey=$(wg genkey)" )
+    for b in {1..52}; do
+        config+=( "AllowedIPs=$a.$b.0.0/16" )
+    done
+done
+n0 wg setconf wg0 <(printf '%s\n' "${config[@]}")
+i=0
+while read -r line; do
+    j=0
+    for ip in $line; do
+        ((++j))
+    done
+    ((j == 53))
+    ((++i))
+done < <(n0 wg show wg0 allowed-ips)
+((i == 40))
+ip0 link del wg0
+
+n0 $program wg0
+config=( )
+for i in {1..29}; do
+    config+=( "[Peer]" "PublicKey=$(wg genkey)" )
+done
+config+=( "[Peer]" "PublicKey=$(wg genkey)" "AllowedIPs=255.2.3.4/32,abcd::255/128" )
+n0 wg setconf wg0 <(printf '%s\n' "${config[@]}")
+n0 wg showconf wg0 > /dev/null
+ip0 link del wg0
+
+! n0 wg show doesnotexist || false
+
+declare -A objects
+while read -t 0.1 -r line 2>/dev/null || [[ $? -ne 142 ]]; do
+    [[ $line =~ .*(wg[0-9]+:\ [A-Z][a-z]+\ [0-9]+)\ .*(created|destroyed).* ]] || continue
+    objects["${BASH_REMATCH[1]}"]+="${BASH_REMATCH[2]}"
+done < /dev/kmsg
+alldeleted=1
+for object in "${!objects[@]}"; do
+    if [[ ${objects["$object"]} != *createddestroyed ]]; then
+        echo "Error: $object: merely ${objects["$object"]}" >&3
+        alldeleted=0
+    fi
+done
+[[ $alldeleted -eq 1 ]]
+pretty "" "Objects that were created were also destroyed."

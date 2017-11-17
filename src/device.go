@@ -8,8 +8,9 @@ import (
 )
 
 type Device struct {
-	log       *Logger // collection of loggers for levels
-	idCounter uint    // for assigning debug ids to peers
+	closed    AtomicBool // device is closed? (acting as guard)
+	log       *Logger    // collection of loggers for levels
+	idCounter uint       // for assigning debug ids to peers
 	fwMark    uint32
 	tun       struct {
 		device TUNDevice
@@ -203,6 +204,9 @@ func (device *Device) RemoveAllPeers() {
 }
 
 func (device *Device) Close() {
+	if device.closed.Swap(true) {
+		return
+	}
 	device.log.Info.Println("Closing device")
 	device.RemoveAllPeers()
 	close(device.signal.stop)

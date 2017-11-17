@@ -15,6 +15,22 @@ type UDPBind interface {
 	Close() error
 }
 
+/* An Endpoint maintains the source/destination caching for a peer
+ *
+ * dst : the remote address of a peer
+ * src : the local address from which datagrams originate going to the peer
+ *
+ */
+type UDPEndpoint interface {
+	ClearSrc()           // clears the source address
+	ClearDst()           // clears the destination address
+	SrcToString() string // returns the local source address (ip:port)
+	DstToString() string // returns the destination address (ip:port)
+	DstToBytes() []byte  // used for mac2 cookie calculations
+	DstIP() net.IP
+	SrcIP() net.IP
+}
+
 func parseEndpoint(s string) (*net.UDPAddr, error) {
 
 	// ensure that the host is an IP address

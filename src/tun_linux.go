@@ -57,7 +57,6 @@ type NativeTun struct {
 }
 
 func (tun *NativeTun) File() *os.File {
-	println(tun.fd.Name())
 	return tun.fd
 }
 

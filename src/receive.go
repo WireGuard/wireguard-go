@@ -311,7 +311,10 @@ func (device *Device) RoutineHandshake() {
 				return
 			}
 
-			srcBytes := elem.endpoint.SrcToBytes()
+			// endpoints destination address is the source of the datagram
+
+			srcBytes := elem.endpoint.DstToBytes()
+
 			if device.IsUnderLoad() {
 
 				// verify MAC2 field
@@ -320,8 +323,12 @@ func (device *Device) RoutineHandshake() {
 
 					// construct cookie reply
 
-					logDebug.Println("Sending cookie reply to:", elem.endpoint.SrcToString())
-					sender := binary.LittleEndian.Uint32(elem.packet[4:8]) // "sender" always follows "type"
+					logDebug.Println(
+						"Sending cookie reply to:",
+						elem.endpoint.DstToString(),
+					)
+
+					sender := binary.LittleEndian.Uint32(elem.packet[4:8])
 					reply, err := device.mac.CreateReply(elem.packet, sender, srcBytes)
 					if err != nil {
 						logError.Println("Failed to create cookie reply:", err)
@@ -555,8 +562,10 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 				src := elem.packet[IPv4offsetSrc : IPv4offsetSrc+net.IPv4len]
 				if device.routingTable.LookupIPv4(src) != peer {
-					logInfo.Println(src)
-					logInfo.Println("Packet with unallowed source IPv4 from", peer.String())
+					logInfo.Println(
+						"IPv4 packet with unallowed source address from",
+						peer.String(),
+					)
 					continue
 				}
 
@@ -581,8 +590,10 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 				src := elem.packet[IPv6offsetSrc : IPv6offsetSrc+net.IPv6len]
 				if device.routingTable.LookupIPv6(src) != peer {
-					logInfo.Println(src)
-					logInfo.Println("Packet with unallowed source IPv6 from", peer.String())
+					logInfo.Println(
+						"IPv6 packet with unallowed source address from",
+						peer.String(),
+					)
 					continue
 				}
 
@@ -591,7 +602,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				continue
 			}
 
-			// write to tun
+			// write to tun device
 
 			atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
 			_, err := device.tun.device.Write(elem.packet)

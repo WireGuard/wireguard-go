@@ -168,7 +168,7 @@ func (end *Endpoint) DstIP() net.IP {
 	}
 }
 
-func (end *Endpoint) SrcToBytes() []byte {
+func (end *Endpoint) DstToBytes() []byte {
 	ptr := unsafe.Pointer(&end.src)
 	arr := (*[unix.SizeofSockaddrInet6]byte)(ptr)
 	return arr[:]

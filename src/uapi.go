@@ -145,11 +145,22 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				}
 
 			case "fwmark":
-				fwmark, err := strconv.ParseUint(value, 10, 32)
+
+				// parse fwmark field
+
+				fwmark, err := func() (uint32, error) {
+					if value == "" {
+						return 0, nil
+					}
+					mark, err := strconv.ParseUint(value, 10, 32)
+					return uint32(mark), err
+				}()
+
 				if err != nil {
 					logError.Println("Invalid fwmark", err)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
+
 				device.net.mutex.Lock()
 				device.net.fwmark = uint32(fwmark)
 				device.net.mutex.Unlock()

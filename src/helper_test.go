@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"testing"
 )
 
@@ -13,6 +14,10 @@ type DummyTUN struct {
 	mtu     int
 	packets chan []byte
 	events  chan TUNEvent
+}
+
+func (tun *DummyTUN) File() *os.File {
+	return nil
 }
 
 func (tun *DummyTUN) Name() string {
@@ -67,7 +72,8 @@ func randDevice(t *testing.T) *Device {
 		t.Fatal(err)
 	}
 	tun, _ := CreateDummyTUN("dummy")
-	device := NewDevice(tun, LogLevelError)
+	logger := NewLogger(LogLevelError, "")
+	device := NewDevice(tun, logger)
 	device.SetPrivateKey(sk)
 	return device
 }

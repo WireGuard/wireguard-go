@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net"
 	"testing"
 )
 
@@ -25,7 +24,7 @@ func TestCookieMAC1(t *testing.T) {
 
 	// check mac1
 
-	src, _ := net.ResolveUDPAddr("udp", "192.168.13.37:4000")
+	src := []byte{192, 168, 13, 37, 10, 10, 10}
 
 	checkMAC1 := func(msg []byte) {
 		generator.AddMacs(msg)
@@ -128,12 +127,12 @@ func TestCookieMAC1(t *testing.T) {
 
 		msg[5] ^= 0x20
 
-		srcBad1, _ := net.ResolveUDPAddr("udp", "192.168.13.37:4001")
+		srcBad1 := []byte{192, 168, 13, 37, 40, 01}
 		if checker.CheckMAC2(msg, srcBad1) {
 			t.Fatal("MAC2 generation/verification failed")
 		}
 
-		srcBad2, _ := net.ResolveUDPAddr("udp", "192.168.13.38:4000")
+		srcBad2 := []byte{192, 168, 13, 38, 40, 01}
 		if checker.CheckMAC2(msg, srcBad2) {
 			t.Fatal("MAC2 generation/verification failed")
 		}
