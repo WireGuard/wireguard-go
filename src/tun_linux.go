@@ -227,7 +227,7 @@ func (tun *NativeTun) MTU() (int, error) {
 
 	val := binary.LittleEndian.Uint32(ifr[16:20])
 	if val >= (1 << 31) {
-		return int(val-(1<<31)) - (1 << 31), nil
+		return int(toInt32(val)), nil
 	}
 	return int(val), nil
 }

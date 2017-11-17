@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	EnvWGTunFD = "WG_TUN_FD"
+	ENV_WG_TUN_FD  = "WG_TUN_FD"
+	ENV_WG_UAPI_FD = "WG_UAPI_FD"
 )
 
 func printUsage() {
@@ -65,46 +66,69 @@ func main() {
 		logLevel,
 		fmt.Sprintf("(%s) ", interfaceName),
 	)
+
 	logger.Debug.Println("Debug log enabled")
 
-	// open TUN device
+	// open TUN device (or use supplied fd)
 
 	tun, err := func() (TUNDevice, error) {
-		tunFdStr := os.Getenv(EnvWGTunFD)
+		tunFdStr := os.Getenv(ENV_WG_TUN_FD)
 		if tunFdStr == "" {
 			return CreateTUN(interfaceName)
 		}
 
-		// construct tun device from supplied FD
+		// construct tun device from supplied fd
 
 		fd, err := strconv.ParseUint(tunFdStr, 10, 32)
 		if err != nil {
 			return nil, err
 		}
 
-		file := os.NewFile(uintptr(fd), "/dev/net/tun")
+		file := os.NewFile(uintptr(fd), "")
 		return CreateTUNFromFile(interfaceName, file)
 	}()
 
 	if err != nil {
 		logger.Error.Println("Failed to create TUN device:", err)
+		os.Exit(ExitSetupFailed)
 	}
 
+	// open UAPI file (or use supplied fd)
+
+	fileUAPI, err := func() (*os.File, error) {
+		uapiFdStr := os.Getenv(ENV_WG_UAPI_FD)
+		if uapiFdStr == "" {
+			return UAPIOpen(interfaceName)
+		}
+
+		// use supplied fd
+
+		fd, err := strconv.ParseUint(uapiFdStr, 10, 32)
+		if err != nil {
+			return nil, err
+		}
+
+		return os.NewFile(uintptr(fd), ""), nil
+	}()
+
+	if err != nil {
+		logger.Error.Println("UAPI listen error:", err)
+		os.Exit(ExitSetupFailed)
+		return
+	}
 	// daemonize the process
 
 	if !foreground {
 		env := os.Environ()
-		_, ok := os.LookupEnv(EnvWGTunFD)
-		if !ok {
-			kvp := fmt.Sprintf("%s=3", EnvWGTunFD)
-			env = append(env, kvp)
-		}
+		env = append(env, fmt.Sprintf("%s=3", ENV_WG_TUN_FD))
+		env = append(env, fmt.Sprintf("%s=4", ENV_WG_UAPI_FD))
 		attr := &os.ProcAttr{
 			Files: []*os.File{
 				nil, // stdin
 				nil, // stdout
 				nil, // stderr
 				tun.File(),
+				fileUAPI,
 			},
 			Dir: ".",
 			Env: env,
@@ -112,6 +136,7 @@ func main() {
 		err = Daemonize(attr)
 		if err != nil {
 			logger.Error.Println("Failed to daemonize:", err)
+			os.Exit(ExitSetupFailed)
 		}
 		return
 	}
@@ -123,19 +148,16 @@ func main() {
 	// create wireguard device
 
 	device := NewDevice(tun, logger)
+
 	logger.Info.Println("Device started")
 
-	// start configuration lister
-
-	uapi, err := NewUAPIListener(interfaceName)
-	if err != nil {
-		logger.Error.Println("UAPI listen error:", err)
-		return
-	}
+	// start uapi listener
 
 	errs := make(chan error)
 	term := make(chan os.Signal)
 	wait := device.WaitChannel()
+
+	uapi, err := UAPIListen(interfaceName, fileUAPI)
 
 	go func() {
 		for {
@@ -161,9 +183,10 @@ func main() {
 	case <-errs:
 	}
 
-	// clean up UAPI bind
+	// clean up
 
 	uapi.Close()
+	device.Close()
 
 	logger.Info.Println("Shutting down")
 }
