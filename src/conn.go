@@ -7,26 +7,28 @@ import (
 	"net"
 )
 
-type UDPBind interface {
+/* A Bind handles listening on a port for both IPv6 and IPv4 UDP traffic
+ */
+type Bind interface {
 	SetMark(value uint32) error
-	ReceiveIPv6(buff []byte, end *Endpoint) (int, error)
-	ReceiveIPv4(buff []byte, end *Endpoint) (int, error)
-	Send(buff []byte, end *Endpoint) error
+	ReceiveIPv6(buff []byte) (int, Endpoint, error)
+	ReceiveIPv4(buff []byte) (int, Endpoint, error)
+	Send(buff []byte, end Endpoint) error
 	Close() error
 }
 
 /* An Endpoint maintains the source/destination caching for a peer
  *
- * dst : the remote address of a peer
+ * dst : the remote address of a peer ("endpoint" in uapi terminology)
  * src : the local address from which datagrams originate going to the peer
- *
  */
-type UDPEndpoint interface {
+type Endpoint interface {
 	ClearSrc()           // clears the source address
 	ClearDst()           // clears the destination address
 	SrcToString() string // returns the local source address (ip:port)
 	DstToString() string // returns the destination address (ip:port)
 	DstToBytes() []byte  // used for mac2 cookie calculations
+	SetDst(string) error // used for manually setting the endpoint (uapi)
 	DstIP() net.IP
 	SrcIP() net.IP
 }
@@ -107,7 +109,9 @@ func UpdateUDPListener(device *Device) error {
 
 		for _, peer := range device.peers {
 			peer.mutex.Lock()
-			peer.endpoint.value.ClearSrc()
+			if peer.endpoint != nil {
+				peer.endpoint.ClearSrc()
+			}
 			peer.mutex.Unlock()
 		}
 

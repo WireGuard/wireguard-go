@@ -22,9 +22,9 @@ type Device struct {
 	}
 	net struct {
 		mutex  sync.RWMutex
-		bind   UDPBind // bind interface
-		port   uint16  // listening port
-		fwmark uint32  // mark value (0 = disabled)
+		bind   Bind   // bind interface
+		port   uint16 // listening port
+		fwmark uint32 // mark value (0 = disabled)
 	}
 	mutex        sync.RWMutex
 	privateKey   NoisePrivateKey

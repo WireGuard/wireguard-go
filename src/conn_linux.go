@@ -21,20 +21,22 @@ import (
  * See e.g. https://github.com/golang/go/issues/17930
  * So this code is remains platform dependent.
  */
-
-type Endpoint struct {
+type NativeEndpoint struct {
 	src unix.RawSockaddrInet6
 	dst unix.RawSockaddrInet6
-}
-
-type IPv4Source struct {
-	src     unix.RawSockaddrInet4
-	Ifindex int32
 }
 
 type NativeBind struct {
 	sock4 int
 	sock6 int
+}
+
+var _ Endpoint = (*NativeEndpoint)(nil)
+var _ Bind = NativeBind{}
+
+type IPv4Source struct {
+	src     unix.RawSockaddrInet4
+	Ifindex int32
 }
 
 func htons(val uint16) uint16 {
@@ -48,7 +50,11 @@ func ntohs(val uint16) uint16 {
 	return binary.BigEndian.Uint16((*tmp)[:])
 }
 
-func CreateUDPBind(port uint16) (UDPBind, uint16, error) {
+func NewEndpoint() Endpoint {
+	return &NativeEndpoint{}
+}
+
+func CreateUDPBind(port uint16) (Bind, uint16, error) {
 	var err error
 	var bind NativeBind
 
@@ -99,28 +105,33 @@ func (bind NativeBind) Close() error {
 	return err2
 }
 
-func (bind NativeBind) ReceiveIPv6(buff []byte, end *Endpoint) (int, error) {
-	return receive6(
+func (bind NativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
+	var end NativeEndpoint
+	n, err := receive6(
 		bind.sock6,
 		buff,
-		end,
+		&end,
 	)
+	return n, &end, err
 }
 
-func (bind NativeBind) ReceiveIPv4(buff []byte, end *Endpoint) (int, error) {
-	return receive4(
+func (bind NativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
+	var end NativeEndpoint
+	n, err := receive4(
 		bind.sock4,
 		buff,
-		end,
+		&end,
 	)
+	return n, &end, err
 }
 
-func (bind NativeBind) Send(buff []byte, end *Endpoint) error {
-	switch end.dst.Family {
+func (bind NativeBind) Send(buff []byte, end Endpoint) error {
+	nend := end.(*NativeEndpoint)
+	switch nend.dst.Family {
 	case unix.AF_INET6:
-		return send6(bind.sock6, end, buff)
+		return send6(bind.sock6, nend, buff)
 	case unix.AF_INET:
-		return send4(bind.sock4, end, buff)
+		return send4(bind.sock4, nend, buff)
 	default:
 		return errors.New("Unknown address family of destination")
 	}
@@ -151,12 +162,12 @@ func sockaddrToString(addr unix.RawSockaddrInet6) string {
 	}
 }
 
-func (end *Endpoint) DstIP() net.IP {
-	switch end.dst.Family {
+func rawAddrToIP(addr unix.RawSockaddrInet6) net.IP {
+	switch addr.Family {
 	case unix.AF_INET6:
-		return end.dst.Addr[:]
+		return addr.Addr[:]
 	case unix.AF_INET:
-		ptr := (*unix.RawSockaddrInet4)(unsafe.Pointer(&end.dst))
+		ptr := (*unix.RawSockaddrInet4)(unsafe.Pointer(&addr))
 		return net.IPv4(
 			ptr.Addr[0],
 			ptr.Addr[1],
@@ -168,25 +179,33 @@ func (end *Endpoint) DstIP() net.IP {
 	}
 }
 
-func (end *Endpoint) DstToBytes() []byte {
+func (end *NativeEndpoint) SrcIP() net.IP {
+	return rawAddrToIP(end.src)
+}
+
+func (end *NativeEndpoint) DstIP() net.IP {
+	return rawAddrToIP(end.dst)
+}
+
+func (end *NativeEndpoint) DstToBytes() []byte {
 	ptr := unsafe.Pointer(&end.src)
 	arr := (*[unix.SizeofSockaddrInet6]byte)(ptr)
 	return arr[:]
 }
 
-func (end *Endpoint) SrcToString() string {
+func (end *NativeEndpoint) SrcToString() string {
 	return sockaddrToString(end.src)
 }
 
-func (end *Endpoint) DstToString() string {
+func (end *NativeEndpoint) DstToString() string {
 	return sockaddrToString(end.dst)
 }
 
-func (end *Endpoint) ClearDst() {
+func (end *NativeEndpoint) ClearDst() {
 	end.dst = unix.RawSockaddrInet6{}
 }
 
-func (end *Endpoint) ClearSrc() {
+func (end *NativeEndpoint) ClearSrc() {
 	end.src = unix.RawSockaddrInet6{}
 }
 
@@ -306,7 +325,7 @@ func create6(port uint16) (int, uint16, error) {
 	return fd, uint16(addr.Port), err
 }
 
-func (end *Endpoint) SetDst(s string) error {
+func (end *NativeEndpoint) SetDst(s string) error {
 	addr, err := parseEndpoint(s)
 	if err != nil {
 		return err
@@ -342,7 +361,7 @@ func (end *Endpoint) SetDst(s string) error {
 	return errors.New("Failed to recognize IP address format")
 }
 
-func send6(sock int, end *Endpoint, buff []byte) error {
+func send6(sock int, end *NativeEndpoint, buff []byte) error {
 
 	// construct message header
 
@@ -404,7 +423,7 @@ func send6(sock int, end *Endpoint, buff []byte) error {
 	return errno
 }
 
-func send4(sock int, end *Endpoint, buff []byte) error {
+func send4(sock int, end *NativeEndpoint, buff []byte) error {
 
 	// construct message header
 
@@ -470,7 +489,7 @@ func send4(sock int, end *Endpoint, buff []byte) error {
 	return errno
 }
 
-func receive4(sock int, buff []byte, end *Endpoint) (int, error) {
+func receive4(sock int, buff []byte, end *NativeEndpoint) (int, error) {
 
 	// contruct message header
 
@@ -518,7 +537,7 @@ func receive4(sock int, buff []byte, end *Endpoint) (int, error) {
 	return int(size), nil
 }
 
-func receive6(sock int, buff []byte, end *Endpoint) (int, error) {
+func receive6(sock int, buff []byte, end *NativeEndpoint) (int, error) {
 
 	// contruct message header
 

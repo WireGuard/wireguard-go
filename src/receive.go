@@ -93,7 +93,7 @@ func (device *Device) addToHandshakeQueue(
 	}
 }
 
-func (device *Device) RoutineReceiveIncomming(IP int, bind UDPBind) {
+func (device *Device) RoutineReceiveIncomming(IP int, bind Bind) {
 
 	logDebug := device.log.Debug
 	logDebug.Println("Routine, receive incomming, IP version:", IP)
@@ -104,20 +104,21 @@ func (device *Device) RoutineReceiveIncomming(IP int, bind UDPBind) {
 
 		buffer := device.GetMessageBuffer()
 
-		var size int
-		var err error
+		var (
+			err      error
+			size     int
+			endpoint Endpoint
+		)
 
 		for {
 
 			// read next datagram
 
-			var endpoint Endpoint
-
 			switch IP {
 			case ipv4.Version:
-				size, err = bind.ReceiveIPv4(buffer[:], &endpoint)
+				size, endpoint, err = bind.ReceiveIPv4(buffer[:])
 			case ipv6.Version:
-				size, err = bind.ReceiveIPv6(buffer[:], &endpoint)
+				size, endpoint, err = bind.ReceiveIPv6(buffer[:])
 			default:
 				return
 			}
@@ -339,10 +340,7 @@ func (device *Device) RoutineHandshake() {
 
 					writer := bytes.NewBuffer(temp[:0])
 					binary.Write(writer, binary.LittleEndian, reply)
-					device.net.bind.Send(
-						writer.Bytes(),
-						&elem.endpoint,
-					)
+					device.net.bind.Send(writer.Bytes(), elem.endpoint)
 					if err != nil {
 						logDebug.Println("Failed to send cookie reply:", err)
 					}
@@ -395,8 +393,7 @@ func (device *Device) RoutineHandshake() {
 			// update endpoint
 
 			peer.mutex.Lock()
-			peer.endpoint.set = true
-			peer.endpoint.value = elem.endpoint
+			peer.endpoint = elem.endpoint
 			peer.mutex.Unlock()
 
 			// create response
@@ -452,8 +449,7 @@ func (device *Device) RoutineHandshake() {
 			// update endpoint
 
 			peer.mutex.Lock()
-			peer.endpoint.set = true
-			peer.endpoint.value = elem.endpoint
+			peer.endpoint = elem.endpoint
 			peer.mutex.Unlock()
 
 			logDebug.Println("Received handshake initation from", peer)
@@ -527,8 +523,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			// update endpoint
 
 			peer.mutex.Lock()
-			peer.endpoint.set = true
-			peer.endpoint.value = elem.endpoint
+			peer.endpoint = elem.endpoint
 			peer.mutex.Unlock()
 
 			// check for keep-alive

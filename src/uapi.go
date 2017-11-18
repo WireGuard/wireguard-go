@@ -53,8 +53,8 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 			defer peer.mutex.RUnlock()
 			send("public_key=" + peer.handshake.remoteStatic.ToHex())
 			send("preshared_key=" + peer.handshake.presharedKey.ToHex())
-			if peer.endpoint.set {
-				send("endpoint=" + peer.endpoint.value.DstToString())
+			if peer.endpoint != nil {
+				send("endpoint=" + peer.endpoint.DstToString())
 			}
 
 			nano := atomic.LoadInt64(&peer.stats.lastHandshakeNano)
@@ -255,17 +255,25 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 			case "endpoint":
 
-				// set endpoint destination and reset handshake timer
+				// set endpoint destination
 
-				peer.mutex.Lock()
-				err := peer.endpoint.value.SetDst(value)
-				peer.endpoint.set = (err == nil)
-				peer.mutex.Unlock()
+				err := func() error {
+					peer.mutex.Lock()
+					defer peer.mutex.Unlock()
+
+					endpoint := NewEndpoint()
+					if err := endpoint.SetDst(value); err != nil {
+						return err
+					}
+					peer.endpoint = endpoint
+					signalSend(peer.signal.handshakeReset)
+					return nil
+				}()
+
 				if err != nil {
 					logError.Println("Failed to set endpoint:", value)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
-				signalSend(peer.signal.handshakeReset)
 
 			case "persistent_keepalive_interval":
 

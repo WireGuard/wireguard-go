@@ -15,11 +15,8 @@ type Peer struct {
 	keyPairs                    KeyPairs
 	handshake                   Handshake
 	device                      *Device
-	endpoint                    struct {
-		set   bool     // has a known endpoint been discovered
-		value Endpoint // source / destination cache
-	}
-	stats struct {
+	endpoint                    Endpoint
+	stats                       struct {
 		txBytes           uint64 // bytes send to peer (endpoint)
 		rxBytes           uint64 // bytes received from peer
 		lastHandshakeNano int64  // nano seconds since epoch
@@ -110,9 +107,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 
 	// reset endpoint
 
-	peer.endpoint.set = false
-	peer.endpoint.value.ClearDst()
-	peer.endpoint.value.ClearSrc()
+	peer.endpoint = nil
 
 	// prepare queuing
 
@@ -143,16 +138,16 @@ func (peer *Peer) SendBuffer(buffer []byte) error {
 	defer peer.device.net.mutex.RUnlock()
 	peer.mutex.RLock()
 	defer peer.mutex.RUnlock()
-	if !peer.endpoint.set {
+	if peer.endpoint == nil {
 		return errors.New("No known endpoint for peer")
 	}
-	return peer.device.net.bind.Send(buffer, &peer.endpoint.value)
+	return peer.device.net.bind.Send(buffer, peer.endpoint)
 }
 
 /* Returns a short string identification for logging
  */
 func (peer *Peer) String() string {
-	if !peer.endpoint.set {
+	if peer.endpoint == nil {
 		return fmt.Sprintf(
 			"peer(%d unknown %s)",
 			peer.id,
@@ -162,7 +157,7 @@ func (peer *Peer) String() string {
 	return fmt.Sprintf(
 		"peer(%d %s %s)",
 		peer.id,
-		peer.endpoint.value.DstToString(),
+		peer.endpoint.DstToString(),
 		base64.StdEncoding.EncodeToString(peer.handshake.remoteStatic[:]),
 	)
 }
