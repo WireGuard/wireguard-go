@@ -50,11 +50,44 @@ func ntohs(val uint16) uint16 {
 	return binary.BigEndian.Uint16((*tmp)[:])
 }
 
-func NewEndpoint() Endpoint {
-	return &NativeEndpoint{}
+func CreateEndpoint(s string) (Endpoint, error) {
+	var end NativeEndpoint
+	addr, err := parseEndpoint(s)
+	if err != nil {
+		return nil, err
+	}
+
+	ipv4 := addr.IP.To4()
+	if ipv4 != nil {
+		dst := (*unix.RawSockaddrInet4)(unsafe.Pointer(&end.dst))
+		dst.Family = unix.AF_INET
+		dst.Port = htons(uint16(addr.Port))
+		dst.Zero = [8]byte{}
+		copy(dst.Addr[:], ipv4)
+		end.ClearSrc()
+		return &end, nil
+	}
+
+	ipv6 := addr.IP.To16()
+	if ipv6 != nil {
+		zone, err := zoneToUint32(addr.Zone)
+		if err != nil {
+			return nil, err
+		}
+		dst := &end.dst
+		dst.Family = unix.AF_INET6
+		dst.Port = htons(uint16(addr.Port))
+		dst.Flowinfo = 0
+		dst.Scope_id = zone
+		copy(dst.Addr[:], ipv6[:])
+		end.ClearSrc()
+		return &end, nil
+	}
+
+	return nil, errors.New("Failed to recognize IP address format")
 }
 
-func CreateUDPBind(port uint16) (Bind, uint16, error) {
+func CreateBind(port uint16) (Bind, uint16, error) {
 	var err error
 	var bind NativeBind
 
@@ -323,42 +356,6 @@ func create6(port uint16) (int, uint16, error) {
 	}
 
 	return fd, uint16(addr.Port), err
-}
-
-func (end *NativeEndpoint) SetDst(s string) error {
-	addr, err := parseEndpoint(s)
-	if err != nil {
-		return err
-	}
-
-	ipv4 := addr.IP.To4()
-	if ipv4 != nil {
-		dst := (*unix.RawSockaddrInet4)(unsafe.Pointer(&end.dst))
-		dst.Family = unix.AF_INET
-		dst.Port = htons(uint16(addr.Port))
-		dst.Zero = [8]byte{}
-		copy(dst.Addr[:], ipv4)
-		end.ClearSrc()
-		return nil
-	}
-
-	ipv6 := addr.IP.To16()
-	if ipv6 != nil {
-		zone, err := zoneToUint32(addr.Zone)
-		if err != nil {
-			return err
-		}
-		dst := &end.dst
-		dst.Family = unix.AF_INET6
-		dst.Port = htons(uint16(addr.Port))
-		dst.Flowinfo = 0
-		dst.Scope_id = zone
-		copy(dst.Addr[:], ipv6[:])
-		end.ClearSrc()
-		return nil
-	}
-
-	return errors.New("Failed to recognize IP address format")
 }
 
 func send6(sock int, end *NativeEndpoint, buff []byte) error {

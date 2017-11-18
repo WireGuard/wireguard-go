@@ -24,11 +24,9 @@ type Bind interface {
  */
 type Endpoint interface {
 	ClearSrc()           // clears the source address
-	ClearDst()           // clears the destination address
 	SrcToString() string // returns the local source address (ip:port)
 	DstToString() string // returns the destination address (ip:port)
 	DstToBytes() []byte  // used for mac2 cookie calculations
-	SetDst(string) error // used for manually setting the endpoint (uapi)
 	DstIP() net.IP
 	SrcIP() net.IP
 }
@@ -92,7 +90,7 @@ func UpdateUDPListener(device *Device) error {
 		// bind to new port
 
 		var err error
-		netc.bind, netc.port, err = CreateUDPBind(netc.port)
+		netc.bind, netc.port, err = CreateBind(netc.port)
 		if err != nil {
 			netc.bind = nil
 			return err

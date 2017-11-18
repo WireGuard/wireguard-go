@@ -260,9 +260,8 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				err := func() error {
 					peer.mutex.Lock()
 					defer peer.mutex.Unlock()
-
-					endpoint := NewEndpoint()
-					if err := endpoint.SetDst(value); err != nil {
+					endpoint, err := CreateEndpoint(value)
+					if err != nil {
 						return err
 					}
 					peer.endpoint = endpoint
