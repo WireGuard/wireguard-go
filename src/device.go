@@ -210,7 +210,7 @@ func (device *Device) Close() {
 	device.log.Info.Println("Closing device")
 	device.RemoveAllPeers()
 	close(device.signal.stop)
-	CloseUDPListener(device)
+	closeBind(device)
 	device.tun.device.Close()
 }
 

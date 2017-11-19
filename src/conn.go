@@ -54,7 +54,7 @@ func parseEndpoint(s string) (*net.UDPAddr, error) {
 
 /* Must hold device and net lock
  */
-func unsafeCloseUDPListener(device *Device) error {
+func unsafeCloseBind(device *Device) error {
 	var err error
 	netc := &device.net
 	if netc.bind != nil {
@@ -64,8 +64,7 @@ func unsafeCloseUDPListener(device *Device) error {
 	return err
 }
 
-// must inform all listeners
-func UpdateUDPListener(device *Device) error {
+func updateBind(device *Device) error {
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
 
@@ -75,7 +74,7 @@ func UpdateUDPListener(device *Device) error {
 
 	// close existing sockets
 
-	if err := unsafeCloseUDPListener(device); err != nil {
+	if err := unsafeCloseBind(device); err != nil {
 		return err
 	}
 
@@ -124,10 +123,10 @@ func UpdateUDPListener(device *Device) error {
 	return nil
 }
 
-func CloseUDPListener(device *Device) error {
+func closeBind(device *Device) error {
 	device.mutex.Lock()
 	device.net.mutex.Lock()
-	err := unsafeCloseUDPListener(device)
+	err := unsafeCloseBind(device)
 	device.net.mutex.Unlock()
 	device.mutex.Unlock()
 	return err

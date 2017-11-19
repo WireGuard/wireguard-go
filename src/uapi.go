@@ -139,7 +139,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 				device.net.port = uint16(port)
-				if err := UpdateUDPListener(device); err != nil {
+				if err := updateBind(device); err != nil {
 					logError.Println("Failed to set listen_port:", err)
 					return &IPCError{Code: ipcErrorPortInUse}
 				}
