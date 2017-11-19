@@ -5,10 +5,8 @@ import (
 	"crypto/rand"
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20poly1305"
-	"net"
 	"sync"
 	"time"
-	"unsafe"
 )
 
 type CookieChecker struct {
@@ -76,7 +74,7 @@ func (st *CookieChecker) CheckMAC1(msg []byte) bool {
 	return hmac.Equal(mac1[:], msg[smac1:smac2])
 }
 
-func (st *CookieChecker) CheckMAC2(msg []byte, src *net.UDPAddr) bool {
+func (st *CookieChecker) CheckMAC2(msg []byte, src []byte) bool {
 	st.mutex.RLock()
 	defer st.mutex.RUnlock()
 
@@ -89,8 +87,7 @@ func (st *CookieChecker) CheckMAC2(msg []byte, src *net.UDPAddr) bool {
 	var cookie [blake2s.Size128]byte
 	func() {
 		mac, _ := blake2s.New128(st.mac2.secret[:])
-		mac.Write(src.IP)
-		mac.Write((*[unsafe.Sizeof(src.Port)]byte)(unsafe.Pointer(&src.Port))[:])
+		mac.Write(src)
 		mac.Sum(cookie[:0])
 	}()
 
@@ -111,7 +108,7 @@ func (st *CookieChecker) CheckMAC2(msg []byte, src *net.UDPAddr) bool {
 func (st *CookieChecker) CreateReply(
 	msg []byte,
 	recv uint32,
-	src *net.UDPAddr,
+	src []byte,
 ) (*MessageCookieReply, error) {
 
 	st.mutex.RLock()
@@ -136,8 +133,7 @@ func (st *CookieChecker) CreateReply(
 	var cookie [blake2s.Size128]byte
 	func() {
 		mac, _ := blake2s.New128(st.mac2.secret[:])
-		mac.Write(src.IP)
-		mac.Write((*[unsafe.Sizeof(src.Port)]byte)(unsafe.Pointer(&src.Port))[:])
+		mac.Write(src)
 		mac.Sum(cookie[:0])
 	}()
 

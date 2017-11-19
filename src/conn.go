@@ -2,9 +2,34 @@ package main
 
 import (
 	"errors"
+	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 	"net"
-	"time"
 )
+
+/* A Bind handles listening on a port for both IPv6 and IPv4 UDP traffic
+ */
+type Bind interface {
+	SetMark(value uint32) error
+	ReceiveIPv6(buff []byte) (int, Endpoint, error)
+	ReceiveIPv4(buff []byte) (int, Endpoint, error)
+	Send(buff []byte, end Endpoint) error
+	Close() error
+}
+
+/* An Endpoint maintains the source/destination caching for a peer
+ *
+ * dst : the remote address of a peer ("endpoint" in uapi terminology)
+ * src : the local address from which datagrams originate going to the peer
+ */
+type Endpoint interface {
+	ClearSrc()           // clears the source address
+	SrcToString() string // returns the local source address (ip:port)
+	DstToString() string // returns the destination address (ip:port)
+	DstToBytes() []byte  // used for mac2 cookie calculations
+	DstIP() net.IP
+	SrcIP() net.IP
+}
 
 func parseEndpoint(s string) (*net.UDPAddr, error) {
 
@@ -27,63 +52,83 @@ func parseEndpoint(s string) (*net.UDPAddr, error) {
 	return addr, err
 }
 
-func updateUDPConn(device *Device) error {
+/* Must hold device and net lock
+ */
+func unsafeCloseUDPListener(device *Device) error {
+	var err error
+	netc := &device.net
+	if netc.bind != nil {
+		err = netc.bind.Close()
+		netc.bind = nil
+	}
+	return err
+}
+
+// must inform all listeners
+func UpdateUDPListener(device *Device) error {
+	device.mutex.Lock()
+	defer device.mutex.Unlock()
+
 	netc := &device.net
 	netc.mutex.Lock()
 	defer netc.mutex.Unlock()
 
-	// close existing connection
+	// close existing sockets
 
-	if netc.conn != nil {
-		netc.conn.Close()
-		netc.conn = nil
-
-		// We need for that fd to be closed in all other go routines, which
-		// means we have to wait. TODO: find less horrible way of doing this.
-		time.Sleep(time.Second / 2)
+	if err := unsafeCloseUDPListener(device); err != nil {
+		return err
 	}
 
-	// open new connection
+	// assumption: netc.update WaitGroup should be exactly 1
+
+	// open new sockets
 
 	if device.tun.isUp.Get() {
 
-		// listen on new address
+		device.log.Debug.Println("UDP bind updating")
 
-		conn, err := net.ListenUDP("udp", netc.addr)
+		// bind to new port
+
+		var err error
+		netc.bind, netc.port, err = CreateBind(netc.port)
+		if err != nil {
+			netc.bind = nil
+			return err
+		}
+
+		// set mark
+
+		err = netc.bind.SetMark(netc.fwmark)
 		if err != nil {
 			return err
 		}
 
-		// set fwmark
+		// clear cached source addresses
 
-		err = setMark(netc.conn, netc.fwmark)
-		if err != nil {
-			return err
+		for _, peer := range device.peers {
+			peer.mutex.Lock()
+			if peer.endpoint != nil {
+				peer.endpoint.ClearSrc()
+			}
+			peer.mutex.Unlock()
 		}
 
-		// retrieve port (may have been chosen by kernel)
+		// decrease waitgroup to 0
 
-		addr := conn.LocalAddr()
-		netc.conn = conn
-		netc.addr, _ = net.ResolveUDPAddr(
-			addr.Network(),
-			addr.String(),
-		)
+		go device.RoutineReceiveIncomming(ipv4.Version, netc.bind)
+		go device.RoutineReceiveIncomming(ipv6.Version, netc.bind)
 
-		// notify goroutines
-
-		signalSend(device.signal.newUDPConn)
+		device.log.Debug.Println("UDP bind has been updated")
 	}
 
 	return nil
 }
 
-func closeUDPConn(device *Device) {
-	netc := &device.net
-	netc.mutex.Lock()
-	if netc.conn != nil {
-		netc.conn.Close()
-	}
-	netc.mutex.Unlock()
-	signalSend(device.signal.newUDPConn)
+func CloseUDPListener(device *Device) error {
+	device.mutex.Lock()
+	device.net.mutex.Lock()
+	err := unsafeCloseUDPListener(device)
+	device.net.mutex.Unlock()
+	device.mutex.Unlock()
+	return err
 }

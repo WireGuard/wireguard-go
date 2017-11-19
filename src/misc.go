@@ -21,6 +21,14 @@ func (a *AtomicBool) Get() bool {
 	return atomic.LoadInt32(&a.flag) == AtomicTrue
 }
 
+func (a *AtomicBool) Swap(val bool) bool {
+	flag := AtomicFalse
+	if val {
+		flag = AtomicTrue
+	}
+	return atomic.SwapInt32(&a.flag, flag) == AtomicTrue
+}
+
 func (a *AtomicBool) Set(val bool) {
 	flag := AtomicFalse
 	if val {

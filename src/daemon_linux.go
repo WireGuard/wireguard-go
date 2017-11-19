@@ -2,29 +2,25 @@ package main
 
 import (
 	"os"
+	"os/exec"
 )
 
 /* Daemonizes the process on linux
  *
  * This is done by spawning and releasing a copy with the --foreground flag
- *
- * TODO: Use env variable to spawn in background
  */
+func Daemonize(attr *os.ProcAttr) error {
+	// I would like to use os.Executable,
+	// however this means dropping support for Go <1.8
+	path, err := exec.LookPath(os.Args[0])
+	if err != nil {
+		return err
+	}
 
-func Daemonize() error {
 	argv := []string{os.Args[0], "--foreground"}
 	argv = append(argv, os.Args[1:]...)
-	attr := &os.ProcAttr{
-		Dir: ".",
-		Env: os.Environ(),
-		Files: []*os.File{
-			os.Stdin,
-			nil,
-			nil,
-		},
-	}
 	process, err := os.StartProcess(
-		argv[0],
+		path,
 		argv,
 		attr,
 	)

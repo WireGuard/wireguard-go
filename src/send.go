@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/binary"
-	"errors"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -103,26 +102,6 @@ func addToEncryptionQueue(
 			}
 		}
 	}
-}
-
-func (peer *Peer) SendBuffer(buffer []byte) (int, error) {
-	peer.device.net.mutex.RLock()
-	defer peer.device.net.mutex.RUnlock()
-
-	peer.mutex.RLock()
-	defer peer.mutex.RUnlock()
-
-	endpoint := peer.endpoint
-	if endpoint == nil {
-		return 0, errors.New("No known endpoint for peer")
-	}
-
-	conn := peer.device.net.conn
-	if conn == nil {
-		return 0, errors.New("No UDP socket for device")
-	}
-
-	return conn.WriteToUDP(buffer, endpoint)
 }
 
 /* Reads packets from the TUN and inserts
@@ -343,7 +322,7 @@ func (peer *Peer) RoutineSequentialSender() {
 			// send message and return buffer to pool
 
 			length := uint64(len(elem.packet))
-			_, err := peer.SendBuffer(elem.packet)
+			err := peer.SendBuffer(elem.packet)
 			device.PutMessageBuffer(elem.buffer)
 			if err != nil {
 				logDebug.Println("Failed to send authenticated packet to peer", peer.String())

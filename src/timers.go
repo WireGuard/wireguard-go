@@ -279,33 +279,30 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 				break AttemptHandshakes
 			}
 
-			jitter := time.Millisecond * time.Duration(rand.Uint32()%334)
-
-			// marshal and send
+			// marshal handshake message
 
 			writer := bytes.NewBuffer(temp[:0])
 			binary.Write(writer, binary.LittleEndian, msg)
 			packet := writer.Bytes()
 			peer.mac.AddMacs(packet)
 
-			_, err = peer.SendBuffer(packet)
-			if err != nil {
+			// send to endpoint
+
+			err = peer.SendBuffer(packet)
+			jitter := time.Millisecond * time.Duration(rand.Uint32()%334)
+			timeout := time.NewTimer(RekeyTimeout + jitter)
+			if err == nil {
+				peer.TimerAnyAuthenticatedPacketTraversal()
+				logDebug.Println(
+					"Handshake initiation attempt",
+					attempts, "sent to", peer.String(),
+				)
+			} else {
 				logError.Println(
 					"Failed to send handshake initiation message to",
 					peer.String(), ":", err,
 				)
-				continue
 			}
-
-			peer.TimerAnyAuthenticatedPacketTraversal()
-
-			// set handshake timeout
-
-			timeout := time.NewTimer(RekeyTimeout + jitter)
-			logDebug.Println(
-				"Handshake initiation attempt",
-				attempts, "sent to", peer.String(),
-			)
 
 			// wait for handshake or timeout
 

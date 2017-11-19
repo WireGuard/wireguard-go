@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"sync/atomic"
 )
 
@@ -15,6 +16,7 @@ const (
 )
 
 type TUNDevice interface {
+	File() *os.File            // returns the file descriptor of the device
 	Read([]byte) (int, error)  // read a packet from the device (without any additional headers)
 	Write([]byte) (int, error) // writes a packet to the device (without any additional headers)
 	MTU() (int, error)         // returns the MTU of the device
@@ -47,7 +49,7 @@ func (device *Device) RoutineTUNEventReader() {
 			if !device.tun.isUp.Get() {
 				logInfo.Println("Interface set up")
 				device.tun.isUp.Set(true)
-				updateUDPConn(device)
+				UpdateUDPListener(device)
 			}
 		}
 
@@ -55,7 +57,7 @@ func (device *Device) RoutineTUNEventReader() {
 			if device.tun.isUp.Get() {
 				logInfo.Println("Interface set down")
 				device.tun.isUp.Set(false)
-				closeUDPConn(device)
+				CloseUDPListener(device)
 			}
 		}
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -9,8 +8,9 @@ import (
 )
 
 type Device struct {
-	log       *Logger // collection of loggers for levels
-	idCounter uint    // for assigning debug ids to peers
+	closed    AtomicBool // device is closed? (acting as guard)
+	log       *Logger    // collection of loggers for levels
+	idCounter uint       // for assigning debug ids to peers
 	fwMark    uint32
 	tun       struct {
 		device TUNDevice
@@ -22,9 +22,9 @@ type Device struct {
 	}
 	net struct {
 		mutex  sync.RWMutex
-		addr   *net.UDPAddr // UDP source address
-		conn   *net.UDPConn // UDP "connection"
-		fwmark uint32
+		bind   Bind   // bind interface
+		port   uint16 // listening port
+		fwmark uint32 // mark value (0 = disabled)
 	}
 	mutex        sync.RWMutex
 	privateKey   NoisePrivateKey
@@ -37,8 +37,7 @@ type Device struct {
 		handshake  chan QueueHandshakeElement
 	}
 	signal struct {
-		stop       chan struct{} // halts all go routines
-		newUDPConn chan struct{} // a net.conn was set (consumed by the receiver routine)
+		stop chan struct{}
 	}
 	underLoadUntil atomic.Value
 	ratelimiter    Ratelimiter
@@ -128,21 +127,23 @@ func (device *Device) PutMessageBuffer(msg *[MaxMessageSize]byte) {
 	device.pool.messageBuffers.Put(msg)
 }
 
-func NewDevice(tun TUNDevice, logLevel int) *Device {
+func NewDevice(tun TUNDevice, logger *Logger) *Device {
 	device := new(Device)
 
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
 
-	device.log = NewLogger(logLevel, "("+tun.Name()+") ")
+	device.log = logger
 	device.peers = make(map[NoisePublicKey]*Peer)
 	device.tun.device = tun
+
 	device.indices.Init()
 	device.ratelimiter.Init()
+
 	device.routingTable.Reset()
 	device.underLoadUntil.Store(time.Time{})
 
-	// setup pools
+	// setup buffer pool
 
 	device.pool.messageBuffers = sync.Pool{
 		New: func() interface{} {
@@ -159,7 +160,11 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 	// prepare signals
 
 	device.signal.stop = make(chan struct{})
-	device.signal.newUDPConn = make(chan struct{}, 1)
+
+	// prepare net
+
+	device.net.port = 0
+	device.net.bind = nil
 
 	// start workers
 
@@ -168,12 +173,9 @@ func NewDevice(tun TUNDevice, logLevel int) *Device {
 		go device.RoutineDecryption()
 		go device.RoutineHandshake()
 	}
-
+	go device.RoutineReadFromTUN()
 	go device.RoutineTUNEventReader()
 	go device.ratelimiter.RoutineGarbageCollector(device.signal.stop)
-	go device.RoutineReadFromTUN()
-	go device.RoutineReceiveIncomming()
-
 	return device
 }
 
@@ -202,9 +204,13 @@ func (device *Device) RemoveAllPeers() {
 }
 
 func (device *Device) Close() {
+	if device.closed.Swap(true) {
+		return
+	}
+	device.log.Info.Println("Closing device")
 	device.RemoveAllPeers()
 	close(device.signal.stop)
-	closeUDPConn(device)
+	CloseUDPListener(device)
 	device.tun.device.Close()
 }
 

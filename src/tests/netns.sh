@@ -20,6 +20,14 @@
 # wireguard peers in $ns1 and $ns2. Note that $ns0 is the endpoint for the wg1
 # interfaces in $ns1 and $ns2. See https://www.wireguard.com/netns/ for further
 # details on how this is accomplished.
+
+# This code is ported to the WireGuard-Go directly from the kernel project.
+#
+# Please ensure that you have installed the newest version of the WireGuard
+# tools from the WireGuard project and before running these tests as:
+#
+# ./netns.sh <path to wireguard-go>
+
 set -e
 
 exec 3>&1
@@ -27,8 +35,8 @@ export WG_HIDE_KEYS=never
 netns0="wg-test-$$-0"
 netns1="wg-test-$$-1"
 netns2="wg-test-$$-2"
-program="../wireguard-go"
-export LOG_LEVEL="error"
+program=$1
+export LOG_LEVEL="info"
 
 pretty() { echo -e "\x1b[32m\x1b[1m[+] ${1:+NS$1: }${2}\x1b[0m" >&3; }
 pp() { pretty "" "$*"; "$@"; }
@@ -72,13 +80,11 @@ pp ip netns add $netns2
 ip0 link set up dev lo
 
 # ip0 link add dev wg1 type wireguard
-n0 $program -f wg1 &
-sleep 1
+n0 $program wg1
 ip0 link set wg1 netns $netns1
 
 # ip0 link add dev wg1 type wireguard
-n0 $program -f wg2 &
-sleep 1
+n0 $program wg2
 ip0 link set wg2 netns $netns2
 
 key1="$(pp wg genkey)"
@@ -185,14 +191,14 @@ ip0 -4 addr del 127.0.0.1/8 dev lo
 ip0 -4 addr add 127.212.121.99/8 dev lo
 n0 wg set wg1 listen-port 9999
 n0 wg set wg1 peer "$pub2" endpoint 127.0.0.1:20000
-n1 ping6 -W 1 -c 1 fd00::20000
-[[ $(n2 wg show wg2 endpoints) == "$pub1    127.212.121.99:9999" ]]
+n1 ping6 -W 1 -c 1 fd00::2
+[[ $(n2 wg show wg2 endpoints) == "$pub1	127.212.121.99:9999" ]]
 
 # Test using IPv6 that roaming works
 n1 wg set wg1 listen-port 9998
 n1 wg set wg1 peer "$pub2" endpoint [::1]:20000
 n1 ping -W 1 -c 1 192.168.241.2
-[[ $(n2 wg show wg2 endpoints) == "$pub1    [::1]:9998" ]]
+[[ $(n2 wg show wg2 endpoints) == "$pub1	[::1]:9998" ]]
 
 # Test that crypto-RP filter works
 n1 wg set wg1 peer "$pub2" allowed-ips 192.168.241.0/24
@@ -212,7 +218,7 @@ n2 ncat -u 192.168.241.1 1111 <<<"X"
 ! read -r -N 1 -t 1 out <&4
 kill $nmap_pid
 n0 wg set wg1 peer "$more_specific_key" remove
-[[ $(n1 wg show wg1 endpoints) == "$pub2    [::1]:9997" ]]
+[[ $(n1 wg show wg1 endpoints) == "$pub2	[::1]:9997" ]]
 
 ip1 link del wg1
 ip2 link del wg2
@@ -263,7 +269,7 @@ n0 iptables -t nat -A POSTROUTING -s 192.168.1.0/24 -d 10.0.0.0/24 -j SNAT --to 
 n0 wg set wg1 peer "$pub2" endpoint 10.0.0.100:20000 persistent-keepalive 1
 n1 ping -W 1 -c 1 192.168.241.2
 n2 ping -W 1 -c 1 192.168.241.1
-[[ $(n2 wg show wg2 endpoints) == "$pub1    10.0.0.1:10000" ]]
+[[ $(n2 wg show wg2 endpoints) == "$pub1	10.0.0.1:10000" ]]
 # Demonstrate n2 can still send packets to n1, since persistent-keepalive will prevent connection tracking entry from expiring (to see entries: `n0 conntrack -L`).
 pp sleep 3
 n2 ping -W 1 -c 1 192.168.241.1
@@ -289,7 +295,7 @@ ip2 link del wg2
 # ip1 link add dev wg1 type wireguard
 # ip2 link add dev wg1 type wireguard
 n1 $program wg1
-n2 $program wg1
+n2 $program wg2
 
 configure_peers
 
@@ -336,17 +342,83 @@ waitiface $netns1 veth1
 waitiface $netns2 veth2
 n0 wg set wg2 peer "$pub1" endpoint 10.0.0.1:10000
 n2 ping -W 1 -c 1 192.168.241.1
-[[ $(n0 wg show wg2 endpoints) == "$pub1    10.0.0.1:10000" ]]
+[[ $(n0 wg show wg2 endpoints) == "$pub1	10.0.0.1:10000" ]]
 n0 wg set wg2 peer "$pub1" endpoint [fd00:aa::1]:10000
 n2 ping -W 1 -c 1 192.168.241.1
-[[ $(n0 wg show wg2 endpoints) == "$pub1    [fd00:aa::1]:10000" ]]
+[[ $(n0 wg show wg2 endpoints) == "$pub1	[fd00:aa::1]:10000" ]]
 n0 wg set wg2 peer "$pub1" endpoint 10.0.0.2:10000
 n2 ping -W 1 -c 1 192.168.241.1
-[[ $(n0 wg show wg2 endpoints) == "$pub1    10.0.0.2:10000" ]]
+[[ $(n0 wg show wg2 endpoints) == "$pub1	10.0.0.2:10000" ]]
 n0 wg set wg2 peer "$pub1" endpoint [fd00:aa::2]:10000
 n2 ping -W 1 -c 1 192.168.241.1
-[[ $(n0 wg show wg2 endpoints) == "$pub1    [fd00:aa::2]:10000" ]]
+[[ $(n0 wg show wg2 endpoints) == "$pub1	[fd00:aa::2]:10000" ]]
 
 ip1 link del veth1
 ip1 link del wg1
 ip2 link del wg2
+
+# Test that Netlink/IPC is working properly by doing things that usually cause split responses
+
+n0 $program wg0
+sleep 5
+config=( "[Interface]" "PrivateKey=$(wg genkey)" "[Peer]" "PublicKey=$(wg genkey)" )
+for a in {1..255}; do
+    for b in {0..255}; do
+        config+=( "AllowedIPs=$a.$b.0.0/16,$a::$b/128" )
+    done
+done
+n0 wg setconf wg0 <(printf '%s\n' "${config[@]}")
+i=0
+for ip in $(n0 wg show wg0 allowed-ips); do
+    ((++i))
+done
+((i == 255*256*2+1))
+ip0 link del wg0
+
+n0 $program wg0
+config=( "[Interface]" "PrivateKey=$(wg genkey)" )
+for a in {1..40}; do
+    config+=( "[Peer]" "PublicKey=$(wg genkey)" )
+    for b in {1..52}; do
+        config+=( "AllowedIPs=$a.$b.0.0/16" )
+    done
+done
+n0 wg setconf wg0 <(printf '%s\n' "${config[@]}")
+i=0
+while read -r line; do
+    j=0
+    for ip in $line; do
+        ((++j))
+    done
+    ((j == 53))
+    ((++i))
+done < <(n0 wg show wg0 allowed-ips)
+((i == 40))
+ip0 link del wg0
+
+n0 $program wg0
+config=( )
+for i in {1..29}; do
+    config+=( "[Peer]" "PublicKey=$(wg genkey)" )
+done
+config+=( "[Peer]" "PublicKey=$(wg genkey)" "AllowedIPs=255.2.3.4/32,abcd::255/128" )
+n0 wg setconf wg0 <(printf '%s\n' "${config[@]}")
+n0 wg showconf wg0 > /dev/null
+ip0 link del wg0
+
+! n0 wg show doesnotexist || false
+
+declare -A objects
+while read -t 0.1 -r line 2>/dev/null || [[ $? -ne 142 ]]; do
+    [[ $line =~ .*(wg[0-9]+:\ [A-Z][a-z]+\ [0-9]+)\ .*(created|destroyed).* ]] || continue
+    objects["${BASH_REMATCH[1]}"]+="${BASH_REMATCH[2]}"
+done < /dev/kmsg
+alldeleted=1
+for object in "${!objects[@]}"; do
+    if [[ ${objects["$object"]} != *createddestroyed ]]; then
+        echo "Error: $object: merely ${objects["$object"]}" >&3
+        alldeleted=0
+    fi
+done
+[[ $alldeleted -eq 1 ]]
+pretty "" "Objects that were created were also destroyed."
