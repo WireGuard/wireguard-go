@@ -25,7 +25,7 @@ var _ Endpoint = (*NativeEndpoint)(nil)
 
 func CreateEndpoint(s string) (Endpoint, error) {
 	addr, err := parseEndpoint(s)
-	return (addr).(*NativeEndpoint), err
+	return (*NativeEndpoint)(addr), err
 }
 
 func (_ *NativeEndpoint) ClearSrc() {}
@@ -40,7 +40,7 @@ func (e *NativeEndpoint) SrcIP() net.IP {
 
 func (e *NativeEndpoint) DstToBytes() []byte {
 	addr := (*net.UDPAddr)(e)
-	out := addr.IP.([]byte)
+	out := addr.IP
 	out = append(out, byte(addr.Port&0xff))
 	out = append(out, byte((addr.Port>>8)&0xff))
 	return out
@@ -54,11 +54,11 @@ func (e *NativeEndpoint) SrcToString() string {
 	return ""
 }
 
-func listenNet(net string, port int) (*net.UDPConn, int, error) {
+func listenNet(network string, port int) (*net.UDPConn, int, error) {
 
 	// listen
 
-	conn, err := net.ListenUDP("udp", &UDPAddr{Port: port})
+	conn, err := net.ListenUDP(network, &net.UDPAddr{Port: port})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -66,32 +66,66 @@ func listenNet(net string, port int) (*net.UDPConn, int, error) {
 	// retrieve port
 
 	laddr := conn.LocalAddr()
-	uaddr, _ = net.ResolveUDPAddr(
+	uaddr, err := net.ResolveUDPAddr(
 		laddr.Network(),
 		laddr.String(),
 	)
-
+	if err != nil {
+		return nil, 0, err
+	}
 	return conn, uaddr.Port, nil
 }
 
-func CreateBind(port uint16) (Bind, uint16, error) {
+func CreateBind(uport uint16) (Bind, uint16, error) {
+	var err error
+	var bind NativeBind
 
-	// listen
+	port := int(uport)
 
-	addr := UDPAddr{
-		Port: int(port),
-	}
-	conn, err := net.ListenUDP("udp", &addr)
+	bind.ipv4, port, err = listenNet("udp4", port)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// retrieve port
+	bind.ipv6, port, err = listenNet("udp6", port)
+	if err != nil {
+		bind.ipv4.Close()
+		return nil, 0, err
+	}
 
-	laddr := conn.LocalAddr()
-	uaddr, _ = net.ResolveUDPAddr(
-		laddr.Network(),
-		laddr.String(),
-	)
-	return uaddr.Port
+	return &bind, uint16(port), nil
+}
+
+func (bind *NativeBind) Close() error {
+	err1 := bind.ipv4.Close()
+	err2 := bind.ipv6.Close()
+	if err1 != nil {
+		return err1
+	}
+	return err2
+}
+
+func (bind *NativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
+	n, endpoint, err := bind.ipv4.ReadFromUDP(buff)
+	return n, (*NativeEndpoint)(endpoint), err
+}
+
+func (bind *NativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
+	n, endpoint, err := bind.ipv6.ReadFromUDP(buff)
+	return n, (*NativeEndpoint)(endpoint), err
+}
+
+func (bind *NativeBind) Send(buff []byte, endpoint Endpoint) error {
+	var err error
+	nend := endpoint.(*NativeEndpoint)
+	if nend.IP.To16() != nil {
+		_, err = bind.ipv6.WriteToUDP(buff, (*net.UDPAddr)(nend))
+	} else {
+		_, err = bind.ipv4.WriteToUDP(buff, (*net.UDPAddr)(nend))
+	}
+	return err
+}
+
+func (bind *NativeBind) SetMark(_ uint32) error {
+	return nil
 }
