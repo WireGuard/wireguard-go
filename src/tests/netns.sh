@@ -120,6 +120,7 @@ configure_peers() {
 
     ip1 link set up dev wg1
     ip2 link set up dev wg2
+    sleep 1
 }
 configure_peers
 

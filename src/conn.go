@@ -114,8 +114,8 @@ func updateBind(device *Device) error {
 
 		// decrease waitgroup to 0
 
-		go device.RoutineReceiveIncomming(ipv4.Version, netc.bind)
-		go device.RoutineReceiveIncomming(ipv6.Version, netc.bind)
+		go device.RoutineReceiveIncoming(ipv4.Version, netc.bind)
+		go device.RoutineReceiveIncoming(ipv6.Version, netc.bind)
 
 		device.log.Debug.Println("UDP bind has been updated")
 	}

@@ -321,8 +321,14 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 				goto BeginHandshakes
 
 			case <-timeout.C:
-				// TODO: Clear source address for peer
-				continue
+
+				// clear source address of peer
+
+				peer.mutex.Lock()
+				if peer.endpoint != nil {
+					peer.endpoint.ClearSrc()
+				}
+				peer.mutex.Unlock()
 			}
 		}
 

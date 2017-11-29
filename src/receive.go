@@ -93,10 +93,10 @@ func (device *Device) addToHandshakeQueue(
 	}
 }
 
-func (device *Device) RoutineReceiveIncomming(IP int, bind Bind) {
+func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 
 	logDebug := device.log.Debug
-	logDebug.Println("Routine, receive incomming, IP version:", IP)
+	logDebug.Println("Routine, receive incoming, IP version:", IP)
 
 	for {
 

@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 	"unsafe"
 )
 
@@ -60,14 +61,31 @@ func (tun *NativeTun) File() *os.File {
 	return tun.fd
 }
 
+func (tun *NativeTun) RoutineHackListener() {
+	/* This is needed for the detection to work accross network namespaces
+	 * If you are reading this and know a better method, please get in touch.
+	 */
+	fd := int(tun.fd.Fd())
+	for {
+		_, err := unix.Write(fd, nil)
+		switch err {
+		case unix.EINVAL:
+			tun.events <- TUNEventUp
+		case unix.EIO:
+			tun.events <- TUNEventDown
+		default:
+		}
+		time.Sleep(time.Second / 10)
+	}
+}
+
 func (tun *NativeTun) RoutineNetlinkListener() {
+
 	sock := int(C.bind_rtmgrp())
 	if sock < 0 {
 		tun.errors <- errors.New("Failed to create netlink event listener")
 		return
 	}
-
-	tun.events <- TUNEventUp // TODO: Fix network namespace problem
 
 	for msg := make([]byte, 1<<16); ; {
 
@@ -269,6 +287,7 @@ func CreateTUNFromFile(name string, fd *os.File) (TUNDevice, error) {
 	}
 
 	go device.RoutineNetlinkListener()
+	go device.RoutineHackListener() // cross namespace
 
 	// set default MTU
 
@@ -324,6 +343,7 @@ func CreateTUN(name string) (TUNDevice, error) {
 	}
 
 	go device.RoutineNetlinkListener()
+	go device.RoutineHackListener() // cross namespace
 
 	// set default MTU
 
