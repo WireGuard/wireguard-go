@@ -136,6 +136,7 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 	device.log = logger
 	device.peers = make(map[NoisePublicKey]*Peer)
 	device.tun.device = tun
+	device.tun.isUp.Set(false)
 
 	device.indices.Init()
 	device.ratelimiter.Init()

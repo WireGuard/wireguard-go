@@ -25,7 +25,7 @@ func (peer *Peer) KeepKeyFreshSending() {
 	}
 }
 
-/* Called when a new authenticated message has been recevied
+/* Called when a new authenticated message has been received
  *
  * NOTE: Not thread safe (called by sequential receiver)
  */
@@ -106,7 +106,7 @@ func (peer *Peer) TimerAnyAuthenticatedPacketTraversal() {
 	}
 }
 
-/* Called after succesfully completing a handshake.
+/* Called after successfully completing a handshake.
  * i.e. after:
  *
  * - Valid handshake response
@@ -124,7 +124,7 @@ func (peer *Peer) TimerHandshakeComplete() {
 /* Event:
  * An ephemeral key is generated
  *
- * i.e after:
+ * i.e. after:
  *
  * CreateMessageInitiation
  * CreateMessageResponse
@@ -231,7 +231,7 @@ func (peer *Peer) RoutineHandshakeInitiator() {
 	logInfo := device.log.Info
 	logError := device.log.Error
 	logDebug := device.log.Debug
-	logDebug.Println("Routine, handshake initator, started for", peer.String())
+	logDebug.Println("Routine, handshake initiator, started for", peer.String())
 
 	var temp [256]byte
 

@@ -62,7 +62,7 @@ func (tun *NativeTun) File() *os.File {
 }
 
 func (tun *NativeTun) RoutineHackListener() {
-	/* This is needed for the detection to work accross network namespaces
+	/* This is needed for the detection to work across network namespaces
 	 * If you are reading this and know a better method, please get in touch.
 	 */
 	fd := int(tun.fd.Fd())
