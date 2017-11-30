@@ -28,30 +28,26 @@ type Peer struct {
 		nextKeepalive time.Time
 	}
 	signal struct {
-		newKeyPair         chan struct{} // (size 1) : a new key pair was generated
-		handshakeBegin     chan struct{} // (size 1) : request that a new handshake be started ("queue handshake")
-		handshakeCompleted chan struct{} // (size 1) : handshake completed
-		handshakeReset     chan struct{} // (size 1) : reset handshake negotiation state
-		flushNonceQueue    chan struct{} // (size 1) : empty queued packets
-		messageSend        chan struct{} // (size 1) : a message was send to the peer
-		messageReceived    chan struct{} // (size 1) : an authenticated message was received
-		stop               chan struct{} // (size 0) : close to stop all goroutines for peer
+		newKeyPair         Signal // size 1, new key pair was generated
+		handshakeCompleted Signal // size 1, handshake completed
+		handshakeBegin     Signal // size 1, begin new handshake begin
+		flushNonceQueue    Signal // size 1, empty queued packets
+		messageSend        Signal // size 1, message was send to peer
+		messageReceived    Signal // size 1, authenticated message recv
+		stop               Signal // size 0, stop all goroutines
 	}
 	timer struct {
 		// state related to WireGuard timers
 
-		keepalivePersistent *time.Timer // set for persistent keepalives
-		keepalivePassive    *time.Timer // set upon recieving messages
-		newHandshake        *time.Timer // begin a new handshake (after Keepalive + RekeyTimeout)
-		zeroAllKeys         *time.Timer // zero all key material (after RejectAfterTime*3)
-		handshakeDeadline   *time.Timer // Current handshake must be completed
+		keepalivePersistent Timer // set for persistent keepalives
+		keepalivePassive    Timer // set upon recieving messages
+		newHandshake        Timer // begin a new handshake (stale)
+		zeroAllKeys         Timer // zero all key material
+		handshakeDeadline   Timer // complete handshake timeout
+		handshakeTimeout    Timer // current handshake message timeout
 
-		pendingKeepalivePassive bool
-		pendingNewHandshake     bool
-		pendingZeroAllKeys      bool
-
-		needAnotherKeepalive    bool
 		sendLastMinuteHandshake bool
+		needAnotherKeepalive    bool
 	}
 	queue struct {
 		nonce    chan *QueueOutboundElement // nonce / pre-handshake queue
@@ -71,10 +67,12 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	peer.mac.Init(pk)
 	peer.device = device
 
-	peer.timer.keepalivePersistent = NewStoppedTimer()
-	peer.timer.keepalivePassive = NewStoppedTimer()
-	peer.timer.newHandshake = NewStoppedTimer()
-	peer.timer.zeroAllKeys = NewStoppedTimer()
+	peer.timer.keepalivePersistent = NewTimer()
+	peer.timer.keepalivePassive = NewTimer()
+	peer.timer.newHandshake = NewTimer()
+	peer.timer.zeroAllKeys = NewTimer()
+	peer.timer.handshakeDeadline = NewTimer()
+	peer.timer.handshakeTimeout = NewTimer()
 
 	// assign id for debugging
 
@@ -102,7 +100,8 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
 	handshake.remoteStatic = pk
-	handshake.precomputedStaticStatic = device.privateKey.sharedSecret(handshake.remoteStatic)
+	handshake.precomputedStaticStatic =
+		device.privateKey.sharedSecret(handshake.remoteStatic)
 	handshake.mutex.Unlock()
 
 	// reset endpoint
@@ -117,16 +116,14 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 
 	// prepare signaling & routines
 
-	peer.signal.stop = make(chan struct{})
-	peer.signal.newKeyPair = make(chan struct{}, 1)
-	peer.signal.handshakeBegin = make(chan struct{}, 1)
-	peer.signal.handshakeReset = make(chan struct{}, 1)
-	peer.signal.handshakeCompleted = make(chan struct{}, 1)
-	peer.signal.flushNonceQueue = make(chan struct{}, 1)
+	peer.signal.stop = NewSignal()
+	peer.signal.newKeyPair = NewSignal()
+	peer.signal.handshakeBegin = NewSignal()
+	peer.signal.handshakeCompleted = NewSignal()
+	peer.signal.flushNonceQueue = NewSignal()
 
 	go peer.RoutineNonce()
 	go peer.RoutineTimerHandler()
-	go peer.RoutineHandshakeInitiator()
 	go peer.RoutineSequentialSender()
 	go peer.RoutineSequentialReceiver()
 
@@ -163,5 +160,5 @@ func (peer *Peer) String() string {
 }
 
 func (peer *Peer) Close() {
-	close(peer.signal.stop)
+	peer.signal.stop.Broadcast()
 }

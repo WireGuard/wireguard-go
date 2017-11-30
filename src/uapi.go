@@ -221,7 +221,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 							return &IPCError{Code: ipcErrorInvalid}
 						}
 					}
-					signalSend(peer.signal.handshakeReset)
+					peer.timer.handshakeDeadline.Reset(RekeyAttemptTime)
 					dummy = false
 
 				}
@@ -265,7 +265,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 						return err
 					}
 					peer.endpoint = endpoint
-					signalSend(peer.signal.handshakeReset)
+					peer.timer.handshakeDeadline.Reset(RekeyAttemptTime)
 					return nil
 				}()
 

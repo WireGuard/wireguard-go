@@ -532,7 +532,6 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 	kp := &peer.keyPairs
 	kp.mutex.Lock()
 
-	// TODO: Adapt kernel behavior noise.c:161
 	if isInitiator {
 		if kp.previous != nil {
 			device.DeleteKeyPair(kp.previous)
@@ -545,7 +544,7 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 		} else {
 			kp.previous = kp.current
 			kp.current = keyPair
-			signalSend(peer.signal.newKeyPair) // TODO: This more places (after confirming the key)
+			peer.signal.newKeyPair.Send()
 		}
 
 	} else {

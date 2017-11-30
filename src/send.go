@@ -164,7 +164,7 @@ func (device *Device) RoutineReadFromTUN() {
 
 		// insert into nonce/pre-handshake queue
 
-		signalSend(peer.signal.handshakeReset)
+		peer.timer.handshakeDeadline.Reset(RekeyAttemptTime)
 		addToOutboundQueue(peer.queue.nonce, elem)
 		elem = device.NewOutboundElement()
 	}
@@ -186,7 +186,7 @@ func (peer *Peer) RoutineNonce() {
 	for {
 	NextPacket:
 		select {
-		case <-peer.signal.stop:
+		case <-peer.signal.stop.Wait():
 			return
 
 		case elem := <-peer.queue.nonce:
@@ -201,16 +201,17 @@ func (peer *Peer) RoutineNonce() {
 					}
 				}
 
-				signalSend(peer.signal.handshakeBegin)
+				peer.signal.handshakeBegin.Send()
+
 				logDebug.Println("Awaiting key-pair for", peer.String())
 
 				select {
-				case <-peer.signal.newKeyPair:
-				case <-peer.signal.flushNonceQueue:
+				case <-peer.signal.newKeyPair.Wait():
+				case <-peer.signal.flushNonceQueue.Wait():
 					logDebug.Println("Clearing queue for", peer.String())
 					peer.FlushNonceQueue()
 					goto NextPacket
-				case <-peer.signal.stop:
+				case <-peer.signal.stop.Wait():
 					return
 				}
 			}
@@ -309,8 +310,10 @@ func (peer *Peer) RoutineSequentialSender() {
 
 	for {
 		select {
-		case <-peer.signal.stop:
-			logDebug.Println("Routine, sequential sender, stopped for", peer.String())
+
+		case <-peer.signal.stop.Wait():
+			logDebug.Println(
+				"Routine, sequential sender, stopped for", peer.String())
 			return
 
 		case elem := <-peer.queue.outbound:
