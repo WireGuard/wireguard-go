@@ -9,6 +9,11 @@ import (
 )
 
 const (
+	ExitSetupSuccess = 0
+	ExitSetupFailed  = 1
+)
+
+const (
 	ENV_WG_TUN_FD  = "WG_TUN_FD"
 	ENV_WG_UAPI_FD = "WG_UAPI_FD"
 )
