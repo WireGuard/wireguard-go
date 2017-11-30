@@ -98,118 +98,115 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 	logDebug := device.log.Debug
 	logDebug.Println("Routine, receive incoming, IP version:", IP)
 
+	// receive datagrams until conn is closed
+
+	buffer := device.GetMessageBuffer()
+
+	var (
+		err      error
+		size     int
+		endpoint Endpoint
+	)
+
 	for {
 
-		// receive datagrams until conn is closed
+		// read next datagram
 
-		buffer := device.GetMessageBuffer()
+		switch IP {
+		case ipv4.Version:
+			size, endpoint, err = bind.ReceiveIPv4(buffer[:])
+		case ipv6.Version:
+			size, endpoint, err = bind.ReceiveIPv6(buffer[:])
+		default:
+			return
+		}
 
-		var (
-			err      error
-			size     int
-			endpoint Endpoint
-		)
+		if err != nil {
+			return
+		}
 
-		for {
+		if size < MinMessageSize {
+			continue
+		}
 
-			// read next datagram
+		// check size of packet
 
-			switch IP {
-			case ipv4.Version:
-				size, endpoint, err = bind.ReceiveIPv4(buffer[:])
-			case ipv6.Version:
-				size, endpoint, err = bind.ReceiveIPv6(buffer[:])
-			default:
-				return
-			}
+		packet := buffer[:size]
+		msgType := binary.LittleEndian.Uint32(packet[:4])
 
-			if err != nil {
-				break
-			}
+		var okay bool
 
-			if size < MinMessageSize {
+		switch msgType {
+
+		// check if transport
+
+		case MessageTransportType:
+
+			// check size
+
+			if len(packet) < MessageTransportType {
 				continue
 			}
 
-			// check size of packet
+			// lookup key pair
 
-			packet := buffer[:size]
-			msgType := binary.LittleEndian.Uint32(packet[:4])
+			receiver := binary.LittleEndian.Uint32(
+				packet[MessageTransportOffsetReceiver:MessageTransportOffsetCounter],
+			)
+			value := device.indices.Lookup(receiver)
+			keyPair := value.keyPair
+			if keyPair == nil {
+				continue
+			}
 
-			var okay bool
+			// check key-pair expiry
 
-			switch msgType {
+			if keyPair.created.Add(RejectAfterTime).Before(time.Now()) {
+				continue
+			}
 
-			// check if transport
+			// create work element
 
-			case MessageTransportType:
+			peer := value.peer
+			elem := &QueueInboundElement{
+				packet:   packet,
+				buffer:   buffer,
+				keyPair:  keyPair,
+				dropped:  AtomicFalse,
+				endpoint: endpoint,
+			}
+			elem.mutex.Lock()
 
-				// check size
+			// add to decryption queues
 
-				if len(packet) < MessageTransportType {
-					continue
-				}
+			device.addToDecryptionQueue(device.queue.decryption, elem)
+			device.addToInboundQueue(peer.queue.inbound, elem)
+			buffer = device.GetMessageBuffer()
+			continue
 
-				// lookup key pair
+		// otherwise it is a fixed size & handshake related packet
 
-				receiver := binary.LittleEndian.Uint32(
-					packet[MessageTransportOffsetReceiver:MessageTransportOffsetCounter],
-				)
-				value := device.indices.Lookup(receiver)
-				keyPair := value.keyPair
-				if keyPair == nil {
-					continue
-				}
+		case MessageInitiationType:
+			okay = len(packet) == MessageInitiationSize
 
-				// check key-pair expiry
+		case MessageResponseType:
+			okay = len(packet) == MessageResponseSize
 
-				if keyPair.created.Add(RejectAfterTime).Before(time.Now()) {
-					continue
-				}
+		case MessageCookieReplyType:
+			okay = len(packet) == MessageCookieReplySize
+		}
 
-				// create work element
-
-				peer := value.peer
-				elem := &QueueInboundElement{
-					packet:   packet,
+		if okay {
+			device.addToHandshakeQueue(
+				device.queue.handshake,
+				QueueHandshakeElement{
+					msgType:  msgType,
 					buffer:   buffer,
-					keyPair:  keyPair,
-					dropped:  AtomicFalse,
+					packet:   packet,
 					endpoint: endpoint,
-				}
-				elem.mutex.Lock()
-
-				// add to decryption queues
-
-				device.addToDecryptionQueue(device.queue.decryption, elem)
-				device.addToInboundQueue(peer.queue.inbound, elem)
-				buffer = device.GetMessageBuffer()
-				continue
-
-			// otherwise it is a fixed size & handshake related packet
-
-			case MessageInitiationType:
-				okay = len(packet) == MessageInitiationSize
-
-			case MessageResponseType:
-				okay = len(packet) == MessageResponseSize
-
-			case MessageCookieReplyType:
-				okay = len(packet) == MessageCookieReplySize
-			}
-
-			if okay {
-				device.addToHandshakeQueue(
-					device.queue.handshake,
-					QueueHandshakeElement{
-						msgType:  msgType,
-						buffer:   buffer,
-						packet:   packet,
-						endpoint: endpoint,
-					},
-				)
-				buffer = device.GetMessageBuffer()
-			}
+				},
+			)
+			buffer = device.GetMessageBuffer()
 		}
 	}
 }
