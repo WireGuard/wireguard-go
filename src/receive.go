@@ -93,6 +93,11 @@ func (device *Device) addToHandshakeQueue(
 	}
 }
 
+/* Receives incoming datagrams for the device
+ *
+ * Every time the bind is updated a new routine is started for
+ * IPv4 and IPv6 (separately)
+ */
 func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 
 	logDebug := device.log.Debug
@@ -182,6 +187,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 			device.addToDecryptionQueue(device.queue.decryption, elem)
 			device.addToInboundQueue(peer.queue.inbound, elem)
 			buffer = device.GetMessageBuffer()
+
 			continue
 
 		// otherwise it is a fixed size & handshake related packet
@@ -220,7 +226,7 @@ func (device *Device) RoutineDecryption() {
 
 	for {
 		select {
-		case <-device.signal.stop:
+		case <-device.signal.stop.Wait():
 			logDebug.Println("Routine, decryption worker, stopped")
 			return
 
@@ -256,7 +262,7 @@ func (device *Device) RoutineDecryption() {
 	}
 }
 
-/* Handles incomming packets related to handshake
+/* Handles incoming packets related to handshake
  */
 func (device *Device) RoutineHandshake() {
 
@@ -271,7 +277,7 @@ func (device *Device) RoutineHandshake() {
 	for {
 		select {
 		case elem = <-device.queue.handshake:
-		case <-device.signal.stop:
+		case <-device.signal.stop.Wait():
 			return
 		}
 
@@ -356,7 +362,7 @@ func (device *Device) RoutineHandshake() {
 			continue
 		}
 
-		// handle handshake initation/response content
+		// handle handshake initiation/response content
 
 		switch elem.msgType {
 		case MessageInitiationType:
@@ -376,7 +382,7 @@ func (device *Device) RoutineHandshake() {
 			peer := device.ConsumeMessageInitiation(&msg)
 			if peer == nil {
 				logInfo.Println(
-					"Recieved invalid initiation message from",
+					"Received invalid initiation message from",
 					elem.endpoint.DstToString(),
 				)
 				continue
@@ -449,7 +455,7 @@ func (device *Device) RoutineHandshake() {
 			peer.endpoint = elem.endpoint
 			peer.mutex.Unlock()
 
-			logDebug.Println("Received handshake initation from", peer)
+			logDebug.Println("Received handshake initiation from", peer)
 
 			peer.TimerEphemeralKeyCreated()
 
@@ -556,7 +562,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				src := elem.packet[IPv4offsetSrc : IPv4offsetSrc+net.IPv4len]
 				if device.routingTable.LookupIPv4(src) != peer {
 					logInfo.Println(
-						"IPv4 packet with unallowed source address from",
+						"IPv4 packet with disallowed source address from",
 						peer.String(),
 					)
 					continue
@@ -584,7 +590,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				src := elem.packet[IPv6offsetSrc : IPv6offsetSrc+net.IPv6len]
 				if device.routingTable.LookupIPv6(src) != peer {
 					logInfo.Println(
-						"IPv6 packet with unallowed source address from",
+						"IPv6 packet with disallowed source address from",
 						peer.String(),
 					)
 					continue

@@ -2,12 +2,10 @@ package main
 
 import (
 	"sync/atomic"
-	"time"
 )
 
-/* We use int32 as atomic bools
- * (since booleans are not natively supported by sync/atomic)
- */
+/* Atomic Boolean */
+
 const (
 	AtomicFalse = int32(iota)
 	AtomicTrue
@@ -37,6 +35,8 @@ func (a *AtomicBool) Set(val bool) {
 	atomic.StoreInt32(&a.flag, flag)
 }
 
+/* Integer manipulation */
+
 func toInt32(n uint32) int32 {
 	mask := uint32(1 << 31)
 	return int32(-(n & mask) + (n & ^mask))
@@ -54,33 +54,4 @@ func minUint64(a uint64, b uint64) uint64 {
 		return b
 	}
 	return a
-}
-
-func signalSend(c chan struct{}) {
-	select {
-	case c <- struct{}{}:
-	default:
-	}
-}
-
-func signalClear(c chan struct{}) {
-	select {
-	case <-c:
-	default:
-	}
-}
-
-func timerStop(timer *time.Timer) {
-	if !timer.Stop() {
-		select {
-		case <-timer.C:
-		default:
-		}
-	}
-}
-
-func NewStoppedTimer() *time.Timer {
-	timer := time.NewTimer(time.Hour)
-	timerStop(timer)
-	return timer
 }

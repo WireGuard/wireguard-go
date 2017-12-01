@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-/* Handles outbound flow
+/* Outbound flow
  *
  * 1. TUN queue
  * 2. Routing (sequential)
@@ -19,17 +19,22 @@ import (
  * 4. Encryption (parallel)
  * 5. Transmission (sequential)
  *
- * The order of packets (per peer) is maintained.
- * The functions in this file occure (roughly) in the order packets are processed.
- */
-
-/* The sequential consumers will attempt to take the lock,
+ * The functions in this file occur (roughly) in the order in
+ * which the packets are processed.
+ *
+ * Locking, Producers and Consumers
+ *
+ * The order of packets (per peer) must be maintained,
+ * but encryption of packets happen out-of-order:
+ *
+ * The sequential consumers will attempt to take the lock,
  * workers release lock when they have completed work (encryption) on the packet.
  *
  * If the element is inserted into the "encryption queue",
- * the content is preceeded by enough "junk" to contain the transport header
+ * the content is preceded by enough "junk" to contain the transport header
  * (to allow the construction of transport messages in-place)
  */
+
 type QueueOutboundElement struct {
 	dropped int32
 	mutex   sync.Mutex
@@ -155,7 +160,7 @@ func (device *Device) RoutineReadFromTUN() {
 			peer = device.routingTable.LookupIPv6(dst)
 
 		default:
-			logDebug.Println("Receieved packet with unknown IP version")
+			logDebug.Println("Received packet with unknown IP version")
 		}
 
 		if peer == nil {
@@ -249,7 +254,7 @@ func (device *Device) RoutineEncryption() {
 		// fetch next element
 
 		select {
-		case <-device.signal.stop:
+		case <-device.signal.stop.Wait():
 			logDebug.Println("Routine, encryption worker, stopped")
 			return
 

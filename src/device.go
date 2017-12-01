@@ -37,7 +37,7 @@ type Device struct {
 		handshake  chan QueueHandshakeElement
 	}
 	signal struct {
-		stop chan struct{}
+		stop Signal
 	}
 	underLoadUntil atomic.Value
 	ratelimiter    Ratelimiter
@@ -129,7 +129,6 @@ func (device *Device) PutMessageBuffer(msg *[MaxMessageSize]byte) {
 
 func NewDevice(tun TUNDevice, logger *Logger) *Device {
 	device := new(Device)
-
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
 
@@ -160,7 +159,7 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 
 	// prepare signals
 
-	device.signal.stop = make(chan struct{})
+	device.signal.stop = NewSignal()
 
 	// prepare net
 
@@ -174,9 +173,11 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 		go device.RoutineDecryption()
 		go device.RoutineHandshake()
 	}
+
 	go device.RoutineReadFromTUN()
 	go device.RoutineTUNEventReader()
 	go device.ratelimiter.RoutineGarbageCollector(device.signal.stop)
+
 	return device
 }
 
@@ -210,11 +211,11 @@ func (device *Device) Close() {
 	}
 	device.log.Info.Println("Closing device")
 	device.RemoveAllPeers()
-	close(device.signal.stop)
-	closeBind(device)
+	device.signal.stop.Broadcast()
 	device.tun.device.Close()
+	closeBind(device)
 }
 
-func (device *Device) WaitChannel() chan struct{} {
-	return device.signal.stop
+func (device *Device) Wait() chan struct{} {
+	return device.signal.stop.Wait()
 }

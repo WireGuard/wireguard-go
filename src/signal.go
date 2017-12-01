@@ -20,6 +20,8 @@ func (s *Signal) Enable() {
 	s.enabled.Set(true)
 }
 
+/* Unblock exactly one listener
+ */
 func (s *Signal) Send() {
 	if s.enabled.Get() {
 		select {
@@ -29,6 +31,8 @@ func (s *Signal) Send() {
 	}
 }
 
+/* Clear the signal if already fired
+ */
 func (s Signal) Clear() {
 	select {
 	case <-s.C:
@@ -36,10 +40,14 @@ func (s Signal) Clear() {
 	}
 }
 
+/* Unblocks all listeners (forever)
+ */
 func (s Signal) Broadcast() {
-	close(s.C) // unblocks all selectors
+	close(s.C)
 }
 
+/* Wait for the signal
+ */
 func (s Signal) Wait() chan struct{} {
 	return s.C
 }

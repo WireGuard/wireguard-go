@@ -66,11 +66,11 @@ func (rate *Ratelimiter) GarbageCollectEntries() {
 	rate.mutex.Unlock()
 }
 
-func (rate *Ratelimiter) RoutineGarbageCollector(stop chan struct{}) {
+func (rate *Ratelimiter) RoutineGarbageCollector(stop Signal) {
 	timer := time.NewTimer(time.Second)
 	for {
 		select {
-		case <-stop:
+		case <-stop.Wait():
 			return
 		case <-timer.C:
 			rate.GarbageCollectEntries()

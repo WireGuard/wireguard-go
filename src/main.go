@@ -8,6 +8,10 @@ import (
 	"strconv"
 )
 
+import _ "net/http/pprof"
+import "net/http"
+import "log"
+
 const (
 	ExitSetupSuccess = 0
 	ExitSetupFailed  = 1
@@ -24,6 +28,10 @@ func printUsage() {
 }
 
 func main() {
+
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	// parse arguments
 
@@ -160,7 +168,6 @@ func main() {
 
 	errs := make(chan error)
 	term := make(chan os.Signal)
-	wait := device.WaitChannel()
 
 	uapi, err := UAPIListen(interfaceName, fileUAPI)
 
@@ -183,9 +190,9 @@ func main() {
 	signal.Notify(term, os.Interrupt)
 
 	select {
-	case <-wait:
 	case <-term:
 	case <-errs:
+	case <-device.Wait():
 	}
 
 	// clean up

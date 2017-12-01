@@ -11,10 +11,8 @@ import (
  * same way as those created by the "net" functions.
  * Here the IPs are slices of either 4 or 16 byte (not always 16)
  *
- * Syncronization done seperatly
+ * Synchronization done separately
  * See: routing.go
- *
- * TODO: Better commenting
  */
 
 type Trie struct {
@@ -30,7 +28,11 @@ type Trie struct {
 }
 
 /* Finds length of matching prefix
- * TODO: Make faster
+ *
+ * TODO: Only use during insertion (xor + prefix mask for lookup)
+ *       Check out
+ *       prefix_matches(struct allowedips_node *node, const u8 *key, u8 bits)
+ *       https://git.zx2c4.com/WireGuard/commit/?h=jd/precomputed-prefix-match
  *
  * Assumption:
  *	  len(ip1) == len(ip2)
@@ -88,7 +90,7 @@ func (node *Trie) RemovePeer(p *Peer) *Trie {
 		return node
 	}
 
-	// walk recursivly
+	// walk recursively
 
 	node.child[0] = node.child[0].RemovePeer(p)
 	node.child[1] = node.child[1].RemovePeer(p)

@@ -27,7 +27,7 @@ func (peer *Peer) KeepKeyFreshSending() {
 
 /* Called when a new authenticated message has been received
  *
- * NOTE: Not thread safe (called by sequential receiver)
+ * NOTE: Not thread safe, but called by sequential receiver!
  */
 func (peer *Peer) KeepKeyFreshReceiving() {
 	if peer.timer.sendLastMinuteHandshake {
