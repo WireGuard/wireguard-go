@@ -243,13 +243,24 @@ func (device *Device) RoutineDecryption() {
 			counter := elem.packet[MessageTransportOffsetCounter:MessageTransportOffsetContent]
 			content := elem.packet[MessageTransportOffsetContent:]
 
+			// expand nonce
+
+			nonce[0x4] = counter[0x0]
+			nonce[0x5] = counter[0x1]
+			nonce[0x6] = counter[0x2]
+			nonce[0x7] = counter[0x3]
+
+			nonce[0x8] = counter[0x4]
+			nonce[0x9] = counter[0x5]
+			nonce[0xa] = counter[0x6]
+			nonce[0xb] = counter[0x7]
+
 			// decrypt and release to consumer
 
 			var err error
-			copy(nonce[4:], counter)
 			elem.counter = binary.LittleEndian.Uint64(counter)
 			elem.packet, err = elem.keyPair.receive.Open(
-				elem.buffer[:0],
+				content[:0],
 				nonce[:],
 				content,
 				nil,
@@ -495,6 +506,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			// wait for decryption
 
 			elem.mutex.Lock()
+
 			if elem.IsDropped() {
 				continue
 			}
@@ -603,8 +615,11 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 			// write to tun device
 
+			offset := MessageTransportOffsetContent
 			atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
-			_, err := device.tun.device.Write(elem.packet)
+			_, err := device.tun.device.Write(
+				elem.buffer[:offset+len(elem.packet)],
+				offset)
 			device.PutMessageBuffer(elem.buffer)
 			if err != nil {
 				logError.Println("Failed to write packet to TUN device:", err)

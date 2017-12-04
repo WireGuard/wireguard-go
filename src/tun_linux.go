@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
 	"net"
 	"os"
@@ -249,16 +250,41 @@ func (tun *NativeTun) MTU() (int, error) {
 	return int(val), nil
 }
 
-func (tun *NativeTun) Write(d []byte) (int, error) {
-	return tun.fd.Write(d)
+func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
+
+	// reserve space for header
+
+	buff = buff[offset-4:]
+
+	// add packet information header
+
+	buff[0] = 0x00
+	buff[1] = 0x00
+
+	if buff[4] == ipv6.Version<<4 {
+		buff[2] = 0x86
+		buff[3] = 0xdd
+	} else {
+		buff[2] = 0x08
+		buff[3] = 0x00
+	}
+
+	// write
+
+	return tun.fd.Write(buff)
 }
 
-func (tun *NativeTun) Read(d []byte) (int, error) {
+func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	select {
 	case err := <-tun.errors:
 		return 0, err
 	default:
-		return tun.fd.Read(d)
+		buff := buff[offset-4:]
+		n, err := tun.fd.Read(buff[:])
+		if n < 4 {
+			return 0, err
+		}
+		return n - 4, err
 	}
 }
 
@@ -306,7 +332,7 @@ func CreateTUN(name string) (TUNDevice, error) {
 	// create new device
 
 	var ifr [IFReqSize]byte
-	var flags uint16 = unix.IFF_TUN | unix.IFF_NO_PI
+	var flags uint16 = unix.IFF_TUN // | unix.IFF_NO_PI
 	nameBytes := []byte(name)
 	if len(nameBytes) >= unix.IFNAMSIZ {
 		return nil, errors.New("Interface name too long")

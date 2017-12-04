@@ -127,8 +127,9 @@ func (device *Device) RoutineReadFromTUN() {
 
 		// read packet
 
-		elem.packet = elem.buffer[MessageTransportHeaderSize:]
-		size, err := device.tun.device.Read(elem.packet)
+		offset := MessageTransportHeaderSize
+		size, err := device.tun.device.Read(elem.buffer[:], offset)
+
 		if err != nil {
 			logError.Println("Failed to read packet from TUN device:", err)
 			device.Close()
@@ -139,7 +140,7 @@ func (device *Device) RoutineReadFromTUN() {
 			continue
 		}
 
-		elem.packet = elem.packet[:size]
+		elem.packet = elem.buffer[offset : offset+size]
 
 		// lookup peer
 
