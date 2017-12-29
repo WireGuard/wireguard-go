@@ -34,15 +34,15 @@ type Peer struct {
 		flushNonceQueue    Signal // size 1, empty queued packets
 		messageSend        Signal // size 1, message was send to peer
 		messageReceived    Signal // size 1, authenticated message recv
-		stop               Signal // size 0, stop all goroutines
+		stop               Signal // size 0, stop all goroutines in peer
 	}
 	timer struct {
 		// state related to WireGuard timers
 
 		keepalivePersistent Timer // set for persistent keepalives
 		keepalivePassive    Timer // set upon recieving messages
-		newHandshake        Timer // begin a new handshake (stale)
 		zeroAllKeys         Timer // zero all key material
+		handshakeNew        Timer // begin a new handshake (stale)
 		handshakeDeadline   Timer // complete handshake timeout
 		handshakeTimeout    Timer // current handshake message timeout
 
@@ -69,8 +69,8 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 
 	peer.timer.keepalivePersistent = NewTimer()
 	peer.timer.keepalivePassive = NewTimer()
-	peer.timer.newHandshake = NewTimer()
 	peer.timer.zeroAllKeys = NewTimer()
+	peer.timer.handshakeNew = NewTimer()
 	peer.timer.handshakeDeadline = NewTimer()
 	peer.timer.handshakeTimeout = NewTimer()
 
@@ -116,16 +116,10 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 
 	// prepare signaling & routines
 
-	peer.signal.stop = NewSignal()
 	peer.signal.newKeyPair = NewSignal()
 	peer.signal.handshakeBegin = NewSignal()
 	peer.signal.handshakeCompleted = NewSignal()
 	peer.signal.flushNonceQueue = NewSignal()
-
-	go peer.RoutineNonce()
-	go peer.RoutineTimerHandler()
-	go peer.RoutineSequentialSender()
-	go peer.RoutineSequentialReceiver()
 
 	return peer, nil
 }
@@ -133,15 +127,18 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 func (peer *Peer) SendBuffer(buffer []byte) error {
 	peer.device.net.mutex.RLock()
 	defer peer.device.net.mutex.RUnlock()
+
 	peer.mutex.RLock()
 	defer peer.mutex.RUnlock()
+
 	if peer.endpoint == nil {
 		return errors.New("No known endpoint for peer")
 	}
+
 	return peer.device.net.bind.Send(buffer, peer.endpoint)
 }
 
-/* Returns a short string identification for logging
+/* Returns a short string identifier for logging
  */
 func (peer *Peer) String() string {
 	if peer.endpoint == nil {
@@ -159,6 +156,32 @@ func (peer *Peer) String() string {
 	)
 }
 
-func (peer *Peer) Close() {
+/* Starts all routines for a given peer
+ *
+ * Requires that the caller holds the exclusive peer lock!
+ */
+func unsafePeerStart(peer *Peer) {
+	peer.signal.stop.Broadcast()
+	peer.signal.stop = NewSignal()
+
+	var wait sync.WaitGroup
+
+	wait.Add(1)
+
+	go peer.RoutineNonce()
+	go peer.RoutineTimerHandler(&wait)
+	go peer.RoutineSequentialSender()
+	go peer.RoutineSequentialReceiver()
+
+	wait.Wait()
+}
+
+func (peer *Peer) Start() {
+	peer.mutex.Lock()
+	unsafePeerStart(peer)
+	peer.mutex.Unlock()
+}
+
+func (peer *Peer) Stop() {
 	peer.signal.stop.Broadcast()
 }

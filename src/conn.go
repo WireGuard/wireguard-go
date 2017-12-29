@@ -82,7 +82,7 @@ func updateBind(device *Device) error {
 
 	// open new sockets
 
-	if device.tun.isUp.Get() {
+	if device.isUp.Get() {
 
 		device.log.Debug.Println("UDP bind updating")
 

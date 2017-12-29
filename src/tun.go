@@ -46,21 +46,13 @@ func (device *Device) RoutineTUNEventReader() {
 		}
 
 		if event&TUNEventUp != 0 {
-			if !device.tun.isUp.Get() {
-				// begin listening for incomming datagrams
-				logInfo.Println("Interface set up")
-				device.tun.isUp.Set(true)
-				updateBind(device)
-			}
+			logInfo.Println("Interface set up")
+			device.Up()
 		}
 
 		if event&TUNEventDown != 0 {
-			if device.tun.isUp.Get() {
-				// stop listening for incomming datagrams
-				logInfo.Println("Interface set down")
-				device.tun.isUp.Set(false)
-				closeBind(device)
-			}
+			logInfo.Println("Interface set down")
+			device.Up()
 		}
 	}
 }

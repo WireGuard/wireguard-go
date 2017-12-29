@@ -43,12 +43,6 @@ func (t *Timer) Reset(dur time.Duration) {
 	t.Start(dur)
 }
 
-func (t *Timer) Push(dur time.Duration) {
-	if t.pending.Get() {
-		t.Reset(dur)
-	}
-}
-
 func (t *Timer) Wait() <-chan time.Time {
 	return t.timer.C
 }
