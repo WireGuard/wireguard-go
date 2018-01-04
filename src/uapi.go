@@ -296,7 +296,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 						logError.Println("Failed to get tun device status:", err)
 						return &IPCError{Code: ipcErrorIO}
 					}
-					if device.isUp.Get() && !dummy {
+					if device.tun.isUp.Get() && !dummy {
 						peer.SendKeepAlive()
 					}
 				}

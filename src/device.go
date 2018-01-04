@@ -8,13 +8,13 @@ import (
 )
 
 type Device struct {
-	isUp      AtomicBool // device is up (TUN interface up)?
-	isClosed  AtomicBool // device is closed? (acting as guard)
+	closed    AtomicBool // device is closed? (acting as guard)
 	log       *Logger    // collection of loggers for levels
 	idCounter uint       // for assigning debug ids to peers
 	fwMark    uint32
 	tun       struct {
 		device TUNDevice
+		isUp   AtomicBool
 		mtu    int32
 	}
 	pool struct {
@@ -45,28 +45,6 @@ type Device struct {
 	mac            CookieChecker
 }
 
-func (device *Device) Up() {
-	device.mutex.Lock()
-	defer device.mutex.Unlock()
-
-	device.isUp.Set(true)
-	updateBind(device)
-	for _, peer := range device.peers {
-		peer.Start()
-	}
-}
-
-func (device *Device) Down() {
-	device.mutex.Lock()
-	defer device.mutex.Unlock()
-
-	device.isUp.Set(false)
-	closeBind(device)
-	for _, peer := range device.peers {
-		peer.Stop()
-	}
-}
-
 /* Warning:
  * The caller must hold the device mutex (write lock)
  */
@@ -76,9 +54,9 @@ func removePeerUnsafe(device *Device, key NoisePublicKey) {
 		return
 	}
 	peer.mutex.Lock()
-	peer.Stop()
 	device.routingTable.RemovePeer(peer)
 	delete(device.peers, key)
+	peer.Close()
 }
 
 func (device *Device) IsUnderLoad() bool {
@@ -120,7 +98,7 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 	device.publicKey = publicKey
 	device.mac.Init(publicKey)
 
-	// do DH pre-computations
+	// do DH precomputations
 
 	rmKey := device.privateKey.IsZero()
 
@@ -154,12 +132,10 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
 
-	device.isUp.Set(false)
-	device.isClosed.Set(false)
-
 	device.log = logger
 	device.peers = make(map[NoisePublicKey]*Peer)
 	device.tun.device = tun
+	device.tun.isUp.Set(false)
 
 	device.indices.Init()
 	device.ratelimiter.Init()
@@ -220,13 +196,17 @@ func (device *Device) RemovePeer(key NoisePublicKey) {
 func (device *Device) RemoveAllPeers() {
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
-	for key := range device.peers {
-		removePeerUnsafe(device, key)
+
+	for key, peer := range device.peers {
+		peer.mutex.Lock()
+		delete(device.peers, key)
+		peer.Close()
+		peer.mutex.Unlock()
 	}
 }
 
 func (device *Device) Close() {
-	if device.isClosed.Swap(true) {
+	if device.closed.Swap(true) {
 		return
 	}
 	device.log.Info.Println("Closing device")
