@@ -163,6 +163,9 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 				device.net.mutex.Lock()
 				device.net.fwmark = uint32(fwmark)
+				if err := device.net.bind.SetMark(fwmark); err != nil {
+					logError.Println("Failed to update fwmark:", err)
+				}
 				device.net.mutex.Unlock()
 
 			case "public_key":

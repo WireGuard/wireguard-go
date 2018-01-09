@@ -50,7 +50,9 @@ func (device *Device) RoutineTUNEventReader() {
 				// begin listening for incomming datagrams
 				logInfo.Println("Interface set up")
 				device.tun.isUp.Set(true)
-				updateBind(device)
+				if err := updateBind(device); err != nil {
+					logInfo.Println("Failed to bind UDP socket:", err)
+				}
 			}
 		}
 
@@ -59,7 +61,9 @@ func (device *Device) RoutineTUNEventReader() {
 				// stop listening for incomming datagrams
 				logInfo.Println("Interface set down")
 				device.tun.isUp.Set(false)
-				closeBind(device)
+				if err := closeBind(device); err != nil {
+					logInfo.Println("Failed to close UDP socket:", err)
+				}
 			}
 		}
 	}
