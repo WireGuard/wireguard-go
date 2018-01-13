@@ -497,7 +497,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 		select {
 
-		case <-peer.signal.stop.Wait():
+		case <-peer.routines.stop.Wait():
 			logDebug.Println("Routine, sequential receiver, stopped for peer", peer.id)
 			return
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/rand"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -182,7 +181,10 @@ func (peer *Peer) sendNewHandshake() error {
 	return err
 }
 
-func (peer *Peer) RoutineTimerHandler(ready *sync.WaitGroup) {
+func (peer *Peer) RoutineTimerHandler() {
+
+	defer peer.routines.stopping.Done()
+
 	device := peer.device
 
 	logInfo := device.log.Info
@@ -203,14 +205,19 @@ func (peer *Peer) RoutineTimerHandler(ready *sync.WaitGroup) {
 		peer.timer.keepalivePersistent.Reset(duration)
 	}
 
-	// signal that timers are reset
+	// signal synchronised setup complete
 
-	ready.Done()
+	peer.routines.starting.Done()
 
 	// handle timer events
 
 	for {
 		select {
+
+		/* stopping */
+
+		case <-peer.routines.stop.Wait():
+			return
 
 		/* timers */
 
@@ -311,9 +318,6 @@ func (peer *Peer) RoutineTimerHandler(ready *sync.WaitGroup) {
 			peer.signal.handshakeBegin.Enable()
 
 		/* signals */
-
-		case <-peer.signal.stop.Wait():
-			return
 
 		case <-peer.signal.handshakeBegin.Wait():
 

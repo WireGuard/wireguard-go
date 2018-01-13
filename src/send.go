@@ -192,7 +192,7 @@ func (peer *Peer) RoutineNonce() {
 	for {
 	NextPacket:
 		select {
-		case <-peer.signal.stop.Wait():
+		case <-peer.routines.stop.Wait():
 			return
 
 		case elem := <-peer.queue.nonce:
@@ -217,7 +217,7 @@ func (peer *Peer) RoutineNonce() {
 					logDebug.Println("Clearing queue for", peer.String())
 					peer.FlushNonceQueue()
 					goto NextPacket
-				case <-peer.signal.stop.Wait():
+				case <-peer.routines.stop.Wait():
 					return
 				}
 			}
@@ -309,15 +309,20 @@ func (device *Device) RoutineEncryption() {
  * The routine terminates then the outbound queue is closed.
  */
 func (peer *Peer) RoutineSequentialSender() {
+
+	defer peer.routines.stopping.Done()
+
 	device := peer.device
 
 	logDebug := device.log.Debug
 	logDebug.Println("Routine, sequential sender, started for", peer.String())
 
+	peer.routines.starting.Done()
+
 	for {
 		select {
 
-		case <-peer.signal.stop.Wait():
+		case <-peer.routines.stop.Wait():
 			logDebug.Println(
 				"Routine, sequential sender, stopped for", peer.String())
 			return

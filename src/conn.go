@@ -64,13 +64,9 @@ func unsafeCloseBind(device *Device) error {
 	return err
 }
 
-func updateBind(device *Device) error {
-	device.mutex.Lock()
-	defer device.mutex.Unlock()
-
-	netc := &device.net
-	netc.mutex.Lock()
-	defer netc.mutex.Unlock()
+/* Must hold device and net lock
+ */
+func unsafeUpdateBind(device *Device) error {
 
 	// close existing sockets
 
@@ -89,6 +85,7 @@ func updateBind(device *Device) error {
 		// bind to new port
 
 		var err error
+		netc := &device.net
 		netc.bind, netc.port, err = CreateBind(netc.port)
 		if err != nil {
 			netc.bind = nil

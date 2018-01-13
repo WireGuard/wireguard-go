@@ -45,14 +45,14 @@ func (device *Device) RoutineTUNEventReader() {
 			}
 		}
 
-		if event&TUNEventUp != 0 {
+		if event&TUNEventUp != 0 && !device.isUp.Get() {
 			logInfo.Println("Interface set up")
 			device.Up()
 		}
 
-		if event&TUNEventDown != 0 {
+		if event&TUNEventDown != 0 && device.isUp.Get() {
 			logInfo.Println("Interface set down")
-			device.Up()
+			device.Down()
 		}
 	}
 }

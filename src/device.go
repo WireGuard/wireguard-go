@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/sasha-s/go-deadlock"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -21,12 +22,12 @@ type Device struct {
 		messageBuffers sync.Pool
 	}
 	net struct {
-		mutex  sync.RWMutex
+		mutex  deadlock.RWMutex
 		bind   Bind   // bind interface
 		port   uint16 // listening port
 		fwmark uint32 // mark value (0 = disabled)
 	}
-	mutex        sync.RWMutex
+	mutex        deadlock.RWMutex
 	privateKey   NoisePrivateKey
 	publicKey    NoisePublicKey
 	routingTable RoutingTable
@@ -49,8 +50,15 @@ func (device *Device) Up() {
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
 
-	device.isUp.Set(true)
-	updateBind(device)
+	device.net.mutex.Lock()
+	defer device.net.mutex.Unlock()
+
+	if device.isUp.Swap(true) {
+		return
+	}
+
+	unsafeUpdateBind(device)
+
 	for _, peer := range device.peers {
 		peer.Start()
 	}
@@ -60,8 +68,12 @@ func (device *Device) Down() {
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
 
-	device.isUp.Set(false)
+	if !device.isUp.Swap(false) {
+		return
+	}
+
 	closeBind(device)
+
 	for _, peer := range device.peers {
 		peer.Stop()
 	}
@@ -75,7 +87,6 @@ func removePeerUnsafe(device *Device, key NoisePublicKey) {
 	if !ok {
 		return
 	}
-	peer.mutex.Lock()
 	peer.Stop()
 	device.routingTable.RemovePeer(peer)
 	delete(device.peers, key)

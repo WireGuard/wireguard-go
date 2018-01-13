@@ -133,13 +133,27 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				device.SetPrivateKey(sk)
 
 			case "listen_port":
+
+				// parse port number
+
 				port, err := strconv.ParseUint(value, 10, 16)
 				if err != nil {
 					logError.Println("Failed to parse listen_port:", err)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
+
+				// update port and rebind
+
+				device.mutex.Lock()
+				device.net.mutex.Lock()
+
 				device.net.port = uint16(port)
-				if err := updateBind(device); err != nil {
+				err = unsafeUpdateBind(device)
+
+				device.net.mutex.Unlock()
+				device.mutex.Unlock()
+
+				if err != nil {
 					logError.Println("Failed to set listen_port:", err)
 					return &IPCError{Code: ipcErrorPortInUse}
 				}
