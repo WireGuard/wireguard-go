@@ -312,7 +312,7 @@ func (device *Device) RoutineHandshake() {
 
 			entry := device.indices.Lookup(reply.Receiver)
 			if entry.peer == nil {
-				return
+				continue
 			}
 			entry.peer.mac.ConsumeReply(&reply)
 			continue
@@ -323,7 +323,7 @@ func (device *Device) RoutineHandshake() {
 
 			if !device.mac.CheckMAC1(elem.packet) {
 				logDebug.Println("Received packet with invalid mac1")
-				return
+				continue
 			}
 
 			// endpoints destination address is the source of the datagram
@@ -347,7 +347,7 @@ func (device *Device) RoutineHandshake() {
 					reply, err := device.mac.CreateReply(elem.packet, sender, srcBytes)
 					if err != nil {
 						logError.Println("Failed to create cookie reply:", err)
-						return
+						continue
 					}
 
 					// marshal and send reply
