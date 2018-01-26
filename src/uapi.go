@@ -144,16 +144,11 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 				// update port and rebind
 
-				device.mutex.Lock()
 				device.net.mutex.Lock()
-
 				device.net.port = uint16(port)
-				err = unsafeUpdateBind(device)
-
 				device.net.mutex.Unlock()
-				device.mutex.Unlock()
 
-				if err != nil {
+				if err := device.BindUpdate(); err != nil {
 					logError.Println("Failed to set listen_port:", err)
 					return &IPCError{Code: ipcErrorPortInUse}
 				}
@@ -178,6 +173,11 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				device.net.mutex.Lock()
 				device.net.fwmark = uint32(fwmark)
 				device.net.mutex.Unlock()
+
+				if err := device.BindUpdate(); err != nil {
+					logError.Println("Failed to update fwmark:", err)
+					return &IPCError{Code: ipcErrorPortInUse}
+				}
 
 			case "public_key":
 				// switch to peer configuration

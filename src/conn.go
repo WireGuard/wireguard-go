@@ -64,9 +64,13 @@ func unsafeCloseBind(device *Device) error {
 	return err
 }
 
-/* Must hold device and net lock
- */
-func unsafeUpdateBind(device *Device) error {
+func (device *Device) BindUpdate() error {
+	device.mutex.Lock()
+	defer device.mutex.Unlock()
+
+	netc := &device.net
+	netc.mutex.Lock()
+	defer netc.mutex.Unlock()
 
 	// close existing sockets
 
@@ -74,18 +78,13 @@ func unsafeUpdateBind(device *Device) error {
 		return err
 	}
 
-	// assumption: netc.update WaitGroup should be exactly 1
-
 	// open new sockets
 
 	if device.isUp.Get() {
 
-		device.log.Debug.Println("UDP bind updating")
-
 		// bind to new port
 
 		var err error
-		netc := &device.net
 		netc.bind, netc.port, err = CreateBind(netc.port)
 		if err != nil {
 			netc.bind = nil
@@ -109,7 +108,7 @@ func unsafeUpdateBind(device *Device) error {
 			peer.mutex.Unlock()
 		}
 
-		// decrease waitgroup to 0
+		// start receiving routines
 
 		go device.RoutineReceiveIncoming(ipv4.Version, netc.bind)
 		go device.RoutineReceiveIncoming(ipv6.Version, netc.bind)
@@ -120,7 +119,7 @@ func unsafeUpdateBind(device *Device) error {
 	return nil
 }
 
-func closeBind(device *Device) error {
+func (device *Device) BindClose() error {
 	device.mutex.Lock()
 	device.net.mutex.Lock()
 	err := unsafeCloseBind(device)

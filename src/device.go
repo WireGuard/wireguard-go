@@ -9,7 +9,7 @@ import (
 )
 
 type Device struct {
-	isUp      AtomicBool // device is up (TUN interface up)?
+	isUp      AtomicBool // device is (going) up
 	isClosed  AtomicBool // device is closed? (acting as guard)
 	log       *Logger    // collection of loggers for levels
 	idCounter uint       // for assigning debug ids to peers
@@ -17,6 +17,11 @@ type Device struct {
 	tun       struct {
 		device TUNDevice
 		mtu    int32
+	}
+	state struct {
+		mutex    deadlock.Mutex
+		changing AtomicBool
+		current  bool
 	}
 	pool struct {
 		messageBuffers sync.Pool
@@ -46,37 +51,86 @@ type Device struct {
 	mac            CookieChecker
 }
 
-func (device *Device) Up() {
-	device.mutex.Lock()
-	defer device.mutex.Unlock()
+func deviceUpdateState(device *Device) {
 
-	device.net.mutex.Lock()
-	defer device.net.mutex.Unlock()
+	// check if state already being updated (guard)
 
-	if device.isUp.Swap(true) {
+	if device.state.changing.Swap(true) {
 		return
 	}
 
-	unsafeUpdateBind(device)
+	// compare to current state of device
 
-	for _, peer := range device.peers {
-		peer.Start()
+	device.state.mutex.Lock()
+
+	newIsUp := device.isUp.Get()
+
+	if newIsUp == device.state.current {
+		device.state.mutex.Unlock()
+		device.state.changing.Set(false)
+		return
 	}
+
+	device.state.mutex.Unlock()
+
+	// change state of device
+
+	switch newIsUp {
+	case true:
+
+		// start listener
+
+		if err := device.BindUpdate(); err != nil {
+			device.isUp.Set(false)
+			break
+		}
+
+		// start every peer
+
+		for _, peer := range device.peers {
+			peer.Start()
+		}
+
+	case false:
+
+		// stop listening
+
+		device.BindClose()
+
+		// stop every peer
+
+		for _, peer := range device.peers {
+			peer.Stop()
+		}
+	}
+
+	// update state variables
+	// and check for state change in the mean time
+
+	device.state.current = newIsUp
+	device.state.changing.Set(false)
+	deviceUpdateState(device)
+}
+
+func (device *Device) Up() {
+
+	// closed device cannot be brought up
+
+	if device.isClosed.Get() {
+		return
+	}
+
+	device.state.mutex.Lock()
+	device.isUp.Set(true)
+	device.state.mutex.Unlock()
+	deviceUpdateState(device)
 }
 
 func (device *Device) Down() {
-	device.mutex.Lock()
-	defer device.mutex.Unlock()
-
-	if !device.isUp.Swap(false) {
-		return
-	}
-
-	closeBind(device)
-
-	for _, peer := range device.peers {
-		peer.Stop()
-	}
+	device.state.mutex.Lock()
+	device.isUp.Set(false)
+	device.state.mutex.Unlock()
+	deviceUpdateState(device)
 }
 
 /* Warning:
@@ -87,7 +141,6 @@ func removePeerUnsafe(device *Device, key NoisePublicKey) {
 	if !ok {
 		return
 	}
-	peer.Stop()
 	device.routingTable.RemovePeer(peer)
 	delete(device.peers, key)
 }
@@ -231,20 +284,30 @@ func (device *Device) RemovePeer(key NoisePublicKey) {
 func (device *Device) RemoveAllPeers() {
 	device.mutex.Lock()
 	defer device.mutex.Unlock()
-	for key := range device.peers {
-		removePeerUnsafe(device, key)
+
+	for key, peer := range device.peers {
+		peer.Stop()
+		peer, ok := device.peers[key]
+		if !ok {
+			return
+		}
+		device.routingTable.RemovePeer(peer)
+		delete(device.peers, key)
 	}
 }
 
 func (device *Device) Close() {
+	device.log.Info.Println("Device closing")
 	if device.isClosed.Swap(true) {
 		return
 	}
-	device.log.Info.Println("Closing device")
-	device.RemoveAllPeers()
 	device.signal.stop.Broadcast()
 	device.tun.device.Close()
-	closeBind(device)
+	device.BindClose()
+	device.isUp.Set(false)
+	println("remove")
+	device.RemoveAllPeers()
+	device.log.Info.Println("Interface closed")
 }
 
 func (device *Device) Wait() chan struct{} {

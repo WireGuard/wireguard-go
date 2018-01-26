@@ -170,9 +170,11 @@ func (device *Device) RoutineReadFromTUN() {
 
 		// insert into nonce/pre-handshake queue
 
-		peer.timer.handshakeDeadline.Reset(RekeyAttemptTime)
-		addToOutboundQueue(peer.queue.nonce, elem)
-		elem = device.NewOutboundElement()
+		if peer.isRunning.Get() {
+			peer.timer.handshakeDeadline.Reset(RekeyAttemptTime)
+			addToOutboundQueue(peer.queue.nonce, elem)
+			elem = device.NewOutboundElement()
+		}
 	}
 }
 
