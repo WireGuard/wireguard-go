@@ -123,7 +123,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 		case ipv6.Version:
 			size, endpoint, err = bind.ReceiveIPv6(buffer[:])
 		default:
-			return
+			panic("invalid IP version")
 		}
 
 		if err != nil {
@@ -184,9 +184,11 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 
 			// add to decryption queues
 
-			device.addToDecryptionQueue(device.queue.decryption, elem)
-			device.addToInboundQueue(peer.queue.inbound, elem)
-			buffer = device.GetMessageBuffer()
+			if peer.isRunning.Get() {
+				device.addToDecryptionQueue(device.queue.decryption, elem)
+				device.addToInboundQueue(peer.queue.inbound, elem)
+				buffer = device.GetMessageBuffer()
+			}
 
 			continue
 
@@ -308,13 +310,20 @@ func (device *Device) RoutineHandshake() {
 				return
 			}
 
-			// lookup peer and consume response
+			// lookup peer from index
 
 			entry := device.indices.Lookup(reply.Receiver)
+
 			if entry.peer == nil {
 				continue
 			}
-			entry.peer.mac.ConsumeReply(&reply)
+
+			// consume reply
+
+			if peer := entry.peer; peer.isRunning.Get() {
+				peer.mac.ConsumeReply(&reply)
+			}
+
 			continue
 
 		case MessageInitiationType, MessageResponseType:
