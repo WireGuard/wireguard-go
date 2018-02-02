@@ -88,28 +88,6 @@ func unsafeRemovePeer(device *Device, peer *Peer, key NoisePublicKey) {
 	device.routing.table.RemovePeer(peer)
 	peer.Stop()
 
-	// clean index table
-
-	kp := &peer.keyPairs
-	kp.mutex.Lock()
-
-	if kp.previous != nil {
-		device.indices.Delete(kp.previous.localIndex)
-	}
-
-	if kp.current != nil {
-		device.indices.Delete(kp.current.localIndex)
-	}
-
-	if kp.next != nil {
-		device.indices.Delete(kp.next.localIndex)
-	}
-
-	kp.previous = nil
-	kp.current = nil
-	kp.next = nil
-	kp.mutex.Unlock()
-
 	// remove from peer map
 
 	delete(device.peers.keyMap, key)

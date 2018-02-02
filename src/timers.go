@@ -274,12 +274,7 @@ func (peer *Peer) RoutineTimerHandler() {
 			// zero out handshake
 
 			device.indices.Delete(hs.localIndex)
-
-			hs.localIndex = 0
-			setZero(hs.localEphemeral[:])
-			setZero(hs.remoteEphemeral[:])
-			setZero(hs.chainKey[:])
-			setZero(hs.hash[:])
+			hs.Clear()
 			hs.mutex.Unlock()
 
 		// handshake timers

@@ -121,6 +121,15 @@ func mixHash(dst *[blake2s.Size]byte, h *[blake2s.Size]byte, data []byte) {
 	hsh.Reset()
 }
 
+func (h *Handshake) Clear() {
+	setZero(h.localEphemeral[:])
+	setZero(h.remoteEphemeral[:])
+	setZero(h.chainKey[:])
+	setZero(h.hash[:])
+	h.localIndex = 0
+	h.state = HandshakeZeroed
+}
+
 func (h *Handshake) mixHash(data []byte) {
 	mixHash(&h.hash, &h.hash, data)
 }
@@ -138,8 +147,8 @@ func init() {
 
 func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, error) {
 
-	device.noise.mutex.Lock()
-	defer device.noise.mutex.Unlock()
+	device.noise.mutex.RLock()
+	defer device.noise.mutex.RUnlock()
 
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
@@ -393,7 +402,7 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 
 	ok := func() bool {
 
-		// read lock handshake
+		// lock handshake state
 
 		handshake.mutex.RLock()
 		defer handshake.mutex.RUnlock()
@@ -401,6 +410,11 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 		if handshake.state != HandshakeInitiationCreated {
 			return false
 		}
+
+		// lock private key for reading
+
+		device.noise.mutex.RLock()
+		defer device.noise.mutex.RUnlock()
 
 		// finish 3-way DH
 
@@ -432,7 +446,7 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 		)
 		mixHash(&hash, &hash, tau[:])
 
-		// authenticate
+		// authenticate transcript
 
 		aead, _ := chacha20poly1305.New(key[:])
 		_, err := aead.Open(nil, ZeroNonce[:], msg.Empty[:], hash[:])

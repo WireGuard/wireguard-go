@@ -48,8 +48,8 @@ type Peer struct {
 
 		// state related to WireGuard timers
 
-		keepalivePersistent Timer // set for persistent keepalives
-		keepalivePassive    Timer // set upon recieving messages
+		keepalivePersistent Timer // set for persistent keep-alive
+		keepalivePassive    Timer // set upon receiving messages
 		zeroAllKeys         Timer // zero all key material
 		handshakeNew        Timer // begin a new handshake (stale)
 		handshakeDeadline   Timer // complete handshake timeout
@@ -69,7 +69,7 @@ type Peer struct {
 		mutex    deadlock.Mutex // held when stopping / starting routines
 		starting sync.WaitGroup // routines pending start
 		stopping sync.WaitGroup // routines pending stop
-		stop     Signal         // size 0, stop all goroutines in peer
+		stop     Signal         // size 0, stop all go-routines in peer
 	}
 
 	mac CookieGenerator
@@ -123,7 +123,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	}
 	device.peers.keyMap[pk] = peer
 
-	// precompute DH
+	// pre-compute DH
 
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
@@ -186,16 +186,19 @@ func (peer *Peer) String() string {
 
 func (peer *Peer) Start() {
 
+	// should never start a peer on a closed device
+
 	if peer.device.isClosed.Get() {
 		return
 	}
 
+	// prevent simultaneous start/stop operations
+
 	peer.routines.mutex.Lock()
 	defer peer.routines.mutex.Unlock()
-
 	peer.device.log.Debug.Println("Starting:", peer.String())
 
-	// stop & wait for ungoing routines (if any)
+	// stop & wait for ongoing routines (if any)
 
 	peer.isRunning.Set(false)
 	peer.routines.stop.Broadcast()
@@ -230,12 +233,15 @@ func (peer *Peer) Start() {
 
 func (peer *Peer) Stop() {
 
+	// prevent simultaneous start/stop operations
+
 	peer.routines.mutex.Lock()
 	defer peer.routines.mutex.Unlock()
 
-	peer.device.log.Debug.Println("Stopping:", peer.String())
+	device := peer.device
+	device.log.Debug.Println("Stopping:", peer.String())
 
-	// stop & wait for ungoing routines (if any)
+	// stop & wait for ongoing peer routines (if any)
 
 	peer.routines.stop.Broadcast()
 	peer.routines.starting.Wait()
@@ -246,6 +252,28 @@ func (peer *Peer) Stop() {
 	close(peer.queue.nonce)
 	close(peer.queue.outbound)
 	close(peer.queue.inbound)
+
+	// clear key pairs
+
+	kp := &peer.keyPairs
+	kp.mutex.Lock()
+
+	device.DeleteKeyPair(kp.previous)
+	device.DeleteKeyPair(kp.current)
+	device.DeleteKeyPair(kp.next)
+
+	kp.previous = nil
+	kp.current = nil
+	kp.next = nil
+	kp.mutex.Unlock()
+
+	// clear handshake state
+
+	hs := &peer.handshake
+	hs.mutex.Lock()
+	device.indices.Delete(hs.localIndex)
+	hs.Clear()
+	hs.mutex.Unlock()
 
 	// reset signal (to handle repeated stopping)
 
