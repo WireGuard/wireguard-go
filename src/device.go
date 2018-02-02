@@ -9,46 +9,110 @@ import (
 )
 
 type Device struct {
-	isUp      AtomicBool // device is (going) up
-	isClosed  AtomicBool // device is closed? (acting as guard)
-	log       *Logger    // collection of loggers for levels
-	idCounter uint       // for assigning debug ids to peers
-	fwMark    uint32
-	tun       struct {
-		device TUNDevice
-		mtu    int32
-	}
+	isUp     AtomicBool // device is (going) up
+	isClosed AtomicBool // device is closed? (acting as guard)
+	log      *Logger
+
+	// synchronized resources (locks acquired in order)
+
 	state struct {
 		mutex    deadlock.Mutex
 		changing AtomicBool
 		current  bool
 	}
-	pool struct {
-		messageBuffers sync.Pool
-	}
+
 	net struct {
 		mutex  deadlock.RWMutex
 		bind   Bind   // bind interface
 		port   uint16 // listening port
 		fwmark uint32 // mark value (0 = disabled)
 	}
-	mutex        deadlock.RWMutex
-	privateKey   NoisePrivateKey
-	publicKey    NoisePublicKey
-	routingTable RoutingTable
-	indices      IndexTable
-	queue        struct {
+
+	noise struct {
+		mutex      deadlock.RWMutex
+		privateKey NoisePrivateKey
+		publicKey  NoisePublicKey
+	}
+
+	routing struct {
+		mutex deadlock.RWMutex
+		table RoutingTable
+	}
+
+	peers struct {
+		mutex  deadlock.RWMutex
+		keyMap map[NoisePublicKey]*Peer
+	}
+
+	// unprotected / "self-synchronising resources"
+
+	indices IndexTable
+	mac     CookieChecker
+
+	rate struct {
+		underLoadUntil atomic.Value
+		limiter        Ratelimiter
+	}
+
+	pool struct {
+		messageBuffers sync.Pool
+	}
+
+	queue struct {
 		encryption chan *QueueOutboundElement
 		decryption chan *QueueInboundElement
 		handshake  chan QueueHandshakeElement
 	}
+
 	signal struct {
 		stop Signal
 	}
-	underLoadUntil atomic.Value
-	ratelimiter    Ratelimiter
-	peers          map[NoisePublicKey]*Peer
-	mac            CookieChecker
+
+	tun struct {
+		device TUNDevice
+		mtu    int32
+	}
+}
+
+/* Converts the peer into a "zombie", which remains in the peer map,
+ * but processes no packets and does not exists in the routing table.
+ *
+ * Must hold:
+ *  device.peers.mutex : exclusive lock
+ *  device.routing     : exclusive lock
+ */
+func unsafeRemovePeer(device *Device, peer *Peer, key NoisePublicKey) {
+
+	// stop routing and processing of packets
+
+	device.routing.table.RemovePeer(peer)
+	peer.Stop()
+
+	// clean index table
+
+	kp := &peer.keyPairs
+	kp.mutex.Lock()
+
+	if kp.previous != nil {
+		device.indices.Delete(kp.previous.localIndex)
+	}
+
+	if kp.current != nil {
+		device.indices.Delete(kp.current.localIndex)
+	}
+
+	if kp.next != nil {
+		device.indices.Delete(kp.next.localIndex)
+	}
+
+	kp.previous = nil
+	kp.current = nil
+	kp.next = nil
+	kp.mutex.Unlock()
+
+	// remove from peer map
+
+	delete(device.peers.keyMap, key)
 }
 
 func deviceUpdateState(device *Device) {
@@ -59,56 +123,56 @@ func deviceUpdateState(device *Device) {
 		return
 	}
 
-	// compare to current state of device
+	func() {
 
-	device.state.mutex.Lock()
+		// compare to current state of device
 
-	newIsUp := device.isUp.Get()
+		device.state.mutex.Lock()
+		defer device.state.mutex.Unlock()
 
-	if newIsUp == device.state.current {
-		device.state.mutex.Unlock()
+		newIsUp := device.isUp.Get()
+
+		if newIsUp == device.state.current {
+			device.state.changing.Set(false)
+			return
+		}
+
+		// change state of device
+
+		switch newIsUp {
+		case true:
+			if err := device.BindUpdate(); err != nil {
+				device.isUp.Set(false)
+				break
+			}
+
+			device.peers.mutex.Lock()
+			defer device.peers.mutex.Unlock()
+
+			for _, peer := range device.peers.keyMap {
+				peer.Start()
+			}
+
+		case false:
+			device.BindClose()
+
+			device.peers.mutex.Lock()
+			defer device.peers.mutex.Unlock()
+
+			for _, peer := range device.peers.keyMap {
+				println("stopping peer")
+				peer.Stop()
+			}
+		}
+
+		// update state variables
+
+		device.state.current = newIsUp
 		device.state.changing.Set(false)
-		return
-	}
+	}()
 
-	device.state.mutex.Unlock()
+	// check for state change in the mean time
 
-	// change state of device
-
-	switch newIsUp {
-	case true:
-
-		// start listener
-
-		if err := device.BindUpdate(); err != nil {
-			device.isUp.Set(false)
-			break
-		}
-
-		// start every peer
-
-		for _, peer := range device.peers {
-			peer.Start()
-		}
-
-	case false:
-
-		// stop listening
-
-		device.BindClose()
-
-		// stop every peer
-
-		for _, peer := range device.peers {
-			peer.Stop()
-		}
-	}
-
-	// update state variables
-	// and check for state change in the mean time
-
-	device.state.current = newIsUp
-	device.state.changing.Set(false)
 	deviceUpdateState(device)
 }
 
@@ -133,18 +197,6 @@ func (device *Device) Down() {
 	deviceUpdateState(device)
 }
 
-/* Warning:
- * The caller must hold the device mutex (write lock)
- */
-func removePeerUnsafe(device *Device, key NoisePublicKey) {
-	peer, ok := device.peers[key]
-	if !ok {
-		return
-	}
-	device.routingTable.RemovePeer(peer)
-	delete(device.peers, key)
-}
-
 func (device *Device) IsUnderLoad() bool {
 
 	// check if currently under load
@@ -152,54 +204,66 @@ func (device *Device) IsUnderLoad() bool {
 	now := time.Now()
 	underLoad := len(device.queue.handshake) >= UnderLoadQueueSize
 	if underLoad {
-		device.underLoadUntil.Store(now.Add(time.Second))
+		device.rate.underLoadUntil.Store(now.Add(time.Second))
 		return true
 	}
 
 	// check if recently under load
 
-	until := device.underLoadUntil.Load().(time.Time)
+	until := device.rate.underLoadUntil.Load().(time.Time)
 	return until.After(now)
 }
 
 func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
-	device.mutex.Lock()
-	defer device.mutex.Unlock()
+
+	// lock required resources
+
+	device.noise.mutex.Lock()
+	defer device.noise.mutex.Unlock()
+
+	device.routing.mutex.Lock()
+	defer device.routing.mutex.Unlock()
+
+	device.peers.mutex.Lock()
+	defer device.peers.mutex.Unlock()
+
+	for _, peer := range device.peers.keyMap {
+		peer.handshake.mutex.RLock()
+		defer peer.handshake.mutex.RUnlock()
+	}
 
 	// remove peers with matching public keys
 
 	publicKey := sk.publicKey()
-	for key, peer := range device.peers {
-		h := &peer.handshake
-		h.mutex.RLock()
-		if h.remoteStatic.Equals(publicKey) {
-			removePeerUnsafe(device, key)
+	for key, peer := range device.peers.keyMap {
+		if peer.handshake.remoteStatic.Equals(publicKey) {
+			unsafeRemovePeer(device, peer, key)
 		}
-		h.mutex.RUnlock()
 	}
 
 	// update key material
 
-	device.privateKey = sk
-	device.publicKey = publicKey
+	device.noise.privateKey = sk
+	device.noise.publicKey = publicKey
 	device.mac.Init(publicKey)
 
-	// do DH pre-computations
+	// do static-static DH pre-computations
 
-	rmKey := device.privateKey.IsZero()
+	rmKey := device.noise.privateKey.IsZero()
 
-	for key, peer := range device.peers {
-		h := &peer.handshake
-		h.mutex.Lock()
+	for key, peer := range device.peers.keyMap {
+
+		hs := &peer.handshake
+
 		if rmKey {
-			h.precomputedStaticStatic = [NoisePublicKeySize]byte{}
+			hs.precomputedStaticStatic = [NoisePublicKeySize]byte{}
 		} else {
-			h.precomputedStaticStatic = device.privateKey.sharedSecret(h.remoteStatic)
-			if isZero(h.precomputedStaticStatic[:]) {
-				removePeerUnsafe(device, key)
-			}
+			hs.precomputedStaticStatic = device.noise.privateKey.sharedSecret(hs.remoteStatic)
 		}
-		h.mutex.Unlock()
+
+		if isZero(hs.precomputedStaticStatic[:]) {
+			unsafeRemovePeer(device, peer, key)
+		}
 	}
 
 	return nil
@@ -215,21 +279,23 @@ func (device *Device) PutMessageBuffer(msg *[MaxMessageSize]byte) {
 
 func NewDevice(tun TUNDevice, logger *Logger) *Device {
 	device := new(Device)
-	device.mutex.Lock()
-	defer device.mutex.Unlock()
 
 	device.isUp.Set(false)
 	device.isClosed.Set(false)
 
 	device.log = logger
-	device.peers = make(map[NoisePublicKey]*Peer)
 	device.tun.device = tun
+	device.peers.keyMap = make(map[NoisePublicKey]*Peer)
+
+	// initialize anti-DoS / anti-scanning features
+
+	device.rate.limiter.Init()
+	device.rate.underLoadUntil.Store(time.Time{})
+
+	// initialize noise & crypt-key routine
 
 	device.indices.Init()
-	device.ratelimiter.Init()
-
-	device.routingTable.Reset()
-	device.underLoadUntil.Store(time.Time{})
+	device.routing.table.Reset()
 
 	// setup buffer pool
 
@@ -264,36 +330,50 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 
 	go device.RoutineReadFromTUN()
 	go device.RoutineTUNEventReader()
-	go device.ratelimiter.RoutineGarbageCollector(device.signal.stop)
+	go device.rate.limiter.RoutineGarbageCollector(device.signal.stop)
 
 	return device
 }
 
 func (device *Device) LookupPeer(pk NoisePublicKey) *Peer {
-	device.mutex.RLock()
-	defer device.mutex.RUnlock()
-	return device.peers[pk]
+	device.peers.mutex.RLock()
+	defer device.peers.mutex.RUnlock()
+
+	return device.peers.keyMap[pk]
 }
 
 func (device *Device) RemovePeer(key NoisePublicKey) {
-	device.mutex.Lock()
-	defer device.mutex.Unlock()
-	removePeerUnsafe(device, key)
+	device.noise.mutex.Lock()
+	defer device.noise.mutex.Unlock()
+
+	device.routing.mutex.Lock()
+	defer device.routing.mutex.Unlock()
+
+	device.peers.mutex.Lock()
+	defer device.peers.mutex.Unlock()
+
+	// stop peer and remove from routing
+
+	peer, ok := device.peers.keyMap[key]
+	if ok {
+		unsafeRemovePeer(device, peer, key)
+	}
 }
 
 func (device *Device) RemoveAllPeers() {
-	device.mutex.Lock()
-	defer device.mutex.Unlock()
 
-	for key, peer := range device.peers {
-		peer.Stop()
-		peer, ok := device.peers[key]
-		if !ok {
-			return
-		}
-		device.routingTable.RemovePeer(peer)
-		delete(device.peers, key)
+	device.routing.mutex.Lock()
+	defer device.routing.mutex.Unlock()
+
+	device.peers.mutex.Lock()
+	defer device.peers.mutex.Unlock()
+
+	for key, peer := range device.peers.keyMap {
+		println("rm", peer.String())
+		unsafeRemovePeer(device, peer, key)
 	}
+
+	device.peers.keyMap = make(map[NoisePublicKey]*Peer)
 }
 
 func (device *Device) Close() {
@@ -305,7 +385,6 @@ func (device *Device) Close() {
 	device.tun.device.Close()
 	device.BindClose()
 	device.isUp.Set(false)
-	println("remove")
 	device.RemoveAllPeers()
 	device.log.Info.Println("Interface closed")
 }

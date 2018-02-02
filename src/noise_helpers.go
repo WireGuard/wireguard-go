@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/hmac"
 	"crypto/rand"
+	"crypto/subtle"
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/curve25519"
 	"hash"
@@ -58,11 +59,11 @@ func KDF3(t0, t1, t2 *[blake2s.Size]byte, key, input []byte) {
 }
 
 func isZero(val []byte) bool {
-	var acc byte
+	acc := 1
 	for _, b := range val {
-		acc |= b
+		acc &= subtle.ConstantTimeByteEq(b, 0)
 	}
-	return acc == 0
+	return acc == 1
 }
 
 func setZero(arr []byte) {

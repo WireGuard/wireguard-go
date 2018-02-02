@@ -151,14 +151,14 @@ func (device *Device) RoutineReadFromTUN() {
 				continue
 			}
 			dst := elem.packet[IPv4offsetDst : IPv4offsetDst+net.IPv4len]
-			peer = device.routingTable.LookupIPv4(dst)
+			peer = device.routing.table.LookupIPv4(dst)
 
 		case ipv6.Version:
 			if len(elem.packet) < ipv6.HeaderLen {
 				continue
 			}
 			dst := elem.packet[IPv6offsetDst : IPv6offsetDst+net.IPv6len]
-			peer = device.routingTable.LookupIPv6(dst)
+			peer = device.routing.table.LookupIPv6(dst)
 
 		default:
 			logDebug.Println("Received packet with unknown IP version")
@@ -187,9 +187,13 @@ func (device *Device) RoutineReadFromTUN() {
 func (peer *Peer) RoutineNonce() {
 	var keyPair *KeyPair
 
+	defer peer.routines.stopping.Done()
+
 	device := peer.device
 	logDebug := device.log.Debug
 	logDebug.Println("Routine, nonce worker, started for peer", peer.String())
+
+	peer.routines.starting.Done()
 
 	for {
 	NextPacket:

@@ -137,6 +137,10 @@ func init() {
 }
 
 func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, error) {
+
+	device.noise.mutex.Lock()
+	defer device.noise.mutex.Unlock()
+
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
 	defer handshake.mutex.Unlock()
@@ -187,7 +191,7 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 			ss[:],
 		)
 		aead, _ := chacha20poly1305.New(key[:])
-		aead.Seal(msg.Static[:0], ZeroNonce[:], device.publicKey[:], handshake.hash[:])
+		aead.Seal(msg.Static[:0], ZeroNonce[:], device.noise.publicKey[:], handshake.hash[:])
 	}()
 	handshake.mixHash(msg.Static[:])
 
@@ -212,16 +216,19 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 }
 
 func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
-	if msg.Type != MessageInitiationType {
-		return nil
-	}
-
 	var (
 		hash     [blake2s.Size]byte
 		chainKey [blake2s.Size]byte
 	)
 
-	mixHash(&hash, &InitialHash, device.publicKey[:])
+	if msg.Type != MessageInitiationType {
+		return nil
+	}
+
+	device.noise.mutex.RLock()
+	defer device.noise.mutex.RUnlock()
+
+	mixHash(&hash, &InitialHash, device.noise.publicKey[:])
 	mixHash(&hash, &hash, msg.Ephemeral[:])
 	mixKey(&chainKey, &InitialChainKey, msg.Ephemeral[:])
 
@@ -231,7 +238,7 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	var peerPK NoisePublicKey
 	func() {
 		var key [chacha20poly1305.KeySize]byte
-		ss := device.privateKey.sharedSecret(msg.Ephemeral)
+		ss := device.noise.privateKey.sharedSecret(msg.Ephemeral)
 		KDF2(&chainKey, &key, chainKey[:], ss[:])
 		aead, _ := chacha20poly1305.New(key[:])
 		_, err = aead.Open(peerPK[:0], ZeroNonce[:], msg.Static[:], hash[:])
@@ -407,7 +414,7 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 		}()
 
 		func() {
-			ss := device.privateKey.sharedSecret(msg.Ephemeral)
+			ss := device.noise.privateKey.sharedSecret(msg.Ephemeral)
 			mixKey(&chainKey, &chainKey, ss[:])
 			setZero(ss[:])
 		}()

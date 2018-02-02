@@ -372,7 +372,7 @@ func (device *Device) RoutineHandshake() {
 
 				// check ratelimiter
 
-				if !device.ratelimiter.Allow(elem.endpoint.DstIP()) {
+				if !device.rate.limiter.Allow(elem.endpoint.DstIP()) {
 					continue
 				}
 			}
@@ -495,19 +495,23 @@ func (device *Device) RoutineHandshake() {
 
 func (peer *Peer) RoutineSequentialReceiver() {
 
+	defer peer.routines.stopping.Done()
+
 	device := peer.device
 
 	logInfo := device.log.Info
 	logError := device.log.Error
 	logDebug := device.log.Debug
-	logDebug.Println("Routine, sequential receiver, started for peer", peer.id)
+	logDebug.Println("Routine, sequential receiver, started for peer", peer.String())
+
+	peer.routines.starting.Done()
 
 	for {
 
 		select {
 
 		case <-peer.routines.stop.Wait():
-			logDebug.Println("Routine, sequential receiver, stopped for peer", peer.id)
+			logDebug.Println("Routine, sequential receiver, stopped for peer", peer.String())
 			return
 
 		case elem := <-peer.queue.inbound:
@@ -581,7 +585,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				// verify IPv4 source
 
 				src := elem.packet[IPv4offsetSrc : IPv4offsetSrc+net.IPv4len]
-				if device.routingTable.LookupIPv4(src) != peer {
+				if device.routing.table.LookupIPv4(src) != peer {
 					logInfo.Println(
 						"IPv4 packet with disallowed source address from",
 						peer.String(),
@@ -609,7 +613,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				// verify IPv6 source
 
 				src := elem.packet[IPv6offsetSrc : IPv6offsetSrc+net.IPv6len]
-				if device.routingTable.LookupIPv6(src) != peer {
+				if device.routing.table.LookupIPv6(src) != peer {
 					logInfo.Println(
 						"IPv6 packet with disallowed source address from",
 						peer.String(),

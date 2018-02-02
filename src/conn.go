@@ -65,12 +65,12 @@ func unsafeCloseBind(device *Device) error {
 }
 
 func (device *Device) BindUpdate() error {
-	device.mutex.Lock()
-	defer device.mutex.Unlock()
 
-	netc := &device.net
-	netc.mutex.Lock()
-	defer netc.mutex.Unlock()
+	device.net.mutex.Lock()
+	defer device.net.mutex.Unlock()
+
+	device.peers.mutex.Lock()
+	defer device.peers.mutex.Unlock()
 
 	// close existing sockets
 
@@ -85,6 +85,7 @@ func (device *Device) BindUpdate() error {
 		// bind to new port
 
 		var err error
+		netc := &device.net
 		netc.bind, netc.port, err = CreateBind(netc.port)
 		if err != nil {
 			netc.bind = nil
@@ -100,12 +101,12 @@ func (device *Device) BindUpdate() error {
 
 		// clear cached source addresses
 
-		for _, peer := range device.peers {
+		for _, peer := range device.peers.keyMap {
 			peer.mutex.Lock()
+			defer peer.mutex.Unlock()
 			if peer.endpoint != nil {
 				peer.endpoint.ClearSrc()
 			}
-			peer.mutex.Unlock()
 		}
 
 		// start receiving routines
@@ -120,10 +121,8 @@ func (device *Device) BindUpdate() error {
 }
 
 func (device *Device) BindClose() error {
-	device.mutex.Lock()
 	device.net.mutex.Lock()
 	err := unsafeCloseBind(device)
 	device.net.mutex.Unlock()
-	device.mutex.Unlock()
 	return err
 }

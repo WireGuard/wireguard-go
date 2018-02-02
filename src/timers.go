@@ -303,7 +303,7 @@ func (peer *Peer) RoutineTimerHandler() {
 			err := peer.sendNewHandshake()
 			if err != nil {
 				logInfo.Println(
-					"Failed to send handshake to peer:", peer.String())
+					"Failed to send handshake to peer:", peer.String(), "(", err, ")")
 			}
 
 		case <-peer.timer.handshakeDeadline.Wait():
@@ -326,7 +326,7 @@ func (peer *Peer) RoutineTimerHandler() {
 			err := peer.sendNewHandshake()
 			if err != nil {
 				logInfo.Println(
-					"Failed to send handshake to peer:", peer.String())
+					"Failed to send handshake to peer:", peer.String(), "(", err, ")")
 			}
 
 			peer.timer.handshakeDeadline.Reset(RekeyAttemptTime)
