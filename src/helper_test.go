@@ -28,8 +28,8 @@ func (tun *DummyTUN) MTU() (int, error) {
 	return tun.mtu, nil
 }
 
-func (tun *DummyTUN) Write(d []byte) (int, error) {
-	tun.packets <- d
+func (tun *DummyTUN) Write(d []byte, offset int) (int, error) {
+	tun.packets <- d[offset:]
 	return len(d), nil
 }
 
@@ -41,9 +41,9 @@ func (tun *DummyTUN) Events() chan TUNEvent {
 	return tun.events
 }
 
-func (tun *DummyTUN) Read(d []byte) (int, error) {
+func (tun *DummyTUN) Read(d []byte, offset int) (int, error) {
 	t := <-tun.packets
-	copy(d, t)
+	copy(d[offset:], t)
 	return len(t), nil
 }
 

@@ -154,15 +154,15 @@ func (peer *Peer) SendBuffer(buffer []byte) error {
 	peer.device.net.mutex.RLock()
 	defer peer.device.net.mutex.RUnlock()
 
+	if peer.device.net.bind == nil {
+		return errors.New("No bind")
+	}
+
 	peer.mutex.RLock()
 	defer peer.mutex.RUnlock()
 
 	if peer.endpoint == nil {
 		return errors.New("No known endpoint for peer")
-	}
-
-	if peer.device.net.bind == nil {
-		return errors.New("No bind")
 	}
 
 	return peer.device.net.bind.Send(buffer, peer.endpoint)
@@ -196,16 +196,19 @@ func (peer *Peer) Start() {
 
 	peer.routines.mutex.Lock()
 	defer peer.routines.mutex.Unlock()
+
+	if peer.isRunning.Get() {
+		return
+	}
+
 	peer.device.log.Debug.Println("Starting:", peer.String())
 
-	// stop & wait for ongoing routines (if any)
+	// sanity check : these should be 0
 
-	peer.isRunning.Set(false)
-	peer.routines.stop.Broadcast()
 	peer.routines.starting.Wait()
 	peer.routines.stopping.Wait()
 
-	// prepare queues
+	// prepare queues and signals
 
 	peer.signal.newKeyPair = NewSignal()
 	peer.signal.handshakeBegin = NewSignal()
@@ -216,9 +219,11 @@ func (peer *Peer) Start() {
 	peer.queue.outbound = make(chan *QueueOutboundElement, QueueOutboundSize)
 	peer.queue.inbound = make(chan *QueueInboundElement, QueueInboundSize)
 
-	// reset signal and start (new) routines
-
 	peer.routines.stop = NewSignal()
+	peer.isRunning.Set(true)
+
+	// wait for routines to start
+
 	peer.routines.starting.Add(PeerRoutineNumber)
 	peer.routines.stopping.Add(PeerRoutineNumber)
 
@@ -238,14 +243,27 @@ func (peer *Peer) Stop() {
 	peer.routines.mutex.Lock()
 	defer peer.routines.mutex.Unlock()
 
+	if !peer.isRunning.Swap(false) {
+		return
+	}
+
 	device := peer.device
 	device.log.Debug.Println("Stopping:", peer.String())
 
-	// stop & wait for ongoing peer routines (if any)
+	// stop & wait for ongoing peer routines
 
 	peer.routines.stop.Broadcast()
 	peer.routines.starting.Wait()
 	peer.routines.stopping.Wait()
+
+	// stop timers
+
+	peer.timer.keepalivePersistent.Stop()
+	peer.timer.keepalivePassive.Stop()
+	peer.timer.zeroAllKeys.Stop()
+	peer.timer.handshakeNew.Stop()
+	peer.timer.handshakeDeadline.Stop()
+	peer.timer.handshakeTimeout.Stop()
 
 	// close queues
 
@@ -274,9 +292,4 @@ func (peer *Peer) Stop() {
 	device.indices.Delete(hs.localIndex)
 	hs.Clear()
 	hs.mutex.Unlock()
-
-	// reset signal (to handle repeated stopping)
-
-	peer.routines.stop = NewSignal()
-	peer.isRunning.Set(false)
 }
