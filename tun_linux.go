@@ -313,7 +313,7 @@ func CreateTUNFromFile(name string, fd *os.File) (TUNDevice, error) {
 	}
 
 	go device.RoutineNetlinkListener()
-	// go device.RoutineHackListener() // cross namespace
+	go device.RoutineHackListener() // cross namespace
 
 	// set default MTU
 
@@ -369,7 +369,7 @@ func CreateTUN(name string) (TUNDevice, error) {
 	}
 
 	go device.RoutineNetlinkListener()
-	// go device.RoutineHackListener() // cross namespace
+	go device.RoutineHackListener() // cross namespace
 
 	// set default MTU
 
