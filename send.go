@@ -187,13 +187,16 @@ func (device *Device) RoutineReadFromTUN() {
 func (peer *Peer) RoutineNonce() {
 	var keyPair *KeyPair
 
-	defer peer.routines.stopping.Done()
-
 	device := peer.device
 	logDebug := device.log.Debug
-	logDebug.Println("Routine, nonce worker, started for peer", peer.String())
+
+	defer func() {
+		peer.routines.stopping.Done()
+		logDebug.Println(peer.String(), ": Routine, Nonce Worker, Stopped")
+	}()
 
 	peer.routines.starting.Done()
+	logDebug.Println(peer.String(), ": Routine, Nonce Worker, Started")
 
 	for {
 	NextPacket:
@@ -215,12 +218,13 @@ func (peer *Peer) RoutineNonce() {
 
 				peer.signal.handshakeBegin.Send()
 
-				logDebug.Println("Awaiting key-pair for", peer.String())
+				logDebug.Println(peer.String(), ": Awaiting key-pair")
 
 				select {
 				case <-peer.signal.newKeyPair.Wait():
+					logDebug.Println(peer.String(), ": Obtained awaited key-pair")
 				case <-peer.signal.flushNonceQueue.Wait():
-					logDebug.Println("Clearing queue for", peer.String())
+					logDebug.Println(peer.String(), ": Flushing nonce queue")
 					peer.FlushNonceQueue()
 					goto NextPacket
 				case <-peer.routines.stop.Wait():

@@ -11,6 +11,10 @@ func NewSignal() (s Signal) {
 	return
 }
 
+func (s *Signal) Close() {
+	close(s.C)
+}
+
 func (s *Signal) Disable() {
 	s.enabled.Set(false)
 	s.Clear()
@@ -43,7 +47,9 @@ func (s Signal) Clear() {
 /* Unblocks all listeners (forever)
  */
 func (s Signal) Broadcast() {
-	close(s.C)
+	if s.enabled.Get() {
+		close(s.C)
+	}
 }
 
 /* Wait for the signal

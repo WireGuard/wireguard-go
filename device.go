@@ -339,7 +339,6 @@ func (device *Device) RemoveAllPeers() {
 	defer device.peers.mutex.Unlock()
 
 	for key, peer := range device.peers.keyMap {
-		println("rm", peer.String())
 		unsafeRemovePeer(device, peer, key)
 	}
 

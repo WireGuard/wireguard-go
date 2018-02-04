@@ -200,7 +200,8 @@ func (peer *Peer) Start() {
 		return
 	}
 
-	peer.device.log.Debug.Println("Starting:", peer.String())
+	device := peer.device
+	device.log.Debug.Println(peer.String(), ": Starting...")
 
 	// sanity check : these should be 0
 
@@ -247,7 +248,7 @@ func (peer *Peer) Stop() {
 	}
 
 	device := peer.device
-	device.log.Debug.Println("Stopping:", peer.String())
+	device.log.Debug.Println(peer.String(), ": Stopping...")
 
 	// stop & wait for ongoing peer routines
 
@@ -269,6 +270,13 @@ func (peer *Peer) Stop() {
 	close(peer.queue.nonce)
 	close(peer.queue.outbound)
 	close(peer.queue.inbound)
+
+	// close signals
+
+	peer.signal.newKeyPair.Close()
+	peer.signal.handshakeBegin.Close()
+	peer.signal.handshakeCompleted.Close()
+	peer.signal.flushNonceQueue.Close()
 
 	// clear key pairs
 

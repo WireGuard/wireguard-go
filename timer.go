@@ -12,8 +12,7 @@ type Timer struct {
 /* Starts the timer if not already pending
  */
 func (t *Timer) Start(dur time.Duration) bool {
-	set := t.pending.Swap(true)
-	if !set {
+	if !t.pending.Swap(true) {
 		t.timer.Reset(dur)
 		return true
 	}
@@ -23,8 +22,7 @@ func (t *Timer) Start(dur time.Duration) bool {
 /* Stops the timer
  */
 func (t *Timer) Stop() {
-	set := t.pending.Swap(true)
-	if set {
+	if t.pending.Swap(true) {
 		t.timer.Stop()
 		select {
 		case <-t.timer.C:

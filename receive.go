@@ -430,7 +430,7 @@ func (device *Device) RoutineHandshake() {
 			peer.TimerEphemeralKeyCreated()
 			peer.NewKeyPair()
 
-			logDebug.Println("Creating response message for", peer.String())
+			logDebug.Println(peer.String(), "Creating handshake response")
 
 			writer := bytes.NewBuffer(temp[:0])
 			binary.Write(writer, binary.LittleEndian, response)
@@ -443,7 +443,7 @@ func (device *Device) RoutineHandshake() {
 			if err == nil {
 				peer.TimerAnyAuthenticatedPacketTraversal()
 			} else {
-				logError.Println("Failed to send response to:", peer.String(), err)
+				logError.Println(peer.String(), "Failed to send handshake response", err)
 			}
 
 		case MessageResponseType:
@@ -495,14 +495,17 @@ func (device *Device) RoutineHandshake() {
 
 func (peer *Peer) RoutineSequentialReceiver() {
 
-	defer peer.routines.stopping.Done()
-
 	device := peer.device
-
 	logInfo := device.log.Info
 	logError := device.log.Error
 	logDebug := device.log.Debug
-	logDebug.Println("Routine, sequential receiver, started for peer", peer.String())
+
+	func() {
+		defer peer.routines.stopping.Done()
+		logDebug.Println(peer.String(), ": Routine, Sequential Receiver, Stopped")
+	}()
+
+	logDebug.Println(peer.String(), ": Routine, Sequential Receiver, Started")
 
 	peer.routines.starting.Done()
 
@@ -511,7 +514,6 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		select {
 
 		case <-peer.routines.stop.Wait():
-			logDebug.Println("Routine, sequential receiver, stopped for peer", peer.String())
 			return
 
 		case elem := <-peer.queue.inbound:
