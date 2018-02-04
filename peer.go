@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/sasha-s/go-deadlock"
 	"sync"
 	"time"
 )
@@ -15,7 +14,7 @@ const (
 
 type Peer struct {
 	isRunning                   AtomicBool
-	mutex                       deadlock.RWMutex
+	mutex                       sync.RWMutex
 	persistentKeepaliveInterval uint64
 	keyPairs                    KeyPairs
 	handshake                   Handshake
@@ -29,7 +28,7 @@ type Peer struct {
 	}
 
 	time struct {
-		mutex         deadlock.RWMutex
+		mutex         sync.RWMutex
 		lastSend      time.Time // last send message
 		lastHandshake time.Time // last completed handshake
 		nextKeepalive time.Time
@@ -66,7 +65,7 @@ type Peer struct {
 	}
 
 	routines struct {
-		mutex    deadlock.Mutex // held when stopping / starting routines
+		mutex    sync.Mutex     // held when stopping / starting routines
 		starting sync.WaitGroup // routines pending start
 		stopping sync.WaitGroup // routines pending stop
 		stop     Signal         // size 0, stop all go-routines in peer

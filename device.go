@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/sasha-s/go-deadlock"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -16,31 +15,31 @@ type Device struct {
 	// synchronized resources (locks acquired in order)
 
 	state struct {
-		mutex    deadlock.Mutex
+		mutex    sync.Mutex
 		changing AtomicBool
 		current  bool
 	}
 
 	net struct {
-		mutex  deadlock.RWMutex
+		mutex  sync.RWMutex
 		bind   Bind   // bind interface
 		port   uint16 // listening port
 		fwmark uint32 // mark value (0 = disabled)
 	}
 
 	noise struct {
-		mutex      deadlock.RWMutex
+		mutex      sync.RWMutex
 		privateKey NoisePrivateKey
 		publicKey  NoisePublicKey
 	}
 
 	routing struct {
-		mutex deadlock.RWMutex
+		mutex sync.RWMutex
 		table RoutingTable
 	}
 
 	peers struct {
-		mutex  deadlock.RWMutex
+		mutex  sync.RWMutex
 		keyMap map[NoisePublicKey]*Peer
 	}
 
@@ -101,53 +100,46 @@ func deviceUpdateState(device *Device) {
 		return
 	}
 
-	func() {
+	// compare to current state of device
 
-		// compare to current state of device
+	device.state.mutex.Lock()
 
-		device.state.mutex.Lock()
-		defer device.state.mutex.Unlock()
+	newIsUp := device.isUp.Get()
 
-		newIsUp := device.isUp.Get()
-
-		if newIsUp == device.state.current {
-			device.state.changing.Set(false)
-			return
-		}
-
-		// change state of device
-
-		switch newIsUp {
-		case true:
-			if err := device.BindUpdate(); err != nil {
-				device.isUp.Set(false)
-				break
-			}
-
-			device.peers.mutex.Lock()
-			defer device.peers.mutex.Unlock()
-
-			for _, peer := range device.peers.keyMap {
-				peer.Start()
-			}
-
-		case false:
-			device.BindClose()
-
-			device.peers.mutex.Lock()
-			defer device.peers.mutex.Unlock()
-
-			for _, peer := range device.peers.keyMap {
-				println("stopping peer")
-				peer.Stop()
-			}
-		}
-
-		// update state variables
-
-		device.state.current = newIsUp
+	if newIsUp == device.state.current {
 		device.state.changing.Set(false)
-	}()
+		device.state.mutex.Unlock()
+		return
+	}
+
+	// change state of device
+
+	switch newIsUp {
+	case true:
+		if err := device.BindUpdate(); err != nil {
+			device.isUp.Set(false)
+			break
+		}
+		device.peers.mutex.Lock()
+		for _, peer := range device.peers.keyMap {
+			peer.Start()
+		}
+		device.peers.mutex.Unlock()
+
+	case false:
+		device.BindClose()
+		device.peers.mutex.Lock()
+		for _, peer := range device.peers.keyMap {
+			peer.Stop()
+		}
+		device.peers.mutex.Unlock()
+	}
+
+	// update state variables
+
+	device.state.current = newIsUp
+	device.state.changing.Set(false)
+	device.state.mutex.Unlock()
 
 	// check for state change in the mean time
 
