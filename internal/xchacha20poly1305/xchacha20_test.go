@@ -1,4 +1,4 @@
-package main
+package xchacha20poly1305
 
 import (
 	"encoding/hex"
@@ -60,7 +60,7 @@ func TestXChaCha20(t *testing.T) {
 
 			// test encryption
 
-			ct := XChaCha20Poly1305Encrypt(
+			ct := Encrypt(
 				nil,
 				&nonceArray,
 				pt,
@@ -74,7 +74,7 @@ func TestXChaCha20(t *testing.T) {
 
 			// test decryption
 
-			ptp, err := XChaCha20Poly1305Decrypt(
+			ptp, err := Decrypt(
 				nil,
 				&nonceArray,
 				ct,

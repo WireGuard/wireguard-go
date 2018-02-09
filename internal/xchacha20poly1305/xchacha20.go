@@ -2,14 +2,14 @@
 // Use of this source code is governed by a license that can be
 // found in the LICENSE file.
 
-package main
+package xchacha20poly1305
 
 import (
 	"encoding/binary"
 	"golang.org/x/crypto/chacha20poly1305"
 )
 
-func HChaCha20(out *[32]byte, nonce []byte, key *[32]byte) {
+func hChaCha20(out *[32]byte, nonce []byte, key *[32]byte) {
 
 	v00 := uint32(0x61707865)
 	v01 := uint32(0x3320646e)
@@ -138,7 +138,7 @@ func HChaCha20(out *[32]byte, nonce []byte, key *[32]byte) {
 	binary.LittleEndian.PutUint32(out[28:], v15)
 }
 
-func XChaCha20Poly1305Encrypt(
+func Encrypt(
 	dst []byte,
 	nonceFull *[24]byte,
 	plaintext []byte,
@@ -147,13 +147,13 @@ func XChaCha20Poly1305Encrypt(
 ) []byte {
 	var nonce [chacha20poly1305.NonceSize]byte
 	var derivedKey [chacha20poly1305.KeySize]byte
-	HChaCha20(&derivedKey, nonceFull[:16], key)
+	hChaCha20(&derivedKey, nonceFull[:16], key)
 	aead, _ := chacha20poly1305.New(derivedKey[:])
 	copy(nonce[4:], nonceFull[16:])
 	return aead.Seal(dst, nonce[:], plaintext, additionalData)
 }
 
-func XChaCha20Poly1305Decrypt(
+func Decrypt(
 	dst []byte,
 	nonceFull *[24]byte,
 	plaintext []byte,
@@ -162,7 +162,7 @@ func XChaCha20Poly1305Decrypt(
 ) ([]byte, error) {
 	var nonce [chacha20poly1305.NonceSize]byte
 	var derivedKey [chacha20poly1305.KeySize]byte
-	HChaCha20(&derivedKey, nonceFull[:16], key)
+	hChaCha20(&derivedKey, nonceFull[:16], key)
 	aead, _ := chacha20poly1305.New(derivedKey[:])
 	copy(nonce[4:], nonceFull[16:])
 	return aead.Open(dst, nonce[:], plaintext, additionalData)
