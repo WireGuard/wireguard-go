@@ -1,4 +1,4 @@
-package main
+package tai64n
 
 import (
 	"bytes"
@@ -6,23 +6,21 @@ import (
 	"time"
 )
 
-const (
-	TAI64NBase = uint64(4611686018427387914)
-	TAI64NSize = 12
-)
+const TimestampSize = 12
+const base = uint64(4611686018427387914)
 
-type TAI64N [TAI64NSize]byte
+type Timestamp [TimestampSize]byte
 
-func Timestamp() TAI64N {
-	var tai64n TAI64N
+func Now() Timestamp {
+	var tai64n Timestamp
 	now := time.Now()
-	secs := TAI64NBase + uint64(now.Unix())
+	secs := base + uint64(now.Unix())
 	nano := uint32(now.UnixNano())
 	binary.BigEndian.PutUint64(tai64n[:], secs)
 	binary.BigEndian.PutUint32(tai64n[8:], nano)
 	return tai64n
 }
 
-func (t1 *TAI64N) After(t2 TAI64N) bool {
+func (t1 Timestamp) After(t2 Timestamp) bool {
 	return bytes.Compare(t1[:], t2[:]) > 0
 }

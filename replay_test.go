@@ -24,40 +24,40 @@ func TestReplay(t *testing.T) {
 
 	filter.Init()
 
-	/*  1 */ T(0, true)
-	/*  2 */ T(1, true)
-	/*  3 */ T(1, false)
-	/*  4 */ T(9, true)
-	/*  5 */ T(8, true)
-	/*  6 */ T(7, true)
-	/*  7 */ T(7, false)
-	/*  8 */ T(T_LIM, true)
-	/*  9 */ T(T_LIM-1, true)
-	/* 10 */ T(T_LIM-1, false)
-	/* 11 */ T(T_LIM-2, true)
-	/* 12 */ T(2, true)
-	/* 13 */ T(2, false)
-	/* 14 */ T(T_LIM+16, true)
-	/* 15 */ T(3, false)
-	/* 16 */ T(T_LIM+16, false)
-	/* 17 */ T(T_LIM*4, true)
-	/* 18 */ T(T_LIM*4-(T_LIM-1), true)
-	/* 19 */ T(10, false)
-	/* 20 */ T(T_LIM*4-T_LIM, false)
-	/* 21 */ T(T_LIM*4-(T_LIM+1), false)
-	/* 22 */ T(T_LIM*4-(T_LIM-2), true)
-	/* 23 */ T(T_LIM*4+1-T_LIM, false)
-	/* 24 */ T(0, false)
-	/* 25 */ T(RejectAfterMessages, false)
-	/* 26 */ T(RejectAfterMessages-1, true)
-	/* 27 */ T(RejectAfterMessages, false)
-	/* 28 */ T(RejectAfterMessages-1, false)
-	/* 29 */ T(RejectAfterMessages-2, true)
-	/* 30 */ T(RejectAfterMessages+1, false)
-	/* 31 */ T(RejectAfterMessages+2, false)
-	/* 32 */ T(RejectAfterMessages-2, false)
-	/* 33 */ T(RejectAfterMessages-3, true)
-	/* 34 */ T(0, false)
+	T(0, true)                      /*  1 */
+	T(1, true)                      /*  2 */
+	T(1, false)                     /*  3 */
+	T(9, true)                      /*  4 */
+	T(8, true)                      /*  5 */
+	T(7, true)                      /*  6 */
+	T(7, false)                     /*  7 */
+	T(T_LIM, true)                  /*  8 */
+	T(T_LIM-1, true)                /*  9 */
+	T(T_LIM-1, false)               /* 10 */
+	T(T_LIM-2, true)                /* 11 */
+	T(2, true)                      /* 12 */
+	T(2, false)                     /* 13 */
+	T(T_LIM+16, true)               /* 14 */
+	T(3, false)                     /* 15 */
+	T(T_LIM+16, false)              /* 16 */
+	T(T_LIM*4, true)                /* 17 */
+	T(T_LIM*4-(T_LIM-1), true)      /* 18 */
+	T(10, false)                    /* 19 */
+	T(T_LIM*4-T_LIM, false)         /* 20 */
+	T(T_LIM*4-(T_LIM+1), false)     /* 21 */
+	T(T_LIM*4-(T_LIM-2), true)      /* 22 */
+	T(T_LIM*4+1-T_LIM, false)       /* 23 */
+	T(0, false)                     /* 24 */
+	T(RejectAfterMessages, false)   /* 25 */
+	T(RejectAfterMessages-1, true)  /* 26 */
+	T(RejectAfterMessages, false)   /* 27 */
+	T(RejectAfterMessages-1, false) /* 28 */
+	T(RejectAfterMessages-2, true)  /* 29 */
+	T(RejectAfterMessages+1, false) /* 30 */
+	T(RejectAfterMessages+2, false) /* 31 */
+	T(RejectAfterMessages-2, false) /* 32 */
+	T(RejectAfterMessages-3, true)  /* 33 */
+	T(0, false)                     /* 34 */
 
 	t.Log("Bulk test 1")
 	filter.Init()
