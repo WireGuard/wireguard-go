@@ -1,12 +1,13 @@
 package main
 
 import (
-	"git.zx2c4.com/wireguard-go/internal/events"
 	"os"
 	"sync/atomic"
 )
 
 const DefaultMTU = 1420
+
+type TUNEvent int
 
 const (
 	TUNEventUp = 1 << iota
@@ -20,7 +21,7 @@ type TUNDevice interface {
 	Write([]byte, int) (int, error) // writes a packet to the device (without any additional headers)
 	MTU() (int, error)              // returns the MTU of the device
 	Name() string                   // returns the current name
-	Events() chan events.Event      // returns a constant channel of events related to the device
+	Events() chan TUNEvent          // returns a constant channel of events related to the device
 	Close() error                   // stops the device and closes the event channel
 }
 
@@ -29,8 +30,7 @@ func (device *Device) RoutineTUNEventReader() {
 	logError := device.log.Error
 
 	for event := range device.tun.device.Events() {
-
-		if event.Contains(TUNEventMTUUpdate) {
+		if event&TUNEventMTUUpdate != 0 {
 			mtu, err := device.tun.device.MTU()
 			old := atomic.LoadInt32(&device.tun.mtu)
 			if err != nil {
@@ -45,16 +45,14 @@ func (device *Device) RoutineTUNEventReader() {
 			}
 		}
 
-		if event.Contains(TUNEventUp) && !device.isUp.Get() {
+		if event&TUNEventUp != 0 && !device.isUp.Get() {
 			logInfo.Println("Interface set up")
 			device.Up()
 		}
 
-		if event.Contains(TUNEventDown) && device.isUp.Get() {
+		if event&TUNEventDown != 0 && device.isUp.Get() {
 			logInfo.Println("Interface set down")
 			device.Down()
 		}
-
-		event.Processed()
 	}
 }

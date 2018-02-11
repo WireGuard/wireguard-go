@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"git.zx2c4.com/wireguard-go/internal/events"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
 	"net"
@@ -53,10 +52,10 @@ const (
 
 type NativeTun struct {
 	fd     *os.File
-	index  int32             // if index
-	name   string            // name of interface
-	errors chan error        // async error handling
-	events chan events.Event // device related events
+	index  int32         // if index
+	name   string        // name of interface
+	errors chan error    // async error handling
+	events chan TUNEvent // device related events
 }
 
 func (tun *NativeTun) File() *os.File {
@@ -72,9 +71,9 @@ func (tun *NativeTun) RoutineHackListener() {
 		_, err := unix.Write(fd, nil)
 		switch err {
 		case unix.EINVAL:
-			tun.events <- events.NewEvent(TUNEventUp)
+			tun.events <- TUNEventUp
 		case unix.EIO:
-			tun.events <- events.NewEvent(TUNEventDown)
+			tun.events <- TUNEventDown
 		default:
 		}
 		time.Sleep(time.Second / 10)
@@ -119,14 +118,14 @@ func (tun *NativeTun) RoutineNetlinkListener() {
 				}
 
 				if info.Flags&unix.IFF_RUNNING != 0 {
-					tun.events <- events.NewEvent(TUNEventUp)
+					tun.events <- TUNEventUp
 				}
 
 				if info.Flags&unix.IFF_RUNNING == 0 {
-					tun.events <- events.NewEvent(TUNEventDown)
+					tun.events <- TUNEventDown
 				}
 
-				tun.events <- events.NewEvent(TUNEventMTUUpdate)
+				tun.events <- TUNEventMTUUpdate
 
 			default:
 				remain = remain[hdr.Len:]
@@ -289,7 +288,7 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	}
 }
 
-func (tun *NativeTun) Events() chan events.Event {
+func (tun *NativeTun) Events() chan TUNEvent {
 	return tun.events
 }
 
@@ -301,7 +300,7 @@ func CreateTUNFromFile(name string, fd *os.File) (TUNDevice, error) {
 	device := &NativeTun{
 		fd:     fd,
 		name:   name,
-		events: make(chan events.Event, 5),
+		events: make(chan TUNEvent, 5),
 		errors: make(chan error, 5),
 	}
 
@@ -358,7 +357,7 @@ func CreateTUN(name string) (TUNDevice, error) {
 	device := &NativeTun{
 		fd:     fd,
 		name:   newName,
-		events: make(chan events.Event, 5),
+		events: make(chan TUNEvent, 5),
 		errors: make(chan error, 5),
 	}
 
