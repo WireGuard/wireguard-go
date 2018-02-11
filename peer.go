@@ -54,8 +54,8 @@ type Peer struct {
 		handshakeDeadline   Timer // complete handshake timeout
 		handshakeTimeout    Timer // current handshake message timeout
 
-		sendLastMinuteHandshake bool
-		needAnotherKeepalive    bool
+		sendLastMinuteHandshake AtomicBool
+		needAnotherKeepalive    AtomicBool
 	}
 
 	queue struct {
@@ -170,15 +170,8 @@ func (peer *Peer) SendBuffer(buffer []byte) error {
 /* Returns a short string identifier for logging
  */
 func (peer *Peer) String() string {
-	if peer.endpoint == nil {
-		return fmt.Sprintf(
-			"peer(unknown %s)",
-			base64.StdEncoding.EncodeToString(peer.handshake.remoteStatic[:]),
-		)
-	}
 	return fmt.Sprintf(
-		"peer(%s %s)",
-		peer.endpoint.DstToString(),
+		"peer(%s)",
 		base64.StdEncoding.EncodeToString(peer.handshake.remoteStatic[:]),
 	)
 }

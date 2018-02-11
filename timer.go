@@ -1,44 +1,52 @@
 package main
 
 import (
+	"sync"
 	"time"
 )
 
 type Timer struct {
-	pending AtomicBool
+	mutex   sync.Mutex
+	pending bool
 	timer   *time.Timer
 }
 
 /* Starts the timer if not already pending
  */
 func (t *Timer) Start(dur time.Duration) bool {
-	if !t.pending.Swap(true) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	started := !t.pending
+	if started {
 		t.timer.Reset(dur)
-		return true
 	}
-	return false
+	return started
 }
 
-/* Stops the timer
- */
 func (t *Timer) Stop() {
-	if t.pending.Swap(true) {
-		t.timer.Stop()
-		select {
-		case <-t.timer.C:
-		default:
-		}
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	t.timer.Stop()
+	select {
+	case <-t.timer.C:
+	default:
 	}
-	t.pending.Set(false)
+	t.pending = false
 }
 
 func (t *Timer) Pending() bool {
-	return t.pending.Get()
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	return t.pending
 }
 
 func (t *Timer) Reset(dur time.Duration) {
-	t.pending.Set(false)
-	t.Start(dur)
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	t.timer.Reset(dur)
 }
 
 func (t *Timer) Wait() <-chan time.Time {
@@ -46,8 +54,8 @@ func (t *Timer) Wait() <-chan time.Time {
 }
 
 func NewTimer() (t Timer) {
-	t.pending.Set(false)
-	t.timer = time.NewTimer(0)
+	t.pending = false
+	t.timer = time.NewTimer(time.Hour)
 	t.timer.Stop()
 	select {
 	case <-t.timer.C:

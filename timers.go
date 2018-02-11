@@ -36,7 +36,7 @@ func (peer *Peer) KeepKeyFreshSending() {
  * NOTE: Not thread safe, but called by sequential receiver!
  */
 func (peer *Peer) KeepKeyFreshReceiving() {
-	if peer.timer.sendLastMinuteHandshake {
+	if peer.timer.sendLastMinuteHandshake.Get() {
 		return
 	}
 	kp := peer.keyPairs.Current()
@@ -50,7 +50,7 @@ func (peer *Peer) KeepKeyFreshReceiving() {
 	send := nonce > RekeyAfterMessages || time.Now().Sub(kp.created) > RekeyAfterTimeReceiving
 	if send {
 		// do a last minute attempt at initiating a new handshake
-		peer.timer.sendLastMinuteHandshake = true
+		peer.timer.sendLastMinuteHandshake.Set(true)
 		peer.signal.handshakeBegin.Send()
 	}
 }
@@ -87,7 +87,7 @@ func (peer *Peer) TimerDataSent() {
  */
 func (peer *Peer) TimerDataReceived() {
 	if !peer.timer.keepalivePassive.Start(KeepaliveTimeout) {
-		peer.timer.needAnotherKeepalive = true
+		peer.timer.needAnotherKeepalive.Set(true)
 	}
 }
 
@@ -238,8 +238,7 @@ func (peer *Peer) RoutineTimerHandler() {
 
 			peer.SendKeepAlive()
 
-			if peer.timer.needAnotherKeepalive {
-				peer.timer.needAnotherKeepalive = false
+			if peer.timer.needAnotherKeepalive.Swap(false) {
 				peer.timer.keepalivePassive.Reset(KeepaliveTimeout)
 			}
 
@@ -342,7 +341,7 @@ func (peer *Peer) RoutineTimerHandler() {
 			peer.timer.handshakeDeadline.Stop()
 			peer.signal.handshakeBegin.Enable()
 
-			peer.timer.sendLastMinuteHandshake = false
+			peer.timer.sendLastMinuteHandshake.Set(false)
 		}
 	}
 }

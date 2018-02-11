@@ -26,6 +26,7 @@ type TUNDevice interface {
 }
 
 func (device *Device) RoutineTUNEventReader() {
+	setUp := false
 	logInfo := device.log.Info
 	logError := device.log.Error
 
@@ -45,13 +46,15 @@ func (device *Device) RoutineTUNEventReader() {
 			}
 		}
 
-		if event&TUNEventUp != 0 && !device.isUp.Get() {
+		if event&TUNEventUp != 0 && !setUp {
 			logInfo.Println("Interface set up")
+			setUp = true
 			device.Up()
 		}
 
-		if event&TUNEventDown != 0 && device.isUp.Get() {
+		if event&TUNEventDown != 0 && setUp {
 			logInfo.Println("Interface set down")
+			setUp = false
 			device.Down()
 		}
 	}
