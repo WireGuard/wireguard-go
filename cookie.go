@@ -62,6 +62,9 @@ func (st *CookieChecker) Init(pk NoisePublicKey) {
 }
 
 func (st *CookieChecker) CheckMAC1(msg []byte) bool {
+	st.mutex.RLock()
+	defer st.mutex.RUnlock()
+
 	size := len(msg)
 	smac2 := size - blake2s.Size128
 	smac1 := smac2 - blake2s.Size128
