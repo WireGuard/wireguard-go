@@ -1,6 +1,7 @@
 package main
 
 import (
+	"git.zx2c4.com/wireguard-go/internal/ratelimiter"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -50,7 +51,7 @@ type Device struct {
 
 	rate struct {
 		underLoadUntil atomic.Value
-		limiter        Ratelimiter
+		limiter        ratelimiter.Ratelimiter
 	}
 
 	pool struct {
@@ -300,7 +301,6 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 
 	go device.RoutineReadFromTUN()
 	go device.RoutineTUNEventReader()
-	go device.rate.limiter.RoutineGarbageCollector(device.signal.stop)
 
 	return device
 }
@@ -355,6 +355,7 @@ func (device *Device) Close() {
 	device.BindClose()
 	device.isUp.Set(false)
 	device.RemoveAllPeers()
+	device.rate.limiter.Close()
 	device.log.Info.Println("Interface closed")
 }
 

@@ -120,7 +120,7 @@ func (peer *Peer) TimerAnyAuthenticatedPacketTraversal() {
  */
 func (peer *Peer) TimerHandshakeComplete() {
 	peer.signal.handshakeCompleted.Send()
-	peer.device.log.Info.Println("Negotiated new handshake for", peer.String())
+	peer.device.log.Info.Println(peer.String(), ": New handshake completed")
 }
 
 /* Event:

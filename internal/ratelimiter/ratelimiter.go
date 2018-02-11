@@ -1,4 +1,4 @@
-package main
+package ratelimiter
 
 /* Copyright (C) 2015-2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved. */
 
@@ -26,21 +26,48 @@ type RatelimiterEntry struct {
 }
 
 type Ratelimiter struct {
-	mutex              sync.RWMutex
-	lastGarbageCollect time.Time
-	tableIPv4          map[[net.IPv4len]byte]*RatelimiterEntry
-	tableIPv6          map[[net.IPv6len]byte]*RatelimiterEntry
+	mutex     sync.RWMutex
+	stop      chan struct{}
+	tableIPv4 map[[net.IPv4len]byte]*RatelimiterEntry
+	tableIPv6 map[[net.IPv6len]byte]*RatelimiterEntry
+}
+
+func (rate *Ratelimiter) Close() {
+	rate.mutex.Lock()
+	defer rate.mutex.Unlock()
+
+	if rate.stop != nil {
+		close(rate.stop)
+	}
 }
 
 func (rate *Ratelimiter) Init() {
 	rate.mutex.Lock()
 	defer rate.mutex.Unlock()
+
+	if rate.stop != nil {
+		close(rate.stop)
+	}
+
+	rate.stop = make(chan struct{})
 	rate.tableIPv4 = make(map[[net.IPv4len]byte]*RatelimiterEntry)
 	rate.tableIPv6 = make(map[[net.IPv6len]byte]*RatelimiterEntry)
-	rate.lastGarbageCollect = time.Now()
+
+	go func() {
+		timer := time.NewTimer(time.Second)
+		for {
+			select {
+			case <-rate.stop:
+				return
+			case <-timer.C:
+				rate.garbageCollectEntries()
+				timer.Reset(time.Second)
+			}
+		}
+	}()
 }
 
-func (rate *Ratelimiter) GarbageCollectEntries() {
+func (rate *Ratelimiter) garbageCollectEntries() {
 	rate.mutex.Lock()
 
 	// remove unused IPv4 entries
@@ -64,19 +91,6 @@ func (rate *Ratelimiter) GarbageCollectEntries() {
 	}
 
 	rate.mutex.Unlock()
-}
-
-func (rate *Ratelimiter) RoutineGarbageCollector(stop Signal) {
-	timer := time.NewTimer(time.Second)
-	for {
-		select {
-		case <-stop.Wait():
-			return
-		case <-timer.C:
-			rate.GarbageCollectEntries()
-			timer.Reset(time.Second)
-		}
-	}
 }
 
 func (rate *Ratelimiter) Allow(ip net.IP) bool {
