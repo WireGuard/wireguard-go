@@ -28,7 +28,7 @@ func TestRatelimiter(t *testing.T) {
 		)
 	}
 
-	for i := 0; i < RatelimiterPacketsBurstable; i++ {
+	for i := 0; i < packetsBurstable; i++ {
 		Add(RatelimiterResult{
 			allowed: true,
 			text:    "inital burst",
@@ -42,7 +42,7 @@ func TestRatelimiter(t *testing.T) {
 
 	Add(RatelimiterResult{
 		allowed: true,
-		wait:    Nano(time.Second.Nanoseconds() / RatelimiterPacketsPerSecond),
+		wait:    Nano(time.Second.Nanoseconds() / packetsPerSecond),
 		text:    "filling tokens for single packet",
 	})
 
@@ -53,7 +53,7 @@ func TestRatelimiter(t *testing.T) {
 
 	Add(RatelimiterResult{
 		allowed: true,
-		wait:    2 * Nano(time.Second.Nanoseconds()/RatelimiterPacketsPerSecond),
+		wait:    2 * (Nano(time.Second.Nanoseconds() / packetsPerSecond)),
 		text:    "filling tokens for two packet burst",
 	})
 
