@@ -1,7 +1,7 @@
 package main
 
 import (
-	"git.zx2c4.com/wireguard-go/internal/ratelimiter"
+	"./ratelimiter"
 	"runtime"
 	"sync"
 	"sync/atomic"

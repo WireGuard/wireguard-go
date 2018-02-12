@@ -1,9 +1,9 @@
 package main
 
 import (
+	"./xchacha20poly1305"
 	"crypto/hmac"
 	"crypto/rand"
-	"git.zx2c4.com/wireguard-go/internal/xchacha20poly1305"
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20poly1305"
 	"sync"
