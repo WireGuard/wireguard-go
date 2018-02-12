@@ -2,7 +2,7 @@
 // Use of this source code is governed by a license that can be
 // found in the LICENSE file.
 
-package xchacha20poly1305
+package main
 
 import (
 	"encoding/binary"
@@ -138,7 +138,7 @@ func hChaCha20(out *[32]byte, nonce []byte, key *[32]byte) {
 	binary.LittleEndian.PutUint32(out[28:], v15)
 }
 
-func Encrypt(
+func XChaCha20Poly1305Encrypt(
 	dst []byte,
 	nonceFull *[24]byte,
 	plaintext []byte,
@@ -153,7 +153,7 @@ func Encrypt(
 	return aead.Seal(dst, nonce[:], plaintext, additionalData)
 }
 
-func Decrypt(
+func XChaCha20Poly1305Decrypt(
 	dst []byte,
 	nonceFull *[24]byte,
 	plaintext []byte,
