@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/hmac"
 	"crypto/rand"
+	"git.zx2c4.com/wireguard-go/internal/xchacha20poly1305"
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20poly1305"
 	"sync"
@@ -157,7 +158,7 @@ func (st *CookieChecker) CreateReply(
 		return nil, err
 	}
 
-	XChaCha20Poly1305Encrypt(
+	xchacha20poly1305.Encrypt(
 		reply.Cookie[:0],
 		&reply.Nonce,
 		cookie[:],
@@ -201,7 +202,7 @@ func (st *CookieGenerator) ConsumeReply(msg *MessageCookieReply) bool {
 
 	var cookie [blake2s.Size128]byte
 
-	_, err := XChaCha20Poly1305Decrypt(
+	_, err := xchacha20poly1305.Decrypt(
 		cookie[:0],
 		&msg.Nonce,
 		msg.Cookie[:],

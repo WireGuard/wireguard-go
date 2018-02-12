@@ -1,4 +1,4 @@
-package main
+package tai64n
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ const base = uint64(4611686018427387914)
 
 type Timestamp [TimestampSize]byte
 
-func TimestampNow() Timestamp {
+func Now() Timestamp {
 	var tai64n Timestamp
 	now := time.Now()
 	secs := base + uint64(now.Unix())

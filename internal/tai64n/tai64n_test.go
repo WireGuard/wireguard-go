@@ -1,4 +1,4 @@
-package main
+package tai64n
 
 import (
 	"testing"
@@ -9,10 +9,10 @@ import (
  * as used by WireGuard.
  */
 func TestMonotonic(t *testing.T) {
-	old := TimestampNow()
+	old := Now()
 	for i := 0; i < 10000; i++ {
 		time.Sleep(time.Nanosecond)
-		next := TimestampNow()
+		next := Now()
 		if !next.After(old) {
 			t.Error("TAI64N, not monotonically increasing on nano-second scale")
 		}

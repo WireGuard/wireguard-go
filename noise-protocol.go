@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"git.zx2c4.com/wireguard-go/internal/tai64n"
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/poly1305"
@@ -58,7 +59,7 @@ type MessageInitiation struct {
 	Sender    uint32
 	Ephemeral NoisePublicKey
 	Static    [NoisePublicKeySize + poly1305.TagSize]byte
-	Timestamp [TimestampSize + poly1305.TagSize]byte
+	Timestamp [tai64n.TimestampSize + poly1305.TagSize]byte
 	MAC1      [blake2s.Size128]byte
 	MAC2      [blake2s.Size128]byte
 }
@@ -99,7 +100,7 @@ type Handshake struct {
 	remoteStatic              NoisePublicKey           // long term key
 	remoteEphemeral           NoisePublicKey           // ephemeral public key
 	precomputedStaticStatic   [NoisePublicKeySize]byte // precomputed shared secret
-	lastTimestamp             Timestamp
+	lastTimestamp             tai64n.Timestamp
 	lastInitiationConsumption time.Time
 }
 
@@ -206,7 +207,7 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 
 	// encrypt timestamp
 
-	timestamp := TimestampNow()
+	timestamp := tai64n.Now()
 	func() {
 		var key [chacha20poly1305.KeySize]byte
 		KDF2(
@@ -271,7 +272,7 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 
 	// verify identity
 
-	var timestamp Timestamp
+	var timestamp tai64n.Timestamp
 	var key [chacha20poly1305.KeySize]byte
 
 	handshake.mutex.RLock()

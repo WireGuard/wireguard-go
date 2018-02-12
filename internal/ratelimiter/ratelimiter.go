@@ -1,4 +1,4 @@
-package main
+package ratelimiter
 
 /* Copyright (C) 2015-2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved. */
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"git.zx2c4.com/wireguard-go/internal/ratelimiter"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -50,7 +51,7 @@ type Device struct {
 
 	rate struct {
 		underLoadUntil atomic.Value
-		limiter        Ratelimiter
+		limiter        ratelimiter.Ratelimiter
 	}
 
 	pool struct {
