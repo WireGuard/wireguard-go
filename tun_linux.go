@@ -16,38 +16,9 @@ import (
 	"unsafe"
 )
 
-// #include <string.h>
-// #include <unistd.h>
-// #include <net/if.h>
-// #include <netinet/in.h>
-// #include <linux/netlink.h>
-// #include <linux/rtnetlink.h>
-//
-// /* Creates a netlink socket
-//  * listening to the RTMGRP_LINK multicast group
-//  */
-//
-// int bind_rtmgrp() {
-//   int nl_sock = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
-//   if (nl_sock < 0)
-//     return -1;
-//
-//	 struct sockaddr_nl addr;
-//   memset ((void *) &addr, 0, sizeof (addr));
-//   addr.nl_family = AF_NETLINK;
-//   addr.nl_pid = getpid ();
-//   addr.nl_groups = RTMGRP_LINK | RTMGRP_IPV4_IFADDR | RTMGRP_IPV6_IFADDR;
-//
-//   if (bind(nl_sock, (struct sockaddr *) &addr, sizeof (addr)) < 0)
-//     return -1;
-//
-//   return nl_sock;
-// }
-import "C"
-
 const (
-	CloneDevicePath = "/dev/net/tun"
-	IFReqSize       = unix.IFNAMSIZ + 64
+	cloneDevicePath = "/dev/net/tun"
+	ifReqSize       = unix.IFNAMSIZ + 64
 )
 
 type NativeTun struct {
@@ -56,6 +27,26 @@ type NativeTun struct {
 	name   string        // name of interface
 	errors chan error    // async error handling
 	events chan TUNEvent // device related events
+}
+
+func toRTMGRP(sc uint) uint {
+	return 1 << (sc - 1)
+}
+
+func (tun *NativeTun) bindRTMGRP() (int, error) {
+	groups := toRTMGRP(unix.RTNLGRP_LINK)
+	groups |= toRTMGRP(unix.RTNLGRP_IPV4_IFADDR)
+	groups |= toRTMGRP(unix.RTNLGRP_IPV6_IFADDR)
+	sock, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW, unix.NETLINK_ROUTE)
+	if err != nil {
+		return 0, err
+	}
+	saddr := &unix.SockaddrNetlink{
+		Family: unix.AF_NETLINK,
+		Pid:    uint32(os.Getpid()),
+		Groups: uint32(groups),
+	}
+	return sock, unix.Bind(sock, saddr)
 }
 
 func (tun *NativeTun) File() *os.File {
@@ -81,9 +72,8 @@ func (tun *NativeTun) RoutineHackListener() {
 }
 
 func (tun *NativeTun) RoutineNetlinkListener() {
-
-	sock := int(C.bind_rtmgrp())
-	if sock < 0 {
+	sock, err := tun.bindRTMGRP()
+	if err != nil {
 		tun.errors <- errors.New("Failed to create netlink event listener")
 		return
 	}
@@ -159,7 +149,7 @@ func getIFIndex(name string) (int32, error) {
 
 	defer unix.Close(fd)
 
-	var ifr [IFReqSize]byte
+	var ifr [ifReqSize]byte
 	copy(ifr[:], name)
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
@@ -194,7 +184,7 @@ func (tun *NativeTun) setMTU(n int) error {
 
 	// do ioctl call
 
-	var ifr [IFReqSize]byte
+	var ifr [ifReqSize]byte
 	copy(ifr[:], tun.name)
 	binary.LittleEndian.PutUint32(ifr[16:20], uint32(n))
 	_, _, errno := unix.Syscall(
@@ -229,7 +219,7 @@ func (tun *NativeTun) MTU() (int, error) {
 
 	// do ioctl call
 
-	var ifr [IFReqSize]byte
+	var ifr [ifReqSize]byte
 	copy(ifr[:], tun.name)
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
@@ -324,15 +314,15 @@ func CreateTUN(name string) (TUNDevice, error) {
 
 	// open clone device
 
-	fd, err := os.OpenFile(CloneDevicePath, os.O_RDWR, 0)
+	fd, err := os.OpenFile(cloneDevicePath, os.O_RDWR, 0)
 	if err != nil {
 		return nil, err
 	}
 
 	// create new device
 
-	var ifr [IFReqSize]byte
-	var flags uint16 = unix.IFF_TUN // | unix.IFF_NO_PI
+	var ifr [ifReqSize]byte
+	var flags uint16 = unix.IFF_TUN // | unix.IFF_NO_PI (disabled for TUN status hack)
 	nameBytes := []byte(name)
 	if len(nameBytes) >= unix.IFNAMSIZ {
 		return nil, errors.New("Interface name too long")
