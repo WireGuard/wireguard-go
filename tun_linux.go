@@ -283,7 +283,7 @@ func (tun *NativeTun) Events() chan TUNEvent {
 }
 
 func (tun *NativeTun) Close() error {
-	return nil
+	return tun.fd.Close()
 }
 
 func CreateTUNFromFile(name string, fd *os.File) (TUNDevice, error) {
