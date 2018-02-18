@@ -64,6 +64,32 @@ func unsafeCloseBind(device *Device) error {
 	return err
 }
 
+func (device *Device) BindSetMark(mark uint32) error {
+
+	device.net.mutex.Lock()
+	defer device.net.mutex.Unlock()
+
+	device.peers.mutex.Lock()
+	defer device.peers.mutex.Unlock()
+
+	// check if modified
+
+	if device.net.fwmark == mark {
+		return nil
+	}
+
+	// update fwmark on existing bind
+
+	device.net.fwmark = mark
+	if device.isUp.Get() && device.net.bind != nil {
+		if err := device.net.bind.SetMark(mark); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (device *Device) BindUpdate() error {
 
 	device.net.mutex.Lock()
@@ -89,14 +115,17 @@ func (device *Device) BindUpdate() error {
 		netc.bind, netc.port, err = CreateBind(netc.port)
 		if err != nil {
 			netc.bind = nil
+			netc.port = 0
 			return err
 		}
 
-		// set mark
+		// set fwmark
 
-		err = netc.bind.SetMark(netc.fwmark)
-		if err != nil {
-			return err
+		if netc.fwmark != 0 {
+			err = netc.bind.SetMark(netc.fwmark)
+			if err != nil {
+				return err
+			}
 		}
 
 		// clear cached source addresses

@@ -191,11 +191,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 				logDebug.Println("UAPI: Updating fwmark")
 
-				device.net.mutex.Lock()
-				device.net.fwmark = uint32(fwmark)
-				device.net.mutex.Unlock()
-
-				if err := device.BindUpdate(); err != nil {
+				if err := device.BindSetMark(uint32(fwmark)); err != nil {
 					logError.Println("Failed to update fwmark:", err)
 					return &IPCError{Code: ipcErrorPortInUse}
 				}
