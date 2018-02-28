@@ -27,6 +27,7 @@ type NativeTun struct {
 	name   string        // name of interface
 	errors chan error    // async error handling
 	events chan TUNEvent // device related events
+	nopi   bool          // the device was pased IFF_NO_PI
 }
 
 func toRTMGRP(sc uint) uint {
@@ -242,21 +243,25 @@ func (tun *NativeTun) MTU() (int, error) {
 
 func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 
-	// reserve space for header
-
-	buff = buff[offset-4:]
-
-	// add packet information header
-
-	buff[0] = 0x00
-	buff[1] = 0x00
-
-	if buff[4] == ipv6.Version<<4 {
-		buff[2] = 0x86
-		buff[3] = 0xdd
+	if tun.nopi {
+		buff = buff[offset:]
 	} else {
-		buff[2] = 0x08
-		buff[3] = 0x00
+		// reserve space for header
+
+		buff = buff[offset-4:]
+
+		// add packet information header
+
+		buff[0] = 0x00
+		buff[1] = 0x00
+
+		if buff[4] == ipv6.Version<<4 {
+			buff[2] = 0x86
+			buff[3] = 0xdd
+		} else {
+			buff[2] = 0x08
+			buff[3] = 0x00
+		}
 	}
 
 	// write
@@ -269,12 +274,16 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	case err := <-tun.errors:
 		return 0, err
 	default:
-		buff := buff[offset-4:]
-		n, err := tun.fd.Read(buff[:])
-		if n < 4 {
-			return 0, err
+		if tun.nopi {
+			return tun.fd.Read(buff[offset:])
+		} else {
+			buff := buff[offset-4:]
+			n, err := tun.fd.Read(buff[:])
+			if n < 4 {
+				return 0, err
+			}
+			return n - 4, err
 		}
-		return n - 4, err
 	}
 }
 
@@ -292,6 +301,7 @@ func CreateTUNFromFile(name string, fd *os.File) (TUNDevice, error) {
 		name:   name,
 		events: make(chan TUNEvent, 5),
 		errors: make(chan error, 5),
+		nopi:   false,
 	}
 
 	// start event listener
@@ -349,6 +359,7 @@ func CreateTUN(name string) (TUNDevice, error) {
 		name:   newName,
 		events: make(chan TUNEvent, 5),
 		errors: make(chan error, 5),
+		nopi:   false,
 	}
 
 	// start event listener
