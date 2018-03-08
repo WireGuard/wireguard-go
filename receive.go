@@ -475,7 +475,7 @@ func (device *Device) RoutineHandshake() {
 			peer.endpoint = elem.endpoint
 			peer.mutex.Unlock()
 
-			logDebug.Println("Received handshake initiation from", peer)
+			logDebug.Println(peer, ": Received handshake initiation")
 
 			peer.TimerEphemeralKeyCreated()
 
