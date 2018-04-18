@@ -105,7 +105,7 @@ func (peer *Peer) TimerAnyAuthenticatedPacketReceived() {
  * Push persistent keep-alive into the future
  */
 func (peer *Peer) TimerAnyAuthenticatedPacketTraversal() {
-	interval := atomic.LoadUint64(&peer.persistentKeepaliveInterval)
+	interval := peer.persistentKeepaliveInterval
 	if interval > 0 {
 		duration := time.Duration(interval) * time.Second
 		peer.timer.keepalivePersistent.Reset(duration)
@@ -199,7 +199,7 @@ func (peer *Peer) RoutineTimerHandler() {
 	peer.timer.handshakeNew.Stop()
 	peer.timer.zeroAllKeys.Stop()
 
-	interval := atomic.LoadUint64(&peer.persistentKeepaliveInterval)
+	interval := peer.persistentKeepaliveInterval
 	if interval > 0 {
 		duration := time.Duration(interval) * time.Second
 		peer.timer.keepalivePersistent.Reset(duration)
@@ -225,7 +225,7 @@ func (peer *Peer) RoutineTimerHandler() {
 
 		case <-peer.timer.keepalivePersistent.Wait():
 
-			interval := atomic.LoadUint64(&peer.persistentKeepaliveInterval)
+			interval := peer.persistentKeepaliveInterval
 			if interval > 0 {
 				logDebug.Println(peer.String(), ": Send keep-alive (persistent)")
 				peer.timer.keepalivePassive.Stop()

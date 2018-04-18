@@ -84,9 +84,7 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 			send(fmt.Sprintf("last_handshake_time_nsec=%d", nano))
 			send(fmt.Sprintf("tx_bytes=%d", peer.stats.txBytes))
 			send(fmt.Sprintf("rx_bytes=%d", peer.stats.rxBytes))
-			send(fmt.Sprintf("persistent_keepalive_interval=%d",
-				atomic.LoadUint64(&peer.persistentKeepaliveInterval),
-			))
+			send(fmt.Sprintf("persistent_keepalive_interval=%d", peer.persistentKeepaliveInterval))
 
 			for _, ip := range device.routing.table.AllowedIPs(peer) {
 				send("allowed_ip=" + ip.String())
@@ -322,10 +320,8 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 
-				old := atomic.SwapUint64(
-					&peer.persistentKeepaliveInterval,
-					secs,
-				)
+				old := peer.persistentKeepaliveInterval
+				peer.persistentKeepaliveInterval = uint16(secs)
 
 				// send immediate keep-alive
 

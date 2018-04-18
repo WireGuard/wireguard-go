@@ -13,13 +13,14 @@ const (
 )
 
 type Peer struct {
-	persistentKeepaliveInterval uint64
 	isRunning                   AtomicBool
 	mutex                       sync.RWMutex
 	keyPairs                    KeyPairs
 	handshake                   Handshake
 	device                      *Device
 	endpoint                    Endpoint
+	persistentKeepaliveInterval uint16
+	_                           uint32 // padding for alignment
 
 	stats struct {
 		txBytes           uint64 // bytes send to peer (endpoint)
