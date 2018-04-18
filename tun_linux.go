@@ -11,6 +11,7 @@ import (
 	"golang.org/x/sys/unix"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	"unsafe"
@@ -130,10 +131,6 @@ func (tun *NativeTun) isUp() (bool, error) {
 	return inter.Flags&net.FlagUp != 0, err
 }
 
-func (tun *NativeTun) Name() string {
-	return tun.name
-}
-
 func getDummySock() (int, error) {
 	return unix.Socket(
 		unix.AF_INET,
@@ -229,7 +226,7 @@ func (tun *NativeTun) MTU() (int, error) {
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)
 	if errno != 0 {
-		return 0, errors.New("Failed to get MTU of TUN device")
+		return 0, errors.New("Failed to get MTU of TUN device: " + strconv.FormatInt(int64(errno), 10))
 	}
 
 	// convert result to signed 32-bit int
@@ -239,6 +236,22 @@ func (tun *NativeTun) MTU() (int, error) {
 		return int(toInt32(val)), nil
 	}
 	return int(val), nil
+}
+
+func (tun *NativeTun) Name() (string, error) {
+
+	var ifr [ifReqSize]byte
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
+		tun.fd.Fd(),
+		uintptr(unix.TUNGETIFF),
+		uintptr(unsafe.Pointer(&ifr[0])),
+	)
+	if errno != 0 {
+		return "", errors.New("Failed to get name of TUN device: " + strconv.FormatInt(int64(errno), 10))
+	}
+	tun.name = string(ifr[:])
+	return tun.name, nil
 }
 
 func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
@@ -342,7 +355,7 @@ func CreateTUN(name string) (TUNDevice, error) {
 
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
-		uintptr(fd.Fd()),
+		fd.Fd(),
 		uintptr(unix.TUNSETIFF),
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)

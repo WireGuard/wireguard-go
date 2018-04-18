@@ -255,7 +255,15 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 	device.isClosed.Set(false)
 
 	device.log = logger
+
 	device.tun.device = tun
+	mtu, err := device.tun.device.MTU()
+	if err != nil {
+		logger.Error.Println("Trouble determining MTU, assuming 1420:", err)
+		mtu = 1420
+	}
+	device.tun.mtu = int32(mtu)
+
 	device.peers.keyMap = make(map[NoisePublicKey]*Peer)
 
 	// initialize anti-DoS / anti-scanning features
