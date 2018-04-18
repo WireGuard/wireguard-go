@@ -391,14 +391,7 @@ func send6(sock int, end *NativeEndpoint, buff []byte) error {
 
 	msghdr.SetControllen(int(unsafe.Sizeof(cmsg)))
 
-	// sendmsg(sock, &msghdr, 0)
-
-	_, _, errno := unix.Syscall(
-		unix.SYS_SENDMSG,
-		uintptr(sock),
-		uintptr(unsafe.Pointer(&msghdr)),
-		0,
-	)
+	_, _, errno := sendmsg(sock, &msghdr, 0)
 
 	if errno == 0 {
 		return nil
@@ -409,12 +402,7 @@ func send6(sock int, end *NativeEndpoint, buff []byte) error {
 	if errno == unix.EINVAL {
 		end.ClearSrc()
 		cmsg.pktinfo = unix.Inet6Pktinfo{}
-		_, _, errno = unix.Syscall(
-			unix.SYS_SENDMSG,
-			uintptr(sock),
-			uintptr(unsafe.Pointer(&msghdr)),
-			0,
-		)
+		_, _, errno = sendmsg(sock, &msghdr, 0)
 	}
 
 	return errno
@@ -455,26 +443,14 @@ func send4(sock int, end *NativeEndpoint, buff []byte) error {
 	}
 	msghdr.SetControllen(int(unsafe.Sizeof(cmsg)))
 
-	// sendmsg(sock, &msghdr, 0)
-
-	_, _, errno := unix.Syscall(
-		unix.SYS_SENDMSG,
-		uintptr(sock),
-		uintptr(unsafe.Pointer(&msghdr)),
-		0,
-	)
+	_, _, errno := sendmsg(sock, &msghdr, 0)
 
 	// clear source and try again
 
 	if errno == unix.EINVAL {
 		end.ClearSrc()
 		cmsg.pktinfo = unix.Inet4Pktinfo{}
-		_, _, errno = unix.Syscall(
-			unix.SYS_SENDMSG,
-			uintptr(sock),
-			uintptr(unsafe.Pointer(&msghdr)),
-			0,
-		)
+		_, _, errno = sendmsg(sock, &msghdr, 0)
 	}
 
 	// errno = 0 is still an error instance
@@ -507,14 +483,7 @@ func receive4(sock int, buff []byte, end *NativeEndpoint) (int, error) {
 	msghdr.Control = (*byte)(unsafe.Pointer(&cmsg))
 	msghdr.SetControllen(int(unsafe.Sizeof(cmsg)))
 
-	// recvmsg(sock, &mskhdr, 0)
-
-	size, _, errno := unix.Syscall(
-		unix.SYS_RECVMSG,
-		uintptr(sock),
-		uintptr(unsafe.Pointer(&msghdr)),
-		0,
-	)
+	size, _, errno := recvmsg(sock, &msghdr, 0)
 
 	if errno != 0 {
 		return 0, errno
@@ -555,14 +524,7 @@ func receive6(sock int, buff []byte, end *NativeEndpoint) (int, error) {
 	msg.Control = (*byte)(unsafe.Pointer(&cmsg))
 	msg.SetControllen(int(unsafe.Sizeof(cmsg)))
 
-	// recvmsg(sock, &mskhdr, 0)
-
-	size, _, errno := unix.Syscall(
-		unix.SYS_RECVMSG,
-		uintptr(sock),
-		uintptr(unsafe.Pointer(&msg)),
-		0,
-	)
+	size, _, errno := recvmsg(sock, &msg, 0)
 
 	if errno != 0 {
 		return 0, errno
