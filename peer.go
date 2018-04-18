@@ -246,8 +246,8 @@ func (peer *Peer) Stop() {
 
 	// stop & wait for ongoing peer routines
 
-	peer.routines.stop.Broadcast()
 	peer.routines.starting.Wait()
+	peer.routines.stop.Broadcast()
 	peer.routines.stopping.Wait()
 
 	// stop timers

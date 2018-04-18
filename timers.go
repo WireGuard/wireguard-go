@@ -183,13 +183,15 @@ func (peer *Peer) sendNewHandshake() error {
 
 func (peer *Peer) RoutineTimerHandler() {
 
-	defer peer.routines.stopping.Done()
-
 	device := peer.device
 
 	logInfo := device.log.Info
 	logDebug := device.log.Debug
-	logDebug.Println("Routine, timer handler, started for peer", peer.String())
+
+	defer func() {
+		logDebug.Println(peer.String(), ": Routine, Timer handler, Stopped")
+		peer.routines.stopping.Done()
+	}()
 
 	// reset all timers
 
@@ -204,6 +206,8 @@ func (peer *Peer) RoutineTimerHandler() {
 		duration := time.Duration(interval) * time.Second
 		peer.timer.keepalivePersistent.Reset(duration)
 	}
+
+	logDebug.Println("Routine, timer handler, started for peer", peer.String())
 
 	// signal synchronised setup complete
 

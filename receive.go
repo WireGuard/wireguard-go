@@ -500,8 +500,8 @@ func (peer *Peer) RoutineSequentialReceiver() {
 	logError := device.log.Error
 	logDebug := device.log.Debug
 
-	func() {
-		defer peer.routines.stopping.Done()
+	defer func() {
+		peer.routines.stopping.Done()
 		logDebug.Println(peer.String(), ": Routine, Sequential Receiver, Stopped")
 	}()
 
@@ -516,7 +516,11 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		case <-peer.routines.stop.Wait():
 			return
 
-		case elem := <-peer.queue.inbound:
+		case elem, ok := <-peer.queue.inbound:
+
+			if !ok {
+				return
+			}
 
 			// wait for decryption
 

@@ -320,12 +320,15 @@ func (device *Device) RoutineEncryption() {
  */
 func (peer *Peer) RoutineSequentialSender() {
 
-	defer peer.routines.stopping.Done()
-
 	device := peer.device
 
 	logDebug := device.log.Debug
 	logDebug.Println("Routine, sequential sender, started for", peer.String())
+
+	defer func() {
+		peer.routines.stopping.Done()
+		logDebug.Println(peer.String(), ": Routine, Sequential sender, Stopped")
+	}()
 
 	peer.routines.starting.Done()
 
@@ -337,7 +340,12 @@ func (peer *Peer) RoutineSequentialSender() {
 				"Routine, sequential sender, stopped for", peer.String())
 			return
 
-		case elem := <-peer.queue.outbound:
+		case elem, ok := <-peer.queue.outbound:
+
+			if !ok {
+				return
+			}
+
 			elem.mutex.Lock()
 			if elem.IsDropped() {
 				continue
