@@ -14,10 +14,10 @@ import (
  */
 
 type KeyPair struct {
+	sendNonce    uint64
 	send         cipher.AEAD
 	receive      cipher.AEAD
 	replayFilter ReplayFilter
-	sendNonce    uint64
 	isInitiator  bool
 	created      time.Time
 	localIndex   uint32

@@ -13,9 +13,9 @@ const (
 )
 
 type Peer struct {
+	persistentKeepaliveInterval uint64
 	isRunning                   AtomicBool
 	mutex                       sync.RWMutex
-	persistentKeepaliveInterval uint64
 	keyPairs                    KeyPairs
 	handshake                   Handshake
 	device                      *Device
