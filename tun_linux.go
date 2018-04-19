@@ -1,3 +1,5 @@
+/* Copyright 2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved. */
+
 package main
 
 /* Implementation of the TUN device interface for linux
@@ -13,6 +15,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"unsafe"
 )
@@ -23,12 +26,14 @@ const (
 )
 
 type NativeTun struct {
-	fd     *os.File
-	index  int32         // if index
-	name   string        // name of interface
-	errors chan error    // async error handling
-	events chan TUNEvent // device related events
-	nopi   bool          // the device was pased IFF_NO_PI
+	fd            *os.File
+	index         int32         // if index
+	name          string        // name of interface
+	errors        chan error    // async error handling
+	events        chan TUNEvent // device related events
+	nopi          bool          // the device was pased IFF_NO_PI
+	closingReader *os.File
+	closingWriter *os.File
 }
 
 func toRTMGRP(sc uint) uint {
@@ -282,7 +287,44 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 	return tun.fd.Write(buff)
 }
 
-func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
+type FdSet struct {
+	fdset unix.FdSet
+}
+
+func (fdset *FdSet) set(i int) {
+	bits := 32 << (^uint(0) >> 63)
+	fdset.fdset.Bits[i/bits] |= 1 << uint(i%bits)
+}
+
+func (fdset *FdSet) check(i int) bool {
+	bits := 32 << (^uint(0) >> 63)
+	return (fdset.fdset.Bits[i/bits] & (1 << uint(i%bits))) != 0
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func (tun *NativeTun) readyRead() bool {
+	readFd := int(tun.fd.Fd())
+	closeFd := int(tun.closingReader.Fd())
+	fdset := FdSet{}
+	fdset.set(readFd)
+	fdset.set(closeFd)
+	_, err := unix.Select(max(readFd, closeFd)+1, &fdset.fdset, nil, nil, nil)
+	if err != nil {
+		return false
+	}
+	if fdset.check(closeFd) {
+		return false
+	}
+	return fdset.check(readFd)
+}
+
+func (tun *NativeTun) doRead(buff []byte, offset int) (int, error) {
 	select {
 	case err := <-tun.errors:
 		return 0, err
@@ -300,12 +342,38 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	}
 }
 
+func unixIsEAGAIN(err error) bool {
+	if pe, ok := err.(*os.PathError); ok {
+		if errno, ok := pe.Err.(syscall.Errno); ok && errno == syscall.EAGAIN {
+			return true
+		}
+	}
+	return false
+}
+
+func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
+	for {
+		n, err := tun.doRead(buff, offset)
+		if err == nil || !unixIsEAGAIN(err) {
+			return n, err
+		}
+		if !tun.readyRead() {
+			return 0, errors.New("Tun device closed")
+		}
+	}
+}
+
 func (tun *NativeTun) Events() chan TUNEvent {
 	return tun.events
 }
 
 func (tun *NativeTun) Close() error {
-	return tun.fd.Close()
+	err := tun.fd.Close()
+	if err != nil {
+		return err
+	}
+	tun.closingWriter.Write([]byte{0})
+	return nil
 }
 
 func CreateTUNFromFile(fd *os.File) (TUNDevice, error) {
@@ -317,7 +385,17 @@ func CreateTUNFromFile(fd *os.File) (TUNDevice, error) {
 	}
 	var err error
 
+	err = syscall.SetNonblock(int(fd.Fd()), true)
+	if err != nil {
+		return nil, err
+	}
+
 	_, err = device.Name()
+	if err != nil {
+		return nil, err
+	}
+
+	device.closingReader, device.closingWriter, err = os.Pipe()
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +419,19 @@ func CreateTUN(name string) (TUNDevice, error) {
 
 	// open clone device
 
-	fd, err := os.OpenFile(cloneDevicePath, os.O_RDWR, 0)
+	// HACK: we open it as a raw Fd first, so that f.nonblock=false
+	// when we make it into a file object.
+	nfd, err := syscall.Open(cloneDevicePath, os.O_RDWR, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	err = syscall.SetNonblock(nfd, true)
+	if err != nil {
+		return nil, err
+	}
+
+	fd := os.NewFile(uintptr(nfd), cloneDevicePath)
 	if err != nil {
 		return nil, err
 	}
@@ -377,6 +467,11 @@ func CreateTUN(name string) (TUNDevice, error) {
 		events: make(chan TUNEvent, 5),
 		errors: make(chan error, 5),
 		nopi:   false,
+	}
+
+	device.closingReader, device.closingWriter, err = os.Pipe()
+	if err != nil {
+		return nil, err
 	}
 
 	// start event listener
