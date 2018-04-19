@@ -259,8 +259,8 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 	device.tun.device = tun
 	mtu, err := device.tun.device.MTU()
 	if err != nil {
-		logger.Error.Println("Trouble determining MTU, assuming 1420:", err)
-		mtu = 1420
+		logger.Error.Println("Trouble determining MTU, assuming default:", err)
+		mtu = DefaultMTU
 	}
 	device.tun.mtu = int32(mtu)
 
