@@ -308,18 +308,22 @@ func (tun *NativeTun) Close() error {
 	return tun.fd.Close()
 }
 
-func CreateTUNFromFile(name string, fd *os.File) (TUNDevice, error) {
+func CreateTUNFromFile(fd *os.File) (TUNDevice, error) {
 	device := &NativeTun{
 		fd:     fd,
-		name:   name,
 		events: make(chan TUNEvent, 5),
 		errors: make(chan error, 5),
 		nopi:   false,
 	}
+	var err error
+
+	_, err = device.Name()
+	if err != nil {
+		return nil, err
+	}
 
 	// start event listener
 
-	var err error
 	device.index, err = getIFIndex(device.name)
 	if err != nil {
 		return nil, err

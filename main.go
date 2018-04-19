@@ -90,7 +90,7 @@ func main() {
 		}
 
 		file := os.NewFile(uintptr(fd), "")
-		return CreateTUNFromFile(interfaceName, file)
+		return CreateTUNFromFile(file)
 	}()
 
 	if err != nil {
