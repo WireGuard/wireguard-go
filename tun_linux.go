@@ -273,7 +273,7 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 		buff[0] = 0x00
 		buff[1] = 0x00
 
-		if buff[4] == ipv6.Version<<4 {
+		if buff[4]>>4 == ipv6.Version {
 			buff[2] = 0x86
 			buff[3] = 0xdd
 		} else {
