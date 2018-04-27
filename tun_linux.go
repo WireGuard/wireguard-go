@@ -79,7 +79,6 @@ func (tun *NativeTun) RoutineNetlinkListener() {
 	defer unix.Close(sock)
 	saddr := &unix.SockaddrNetlink{
 		Family: unix.AF_NETLINK,
-		Pid:    uint32(os.Getpid()),
 		Groups: uint32(groups),
 	}
 	err = unix.Bind(sock, saddr)
@@ -90,7 +89,9 @@ func (tun *NativeTun) RoutineNetlinkListener() {
 
 	// TODO: This function never actually exits in response to anything,
 	// a go routine that goes forever. We'll want to fix that if this is
-	// to ever be used as any sort of library.
+	// to ever be used as any sort of library. See what we've done with
+	// calling shutdown() on the netlink socket in conn_linux.go, and
+	// change this to be more like that.
 
 	for msg := make([]byte, 1<<16); ; {
 
