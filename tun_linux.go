@@ -36,31 +36,15 @@ type NativeTun struct {
 	closingWriter *os.File
 }
 
-func toRTMGRP(sc uint) uint {
-	return 1 << (sc - 1)
-}
-
-func (tun *NativeTun) bindRTMGRP() (int, error) {
-	groups := toRTMGRP(unix.RTNLGRP_LINK)
-	groups |= toRTMGRP(unix.RTNLGRP_IPV4_IFADDR)
-	groups |= toRTMGRP(unix.RTNLGRP_IPV6_IFADDR)
-	sock, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW, unix.NETLINK_ROUTE)
-	if err != nil {
-		return 0, err
-	}
-	saddr := &unix.SockaddrNetlink{
-		Family: unix.AF_NETLINK,
-		Pid:    uint32(os.Getpid()),
-		Groups: uint32(groups),
-	}
-	return sock, unix.Bind(sock, saddr)
-}
-
 func (tun *NativeTun) File() *os.File {
 	return tun.fd
 }
 
 func (tun *NativeTun) RoutineHackListener() {
+	// TODO: This function never actually exits in response to anything,
+	// a go routine that goes forever. We'll want to fix that if this is
+	// to ever be used as any sort of library.
+
 	/* This is needed for the detection to work across network namespaces
 	 * If you are reading this and know a better method, please get in touch.
 	 */
@@ -78,12 +62,35 @@ func (tun *NativeTun) RoutineHackListener() {
 	}
 }
 
+func toRTMGRP(sc uint) uint {
+	return 1 << (sc - 1)
+}
+
 func (tun *NativeTun) RoutineNetlinkListener() {
-	sock, err := tun.bindRTMGRP()
+
+	groups := toRTMGRP(unix.RTNLGRP_LINK)
+	groups |= toRTMGRP(unix.RTNLGRP_IPV4_IFADDR)
+	groups |= toRTMGRP(unix.RTNLGRP_IPV6_IFADDR)
+	sock, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW, unix.NETLINK_ROUTE)
 	if err != nil {
-		tun.errors <- errors.New("Failed to create netlink event listener")
+		tun.errors <- errors.New("Failed to create netlink event listener socket")
 		return
 	}
+	defer unix.Close(sock)
+	saddr := &unix.SockaddrNetlink{
+		Family: unix.AF_NETLINK,
+		Pid:    uint32(os.Getpid()),
+		Groups: uint32(groups),
+	}
+	err = unix.Bind(sock, saddr)
+	if err != nil {
+		tun.errors <- errors.New("Failed to bind netlink event listener socket")
+		return
+	}
+
+	// TODO: This function never actually exits in response to anything,
+	// a go routine that goes forever. We'll want to fix that if this is
+	// to ever be used as any sort of library.
 
 	for msg := make([]byte, 1<<16); ; {
 
