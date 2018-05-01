@@ -195,7 +195,7 @@ func (peer *Peer) Start() {
 	}
 
 	device := peer.device
-	device.log.Debug.Println(peer.String(), ": Starting...")
+	device.log.Debug.Println(peer.String() + ": Starting...")
 
 	// sanity check : these should be 0
 
@@ -242,7 +242,7 @@ func (peer *Peer) Stop() {
 	}
 
 	device := peer.device
-	device.log.Debug.Println(peer.String(), ": Stopping...")
+	device.log.Debug.Println(peer.String() + ": Stopping...")
 
 	// stop & wait for ongoing peer routines
 

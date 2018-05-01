@@ -121,7 +121,11 @@ func (device *Device) RoutineReadFromTUN() {
 	logDebug := device.log.Debug
 	logError := device.log.Error
 
-	logDebug.Println("Routine, TUN Reader started")
+	defer func() {
+		logDebug.Println("Routine: TUN reader - stopped")
+	}()
+
+	logDebug.Println("Routine: TUN reader - started")
 
 	for {
 
@@ -192,11 +196,11 @@ func (peer *Peer) RoutineNonce() {
 
 	defer func() {
 		peer.routines.stopping.Done()
-		logDebug.Println(peer.String(), ": Routine, Nonce Worker, Stopped")
+		logDebug.Println(peer.String() + ": Routine: nonce worker - stopped")
 	}()
 
 	peer.routines.starting.Done()
-	logDebug.Println(peer.String(), ": Routine, Nonce Worker, Started")
+	logDebug.Println(peer.String() + ": Routine: nonce worker - started")
 
 	for {
 	NextPacket:
@@ -204,7 +208,11 @@ func (peer *Peer) RoutineNonce() {
 		case <-peer.routines.stop.Wait():
 			return
 
-		case elem := <-peer.queue.nonce:
+		case elem, ok := <-peer.queue.nonce:
+
+			if !ok {
+				return
+			}
 
 			// wait for key pair
 
@@ -218,13 +226,13 @@ func (peer *Peer) RoutineNonce() {
 
 				peer.signal.handshakeBegin.Send()
 
-				logDebug.Println(peer.String(), ": Awaiting key-pair")
+				logDebug.Println(peer.String() + ": Awaiting key-pair")
 
 				select {
 				case <-peer.signal.newKeyPair.Wait():
-					logDebug.Println(peer.String(), ": Obtained awaited key-pair")
+					logDebug.Println(peer.String() + ": Obtained awaited key-pair")
 				case <-peer.signal.flushNonceQueue.Wait():
-					logDebug.Println(peer.String(), ": Flushing nonce queue")
+					logDebug.Println(peer.String() + ": Flushing nonce queue")
 					peer.FlushNonceQueue()
 					goto NextPacket
 				case <-peer.routines.stop.Wait():
@@ -258,7 +266,22 @@ func (device *Device) RoutineEncryption() {
 	var nonce [chacha20poly1305.NonceSize]byte
 
 	logDebug := device.log.Debug
-	logDebug.Println("Routine, encryption worker, started")
+
+	defer func() {
+		for {
+			select {
+			case elem, ok := <-device.queue.encryption:
+				if ok {
+					elem.Drop()
+				}
+			default:
+				break
+			}
+		}
+		logDebug.Println("Routine: encryption worker - stopped")
+	}()
+
+	logDebug.Println("Routine: encryption worker - started")
 
 	for {
 
@@ -266,10 +289,13 @@ func (device *Device) RoutineEncryption() {
 
 		select {
 		case <-device.signal.stop.Wait():
-			logDebug.Println("Routine, encryption worker, stopped")
 			return
 
-		case elem := <-device.queue.encryption:
+		case elem, ok := <-device.queue.encryption:
+
+			if !ok {
+				return
+			}
 
 			// check if dropped
 
@@ -323,12 +349,13 @@ func (peer *Peer) RoutineSequentialSender() {
 	device := peer.device
 
 	logDebug := device.log.Debug
-	logDebug.Println("Routine, sequential sender, started for", peer.String())
 
 	defer func() {
 		peer.routines.stopping.Done()
-		logDebug.Println(peer.String(), ": Routine, Sequential sender, Stopped")
+		logDebug.Println(peer.String() + ": Routine: sequential sender - stopped")
 	}()
+
+	logDebug.Println(peer.String() + ": Routine: sequential sender - started")
 
 	peer.routines.starting.Done()
 
@@ -336,8 +363,6 @@ func (peer *Peer) RoutineSequentialSender() {
 		select {
 
 		case <-peer.routines.stop.Wait():
-			logDebug.Println(
-				"Routine, sequential sender, stopped for", peer.String())
 			return
 
 		case elem, ok := <-peer.queue.outbound:

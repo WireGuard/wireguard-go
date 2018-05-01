@@ -339,6 +339,8 @@ func (device *Device) RemovePeer(key NoisePublicKey) {
 }
 
 func (device *Device) RemoveAllPeers() {
+	device.noise.mutex.Lock()
+	defer device.noise.mutex.Unlock()
 
 	device.routing.mutex.Lock()
 	defer device.routing.mutex.Unlock()
@@ -354,16 +356,25 @@ func (device *Device) RemoveAllPeers() {
 }
 
 func (device *Device) Close() {
-	device.log.Info.Println("Device closing")
 	if device.isClosed.Swap(true) {
 		return
 	}
-	device.signal.stop.Broadcast()
+	device.log.Info.Println("Device closing")
+	device.state.changing.Set(true)
+	device.state.mutex.Lock()
+	defer device.state.mutex.Unlock()
+
 	device.tun.device.Close()
 	device.BindClose()
+
 	device.isUp.Set(false)
+
+	device.signal.stop.Broadcast()
+
 	device.RemoveAllPeers()
 	device.rate.limiter.Close()
+
+	device.state.changing.Set(false)
 	device.log.Info.Println("Interface closed")
 }
 
