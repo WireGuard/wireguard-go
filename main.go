@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime"
 	"strconv"
 )
 
@@ -16,6 +15,7 @@ const (
 const (
 	ENV_WG_TUN_FD  = "WG_TUN_FD"
 	ENV_WG_UAPI_FD = "WG_UAPI_FD"
+	ENV_WG_PROCESS_FOREGROUND = "WG_PROCESS_FOREGROUND"
 )
 
 func printUsage() {
@@ -53,6 +53,10 @@ func main() {
 			return
 		}
 		interfaceName = os.Args[1]
+	}
+
+	if !foreground {
+		foreground = os.Getenv(ENV_WG_PROCESS_FOREGROUND) == "1"
 	}
 
 	// get log level (default: info)
@@ -129,6 +133,7 @@ func main() {
 		env := os.Environ()
 		env = append(env, fmt.Sprintf("%s=3", ENV_WG_TUN_FD))
 		env = append(env, fmt.Sprintf("%s=4", ENV_WG_UAPI_FD))
+		env = append(env, fmt.Sprintf("%s=1", ENV_WG_PROCESS_FOREGROUND))
 		attr := &os.ProcAttr{
 			Files: []*os.File{
 				nil, // stdin
@@ -140,17 +145,25 @@ func main() {
 			Dir: ".",
 			Env: env,
 		}
-		err = Daemonize(attr)
+
+		path, err := os.Executable()
+		if err != nil {
+			logger.Error.Println("Failed to determine executable:", err)
+			os.Exit(ExitSetupFailed)
+		}
+
+		process, err := os.StartProcess(
+			path,
+			os.Args,
+			attr,
+		)
 		if err != nil {
 			logger.Error.Println("Failed to daemonize:", err)
 			os.Exit(ExitSetupFailed)
 		}
+		process.Release()
 		return
 	}
-
-	// increase number of go workers (for Go <1.5)
-
-	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// create wireguard device
 
