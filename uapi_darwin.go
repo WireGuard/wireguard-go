@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"golang.org/x/sys/unix"
 	"net"
@@ -44,23 +45,11 @@ func (l *UAPIListener) Addr() net.Addr {
 	return nil
 }
 
-func NewUAPIListener(name string) (net.Listener, error) {
+func UAPIListen(name string, file *os.File) (net.Listener, error) {
 
-	// check if path exist
+	// wrap file in listener
 
-	err := os.MkdirAll(socketDirectory, 077)
-	if err != nil && !os.IsExist(err) {
-		return nil, err
-	}
-
-	// open UNIX socket
-
-	socketPath := path.Join(
-		socketDirectory,
-		fmt.Sprintf(socketName, name),
-	)
-
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := net.FileListener(file)
 	if err != nil {
 		return nil, err
 	}
@@ -70,6 +59,13 @@ func NewUAPIListener(name string) (net.Listener, error) {
 		connNew:  make(chan net.Conn, 1),
 		connErr:  make(chan error, 1),
 	}
+
+	// watch for deletion of socket
+
+	socketPath := path.Join(
+		socketDirectory,
+		fmt.Sprintf(socketName, name),
+	)
 
 	// watch for deletion of socket
 
@@ -96,4 +92,57 @@ func NewUAPIListener(name string) (net.Listener, error) {
 	}(uapi)
 
 	return uapi, nil
+}
+
+func UAPIOpen(name string) (*os.File, error) {
+
+	// check if path exist
+
+	err := os.MkdirAll(socketDirectory, 0600)
+	if err != nil && !os.IsExist(err) {
+		return nil, err
+	}
+
+	// open UNIX socket
+
+	socketPath := path.Join(
+		socketDirectory,
+		fmt.Sprintf(socketName, name),
+	)
+
+	addr, err := net.ResolveUnixAddr("unix", socketPath)
+	if err != nil {
+		return nil, err
+	}
+
+	listener, err := func() (*net.UnixListener, error) {
+
+		// initial connection attempt
+
+		listener, err := net.ListenUnix("unix", addr)
+		if err == nil {
+			return listener, nil
+		}
+
+		// check if socket already active
+
+		_, err = net.Dial("unix", socketPath)
+		if err == nil {
+			return nil, errors.New("unix socket in use")
+		}
+
+		// cleanup & attempt again
+
+		err = os.Remove(socketPath)
+		if err != nil {
+			return nil, err
+		}
+		return net.ListenUnix("unix", addr)
+	}()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return listener.File()
 }

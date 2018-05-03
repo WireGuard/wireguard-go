@@ -25,6 +25,8 @@ func printUsage() {
 
 func main() {
 
+	Warning()
+
 	// parse arguments
 
 	var foreground bool

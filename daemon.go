@@ -2,17 +2,10 @@ package main
 
 import (
 	"os"
-	"os/exec"
 )
 
-/* Daemonizes the process on linux
- *
- * This is done by spawning and releasing a copy with the --foreground flag
- */
 func Daemonize(attr *os.ProcAttr) error {
-	// I would like to use os.Executable,
-	// however this means dropping support for Go <1.8
-	path, err := exec.LookPath(os.Args[0])
+	path, err := os.Executable()
 	if err != nil {
 		return err
 	}
