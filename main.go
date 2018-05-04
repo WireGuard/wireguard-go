@@ -227,6 +227,10 @@ func main() {
 	term := make(chan os.Signal)
 
 	uapi, err := UAPIListen(interfaceName, fileUAPI)
+	if err != nil {
+		logger.Error.Println("Failed to listen on uapi socket:", err)
+		os.Exit(ExitSetupFailed)
+	}
 
 	go func() {
 		for {

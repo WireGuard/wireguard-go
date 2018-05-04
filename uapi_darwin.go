@@ -12,7 +12,6 @@ import (
 	"net"
 	"os"
 	"path"
-	"time"
 )
 
 const (
@@ -28,6 +27,8 @@ type UAPIListener struct {
 	listener net.Listener // unix socket listener
 	connNew  chan net.Conn
 	connErr  chan error
+	kqueueFd int
+	keventFd int
 }
 
 func (l *UAPIListener) Accept() (net.Conn, error) {
@@ -43,7 +44,16 @@ func (l *UAPIListener) Accept() (net.Conn, error) {
 }
 
 func (l *UAPIListener) Close() error {
-	return l.listener.Close()
+	err1 := unix.Close(l.kqueueFd)
+	err2 := unix.Close(l.keventFd)
+	err3 := l.listener.Close()
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
+	return err3
 }
 
 func (l *UAPIListener) Addr() net.Addr {
@@ -65,8 +75,6 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 		connErr:  make(chan error, 1),
 	}
 
-	// watch for deletion of socket
-
 	socketPath := path.Join(
 		socketDirectory,
 		fmt.Sprintf(socketName, name),
@@ -74,12 +82,36 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 
 	// watch for deletion of socket
 
+	uapi.kqueueFd, err = unix.Kqueue()
+	if err != nil {
+		return nil, err
+	}
+	uapi.keventFd, err = unix.Open(socketDirectory, unix.O_EVTONLY, 0)
+	if err != nil {
+		unix.Close(uapi.kqueueFd)
+		return nil, err
+	}
+
 	go func(l *UAPIListener) {
-		for ; ; time.Sleep(time.Second) {
-			if _, err := os.Stat(socketPath); os.IsNotExist(err) {
+		event := unix.Kevent_t{
+			Ident: uint64(uapi.keventFd),
+			Filter: unix.EVFILT_VNODE,
+			Flags: unix.EV_ADD | unix.EV_ENABLE | unix.EV_ONESHOT,
+			Fflags: unix.NOTE_WRITE,
+		}
+		events := make([]unix.Kevent_t, 1)
+		n := 1
+		var kerr error
+		for {
+			// start with lstat to avoid race condition
+			if _, err := os.Lstat(socketPath); os.IsNotExist(err) {
 				l.connErr <- err
 				return
 			}
+			if kerr != nil || n != 1 {
+				return
+			}
+			n, kerr = unix.Kevent(uapi.kqueueFd, []unix.Kevent_t{event}, events, nil)
 		}
 	}(uapi)
 
