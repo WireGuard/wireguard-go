@@ -46,9 +46,11 @@ var sockaddrCtlSize uintptr = 32
 
 func CreateTUN(name string) (TUNDevice, error) {
 	ifIndex := -1
-	fmt.Sscanf(name, "utun%d", &ifIndex)
-	if ifIndex < 0 {
-		return nil, fmt.Errorf("error parsing interface name %s, must be utun[0-9]+", name)
+	if (name != "utun") {
+		fmt.Sscanf(name, "utun%d", &ifIndex)
+		if ifIndex < 0 {
+			return nil, fmt.Errorf("Interface name must be utun[0-9]*")
+		}
 	}
 
 	fd, err := unix.Socket(unix.AF_SYSTEM, unix.SOCK_DGRAM, 2)

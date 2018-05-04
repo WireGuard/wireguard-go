@@ -115,13 +115,6 @@ func main() {
 		return LogLevelInfo
 	}()
 
-	logger := NewLogger(
-		logLevel,
-		fmt.Sprintf("(%s) ", interfaceName),
-	)
-
-	logger.Debug.Println("Debug log enabled")
-
 	// open TUN device (or use supplied fd)
 
 	tun, err := func() (TUNDevice, error) {
@@ -140,6 +133,21 @@ func main() {
 		file := os.NewFile(uintptr(fd), "")
 		return CreateTUNFromFile(file)
 	}()
+
+	if err == nil {
+		realInterfaceName, err2 := tun.Name()
+		if err2 == nil {
+			interfaceName = realInterfaceName
+		}
+	}
+
+	logger := NewLogger(
+		logLevel,
+		fmt.Sprintf("(%s) ", interfaceName),
+	)
+
+	logger.Debug.Println("Debug log enabled")
+
 
 	if err != nil {
 		logger.Error.Println("Failed to create TUN device:", err)
