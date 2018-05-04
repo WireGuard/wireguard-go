@@ -98,7 +98,13 @@ func CreateTUN(name string) (TUNDevice, error) {
 		return nil, fmt.Errorf("SYS_CONNECT: %v", errno)
 	}
 
-	return CreateTUNFromFile(os.NewFile(uintptr(fd), ""))
+	tun, err := CreateTUNFromFile(os.NewFile(uintptr(fd), ""))
+
+	if err == nil && name == "utun" {
+		fmt.Printf("OS assigned interface: %s\n", tun.(*NativeTun).name)
+	}
+
+	return tun, err
 }
 
 func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
