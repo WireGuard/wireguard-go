@@ -238,17 +238,7 @@ func (device *Device) RoutineDecryption() {
 
 	logDebug := device.log.Debug
 	defer func() {
-		for {
-			select {
-			case elem, ok := <-device.queue.decryption:
-				if ok {
-					elem.Drop()
-				}
-			default:
-				goto out
-			}
-		}
-		out:
+		device.state.stopping.Done()
 		logDebug.Println("Routine: decryption worker - stopped")
 	}()
 	logDebug.Println("Routine: decryption worker - started")
@@ -314,14 +304,7 @@ func (device *Device) RoutineHandshake() {
 	logDebug := device.log.Debug
 
 	defer func() {
-		for {
-			select {
-			case <-device.queue.handshake:
-			default:
-				goto out
-			}
-		}
-		out:
+		device.state.stopping.Done()
 		logDebug.Println("Routine: handshake worker - stopped")
 	}()
 

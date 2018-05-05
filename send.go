@@ -274,17 +274,7 @@ func (device *Device) RoutineEncryption() {
 	logDebug := device.log.Debug
 
 	defer func() {
-		for {
-			select {
-			case elem, ok := <-device.queue.encryption:
-				if ok {
-					elem.Drop()
-				}
-			default:
-				goto out
-			}
-		}
-		out:
+		device.state.stopping.Done()
 		logDebug.Println("Routine: encryption worker - stopped")
 	}()
 
