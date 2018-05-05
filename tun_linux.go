@@ -19,6 +19,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"bytes"
 	"strings"
 	"syscall"
 	"time"
@@ -268,7 +269,12 @@ func (tun *NativeTun) Name() (string, error) {
 	if errno != 0 {
 		return "", errors.New("Failed to get name of TUN device: " + strconv.FormatInt(int64(errno), 10))
 	}
-	tun.name = string(ifr[:])
+	nullStr := ifr[:]
+	i := bytes.IndexByte(nullStr, 0)
+	if i != -1 {
+		nullStr = nullStr[:i]
+	}
+	tun.name = string(nullStr)
 	return tun.name, nil
 }
 
