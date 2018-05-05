@@ -20,7 +20,6 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -361,6 +360,7 @@ func (tun *NativeTun) doRead(buff []byte, offset int) (int, error) {
 	}
 }
 
+/* https://golang.org/src/crypto/rand/eagain.go */
 func unixIsEAGAIN(err error) bool {
 	if pe, ok := err.(*os.PathError); ok {
 		if errno, ok := pe.Err.(syscall.Errno); ok && errno == syscall.EAGAIN {
@@ -395,57 +395,18 @@ func (tun *NativeTun) Close() error {
 	return nil
 }
 
-func CreateTUNFromFile(fd *os.File) (TUNDevice, error) {
-	device := &NativeTun{
-		fd:     fd,
-		events: make(chan TUNEvent, 5),
-		errors: make(chan error, 5),
-		nopi:   false,
-	}
-	var err error
-
-	err = syscall.SetNonblock(int(fd.Fd()), true)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = device.Name()
-	if err != nil {
-		return nil, err
-	}
-
-	device.closingReader, device.closingWriter, err = os.Pipe()
-	if err != nil {
-		return nil, err
-	}
-
-	// start event listener
-
-	device.index, err = getIFIndex(device.name)
-	if err != nil {
-		return nil, err
-	}
-
-	go device.RoutineNetlinkListener()
-	go device.RoutineHackListener() // cross namespace
-
-	// set default MTU
-
-	return device, device.setMTU(DefaultMTU)
-}
-
 func CreateTUN(name string) (TUNDevice, error) {
 
 	// open clone device
 
 	// HACK: we open it as a raw Fd first, so that f.nonblock=false
 	// when we make it into a file object.
-	nfd, err := syscall.Open(cloneDevicePath, os.O_RDWR, 0)
+	nfd, err := unix.Open(cloneDevicePath, os.O_RDWR, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	err = syscall.SetNonblock(nfd, true)
+	err = unix.SetNonblock(nfd, true)
 	if err != nil {
 		return nil, err
 	}
@@ -476,16 +437,26 @@ func CreateTUN(name string) (TUNDevice, error) {
 		return nil, errno
 	}
 
-	// read (new) name of interface
+	return CreateTUNFromFile(fd)
+}
 
-	newName := string(ifr[:])
-	newName = newName[:strings.Index(newName, "\000")]
+func CreateTUNFromFile(fd *os.File) (TUNDevice, error) {
 	device := &NativeTun{
 		fd:     fd,
-		name:   newName,
 		events: make(chan TUNEvent, 5),
 		errors: make(chan error, 5),
 		nopi:   false,
+	}
+	var err error
+
+	err = unix.SetNonblock(int(fd.Fd()), true)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = device.Name()
+	if err != nil {
+		return nil, err
 	}
 
 	device.closingReader, device.closingWriter, err = os.Pipe()
