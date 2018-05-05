@@ -288,6 +288,8 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 
+				peer.event.handshakePushDeadline.Fire()
+
 			case "endpoint":
 
 				// set endpoint destination

@@ -561,7 +561,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 		select {
 
-		case <-peer.routines.stop.Wait():
+		case <-peer.routines.stop:
 			return
 
 		case elem, ok := <-peer.queue.inbound:

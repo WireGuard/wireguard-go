@@ -209,8 +209,11 @@ func (peer *Peer) RoutineNonce() {
 
 	for {
 	NextPacket:
+
+		peer.event.flushNonceQueue.Clear()
+
 		select {
-		case <-peer.routines.stop.Wait():
+		case <-peer.routines.stop:
 			return
 
 		case elem, ok := <-peer.queue.nonce:
@@ -239,9 +242,9 @@ func (peer *Peer) RoutineNonce() {
 				select {
 				case <-peer.event.newKeyPair.C:
 					logDebug.Println(peer, ": Obtained awaited key-pair")
-				case <-peer.signal.flushNonceQueue:
+				case <-peer.event.flushNonceQueue.C:
 					goto NextPacket
-				case <-peer.routines.stop.Wait():
+				case <-peer.routines.stop:
 					return
 				}
 			}
@@ -368,7 +371,7 @@ func (peer *Peer) RoutineSequentialSender() {
 	for {
 		select {
 
-		case <-peer.routines.stop.Wait():
+		case <-peer.routines.stop:
 			return
 
 		case elem, ok := <-peer.queue.outbound:

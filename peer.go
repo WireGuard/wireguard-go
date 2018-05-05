@@ -51,15 +51,11 @@ type Peer struct {
 		handshakeBegin                  *Event
 		ephemeralKeyCreated             *Event
 		newKeyPair                      *Event
-	}
-
-	signal struct {
-		flushNonceQueue chan struct{} // size 0, empty queued packets
+		flushNonceQueue                 *Event
 	}
 
 	timer struct {
 		sendLastMinuteHandshake AtomicBool
-		needAnotherKeepalive    AtomicBool
 	}
 
 	queue struct {
@@ -72,7 +68,7 @@ type Peer struct {
 		mutex    sync.Mutex     // held when stopping / starting routines
 		starting sync.WaitGroup // routines pending start
 		stopping sync.WaitGroup // routines pending stop
-		stop     Signal         // size 0, stop all go-routines in peer
+		stop     chan struct{}  // size 0, stop all go-routines in peer
 	}
 
 	mac CookieGenerator
@@ -111,18 +107,6 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	peer.device = device
 	peer.isRunning.Set(false)
 
-	// events
-
-	peer.event.dataSent = newEvent(EventInterval)
-	peer.event.dataReceived = newEvent(EventInterval)
-	peer.event.anyAuthenticatedPacketReceived = newEvent(EventInterval)
-	peer.event.anyAuthenticatedPacketTraversal = newEvent(EventInterval)
-	peer.event.handshakeCompleted = newEvent(EventInterval)
-	peer.event.handshakePushDeadline = newEvent(EventInterval)
-	peer.event.handshakeBegin = newEvent(EventInterval)
-	peer.event.ephemeralKeyCreated = newEvent(EventInterval)
-	peer.event.newKeyPair = newEvent(EventInterval)
-
 	// map public key
 
 	_, ok := device.peers.keyMap[pk]
@@ -142,12 +126,6 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	// reset endpoint
 
 	peer.endpoint = nil
-
-	// prepare signaling & routines
-
-	peer.routines.mutex.Lock()
-	peer.routines.stop = NewSignal()
-	peer.routines.mutex.Unlock()
 
 	// start peer
 
@@ -205,20 +183,31 @@ func (peer *Peer) Start() {
 	device := peer.device
 	device.log.Debug.Println(peer, ": Starting...")
 
-	// sanity check : these should be 0
+	// reset routine state
 
 	peer.routines.starting.Wait()
 	peer.routines.stopping.Wait()
+	peer.routines.stop = make(chan struct{})
 
-	// prepare queues and signals
-
-	peer.signal.flushNonceQueue = make(chan struct{})
+	// prepare queues
 
 	peer.queue.nonce = make(chan *QueueOutboundElement, QueueOutboundSize)
 	peer.queue.outbound = make(chan *QueueOutboundElement, QueueOutboundSize)
 	peer.queue.inbound = make(chan *QueueInboundElement, QueueInboundSize)
 
-	peer.routines.stop = NewSignal()
+	// events
+
+	peer.event.dataSent = newEvent(EventInterval)
+	peer.event.dataReceived = newEvent(EventInterval)
+	peer.event.anyAuthenticatedPacketReceived = newEvent(EventInterval)
+	peer.event.anyAuthenticatedPacketTraversal = newEvent(EventInterval)
+	peer.event.handshakeCompleted = newEvent(EventInterval)
+	peer.event.handshakePushDeadline = newEvent(EventInterval)
+	peer.event.handshakeBegin = newEvent(EventInterval)
+	peer.event.ephemeralKeyCreated = newEvent(EventInterval)
+	peer.event.newKeyPair = newEvent(EventInterval)
+	peer.event.flushNonceQueue = newEvent(EventInterval)
+
 	peer.isRunning.Set(true)
 
 	// wait for routines to start
@@ -252,7 +241,7 @@ func (peer *Peer) Stop() {
 	// stop & wait for ongoing peer routines
 
 	peer.routines.starting.Wait()
-	peer.routines.stop.Broadcast()
+	close(peer.routines.stop)
 	peer.routines.stopping.Wait()
 
 	// close queues
@@ -260,11 +249,6 @@ func (peer *Peer) Stop() {
 	close(peer.queue.nonce)
 	close(peer.queue.outbound)
 	close(peer.queue.inbound)
-
-	// close signals
-
-	close(peer.signal.flushNonceQueue)
-	peer.signal.flushNonceQueue = nil
 
 	// clear key pairs
 

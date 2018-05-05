@@ -148,9 +148,9 @@ func (peer *Peer) RoutineTimerHandler() {
 	// reset all timers
 
 	enableHandshake := true
-
 	pendingHandshakeNew := false
 	pendingKeepalivePassive := false
+	needAnotherKeepalive := false
 
 	timerKeepalivePassive := newTimer()
 	timerHandshakeDeadline := newTimer()
@@ -176,7 +176,7 @@ func (peer *Peer) RoutineTimerHandler() {
 
 		/* stopping */
 
-		case <-peer.routines.stop.Wait():
+		case <-peer.routines.stop:
 			return
 
 		/* events */
@@ -189,7 +189,7 @@ func (peer *Peer) RoutineTimerHandler() {
 
 		case <-peer.event.dataReceived.C:
 			if pendingKeepalivePassive {
-				peer.timer.needAnotherKeepalive.Set(true) // TODO: make local
+				needAnotherKeepalive = true
 			} else {
 				timerKeepalivePassive.Reset(KeepaliveTimeout)
 			}
@@ -250,8 +250,6 @@ func (peer *Peer) RoutineTimerHandler() {
 
 		/* timers */
 
-		// keep-alive
-
 		case <-timerKeepalivePersistent.C:
 
 			interval := peer.persistentKeepaliveInterval
@@ -267,11 +265,10 @@ func (peer *Peer) RoutineTimerHandler() {
 
 			peer.SendKeepAlive()
 
-			if peer.timer.needAnotherKeepalive.Swap(false) {
+			if needAnotherKeepalive {
 				timerKeepalivePassive.Reset(KeepaliveTimeout)
+				needAnotherKeepalive = false
 			}
-
-		// clear key material timer
 
 		case <-timerZeroAllKeys.C:
 
@@ -304,8 +301,6 @@ func (peer *Peer) RoutineTimerHandler() {
 			device.indices.Delete(hs.localIndex)
 			hs.Clear()
 			hs.mutex.Unlock()
-
-		// handshake timers
 
 		case <-timerHandshakeTimeout.C:
 
@@ -349,14 +344,12 @@ func (peer *Peer) RoutineTimerHandler() {
 			logInfo.Println(peer, ": Handshake negotiation timed-out")
 
 			peer.flushNonceQueue()
-			signalSend(peer.signal.flushNonceQueue)
-			timerKeepalivePersistent.Stop()
+			peer.event.flushNonceQueue.Fire()
 
-			// disable further handshakes
+			// renable further handshakes
 
 			peer.event.handshakeBegin.Clear()
 			enableHandshake = true
-
 		}
 	}
 }

@@ -29,7 +29,7 @@ func (e *Event) Clear() {
 }
 
 func (e *Event) Fire() {
-	if atomic.SwapInt32(&e.guard, 1) != 0 {
+	if e == nil || atomic.SwapInt32(&e.guard, 1) != 0 {
 		return
 	}
 	if now := time.Now(); now.After(e.next) {
