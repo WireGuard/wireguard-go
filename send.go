@@ -281,9 +281,10 @@ func (device *Device) RoutineEncryption() {
 					elem.Drop()
 				}
 			default:
-				break
+				goto out
 			}
 		}
+		out:
 		logDebug.Println("Routine: encryption worker - stopped")
 	}()
 

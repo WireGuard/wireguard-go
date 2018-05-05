@@ -245,9 +245,10 @@ func (device *Device) RoutineDecryption() {
 					elem.Drop()
 				}
 			default:
-				break
+				goto out
 			}
 		}
+		out:
 		logDebug.Println("Routine: decryption worker - stopped")
 	}()
 	logDebug.Println("Routine: decryption worker - started")
@@ -317,9 +318,10 @@ func (device *Device) RoutineHandshake() {
 			select {
 			case <-device.queue.handshake:
 			default:
-				return
+				goto out
 			}
 		}
+		out:
 		logDebug.Println("Routine: handshake worker - stopped")
 	}()
 
