@@ -148,7 +148,6 @@ func main() {
 
 	logger.Debug.Println("Debug log enabled")
 
-
 	if err != nil {
 		logger.Error.Println("Failed to create TUN device:", err)
 		os.Exit(ExitSetupFailed)

@@ -571,7 +571,7 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 		} else {
 			kp.previous = kp.current
 			kp.current = keyPair
-			peer.signal.newKeyPair.Send()
+			peer.event.newKeyPair.Fire()
 		}
 
 	} else {

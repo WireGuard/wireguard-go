@@ -15,7 +15,7 @@ import (
 
 const (
 	PeerRoutineNumber = 4
-	EventInterval     = time.Millisecond
+	EventInterval     = 10 * time.Millisecond
 )
 
 type Peer struct {
@@ -46,18 +46,14 @@ type Peer struct {
 		dataReceived                    *Event
 		anyAuthenticatedPacketReceived  *Event
 		anyAuthenticatedPacketTraversal *Event
-		handshakeComplete               *Event
+		handshakeCompleted              *Event
 		handshakePushDeadline           *Event
+		handshakeBegin                  *Event
 		ephemeralKeyCreated             *Event
+		newKeyPair                      *Event
 	}
 
 	signal struct {
-		newKeyPair         Signal // size 1, new key pair was generated
-		handshakeCompleted Signal // size 1, handshake completed
-		handshakeBegin     Signal // size 1, begin new handshake begin
-		messageSend        Signal // size 1, message was send to peer
-		messageReceived    Signal // size 1, authenticated message recv
-
 		flushNonceQueue chan struct{} // size 0, empty queued packets
 	}
 
@@ -114,6 +110,18 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	peer.mac.Init(pk)
 	peer.device = device
 	peer.isRunning.Set(false)
+
+	// events
+
+	peer.event.dataSent = newEvent(EventInterval)
+	peer.event.dataReceived = newEvent(EventInterval)
+	peer.event.anyAuthenticatedPacketReceived = newEvent(EventInterval)
+	peer.event.anyAuthenticatedPacketTraversal = newEvent(EventInterval)
+	peer.event.handshakeCompleted = newEvent(EventInterval)
+	peer.event.handshakePushDeadline = newEvent(EventInterval)
+	peer.event.handshakeBegin = newEvent(EventInterval)
+	peer.event.ephemeralKeyCreated = newEvent(EventInterval)
+	peer.event.newKeyPair = newEvent(EventInterval)
 
 	// map public key
 
@@ -202,21 +210,7 @@ func (peer *Peer) Start() {
 	peer.routines.starting.Wait()
 	peer.routines.stopping.Wait()
 
-	// events
-
-	peer.event.dataSent = newEvent(EventInterval)
-	peer.event.dataReceived = newEvent(EventInterval)
-	peer.event.anyAuthenticatedPacketReceived = newEvent(EventInterval)
-	peer.event.anyAuthenticatedPacketTraversal = newEvent(EventInterval)
-	peer.event.handshakeComplete = newEvent(EventInterval)
-	peer.event.handshakePushDeadline = newEvent(EventInterval)
-	peer.event.ephemeralKeyCreated = newEvent(EventInterval)
-
 	// prepare queues and signals
-
-	peer.signal.newKeyPair = NewSignal()
-	peer.signal.handshakeBegin = NewSignal()
-	peer.signal.handshakeCompleted = NewSignal()
 
 	peer.signal.flushNonceQueue = make(chan struct{})
 
@@ -269,12 +263,7 @@ func (peer *Peer) Stop() {
 
 	// close signals
 
-	peer.signal.newKeyPair.Close()
-	peer.signal.handshakeBegin.Close()
-	peer.signal.handshakeCompleted.Close()
-
 	close(peer.signal.flushNonceQueue)
-
 	peer.signal.flushNonceQueue = nil
 
 	// clear key pairs

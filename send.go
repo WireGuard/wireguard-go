@@ -222,6 +222,9 @@ func (peer *Peer) RoutineNonce() {
 			// wait for key pair
 
 			for {
+
+				peer.event.newKeyPair.Clear()
+
 				keyPair = peer.keyPairs.Current()
 				if keyPair != nil && keyPair.sendNonce < RejectAfterMessages {
 					if time.Now().Sub(keyPair.created) < RejectAfterTime {
@@ -229,12 +232,12 @@ func (peer *Peer) RoutineNonce() {
 					}
 				}
 
-				peer.signal.handshakeBegin.Send()
+				peer.event.handshakeBegin.Fire()
 
 				logDebug.Println(peer, ": Awaiting key-pair")
 
 				select {
-				case <-peer.signal.newKeyPair.Wait():
+				case <-peer.event.newKeyPair.C:
 					logDebug.Println(peer, ": Obtained awaited key-pair")
 				case <-peer.signal.flushNonceQueue:
 					goto NextPacket
@@ -392,9 +395,9 @@ func (peer *Peer) RoutineSequentialSender() {
 
 			// update timers
 
-			peer.TimerAnyAuthenticatedPacketTraversal()
+			peer.event.anyAuthenticatedPacketTraversal.Fire()
 			if len(elem.packet) != MessageKeepaliveSize {
-				peer.TimerDataSent()
+				peer.event.dataSent.Fire()
 			}
 			peer.KeepKeyFreshSending()
 		}

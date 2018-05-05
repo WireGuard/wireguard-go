@@ -29,11 +29,10 @@ func (e *Event) Clear() {
 }
 
 func (e *Event) Fire() {
-	if e == nil || atomic.SwapInt32(&e.guard, 1) != 0 {
+	if atomic.SwapInt32(&e.guard, 1) != 0 {
 		return
 	}
-	now := time.Now()
-	if e.next.After(now) {
+	if now := time.Now(); now.After(e.next) {
 		select {
 		case e.C <- struct{}{}:
 		default:

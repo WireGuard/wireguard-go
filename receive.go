@@ -456,8 +456,8 @@ func (device *Device) RoutineHandshake() {
 
 			// update timers
 
-			peer.TimerAnyAuthenticatedPacketTraversal()
-			peer.TimerAnyAuthenticatedPacketReceived()
+			peer.event.anyAuthenticatedPacketTraversal.Fire()
+			peer.event.anyAuthenticatedPacketReceived.Fire()
 
 			// update endpoint
 
@@ -489,7 +489,7 @@ func (device *Device) RoutineHandshake() {
 
 			err = peer.SendBuffer(packet)
 			if err == nil {
-				peer.TimerAnyAuthenticatedPacketTraversal()
+				peer.event.anyAuthenticatedPacketTraversal.Fire()
 			} else {
 				logError.Println(peer, ": Failed to send handshake response", err)
 			}
@@ -529,9 +529,9 @@ func (device *Device) RoutineHandshake() {
 
 			// update timers
 
-			peer.TimerAnyAuthenticatedPacketTraversal()
-			peer.TimerAnyAuthenticatedPacketReceived()
-			peer.TimerHandshakeComplete()
+			peer.event.anyAuthenticatedPacketTraversal.Fire()
+			peer.event.anyAuthenticatedPacketReceived.Fire()
+			peer.event.handshakeCompleted.Fire()
 
 			// derive key-pair
 
@@ -584,8 +584,8 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				continue
 			}
 
-			peer.TimerAnyAuthenticatedPacketTraversal()
-			peer.TimerAnyAuthenticatedPacketReceived()
+			peer.event.anyAuthenticatedPacketTraversal.Fire()
+			peer.event.anyAuthenticatedPacketReceived.Fire()
 			peer.KeepKeyFreshReceiving()
 
 			// check if using new key-pair
@@ -593,7 +593,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			kp := &peer.keyPairs
 			kp.mutex.Lock()
 			if kp.next == elem.keyPair {
-				peer.TimerHandshakeComplete()
+				peer.event.handshakeCompleted.Fire()
 				if kp.previous != nil {
 					device.DeleteKeyPair(kp.previous)
 				}
@@ -615,7 +615,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				logDebug.Println(peer, ": Received keep-alive")
 				continue
 			}
-			peer.TimerDataReceived()
+			peer.event.dataReceived.Fire()
 
 			// verify source and strip padding
 
