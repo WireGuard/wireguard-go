@@ -50,7 +50,7 @@ type QueueOutboundElement struct {
 	peer    *Peer                 // related peer
 }
 
-func (peer *Peer) FlushNonceQueue() {
+func (peer *Peer) flushNonceQueue() {
 	elems := len(peer.queue.nonce)
 	for i := 0; i < elems; i++ {
 		select {
@@ -180,7 +180,7 @@ func (device *Device) RoutineReadFromTUN() {
 		// insert into nonce/pre-handshake queue
 
 		if peer.isRunning.Get() {
-			peer.timer.handshakeDeadline.Reset(RekeyAttemptTime)
+			peer.event.handshakePushDeadline.Fire()
 			addToOutboundQueue(peer.queue.nonce, elem)
 			elem = device.NewOutboundElement()
 		}
@@ -201,11 +201,11 @@ func (peer *Peer) RoutineNonce() {
 
 	defer func() {
 		peer.routines.stopping.Done()
-		logDebug.Println(peer.String() + ": Routine: nonce worker - stopped")
+		logDebug.Println(peer, ": Routine: nonce worker - stopped")
 	}()
 
 	peer.routines.starting.Done()
-	logDebug.Println(peer.String() + ": Routine: nonce worker - started")
+	logDebug.Println(peer, ": Routine: nonce worker - started")
 
 	for {
 	NextPacket:
@@ -222,6 +222,9 @@ func (peer *Peer) RoutineNonce() {
 			// wait for key pair
 
 			for {
+
+				peer.event.newKeyPair.Clear()
+
 				keyPair = peer.keyPairs.Current()
 				if keyPair != nil && keyPair.sendNonce < RejectAfterMessages {
 					if time.Now().Sub(keyPair.created) < RejectAfterTime {
@@ -229,16 +232,14 @@ func (peer *Peer) RoutineNonce() {
 					}
 				}
 
-				peer.signal.handshakeBegin.Send()
+				peer.event.handshakeBegin.Fire()
 
-				logDebug.Println(peer.String() + ": Awaiting key-pair")
+				logDebug.Println(peer, ": Awaiting key-pair")
 
 				select {
-				case <-peer.signal.newKeyPair.Wait():
-					logDebug.Println(peer.String() + ": Obtained awaited key-pair")
-				case <-peer.signal.flushNonceQueue.Wait():
-					logDebug.Println(peer.String() + ": Flushing nonce queue")
-					peer.FlushNonceQueue()
+				case <-peer.event.newKeyPair.C:
+					logDebug.Println(peer, ": Obtained awaited key-pair")
+				case <-peer.signal.flushNonceQueue:
 					goto NextPacket
 				case <-peer.routines.stop.Wait():
 					return
@@ -357,10 +358,10 @@ func (peer *Peer) RoutineSequentialSender() {
 
 	defer func() {
 		peer.routines.stopping.Done()
-		logDebug.Println(peer.String() + ": Routine: sequential sender - stopped")
+		logDebug.Println(peer, ": Routine: sequential sender - stopped")
 	}()
 
-	logDebug.Println(peer.String() + ": Routine: sequential sender - started")
+	logDebug.Println(peer, ": Routine: sequential sender - started")
 
 	peer.routines.starting.Done()
 
@@ -387,16 +388,16 @@ func (peer *Peer) RoutineSequentialSender() {
 			err := peer.SendBuffer(elem.packet)
 			device.PutMessageBuffer(elem.buffer)
 			if err != nil {
-				logDebug.Println("Failed to send authenticated packet to peer", peer.String())
+				logDebug.Println("Failed to send authenticated packet to peer", peer)
 				continue
 			}
 			atomic.AddUint64(&peer.stats.txBytes, length)
 
 			// update timers
 
-			peer.TimerAnyAuthenticatedPacketTraversal()
+			peer.event.anyAuthenticatedPacketTraversal.Fire()
 			if len(elem.packet) != MessageKeepaliveSize {
-				peer.TimerDataSent()
+				peer.event.dataSent.Fire()
 			}
 			peer.KeepKeyFreshSending()
 		}

@@ -253,12 +253,10 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 						logError.Println("Failed to create new peer:", err)
 						return &IPCError{Code: ipcErrorInvalid}
 					}
-					logDebug.Println("UAPI: Created new peer:", peer.String())
+					logDebug.Println("UAPI: Created new peer:", peer)
 				}
 
-				peer.mutex.Lock()
-				peer.timer.handshakeDeadline.Reset(RekeyAttemptTime)
-				peer.mutex.Unlock()
+				peer.event.handshakePushDeadline.Fire()
 
 			case "remove":
 
@@ -269,7 +267,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 				if !dummy {
-					logDebug.Println("UAPI: Removing peer:", peer.String())
+					logDebug.Println("UAPI: Removing peer:", peer)
 					device.RemovePeer(peer.handshake.remoteStatic)
 				}
 				peer = &Peer{}
@@ -279,7 +277,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 				// update PSK
 
-				logDebug.Println("UAPI: Updating pre-shared key for peer:", peer.String())
+				logDebug.Println("UAPI: Updating pre-shared key for peer:", peer)
 
 				peer.handshake.mutex.Lock()
 				err := peer.handshake.presharedKey.FromHex(value)
@@ -294,7 +292,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 				// set endpoint destination
 
-				logDebug.Println("UAPI: Updating endpoint for peer:", peer.String())
+				logDebug.Println("UAPI: Updating endpoint for peer:", peer)
 
 				err := func() error {
 					peer.mutex.Lock()
@@ -304,7 +302,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 						return err
 					}
 					peer.endpoint = endpoint
-					peer.timer.handshakeDeadline.Reset(RekeyAttemptTime)
+					peer.event.handshakePushDeadline.Fire()
 					return nil
 				}()
 
@@ -317,7 +315,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 				// update keep-alive interval
 
-				logDebug.Println("UAPI: Updating persistent_keepalive_interval for peer:", peer.String())
+				logDebug.Println("UAPI: Updating persistent_keepalive_interval for peer:", peer)
 
 				secs, err := strconv.ParseUint(value, 10, 16)
 				if err != nil {
@@ -342,7 +340,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 			case "replace_allowed_ips":
 
-				logDebug.Println("UAPI: Removing all allowed IPs for peer:", peer.String())
+				logDebug.Println("UAPI: Removing all allowed IPs for peer:", peer)
 
 				if value != "true" {
 					logError.Println("Failed to set replace_allowed_ips, invalid value:", value)
@@ -359,7 +357,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 			case "allowed_ip":
 
-				logDebug.Println("UAPI: Adding allowed_ip to peer:", peer.String())
+				logDebug.Println("UAPI: Adding allowed_ip to peer:", peer)
 
 				_, network, err := net.ParseCIDR(value)
 				if err != nil {

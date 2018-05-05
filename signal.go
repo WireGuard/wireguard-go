@@ -5,6 +5,13 @@
 
 package main
 
+func signalSend(s chan<- struct{}) {
+	select {
+	case s <- struct{}{}:
+	default:
+	}
+}
+
 type Signal struct {
 	enabled AtomicBool
 	C       chan struct{}

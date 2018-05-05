@@ -212,6 +212,9 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 
 		case MessageCookieReplyType:
 			okay = len(packet) == MessageCookieReplySize
+
+		default:
+			logDebug.Println("Received message with unknown type")
 		}
 
 		if okay {
@@ -453,8 +456,8 @@ func (device *Device) RoutineHandshake() {
 
 			// update timers
 
-			peer.TimerAnyAuthenticatedPacketTraversal()
-			peer.TimerAnyAuthenticatedPacketReceived()
+			peer.event.anyAuthenticatedPacketTraversal.Fire()
+			peer.event.anyAuthenticatedPacketReceived.Fire()
 
 			// update endpoint
 
@@ -462,7 +465,7 @@ func (device *Device) RoutineHandshake() {
 			peer.endpoint = elem.endpoint
 			peer.mutex.Unlock()
 
-			logDebug.Println(peer.String() + ": Received handshake initiation")
+			logDebug.Println(peer, ": Received handshake initiation")
 
 			// create response
 
@@ -475,7 +478,7 @@ func (device *Device) RoutineHandshake() {
 			peer.TimerEphemeralKeyCreated()
 			peer.NewKeyPair()
 
-			logDebug.Println(peer.String(), "Creating handshake response")
+			logDebug.Println(peer, ": Creating handshake response")
 
 			writer := bytes.NewBuffer(temp[:0])
 			binary.Write(writer, binary.LittleEndian, response)
@@ -486,9 +489,9 @@ func (device *Device) RoutineHandshake() {
 
 			err = peer.SendBuffer(packet)
 			if err == nil {
-				peer.TimerAnyAuthenticatedPacketTraversal()
+				peer.event.anyAuthenticatedPacketTraversal.Fire()
 			} else {
-				logError.Println(peer.String(), "Failed to send handshake response", err)
+				logError.Println(peer, ": Failed to send handshake response", err)
 			}
 
 		case MessageResponseType:
@@ -520,15 +523,15 @@ func (device *Device) RoutineHandshake() {
 			peer.endpoint = elem.endpoint
 			peer.mutex.Unlock()
 
-			logDebug.Println(peer.String() + ": Received handshake response")
+			logDebug.Println(peer, ": Received handshake response")
 
 			peer.TimerEphemeralKeyCreated()
 
 			// update timers
 
-			peer.TimerAnyAuthenticatedPacketTraversal()
-			peer.TimerAnyAuthenticatedPacketReceived()
-			peer.TimerHandshakeComplete()
+			peer.event.anyAuthenticatedPacketTraversal.Fire()
+			peer.event.anyAuthenticatedPacketReceived.Fire()
+			peer.event.handshakeCompleted.Fire()
 
 			// derive key-pair
 
@@ -547,10 +550,10 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 	defer func() {
 		peer.routines.stopping.Done()
-		logDebug.Println(peer.String() + ": Routine: sequential receiver - stopped")
+		logDebug.Println(peer, ": Routine: sequential receiver - stopped")
 	}()
 
-	logDebug.Println(peer.String() + ": Routine: sequential receiver - started")
+	logDebug.Println(peer, ": Routine: sequential receiver - started")
 
 	peer.routines.starting.Done()
 
@@ -581,8 +584,8 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				continue
 			}
 
-			peer.TimerAnyAuthenticatedPacketTraversal()
-			peer.TimerAnyAuthenticatedPacketReceived()
+			peer.event.anyAuthenticatedPacketTraversal.Fire()
+			peer.event.anyAuthenticatedPacketReceived.Fire()
 			peer.KeepKeyFreshReceiving()
 
 			// check if using new key-pair
@@ -590,7 +593,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			kp := &peer.keyPairs
 			kp.mutex.Lock()
 			if kp.next == elem.keyPair {
-				peer.TimerHandshakeComplete()
+				peer.event.handshakeCompleted.Fire()
 				if kp.previous != nil {
 					device.DeleteKeyPair(kp.previous)
 				}
@@ -609,10 +612,10 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			// check for keep-alive
 
 			if len(elem.packet) == 0 {
-				logDebug.Println("Received keep-alive from", peer.String())
+				logDebug.Println(peer, ": Received keep-alive")
 				continue
 			}
-			peer.TimerDataReceived()
+			peer.event.dataReceived.Fire()
 
 			// verify source and strip padding
 
@@ -639,7 +642,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				if device.routing.table.LookupIPv4(src) != peer {
 					logInfo.Println(
 						"IPv4 packet with disallowed source address from",
-						peer.String(),
+						peer,
 					)
 					continue
 				}
@@ -666,14 +669,14 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				src := elem.packet[IPv6offsetSrc : IPv6offsetSrc+net.IPv6len]
 				if device.routing.table.LookupIPv6(src) != peer {
 					logInfo.Println(
-						"IPv6 packet with disallowed source address from",
-						peer.String(),
+						peer,
+						"sent packet with disallowed IPv6 source",
 					)
 					continue
 				}
 
 			default:
-				logInfo.Println("Packet with invalid IP version from", peer.String())
+				logInfo.Println("Packet with invalid IP version from", peer)
 				continue
 			}
 
