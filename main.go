@@ -1,3 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0
+ *
+ * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+ */
+
 package main
 
 import (
@@ -14,8 +19,9 @@ const (
 )
 
 const (
-	ENV_WG_TUN_FD  = "WG_TUN_FD"
-	ENV_WG_UAPI_FD = "WG_UAPI_FD"
+	ENV_WG_TUN_FD             = "WG_TUN_FD"
+	ENV_WG_UAPI_FD            = "WG_UAPI_FD"
+	ENV_WG_PROCESS_FOREGROUND = "WG_PROCESS_FOREGROUND"
 )
 
 func printUsage() {
@@ -23,7 +29,45 @@ func printUsage() {
 	fmt.Printf("%s [-f/--foreground] INTERFACE-NAME\n", os.Args[0])
 }
 
+func warning() {
+	shouldQuit := false
+
+	fmt.Fprintln(os.Stderr, "WARNING WARNING WARNING WARNING WARNING WARNING WARNING")
+	fmt.Fprintln(os.Stderr, "W                                                     G")
+	fmt.Fprintln(os.Stderr, "W   This is alpha software. It will very likely not   G")
+	fmt.Fprintln(os.Stderr, "W   do what it is supposed to do, and things may go   G")
+	fmt.Fprintln(os.Stderr, "W   horribly wrong. You have been warned. Proceed     G")
+	fmt.Fprintln(os.Stderr, "W   at your own risk.                                 G")
+	if runtime.GOOS == "linux" {
+		shouldQuit = os.Getenv("WG_I_PREFER_BUGGY_USERSPACE_TO_POLISHED_KMOD") != "1"
+
+		fmt.Fprintln(os.Stderr, "W                                                     G")
+		fmt.Fprintln(os.Stderr, "W   Furthermore, you are running this software on a   G")
+		fmt.Fprintln(os.Stderr, "W   Linux kernel, which is probably unnecessary and   G")
+		fmt.Fprintln(os.Stderr, "W   foolish. This is because the Linux kernel has     G")
+		fmt.Fprintln(os.Stderr, "W   built-in first class support for WireGuard, and   G")
+		fmt.Fprintln(os.Stderr, "W   this support is much more refined than this       G")
+		fmt.Fprintln(os.Stderr, "W   program. For more information on installing the   G")
+		fmt.Fprintln(os.Stderr, "W   kernel module, please visit:                      G")
+		fmt.Fprintln(os.Stderr, "W           https://www.wireguard.com/install         G")
+		if shouldQuit {
+			fmt.Fprintln(os.Stderr, "W                                                     G")
+			fmt.Fprintln(os.Stderr, "W   If you still want to use this program, against    G")
+			fmt.Fprintln(os.Stderr, "W   the sage advice here, please first export this    G")
+			fmt.Fprintln(os.Stderr, "W   environment variable:                             G")
+			fmt.Fprintln(os.Stderr, "W   WG_I_PREFER_BUGGY_USERSPACE_TO_POLISHED_KMOD=1    G")
+		}
+	}
+	fmt.Fprintln(os.Stderr, "W                                                     G")
+	fmt.Fprintln(os.Stderr, "WARNING WARNING WARNING WARNING WARNING WARNING WARNING")
+
+	if shouldQuit {
+		os.Exit(1)
+	}
+}
+
 func main() {
+	warning()
 
 	// parse arguments
 
@@ -53,6 +97,10 @@ func main() {
 		interfaceName = os.Args[1]
 	}
 
+	if !foreground {
+		foreground = os.Getenv(ENV_WG_PROCESS_FOREGROUND) == "1"
+	}
+
 	// get log level (default: info)
 
 	logLevel := func() int {
@@ -66,13 +114,6 @@ func main() {
 		}
 		return LogLevelInfo
 	}()
-
-	logger := NewLogger(
-		logLevel,
-		fmt.Sprintf("(%s) ", interfaceName),
-	)
-
-	logger.Debug.Println("Debug log enabled")
 
 	// open TUN device (or use supplied fd)
 
@@ -92,6 +133,21 @@ func main() {
 		file := os.NewFile(uintptr(fd), "")
 		return CreateTUNFromFile(file)
 	}()
+
+	if err == nil {
+		realInterfaceName, err2 := tun.Name()
+		if err2 == nil {
+			interfaceName = realInterfaceName
+		}
+	}
+
+	logger := NewLogger(
+		logLevel,
+		fmt.Sprintf("(%s) ", interfaceName),
+	)
+
+	logger.Debug.Println("Debug log enabled")
+
 
 	if err != nil {
 		logger.Error.Println("Failed to create TUN device:", err)
@@ -127,6 +183,7 @@ func main() {
 		env := os.Environ()
 		env = append(env, fmt.Sprintf("%s=3", ENV_WG_TUN_FD))
 		env = append(env, fmt.Sprintf("%s=4", ENV_WG_UAPI_FD))
+		env = append(env, fmt.Sprintf("%s=1", ENV_WG_PROCESS_FOREGROUND))
 		attr := &os.ProcAttr{
 			Files: []*os.File{
 				nil, // stdin
@@ -138,17 +195,25 @@ func main() {
 			Dir: ".",
 			Env: env,
 		}
-		err = Daemonize(attr)
+
+		path, err := os.Executable()
+		if err != nil {
+			logger.Error.Println("Failed to determine executable:", err)
+			os.Exit(ExitSetupFailed)
+		}
+
+		process, err := os.StartProcess(
+			path,
+			os.Args,
+			attr,
+		)
 		if err != nil {
 			logger.Error.Println("Failed to daemonize:", err)
 			os.Exit(ExitSetupFailed)
 		}
+		process.Release()
 		return
 	}
-
-	// increase number of go workers (for Go <1.5)
-
-	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// create wireguard device
 
@@ -162,6 +227,10 @@ func main() {
 	term := make(chan os.Signal)
 
 	uapi, err := UAPIListen(interfaceName, fileUAPI)
+	if err != nil {
+		logger.Error.Println("Failed to listen on uapi socket:", err)
+		os.Exit(ExitSetupFailed)
+	}
 
 	go func() {
 		for {

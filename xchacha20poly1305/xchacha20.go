@@ -1,6 +1,8 @@
-// Copyright (c) 2016 Andreas Auernhammer. All rights reserved.
-// Use of this source code is governed by a license that can be
-// found in the LICENSE file.
+/* SPDX-License-Identifier: MIT
+ *
+ * Copyright (C) 2016 Andreas Auernhammer. All Rights Reserved.
+ * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+ */
 
 package xchacha20poly1305
 

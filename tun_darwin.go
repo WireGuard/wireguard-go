@@ -1,22 +1,17 @@
-/* Copyright (c) 2016, Song Gao <song@gao.io>
- * All rights reserved.
+/* SPDX-License-Identifier: GPL-2.0
  *
- * Code from https://github.com/songgao/water
+ * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  */
 
 package main
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
-	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
-	"io"
 	"net"
 	"os"
-	"sync"
 	"time"
 	"unsafe"
 )
@@ -36,18 +31,12 @@ type sockaddrCtl struct {
 	scReserved [5]uint32
 }
 
-// NativeTUN is a hack to work around the first 4 bytes "packet
+// NativeTun is a hack to work around the first 4 bytes "packet
 // information" because there doesn't seem to be an IFF_NO_PI for darwin.
-type NativeTUN struct {
+type NativeTun struct {
 	name string
-	f    io.ReadWriteCloser
+	fd   *os.File
 	mtu  int
-
-	rMu  sync.Mutex
-	rBuf []byte
-
-	wMu  sync.Mutex
-	wBuf []byte
 
 	events chan TUNEvent
 	errors chan error
@@ -55,17 +44,19 @@ type NativeTUN struct {
 
 var sockaddrCtlSize uintptr = 32
 
-func CreateTUN(name string) (ifce TUNDevice, err error) {
+func CreateTUN(name string) (TUNDevice, error) {
 	ifIndex := -1
-	fmt.Sscanf(name, "utun%d", &ifIndex)
-	if ifIndex < 0 {
-		return nil, fmt.Errorf("error parsing interface name %s, must be utun[0-9]+", name)
+	if (name != "utun") {
+		fmt.Sscanf(name, "utun%d", &ifIndex)
+		if ifIndex < 0 {
+			return nil, fmt.Errorf("Interface name must be utun[0-9]*")
+		}
 	}
 
 	fd, err := unix.Socket(unix.AF_SYSTEM, unix.SOCK_DGRAM, 2)
 
 	if err != nil {
-		return nil, fmt.Errorf("error in unix.Socket: %v", err)
+		return nil, err
 	}
 
 	var ctlInfo = &struct {
@@ -83,8 +74,7 @@ func CreateTUN(name string) (ifce TUNDevice, err error) {
 	)
 
 	if errno != 0 {
-		err = errno
-		return nil, fmt.Errorf("error in unix.Syscall(unix.SYS_IOTL, ...): %v", err)
+		return nil, fmt.Errorf("_CTLIOCGINFO: %v", errno)
 	}
 
 	sc := sockaddrCtl{
@@ -105,148 +95,139 @@ func CreateTUN(name string) (ifce TUNDevice, err error) {
 	)
 
 	if errno != 0 {
-		err = errno
-		return nil, fmt.Errorf("error in unix.RawSyscall(unix.SYS_CONNECT, ...): %v", err)
+		return nil, fmt.Errorf("SYS_CONNECT: %v", errno)
 	}
 
-	// read (new) name of interface
+	tun, err := CreateTUNFromFile(os.NewFile(uintptr(fd), ""))
 
-	var ifName struct {
-		name [16]byte
-	}
-	ifNameSize := uintptr(16)
-
-	_, _, errno = unix.Syscall6(
-		unix.SYS_GETSOCKOPT,
-		uintptr(fd),
-		2, /* #define SYSPROTO_CONTROL 2 */
-		2, /* #define UTUN_OPT_IFNAME 2 */
-		uintptr(unsafe.Pointer(&ifName)),
-		uintptr(unsafe.Pointer(&ifNameSize)), 0)
-
-	if errno != 0 {
-		err = errno
-		return nil, fmt.Errorf("error in unix.Syscall6(unix.SYS_GETSOCKOPT, ...): %v", err)
+	if err == nil && name == "utun" {
+		fmt.Printf("OS assigned interface: %s\n", tun.(*NativeTun).name)
 	}
 
-	device := &NativeTUN{
-		name:   string(ifName.name[:ifNameSize-1 /* -1 is for \0 */]),
-		f:      os.NewFile(uintptr(fd), string(ifName.name[:])),
+	return tun, err
+}
+
+func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
+
+	tun := &NativeTun{
+		fd:     file,
 		mtu:    1500,
 		events: make(chan TUNEvent, 10),
 		errors: make(chan error, 1),
 	}
 
-	// start listener
+	_, err := tun.Name()
+	if err != nil {
+		return nil, err
+	}
 
-	go func(native *NativeTUN) {
-		// TODO: Fix this very niave implementation
+	// TODO: Fix this very naive implementation
+	go func(tun *NativeTun) {
 		var (
 			statusUp  bool
 			statusMTU int
 		)
 
 		for ; ; time.Sleep(time.Second) {
-			intr, err := net.InterfaceByName(device.name)
+			intr, err := net.InterfaceByName(tun.name)
 			if err != nil {
-				native.errors <- err
+				tun.errors <- err
 				return
 			}
 
 			// Up / Down event
 			up := (intr.Flags & net.FlagUp) != 0
 			if up != statusUp && up {
-				native.events <- TUNEventUp
+				tun.events <- TUNEventUp
 			}
 			if up != statusUp && !up {
-				native.events <- TUNEventDown
+				tun.events <- TUNEventDown
 			}
 			statusUp = up
 
 			// MTU changes
 			if intr.MTU != statusMTU {
-				native.events <- TUNEventMTUUpdate
+				tun.events <- TUNEventMTUUpdate
 			}
 			statusMTU = intr.MTU
 		}
-	}(device)
+	}(tun)
 
 	// set default MTU
+	err = tun.setMTU(DefaultMTU)
 
-	err = device.setMTU(DefaultMTU)
-
-	return device, err
+	return tun, err
 }
 
-var _ io.ReadWriteCloser = (*NativeTUN)(nil)
+func (tun *NativeTun) Name() (string, error) {
 
-func (t *NativeTUN) Events() chan TUNEvent {
-	return t.events
-}
-
-func (t *NativeTUN) Read(to []byte) (int, error) {
-	t.rMu.Lock()
-	defer t.rMu.Unlock()
-
-	if cap(t.rBuf) < len(to)+4 {
-		t.rBuf = make([]byte, len(to)+4)
+	var ifName struct {
+		name [16]byte
 	}
-	t.rBuf = t.rBuf[:len(to)+4]
+	ifNameSize := uintptr(16)
 
-	n, err := t.f.Read(t.rBuf)
-	copy(to, t.rBuf[4:])
+	_, _, errno := unix.Syscall6(
+		unix.SYS_GETSOCKOPT,
+		uintptr(tun.fd.Fd()),
+		2, /* #define SYSPROTO_CONTROL 2 */
+		2, /* #define UTUN_OPT_IFNAME 2 */
+		uintptr(unsafe.Pointer(&ifName)),
+		uintptr(unsafe.Pointer(&ifNameSize)), 0)
+
+	if errno != 0 {
+		return "", fmt.Errorf("SYS_GETSOCKOPT: %v", errno)
+	}
+
+	tun.name = string(ifName.name[:ifNameSize-1])
+	return tun.name, nil
+}
+
+func (tun *NativeTun) File() *os.File {
+	return tun.fd
+}
+
+func (tun *NativeTun) Events() chan TUNEvent {
+	return tun.events
+}
+
+func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
+
+	buff = buff[offset-4:]
+	n, err := tun.fd.Read(buff[:])
+	if n < 4 {
+		return 0, err
+	}
 	return n - 4, err
 }
 
-func (t *NativeTUN) Write(from []byte) (int, error) {
+func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 
-	if len(from) == 0 {
-		return 0, unix.EIO
-	}
+	// reserve space for header
 
-	t.wMu.Lock()
-	defer t.wMu.Unlock()
+	buff = buff[offset-4:]
 
-	if cap(t.wBuf) < len(from)+4 {
-		t.wBuf = make([]byte, len(from)+4)
-	}
-	t.wBuf = t.wBuf[:len(from)+4]
+	// add packet information header
 
-	// determine the IP Family for the NULL L2 Header
+	buff[0] = 0x00
+	buff[1] = 0x00
+	buff[2] = 0x00
 
-	ipVer := from[0] >> 4
-	if ipVer == ipv4.Version {
-		t.wBuf[3] = unix.AF_INET
-	} else if ipVer == ipv6.Version {
-		t.wBuf[3] = unix.AF_INET6
+	if buff[4]>>4 == ipv6.Version {
+		buff[3] = unix.AF_INET6
 	} else {
-		return 0, errors.New("Unable to determine IP version from packet.")
+		buff[3] = unix.AF_INET
 	}
 
-	copy(t.wBuf[4:], from)
+	// write
 
-	n, err := t.f.Write(t.wBuf)
-	return n - 4, err
+	return tun.fd.Write(buff)
 }
 
-func (t *NativeTUN) Close() error {
-
-	// lock to make sure no read/write is in process.
-
-	t.rMu.Lock()
-	defer t.rMu.Unlock()
-
-	t.wMu.Lock()
-	defer t.wMu.Unlock()
-
-	return t.f.Close()
+func (tun *NativeTun) Close() error {
+	return tun.fd.Close()
 }
 
-func (t *NativeTUN) Name() string {
-	return t.name
-}
-
-func (t *NativeTUN) setMTU(n int) error {
+func (tun *NativeTun) setMTU(n int) error {
 
 	// open datagram socket
 
@@ -267,7 +248,7 @@ func (t *NativeTUN) setMTU(n int) error {
 	// do ioctl call
 
 	var ifr [32]byte
-	copy(ifr[:], t.name)
+	copy(ifr[:], tun.name)
 	binary.LittleEndian.PutUint32(ifr[16:20], uint32(n))
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
@@ -277,13 +258,13 @@ func (t *NativeTUN) setMTU(n int) error {
 	)
 
 	if errno != 0 {
-		return fmt.Errorf("Failed to set MTU on %s", t.name)
+		return fmt.Errorf("Failed to set MTU on %s", tun.name)
 	}
 
 	return nil
 }
 
-func (t *NativeTUN) MTU() (int, error) {
+func (tun *NativeTun) MTU() (int, error) {
 
 	// open datagram socket
 
@@ -302,7 +283,7 @@ func (t *NativeTUN) MTU() (int, error) {
 	// do ioctl call
 
 	var ifr [64]byte
-	copy(ifr[:], t.name)
+	copy(ifr[:], tun.name)
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
 		uintptr(fd),
@@ -310,7 +291,7 @@ func (t *NativeTUN) MTU() (int, error) {
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)
 	if errno != 0 {
-		return 0, fmt.Errorf("Failed to get MTU on %s", t.name)
+		return 0, fmt.Errorf("Failed to get MTU on %s", tun.name)
 	}
 
 	// convert result to signed 32-bit int
