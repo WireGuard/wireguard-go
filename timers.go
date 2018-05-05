@@ -201,6 +201,53 @@ func (peer *Peer) RoutineTimerHandler() {
 				timerKeepalivePersistent.Reset(duration)
 			}
 
+		case <-peer.event.handshakeBegin.C:
+
+			if !enableHandshake {
+				continue
+			}
+
+			logDebug.Println(peer, ": Event, Handshake Begin")
+
+			err := peer.sendNewHandshake()
+
+			// set timeout
+
+			jitter := time.Millisecond * time.Duration(rand.Int31n(334))
+			timerKeepalivePassive.Stop()
+			timerHandshakeTimeout.Reset(RekeyTimeout + jitter)
+
+			if err != nil {
+				logInfo.Println(peer, ": Failed to send handshake initiation", err)
+			} else {
+				logDebug.Println(peer, ": Send handshake initiation (initial)")
+			}
+
+			timerHandshakeDeadline.Reset(RekeyAttemptTime)
+
+			// disable further handshakes
+
+			peer.event.handshakeBegin.Clear()
+			enableHandshake = false
+
+		case <-peer.event.handshakeCompleted.C:
+
+			logInfo.Println(peer, ": Handshake completed")
+
+			atomic.StoreInt64(
+				&peer.stats.lastHandshakeNano,
+				time.Now().UnixNano(),
+			)
+
+			timerHandshakeTimeout.Stop()
+			timerHandshakeDeadline.Stop()
+			peer.timer.sendLastMinuteHandshake.Set(false)
+
+			// allow further handshakes
+
+			peer.event.handshakeBegin.Clear()
+			enableHandshake = true
+
 		/* timers */
 
 		// keep-alive
@@ -280,7 +327,7 @@ func (peer *Peer) RoutineTimerHandler() {
 
 			// set timeout
 
-			jitter := time.Millisecond * time.Duration(rand.Uint32()%334)
+			jitter := time.Millisecond * time.Duration(rand.Int31n(334))
 			timerKeepalivePassive.Stop()
 			timerHandshakeTimeout.Reset(RekeyTimeout + jitter)
 
@@ -310,52 +357,6 @@ func (peer *Peer) RoutineTimerHandler() {
 			peer.event.handshakeBegin.Clear()
 			enableHandshake = true
 
-		case <-peer.event.handshakeBegin.C:
-
-			if !enableHandshake {
-				continue
-			}
-
-			logDebug.Println(peer, ": Event, Handshake Begin")
-
-			err := peer.sendNewHandshake()
-
-			// set timeout
-
-			jitter := time.Millisecond * time.Duration(rand.Uint32()%334)
-			timerKeepalivePassive.Stop()
-			timerHandshakeTimeout.Reset(RekeyTimeout + jitter)
-
-			if err != nil {
-				logInfo.Println(peer, ": Failed to send handshake initiation", err)
-			} else {
-				logDebug.Println(peer, ": Send handshake initiation (initial)")
-			}
-
-			timerHandshakeDeadline.Reset(RekeyAttemptTime)
-
-			// disable further handshakes
-
-			peer.event.handshakeBegin.Clear()
-			enableHandshake = false
-
-		case <-peer.event.handshakeCompleted.C:
-
-			logInfo.Println(peer, ": Handshake completed")
-
-			atomic.StoreInt64(
-				&peer.stats.lastHandshakeNano,
-				time.Now().UnixNano(),
-			)
-
-			timerHandshakeTimeout.Stop()
-			timerHandshakeDeadline.Stop()
-			peer.timer.sendLastMinuteHandshake.Set(false)
-
-			// allow further handshakes
-
-			peer.event.handshakeBegin.Clear()
-			enableHandshake = true
 		}
 	}
 }
