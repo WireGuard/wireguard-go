@@ -94,9 +94,9 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 
 	go func(l *UAPIListener) {
 		event := unix.Kevent_t{
-			Ident: uint64(uapi.keventFd),
+			Ident:  uint64(uapi.keventFd),
 			Filter: unix.EVFILT_VNODE,
-			Flags: unix.EV_ADD | unix.EV_ENABLE | unix.EV_ONESHOT,
+			Flags:  unix.EV_ADD | unix.EV_ENABLE | unix.EV_ONESHOT,
 			Fflags: unix.NOTE_WRITE,
 		}
 		events := make([]unix.Kevent_t, 1)
