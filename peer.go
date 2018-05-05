@@ -10,6 +10,7 @@ import (
 
 const (
 	PeerRoutineNumber = 4
+	EventInterval     = time.Millisecond
 )
 
 type Peer struct {
@@ -35,26 +36,27 @@ type Peer struct {
 		nextKeepalive time.Time
 	}
 
+	event struct {
+		dataSent                        *Event
+		dataReceived                    *Event
+		anyAuthenticatedPacketReceived  *Event
+		anyAuthenticatedPacketTraversal *Event
+		handshakeComplete               *Event
+		handshakePushDeadline           *Event
+		ephemeralKeyCreated             *Event
+	}
+
 	signal struct {
 		newKeyPair         Signal // size 1, new key pair was generated
 		handshakeCompleted Signal // size 1, handshake completed
 		handshakeBegin     Signal // size 1, begin new handshake begin
-		flushNonceQueue    Signal // size 1, empty queued packets
 		messageSend        Signal // size 1, message was send to peer
 		messageReceived    Signal // size 1, authenticated message recv
+
+		flushNonceQueue chan struct{} // size 0, empty queued packets
 	}
 
 	timer struct {
-
-		// state related to WireGuard timers
-
-		keepalivePersistent Timer // set for persistent keep-alive
-		keepalivePassive    Timer // set upon receiving messages
-		zeroAllKeys         Timer // zero all key material
-		handshakeNew        Timer // begin a new handshake (stale)
-		handshakeDeadline   Timer // complete handshake timeout
-		handshakeTimeout    Timer // current handshake message timeout
-
 		sendLastMinuteHandshake AtomicBool
 		needAnotherKeepalive    AtomicBool
 	}
@@ -107,13 +109,6 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	peer.mac.Init(pk)
 	peer.device = device
 	peer.isRunning.Set(false)
-
-	peer.timer.zeroAllKeys = NewTimer()
-	peer.timer.keepalivePersistent = NewTimer()
-	peer.timer.keepalivePassive = NewTimer()
-	peer.timer.handshakeNew = NewTimer()
-	peer.timer.handshakeDeadline = NewTimer()
-	peer.timer.handshakeTimeout = NewTimer()
 
 	// map public key
 
@@ -195,19 +190,30 @@ func (peer *Peer) Start() {
 	}
 
 	device := peer.device
-	device.log.Debug.Println(peer.String() + ": Starting...")
+	device.log.Debug.Println(peer, ": Starting...")
 
 	// sanity check : these should be 0
 
 	peer.routines.starting.Wait()
 	peer.routines.stopping.Wait()
 
+	// events
+
+	peer.event.dataSent = newEvent(EventInterval)
+	peer.event.dataReceived = newEvent(EventInterval)
+	peer.event.anyAuthenticatedPacketReceived = newEvent(EventInterval)
+	peer.event.anyAuthenticatedPacketTraversal = newEvent(EventInterval)
+	peer.event.handshakeComplete = newEvent(EventInterval)
+	peer.event.handshakePushDeadline = newEvent(EventInterval)
+	peer.event.ephemeralKeyCreated = newEvent(EventInterval)
+
 	// prepare queues and signals
 
 	peer.signal.newKeyPair = NewSignal()
 	peer.signal.handshakeBegin = NewSignal()
 	peer.signal.handshakeCompleted = NewSignal()
-	peer.signal.flushNonceQueue = NewSignal()
+
+	peer.signal.flushNonceQueue = make(chan struct{})
 
 	peer.queue.nonce = make(chan *QueueOutboundElement, QueueOutboundSize)
 	peer.queue.outbound = make(chan *QueueOutboundElement, QueueOutboundSize)
@@ -242,22 +248,13 @@ func (peer *Peer) Stop() {
 	}
 
 	device := peer.device
-	device.log.Debug.Println(peer.String() + ": Stopping...")
+	device.log.Debug.Println(peer, ": Stopping...")
 
 	// stop & wait for ongoing peer routines
 
 	peer.routines.starting.Wait()
 	peer.routines.stop.Broadcast()
 	peer.routines.stopping.Wait()
-
-	// stop timers
-
-	peer.timer.keepalivePersistent.Stop()
-	peer.timer.keepalivePassive.Stop()
-	peer.timer.zeroAllKeys.Stop()
-	peer.timer.handshakeNew.Stop()
-	peer.timer.handshakeDeadline.Stop()
-	peer.timer.handshakeTimeout.Stop()
 
 	// close queues
 
@@ -270,7 +267,10 @@ func (peer *Peer) Stop() {
 	peer.signal.newKeyPair.Close()
 	peer.signal.handshakeBegin.Close()
 	peer.signal.handshakeCompleted.Close()
-	peer.signal.flushNonceQueue.Close()
+
+	close(peer.signal.flushNonceQueue)
+
+	peer.signal.flushNonceQueue = nil
 
 	// clear key pairs
 
