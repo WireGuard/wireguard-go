@@ -11,6 +11,7 @@ package main
  */
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -19,7 +20,6 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"bytes"
 	"strings"
 	"syscall"
 	"time"
