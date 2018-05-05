@@ -238,8 +238,8 @@ func (device *Device) RoutineDecryption() {
 
 	logDebug := device.log.Debug
 	defer func() {
-		device.state.stopping.Done()
 		logDebug.Println("Routine: decryption worker - stopped")
+		device.state.stopping.Done()
 	}()
 	logDebug.Println("Routine: decryption worker - started")
 
@@ -304,8 +304,8 @@ func (device *Device) RoutineHandshake() {
 	logDebug := device.log.Debug
 
 	defer func() {
-		device.state.stopping.Done()
 		logDebug.Println("Routine: handshake worker - stopped")
+		device.state.stopping.Done()
 	}()
 
 	logDebug.Println("Routine: handshake worker - started")
@@ -534,8 +534,8 @@ func (peer *Peer) RoutineSequentialReceiver() {
 	logDebug := device.log.Debug
 
 	defer func() {
-		peer.routines.stopping.Done()
 		logDebug.Println(peer, ": Routine: sequential receiver - stopped")
+		peer.routines.stopping.Done()
 	}()
 
 	logDebug.Println(peer, ": Routine: sequential receiver - started")

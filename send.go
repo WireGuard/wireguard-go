@@ -200,8 +200,8 @@ func (peer *Peer) RoutineNonce() {
 	logDebug := device.log.Debug
 
 	defer func() {
-		peer.routines.stopping.Done()
 		logDebug.Println(peer, ": Routine: nonce worker - stopped")
+		peer.routines.stopping.Done()
 	}()
 
 	peer.routines.starting.Done()
@@ -274,8 +274,8 @@ func (device *Device) RoutineEncryption() {
 	logDebug := device.log.Debug
 
 	defer func() {
-		device.state.stopping.Done()
 		logDebug.Println("Routine: encryption worker - stopped")
+		device.state.stopping.Done()
 	}()
 
 	logDebug.Println("Routine: encryption worker - started")
@@ -348,8 +348,8 @@ func (peer *Peer) RoutineSequentialSender() {
 	logDebug := device.log.Debug
 
 	defer func() {
-		peer.routines.stopping.Done()
 		logDebug.Println(peer, ": Routine: sequential sender - stopped")
+		peer.routines.stopping.Done()
 	}()
 
 	logDebug.Println(peer, ": Routine: sequential sender - started")
