@@ -1,355 +1,221 @@
 /* SPDX-License-Identifier: GPL-2.0
  *
- * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+ * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+ *
+ * This is based heavily on timers.c from the kernel implementation.
  */
 
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
 	"math/rand"
 	"sync/atomic"
 	"time"
 )
 
-/* NOTE:
- * Notion of validity
+/* This Timer structure and related functions should roughly copy the interface of
+ * the Linux kernel's struct timer_list.
  */
 
-/* Called when a new authenticated message has been send
- *
- */
-func (peer *Peer) KeepKeyFreshSending() {
-	kp := peer.keyPairs.Current()
-	if kp == nil {
-		return
-	}
-	nonce := atomic.LoadUint64(&kp.sendNonce)
-	if nonce > RekeyAfterMessages {
-		peer.event.handshakeBegin.Fire()
-	}
-	if kp.isInitiator && time.Now().Sub(kp.created) > RekeyAfterTime {
-		peer.event.handshakeBegin.Fire()
-	}
+type Timer struct {
+	timer     *time.Timer
+	isPending bool
 }
 
-/* Called when a new authenticated message has been received
- *
- * NOTE: Not thread safe, but called by sequential receiver!
- */
-func (peer *Peer) KeepKeyFreshReceiving() {
-	if peer.timer.sendLastMinuteHandshake.Get() {
-		return
-	}
-	kp := peer.keyPairs.Current()
-	if kp == nil {
-		return
-	}
-	if !kp.isInitiator {
-		return
-	}
-	nonce := atomic.LoadUint64(&kp.sendNonce)
-	send := nonce > RekeyAfterMessages || time.Now().Sub(kp.created) > RekeyAfterTimeReceiving
-	if send {
-		// do a last minute attempt at initiating a new handshake
-		peer.timer.sendLastMinuteHandshake.Set(true)
-		peer.event.handshakeBegin.Fire()
-	}
-}
-
-/* Queues a keep-alive if no packets are queued for peer
- */
-func (peer *Peer) SendKeepAlive() bool {
-	if len(peer.queue.nonce) != 0 {
-		return false
-	}
-	elem := peer.device.NewOutboundElement()
-	elem.packet = nil
-	select {
-	case peer.queue.nonce <- elem:
-		return true
-	default:
-		return false
-	}
-}
-
-/* Called after successfully completing a handshake.
- * i.e. after:
- *
- * - Valid handshake response
- * - First transport message under the "next" key
- */
-// peer.device.log.Info.Println(peer, ": New handshake completed")
-
-/* Event:
- * An ephemeral key is generated
- *
- * i.e. after:
- *
- * CreateMessageInitiation
- * CreateMessageResponse
- *
- * Action:
- * Schedule the deletion of all key material
- * upon failure to complete a handshake
- */
-func (peer *Peer) TimerEphemeralKeyCreated() {
-	peer.event.ephemeralKeyCreated.Fire()
-	// peer.timer.zeroAllKeys.Reset(RejectAfterTime * 3)
-}
-
-/* Sends a new handshake initiation message to the peer (endpoint)
- */
-func (peer *Peer) sendNewHandshake() error {
-
-	// create initiation message
-
-	msg, err := peer.device.CreateMessageInitiation(peer)
-	if err != nil {
-		return err
-	}
-
-	// marshal handshake message
-
-	var buff [MessageInitiationSize]byte
-	writer := bytes.NewBuffer(buff[:0])
-	binary.Write(writer, binary.LittleEndian, msg)
-	packet := writer.Bytes()
-	peer.mac.AddMacs(packet)
-
-	// send to endpoint
-
-	peer.event.anyAuthenticatedPacketTraversal.Fire()
-
-	return peer.SendBuffer(packet)
-}
-
-func newTimer() *time.Timer {
-	timer := time.NewTimer(time.Hour)
-	timer.Stop()
+func (peer *Peer) NewTimer(expirationFunction func(*Peer)) *Timer {
+	timer := &Timer{}
+	timer.timer = time.AfterFunc(time.Hour, func() {
+		timer.isPending = false
+		expirationFunction(peer)
+	})
+	timer.timer.Stop()
 	return timer
 }
 
-func (peer *Peer) RoutineTimerHandler() {
+func (timer *Timer) Mod(d time.Duration) {
+	timer.isPending = true
+	timer.timer.Reset(d)
+}
 
-	device := peer.device
+func (timer *Timer) Del() {
+	timer.isPending = false
+	timer.timer.Stop()
+}
 
-	logInfo := device.log.Info
-	logDebug := device.log.Debug
+func (peer *Peer) timersActive() bool {
+	return peer.isRunning.Get() && peer.device != nil && peer.device.isUp.Get() && len(peer.device.peers.keyMap) > 0
+}
 
-	defer func() {
-		logDebug.Println(peer, ": Routine: timer handler - stopped")
-		peer.routines.stopping.Done()
-	}()
+func expiredRetransmitHandshake(peer *Peer) {
+	if peer.timers.handshakeAttempts > MaxTimerHandshakes {
+		peer.device.log.Debug.Printf("%s: Handshake did not complete after %d attempts, giving up\n", peer, MaxTimerHandshakes+2)
 
-	logDebug.Println(peer, ": Routine: timer handler - started")
+		if peer.timersActive() {
+			peer.timers.sendKeepalive.Del()
+		}
 
-	// reset all timers
+		/* We drop all packets without a keypair and don't try again,
+		 * if we try unsuccessfully for too long to make a handshake.
+		 */
+		peer.FlushNonceQueue()
 
-	enableHandshake := true
-	pendingHandshakeNew := false
-	pendingKeepalivePassive := false
-	needAnotherKeepalive := false
+		/* We set a timer for destroying any residue that might be left
+		 * of a partial exchange.
+		 */
+		if peer.timersActive() && !peer.timers.zeroKeyMaterial.isPending {
+			peer.timers.zeroKeyMaterial.Mod(RejectAfterTime * 3)
+		}
+	} else {
+		peer.timers.handshakeAttempts++
+		peer.device.log.Debug.Printf("%s: Handshake did not complete after %d seconds, retrying (try %d)\n", peer, int(RekeyTimeout.Seconds()), peer.timers.handshakeAttempts+1)
 
-	timerKeepalivePassive := newTimer()
-	timerHandshakeDeadline := newTimer()
-	timerHandshakeTimeout := newTimer()
-	timerHandshakeNew := newTimer()
-	timerZeroAllKeys := newTimer()
-	timerKeepalivePersistent := newTimer()
+		/* We clear the endpoint address src address, in case this is the cause of trouble. */
+		peer.mutex.Lock()
+		if peer.endpoint != nil {
+			peer.endpoint.ClearSrc()
+		}
+		peer.mutex.Unlock()
 
-	interval := peer.persistentKeepaliveInterval
-	if interval > 0 {
-		duration := time.Duration(interval) * time.Second
-		timerKeepalivePersistent.Reset(duration)
+		peer.SendHandshakeInitiation(true)
 	}
+}
 
-	// signal synchronised setup complete
-
-	peer.routines.starting.Done()
-
-	// handle timer events
-
-	for {
-		select {
-
-		/* stopping */
-
-		case <-peer.routines.stop:
-			return
-
-		/* events */
-
-		case <-peer.event.dataSent.C:
-			timerKeepalivePassive.Stop()
-			if !pendingHandshakeNew {
-				timerHandshakeNew.Reset(NewHandshakeTime)
-			}
-
-		case <-peer.event.dataReceived.C:
-			if pendingKeepalivePassive {
-				needAnotherKeepalive = true
-			} else {
-				timerKeepalivePassive.Reset(KeepaliveTimeout)
-			}
-
-		case <-peer.event.anyAuthenticatedPacketTraversal.C:
-			interval := peer.persistentKeepaliveInterval
-			if interval > 0 {
-				duration := time.Duration(interval) * time.Second
-				timerKeepalivePersistent.Reset(duration)
-			}
-
-		case <-peer.event.handshakeBegin.C:
-
-			if !enableHandshake {
-				continue
-			}
-
-			logDebug.Println(peer, ": Event, Handshake Begin")
-
-			err := peer.sendNewHandshake()
-
-			// set timeout
-
-			jitter := time.Millisecond * time.Duration(rand.Int31n(334))
-			timerKeepalivePassive.Stop()
-			timerHandshakeTimeout.Reset(RekeyTimeout + jitter)
-
-			if err != nil {
-				logInfo.Println(peer, ": Failed to send handshake initiation", err)
-			} else {
-				logDebug.Println(peer, ": Send handshake initiation (initial)")
-			}
-
-			timerHandshakeDeadline.Reset(RekeyAttemptTime)
-
-			// disable further handshakes
-
-			peer.event.handshakeBegin.Clear()
-			enableHandshake = false
-
-		case <-peer.event.handshakeCompleted.C:
-
-			logInfo.Println(peer, ": Handshake completed")
-
-			atomic.StoreInt64(
-				&peer.stats.lastHandshakeNano,
-				time.Now().UnixNano(),
-			)
-
-			timerHandshakeTimeout.Stop()
-			timerHandshakeDeadline.Stop()
-			peer.timer.sendLastMinuteHandshake.Set(false)
-
-			// allow further handshakes
-
-			peer.event.handshakeBegin.Clear()
-			enableHandshake = true
-
-		/* timers */
-
-		case <-timerKeepalivePersistent.C:
-
-			interval := peer.persistentKeepaliveInterval
-			if interval > 0 {
-				logDebug.Println(peer, ": Send keep-alive (persistent)")
-				timerKeepalivePassive.Stop()
-				peer.SendKeepAlive()
-			}
-
-		case <-timerKeepalivePassive.C:
-
-			logDebug.Println(peer, ": Send keep-alive (passive)")
-
-			peer.SendKeepAlive()
-
-			if needAnotherKeepalive {
-				timerKeepalivePassive.Reset(KeepaliveTimeout)
-				needAnotherKeepalive = false
-			}
-
-		case <-timerZeroAllKeys.C:
-
-			logDebug.Println(peer, ": Clear all key-material (timer event)")
-
-			hs := &peer.handshake
-			hs.mutex.Lock()
-
-			kp := &peer.keyPairs
-			kp.mutex.Lock()
-
-			// remove key-pairs
-
-			if kp.previous != nil {
-				device.DeleteKeyPair(kp.previous)
-				kp.previous = nil
-			}
-			if kp.current != nil {
-				device.DeleteKeyPair(kp.current)
-				kp.current = nil
-			}
-			if kp.next != nil {
-				device.DeleteKeyPair(kp.next)
-				kp.next = nil
-			}
-			kp.mutex.Unlock()
-
-			// zero out handshake
-
-			device.indices.Delete(hs.localIndex)
-			hs.Clear()
-			hs.mutex.Unlock()
-
-		case <-timerHandshakeTimeout.C:
-
-			// allow new handshake to be send
-
-			enableHandshake = true
-
-			// clear source (in case this is causing problems)
-
-			peer.mutex.Lock()
-			if peer.endpoint != nil {
-				peer.endpoint.ClearSrc()
-			}
-			peer.mutex.Unlock()
-
-			// send new handshake
-
-			err := peer.sendNewHandshake()
-
-			// set timeout
-
-			jitter := time.Millisecond * time.Duration(rand.Int31n(334))
-			timerKeepalivePassive.Stop()
-			timerHandshakeTimeout.Reset(RekeyTimeout + jitter)
-
-			if err != nil {
-				logInfo.Println(peer, ": Failed to send handshake initiation", err)
-			} else {
-				logDebug.Println(peer, ": Send handshake initiation (subsequent)")
-			}
-
-			// disable further handshakes
-
-			peer.event.handshakeBegin.Clear()
-			enableHandshake = false
-
-		case <-timerHandshakeDeadline.C:
-
-			// clear all queued packets and stop keep-alive
-
-			logInfo.Println(peer, ": Handshake negotiation timed-out")
-
-			peer.flushNonceQueue()
-			peer.event.flushNonceQueue.Fire()
-
-			// renable further handshakes
-
-			peer.event.handshakeBegin.Clear()
-			enableHandshake = true
+func expiredSendKeepalive(peer *Peer) {
+	peer.SendKeepalive()
+	if peer.timers.needAnotherKeepalive {
+		peer.timers.needAnotherKeepalive = false
+		if peer.timersActive() {
+			peer.timers.sendKeepalive.Mod(KeepaliveTimeout)
 		}
 	}
+}
+
+func expiredNewHandshake(peer *Peer) {
+	peer.device.log.Debug.Printf("%s: Retrying handshake because we stopped hearing back after %d seconds\n", peer, int((KeepaliveTimeout + RekeyTimeout).Seconds()))
+	/* We clear the endpoint address src address, in case this is the cause of trouble. */
+	peer.mutex.Lock()
+	if peer.endpoint != nil {
+		peer.endpoint.ClearSrc()
+	}
+	peer.mutex.Unlock()
+	peer.SendHandshakeInitiation(false)
+
+}
+
+func expiredZeroKeyMaterial(peer *Peer) {
+	peer.device.log.Debug.Printf(":%s Removing all keys, since we haven't received a new one in %d seconds\n", peer, int((RejectAfterTime * 3).Seconds()))
+
+	hs := &peer.handshake
+	hs.mutex.Lock()
+
+	kp := &peer.keyPairs
+	kp.mutex.Lock()
+
+	if kp.previous != nil {
+		peer.device.DeleteKeypair(kp.previous)
+		kp.previous = nil
+	}
+	if kp.current != nil {
+		peer.device.DeleteKeypair(kp.current)
+		kp.current = nil
+	}
+	if kp.next != nil {
+		peer.device.DeleteKeypair(kp.next)
+		kp.next = nil
+	}
+	kp.mutex.Unlock()
+
+	peer.device.indices.Delete(hs.localIndex)
+	hs.Clear()
+	hs.mutex.Unlock()
+}
+
+func expiredPersistentKeepalive(peer *Peer) {
+	if peer.persistentKeepaliveInterval > 0 {
+		if peer.timersActive() {
+			peer.timers.sendKeepalive.Del()
+		}
+		peer.SendKeepalive()
+	}
+}
+
+/* Should be called after an authenticated data packet is sent. */
+func (peer *Peer) timersDataSent() {
+	if peer.timersActive() {
+		peer.timers.sendKeepalive.Del()
+	}
+
+	if peer.timersActive() && !peer.timers.newHandshake.isPending {
+		peer.timers.newHandshake.Mod(KeepaliveTimeout + RekeyTimeout)
+	}
+}
+
+/* Should be called after an authenticated data packet is received. */
+func (peer *Peer) timersDataReceived() {
+	if peer.timersActive() {
+		if !peer.timers.sendKeepalive.isPending {
+			peer.timers.sendKeepalive.Mod(KeepaliveTimeout)
+		} else {
+			peer.timers.needAnotherKeepalive = true
+		}
+	}
+}
+
+/* Should be called after any type of authenticated packet is received -- keepalive or data. */
+func (peer *Peer) timersAnyAuthenticatedPacketReceived() {
+	if peer.timersActive() {
+		peer.timers.newHandshake.Del()
+	}
+}
+
+/* Should be called after a handshake initiation message is sent. */
+func (peer *Peer) timersHandshakeInitiated() {
+	if peer.timersActive() {
+		peer.timers.sendKeepalive.Del()
+		peer.timers.retransmitHandshake.Mod(RekeyTimeout + time.Millisecond*time.Duration(rand.Int31n(RekeyTimeoutJitterMaxMs)))
+	}
+}
+
+/* Should be called after a handshake response message is received and processed or when getting key confirmation via the first data message. */
+func (peer *Peer) timersHandshakeComplete() {
+	if peer.timersActive() {
+		peer.timers.retransmitHandshake.Del()
+	}
+	peer.timers.handshakeAttempts = 0
+	peer.timers.sentLastMinuteHandshake = false
+	atomic.StoreInt64(&peer.stats.lastHandshakeNano, time.Now().UnixNano())
+}
+
+/* Should be called after an ephemeral key is created, which is before sending a handshake response or after receiving a handshake response. */
+func (peer *Peer) timersSessionDerived() {
+	if peer.timersActive() {
+		peer.timers.zeroKeyMaterial.Mod(RejectAfterTime * 3)
+	}
+}
+
+/* Should be called before a packet with authentication -- data, keepalive, either handshake -- is sent, or after one is received. */
+func (peer *Peer) timersAnyAuthenticatedPacketTraversal() {
+	if peer.persistentKeepaliveInterval > 0 && peer.timersActive() {
+		peer.timers.persistentKeepalive.Mod(time.Duration(peer.persistentKeepaliveInterval) * time.Second)
+	}
+}
+
+func (peer *Peer) timersInit() {
+	peer.timers.retransmitHandshake = peer.NewTimer(expiredRetransmitHandshake)
+	peer.timers.sendKeepalive = peer.NewTimer(expiredSendKeepalive)
+	peer.timers.newHandshake = peer.NewTimer(expiredNewHandshake)
+	peer.timers.zeroKeyMaterial = peer.NewTimer(expiredZeroKeyMaterial)
+	peer.timers.persistentKeepalive = peer.NewTimer(expiredPersistentKeepalive)
+	peer.timers.handshakeAttempts = 0
+	peer.timers.sentLastMinuteHandshake = false
+	peer.timers.needAnotherKeepalive = false
+	peer.timers.lastSentHandshake = time.Now().Add(-(RekeyTimeout + time.Second))
+}
+
+func (peer *Peer) timersStop() {
+	peer.timers.retransmitHandshake.Del()
+	peer.timers.sendKeepalive.Del()
+	peer.timers.newHandshake.Del()
+	peer.timers.zeroKeyMaterial.Del()
+	peer.timers.persistentKeepalive.Del()
 }

@@ -18,7 +18,7 @@ import (
 type IndexTableEntry struct {
 	peer      *Peer
 	handshake *Handshake
-	keyPair   *KeyPair
+	keyPair   *Keypair
 }
 
 type IndexTable struct {

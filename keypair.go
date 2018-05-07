@@ -18,7 +18,7 @@ import (
  * we plan to resolve this issue; whenever Go allows us to do so.
  */
 
-type KeyPair struct {
+type Keypair struct {
 	sendNonce    uint64
 	send         cipher.AEAD
 	receive      cipher.AEAD
@@ -29,20 +29,20 @@ type KeyPair struct {
 	remoteIndex  uint32
 }
 
-type KeyPairs struct {
+type Keypairs struct {
 	mutex    sync.RWMutex
-	current  *KeyPair
-	previous *KeyPair
-	next     *KeyPair // not yet "confirmed by transport"
+	current  *Keypair
+	previous *Keypair
+	next     *Keypair // not yet "confirmed by transport"
 }
 
-func (kp *KeyPairs) Current() *KeyPair {
+func (kp *Keypairs) Current() *Keypair {
 	kp.mutex.RLock()
 	defer kp.mutex.RUnlock()
 	return kp.current
 }
 
-func (device *Device) DeleteKeyPair(key *KeyPair) {
+func (device *Device) DeleteKeypair(key *Keypair) {
 	if key != nil {
 		device.indices.Delete(key.localIndex)
 	}

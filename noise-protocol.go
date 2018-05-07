@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0
  *
- * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+ * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  */
 
 package main
@@ -488,7 +488,7 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 /* Derives a new key-pair from the current handshake state
  *
  */
-func (peer *Peer) NewKeyPair() *KeyPair {
+func (peer *Peer) NewKeypair() *Keypair {
 	device := peer.device
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
@@ -528,7 +528,7 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 
 	// create AEAD instances
 
-	keyPair := new(KeyPair)
+	keyPair := new(Keypair)
 	keyPair.send, _ = chacha20poly1305.New(sendKey[:])
 	keyPair.receive, _ = chacha20poly1305.New(recvKey[:])
 
@@ -559,24 +559,27 @@ func (peer *Peer) NewKeyPair() *KeyPair {
 	kp := &peer.keyPairs
 	kp.mutex.Lock()
 
+	peer.timersSessionDerived()
+
+	previous := kp.previous
+	next := kp.next
+	current := kp.current
+
 	if isInitiator {
-		if kp.previous != nil {
-			device.DeleteKeyPair(kp.previous)
-			kp.previous = nil
-		}
-
-		if kp.next != nil {
-			kp.previous = kp.next
-			kp.next = keyPair
+		if next != nil {
+			kp.next = nil
+			kp.previous = next
+			device.DeleteKeypair(current)
 		} else {
-			kp.previous = kp.current
-			kp.current = keyPair
-			peer.event.newKeyPair.Fire()
+			kp.previous = current
 		}
-
+		device.DeleteKeypair(previous)
+		kp.current = keyPair
 	} else {
 		kp.next = keyPair
+		device.DeleteKeypair(next)
 		kp.previous = nil
+		device.DeleteKeypair(previous)
 	}
 	kp.mutex.Unlock()
 

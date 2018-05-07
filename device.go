@@ -74,8 +74,8 @@ type Device struct {
 		handshake  chan QueueHandshakeElement
 	}
 
-	signal struct {
-		stop Signal
+	signals struct {
+		stop chan struct{}
 	}
 
 	tun struct {
@@ -302,7 +302,7 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 
 	// prepare signals
 
-	device.signal.stop = NewSignal()
+	device.signals.stop = make(chan struct{}, 1)
 
 	// prepare net
 
@@ -400,7 +400,7 @@ func (device *Device) Close() {
 
 	device.isUp.Set(false)
 
-	device.signal.stop.Broadcast()
+	close(device.signals.stop)
 
 	device.state.stopping.Wait()
 	device.FlushPacketQueues()
@@ -413,5 +413,5 @@ func (device *Device) Close() {
 }
 
 func (device *Device) Wait() chan struct{} {
-	return device.signal.stop.Wait()
+	return device.signals.stop
 }

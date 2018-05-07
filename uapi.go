@@ -256,8 +256,6 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					logDebug.Println("UAPI: Created new peer:", peer)
 				}
 
-				peer.event.handshakePushDeadline.Fire()
-
 			case "remove":
 
 				// remove currently selected peer from device
@@ -288,8 +286,6 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 
-				peer.event.handshakePushDeadline.Fire()
-
 			case "endpoint":
 
 				// set endpoint destination
@@ -304,7 +300,6 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 						return err
 					}
 					peer.endpoint = endpoint
-					peer.event.handshakePushDeadline.Fire()
 					return nil
 				}()
 
@@ -315,7 +310,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 			case "persistent_keepalive_interval":
 
-				// update keep-alive interval
+				// update persistent keepalive interval
 
 				logDebug.Println("UAPI: Updating persistent_keepalive_interval for peer:", peer)
 
@@ -328,7 +323,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				old := peer.persistentKeepaliveInterval
 				peer.persistentKeepaliveInterval = uint16(secs)
 
-				// send immediate keep-alive
+				// send immediate keepalive if we're turning it on and before it wasn't on
 
 				if old == 0 && secs != 0 {
 					if err != nil {
@@ -336,7 +331,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 						return &IPCError{Code: ipcErrorIO}
 					}
 					if device.isUp.Get() && !dummy {
-						peer.SendKeepAlive()
+						peer.SendKeepalive()
 					}
 				}
 

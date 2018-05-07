@@ -14,14 +14,13 @@ import (
 )
 
 const (
-	PeerRoutineNumber = 4
-	EventInterval     = 10 * time.Millisecond
+	PeerRoutineNumber = 3
 )
 
 type Peer struct {
 	isRunning                   AtomicBool
 	mutex                       sync.RWMutex
-	keyPairs                    KeyPairs
+	keyPairs                    Keypairs
 	handshake                   Handshake
 	device                      *Device
 	endpoint                    Endpoint
@@ -34,34 +33,28 @@ type Peer struct {
 		lastHandshakeNano int64  // nano seconds since epoch
 	}
 
-	time struct {
-		mutex         sync.RWMutex
-		lastSend      time.Time // last send message
-		lastHandshake time.Time // last completed handshake
-		nextKeepalive time.Time
+	timers struct {
+		retransmitHandshake     *Timer
+		sendKeepalive           *Timer
+		newHandshake            *Timer
+		zeroKeyMaterial         *Timer
+		persistentKeepalive     *Timer
+		handshakeAttempts       uint
+		needAnotherKeepalive    bool
+		sentLastMinuteHandshake bool
+		lastSentHandshake       time.Time
 	}
 
-	event struct {
-		dataSent                        *Event
-		dataReceived                    *Event
-		anyAuthenticatedPacketReceived  *Event
-		anyAuthenticatedPacketTraversal *Event
-		handshakeCompleted              *Event
-		handshakePushDeadline           *Event
-		handshakeBegin                  *Event
-		ephemeralKeyCreated             *Event
-		newKeyPair                      *Event
-		flushNonceQueue                 *Event
-	}
-
-	timer struct {
-		sendLastMinuteHandshake AtomicBool
+	signals struct {
+		newKeypairArrived chan struct{}
+		flushNonceQueue   chan struct{}
 	}
 
 	queue struct {
-		nonce    chan *QueueOutboundElement // nonce / pre-handshake queue
-		outbound chan *QueueOutboundElement // sequential ordering of work
-		inbound  chan *QueueInboundElement  // sequential ordering of work
+		nonce                           chan *QueueOutboundElement // nonce / pre-handshake queue
+		outbound                        chan *QueueOutboundElement // sequential ordering of work
+		inbound                         chan *QueueInboundElement  // sequential ordering of work
+		packetInNonceQueueIsAwaitingKey bool
 	}
 
 	routines struct {
@@ -188,6 +181,8 @@ func (peer *Peer) Start() {
 	peer.routines.starting.Wait()
 	peer.routines.stopping.Wait()
 	peer.routines.stop = make(chan struct{})
+	peer.routines.starting.Add(PeerRoutineNumber)
+	peer.routines.stopping.Add(PeerRoutineNumber)
 
 	// prepare queues
 
@@ -195,28 +190,13 @@ func (peer *Peer) Start() {
 	peer.queue.outbound = make(chan *QueueOutboundElement, QueueOutboundSize)
 	peer.queue.inbound = make(chan *QueueInboundElement, QueueInboundSize)
 
-	// events
-
-	peer.event.dataSent = newEvent(EventInterval)
-	peer.event.dataReceived = newEvent(EventInterval)
-	peer.event.anyAuthenticatedPacketReceived = newEvent(EventInterval)
-	peer.event.anyAuthenticatedPacketTraversal = newEvent(EventInterval)
-	peer.event.handshakeCompleted = newEvent(EventInterval)
-	peer.event.handshakePushDeadline = newEvent(EventInterval)
-	peer.event.handshakeBegin = newEvent(EventInterval)
-	peer.event.ephemeralKeyCreated = newEvent(EventInterval)
-	peer.event.newKeyPair = newEvent(EventInterval)
-	peer.event.flushNonceQueue = newEvent(EventInterval)
-
-	peer.isRunning.Set(true)
+	peer.timersInit()
+	peer.signals.newKeypairArrived = make(chan struct{}, 1)
+	peer.signals.flushNonceQueue = make(chan struct{}, 1)
 
 	// wait for routines to start
 
-	peer.routines.starting.Add(PeerRoutineNumber)
-	peer.routines.stopping.Add(PeerRoutineNumber)
-
 	go peer.RoutineNonce()
-	go peer.RoutineTimerHandler()
 	go peer.RoutineSequentialSender()
 	go peer.RoutineSequentialReceiver()
 
@@ -238,6 +218,8 @@ func (peer *Peer) Stop() {
 	device := peer.device
 	device.log.Debug.Println(peer, ": Stopping...")
 
+	peer.timersStop()
+
 	// stop & wait for ongoing peer routines
 
 	peer.routines.starting.Wait()
@@ -255,9 +237,9 @@ func (peer *Peer) Stop() {
 	kp := &peer.keyPairs
 	kp.mutex.Lock()
 
-	device.DeleteKeyPair(kp.previous)
-	device.DeleteKeyPair(kp.current)
-	device.DeleteKeyPair(kp.next)
+	device.DeleteKeypair(kp.previous)
+	device.DeleteKeypair(kp.current)
+	device.DeleteKeypair(kp.next)
 
 	kp.previous = nil
 	kp.current = nil
@@ -271,4 +253,6 @@ func (peer *Peer) Stop() {
 	device.indices.Delete(hs.localIndex)
 	hs.Clear()
 	hs.mutex.Unlock()
+
+	peer.FlushNonceQueue()
 }
