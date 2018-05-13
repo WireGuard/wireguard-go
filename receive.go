@@ -189,7 +189,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 				continue
 			}
 
-			// check key-pair expiry
+			// check keypair expiry
 
 			if keypair.created.Add(RejectAfterTime).Before(time.Now()) {
 				continue
@@ -475,7 +475,7 @@ func (device *Device) RoutineHandshake() {
 				continue
 			}
 
-			if peer.NewKeypair() == nil {
+			if peer.DeriveNewKeypair() != nil {
 				continue
 			}
 
@@ -532,9 +532,9 @@ func (device *Device) RoutineHandshake() {
 			peer.timersAnyAuthenticatedPacketTraversal()
 			peer.timersAnyAuthenticatedPacketReceived()
 
-			// derive key-pair
+			// derive keypair
 
-			if peer.NewKeypair() == nil {
+			if peer.DeriveNewKeypair() != nil {
 				continue
 			}
 
@@ -597,25 +597,12 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			peer.endpoint = elem.endpoint
 			peer.mutex.Unlock()
 
-			// check if using new key-pair
-
-			kp := &peer.keypairs
-			if kp.next == elem.keypair {
-				kp.mutex.Lock()
-				if kp.next != elem.keypair {
-					kp.mutex.Unlock()
-				} else {
-					old := kp.previous
-					kp.previous = kp.current
-					device.DeleteKeypair(old)
-					kp.current = kp.next
-					kp.next = nil
-					kp.mutex.Unlock()
-					peer.timersHandshakeComplete()
-					select {
-					case peer.signals.newKeypairArrived <- struct{}{}:
-					default:
-					}
+			// check if using new keypair
+			if peer.ReceivedWithKeypair(elem.keypair) {
+				peer.timersHandshakeComplete()
+				select {
+				case peer.signals.newKeypairArrived <- struct{}{}:
+				default:
 				}
 			}
 

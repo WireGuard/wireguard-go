@@ -102,15 +102,15 @@ func TestNoiseHandshake(t *testing.T) {
 
 	t.Log("deriving keys")
 
-	key1 := peer1.NewKeypair()
-	key2 := peer2.NewKeypair()
+	key1 := peer1.DeriveNewKeypair()
+	key2 := peer2.DeriveNewKeypair()
 
 	if key1 == nil {
-		t.Fatal("failed to dervice key-pair for peer 1")
+		t.Fatal("failed to dervice keypair for peer 1")
 	}
 
 	if key2 == nil {
-		t.Fatal("failed to dervice key-pair for peer 2")
+		t.Fatal("failed to dervice keypair for peer 2")
 	}
 
 	// encrypting / decryption test

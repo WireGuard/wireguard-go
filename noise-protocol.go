@@ -319,6 +319,9 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 
 	handshake.mutex.Unlock()
 
+	setZero(hash[:])
+	setZero(chainKey[:])
+
 	return peer
 }
 
@@ -362,7 +365,7 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 		handshake.mixKey(ss[:])
 	}()
 
-	// add preshared key (psk)
+	// add preshared key
 
 	var tau [blake2s.Size]byte
 	var key [chacha20poly1305.KeySize]byte
@@ -457,7 +460,6 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 		aead, _ := chacha20poly1305.New(key[:])
 		_, err := aead.Open(nil, ZeroNonce[:], msg.Empty[:], hash[:])
 		if err != nil {
-			device.log.Debug.Println("failed to open")
 			return false
 		}
 		mixHash(&hash, &hash, msg.Empty[:])
@@ -485,10 +487,10 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 	return lookup.peer
 }
 
-/* Derives a new key-pair from the current handshake state
+/* Derives a new keypair from the current handshake state
  *
  */
-func (peer *Peer) NewKeypair() *Keypair {
+func (peer *Peer) DeriveNewKeypair() error {
 	device := peer.device
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
@@ -517,12 +519,13 @@ func (peer *Peer) NewKeypair() *Keypair {
 		)
 		isInitiator = false
 	} else {
-		return nil
+		return errors.New("invalid state for keypair derivation")
 	}
 
 	// zero handshake
 
 	setZero(handshake.chainKey[:])
+	setZero(handshake.hash[:]) // Doesn't necessarily need to be zeroed. Could be used for something interesting down the line.
 	setZero(handshake.localEphemeral[:])
 	peer.handshake.state = HandshakeZeroed
 
@@ -576,5 +579,23 @@ func (peer *Peer) NewKeypair() *Keypair {
 	}
 	kp.mutex.Unlock()
 
-	return keypair
+	return nil
+}
+
+func (peer *Peer) ReceivedWithKeypair(receivedKeypair *Keypair) bool {
+	kp := &peer.keypairs
+	if kp.next != receivedKeypair {
+		return false
+	}
+	kp.mutex.Lock()
+	defer kp.mutex.Unlock()
+	if kp.next != receivedKeypair {
+		return false
+	}
+	old := kp.previous
+	kp.previous = kp.current
+	peer.device.DeleteKeypair(old)
+	kp.current = kp.next
+	kp.next = nil
+	return true
 }

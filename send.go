@@ -47,7 +47,7 @@ type QueueOutboundElement struct {
 	buffer  *[MaxMessageSize]byte // slice holding the packet data
 	packet  []byte                // slice of "buffer" (always!)
 	nonce   uint64                // nonce for encryption
-	keypair *Keypair              // key-pair for encryption
+	keypair *Keypair              // keypair for encryption
 	peer    *Peer                 // related peer
 }
 
@@ -306,11 +306,11 @@ func (peer *Peer) RoutineNonce() {
 
 				peer.SendHandshakeInitiation(false)
 
-				logDebug.Println(peer, ": Awaiting key-pair")
+				logDebug.Println(peer, ": Awaiting keypair")
 
 				select {
 				case <-peer.signals.newKeypairArrived:
-					logDebug.Println(peer, ": Obtained awaited key-pair")
+					logDebug.Println(peer, ": Obtained awaited keypair")
 				case <-peer.signals.flushNonceQueue:
 					for {
 						select {
