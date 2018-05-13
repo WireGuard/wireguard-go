@@ -109,6 +109,11 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 				return
 			}
 			if kerr != nil || n != 1 {
+				if kerr != nil {
+					l.connErr <- kerr
+				} else {
+					l.connErr <- errors.New("kqueue returned empty")
+				}
 				return
 			}
 			n, kerr = unix.Kevent(uapi.kqueueFd, []unix.Kevent_t{event}, events, nil)
