@@ -147,7 +147,7 @@ func (peer *Peer) String() string {
 	base64Key := base64.StdEncoding.EncodeToString(peer.handshake.remoteStatic[:])
 	abbreviatedKey := "invalid"
 	if len(base64Key) == 44 {
-		abbreviatedKey = base64Key[0:4] + "..." + base64Key[40:44]
+		abbreviatedKey = base64Key[0:4] + "…" + base64Key[39:43]
 	}
 	return fmt.Sprintf("peer(%s)", abbreviatedKey)
 }
