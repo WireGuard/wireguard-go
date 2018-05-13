@@ -20,7 +20,7 @@ const (
 type Peer struct {
 	isRunning                   AtomicBool
 	mutex                       sync.RWMutex
-	keyPairs                    Keypairs
+	keypairs                    Keypairs
 	handshake                   Handshake
 	device                      *Device
 	endpoint                    Endpoint
@@ -234,7 +234,7 @@ func (peer *Peer) Stop() {
 
 	// clear key pairs
 
-	kp := &peer.keyPairs
+	kp := &peer.keypairs
 	kp.mutex.Lock()
 
 	device.DeleteKeypair(kp.previous)
@@ -250,7 +250,7 @@ func (peer *Peer) Stop() {
 
 	hs := &peer.handshake
 	hs.mutex.Lock()
-	device.indices.Delete(hs.localIndex)
+	device.indexTable.Delete(hs.localIndex)
 	hs.Clear()
 	hs.mutex.Unlock()
 

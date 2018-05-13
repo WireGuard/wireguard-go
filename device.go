@@ -56,8 +56,8 @@ type Device struct {
 
 	// unprotected / "self-synchronising resources"
 
-	indices IndexTable
-	mac     CookieChecker
+	indexTable IndexTable
+	mac        CookieChecker
 
 	rate struct {
 		underLoadUntil atomic.Value
@@ -283,7 +283,7 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 
 	// initialize noise & crypt-key routine
 
-	device.indices.Init()
+	device.indexTable.Init()
 	device.routing.table.Reset()
 
 	// setup buffer pool

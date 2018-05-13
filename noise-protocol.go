@@ -161,7 +161,7 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 	defer handshake.mutex.Unlock()
 
 	if isZero(handshake.precomputedStaticStatic[:]) {
-		return nil, errors.New("Static shared secret is zero")
+		return nil, errors.New("static shared secret is zero")
 	}
 
 	// create ephemeral key
@@ -176,8 +176,8 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 
 	// assign index
 
-	device.indices.Delete(handshake.localIndex)
-	handshake.localIndex, err = device.indices.NewIndex(peer)
+	device.indexTable.Delete(handshake.localIndex)
+	handshake.localIndex, err = device.indexTable.NewIndexForHandshake(peer, handshake)
 
 	if err != nil {
 		return nil, err
@@ -328,14 +328,14 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 	defer handshake.mutex.Unlock()
 
 	if handshake.state != HandshakeInitiationConsumed {
-		return nil, errors.New("handshake initation must be consumed first")
+		return nil, errors.New("handshake initiation must be consumed first")
 	}
 
 	// assign index
 
 	var err error
-	device.indices.Delete(handshake.localIndex)
-	handshake.localIndex, err = device.indices.NewIndex(peer)
+	device.indexTable.Delete(handshake.localIndex)
+	handshake.localIndex, err = device.indexTable.NewIndexForHandshake(peer, handshake)
 	if err != nil {
 		return nil, err
 	}
@@ -393,9 +393,9 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 		return nil
 	}
 
-	// lookup handshake by reciever
+	// lookup handshake by receiver
 
-	lookup := device.indices.Lookup(msg.Receiver)
+	lookup := device.indexTable.Lookup(msg.Receiver)
 	handshake := lookup.handshake
 	if handshake == nil {
 		return nil
@@ -528,35 +528,28 @@ func (peer *Peer) NewKeypair() *Keypair {
 
 	// create AEAD instances
 
-	keyPair := new(Keypair)
-	keyPair.send, _ = chacha20poly1305.New(sendKey[:])
-	keyPair.receive, _ = chacha20poly1305.New(recvKey[:])
+	keypair := new(Keypair)
+	keypair.send, _ = chacha20poly1305.New(sendKey[:])
+	keypair.receive, _ = chacha20poly1305.New(recvKey[:])
 
 	setZero(sendKey[:])
 	setZero(recvKey[:])
 
-	keyPair.created = time.Now()
-	keyPair.sendNonce = 0
-	keyPair.replayFilter.Init()
-	keyPair.isInitiator = isInitiator
-	keyPair.localIndex = peer.handshake.localIndex
-	keyPair.remoteIndex = peer.handshake.remoteIndex
+	keypair.created = time.Now()
+	keypair.sendNonce = 0
+	keypair.replayFilter.Init()
+	keypair.isInitiator = isInitiator
+	keypair.localIndex = peer.handshake.localIndex
+	keypair.remoteIndex = peer.handshake.remoteIndex
 
 	// remap index
 
-	device.indices.Insert(
-		handshake.localIndex,
-		IndexTableEntry{
-			peer:      peer,
-			keyPair:   keyPair,
-			handshake: nil,
-		},
-	)
+	device.indexTable.SwapIndexForKeypair(handshake.localIndex, keypair)
 	handshake.localIndex = 0
 
 	// rotate key pairs
 
-	kp := &peer.keyPairs
+	kp := &peer.keypairs
 	kp.mutex.Lock()
 
 	peer.timersSessionDerived()
@@ -574,14 +567,14 @@ func (peer *Peer) NewKeypair() *Keypair {
 			kp.previous = current
 		}
 		device.DeleteKeypair(previous)
-		kp.current = keyPair
+		kp.current = keypair
 	} else {
-		kp.next = keyPair
+		kp.next = keypair
 		device.DeleteKeypair(next)
 		kp.previous = nil
 		device.DeleteKeypair(previous)
 	}
 	kp.mutex.Unlock()
 
-	return keyPair
+	return keypair
 }

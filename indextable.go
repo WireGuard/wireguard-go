@@ -7,18 +7,14 @@ package main
 
 import (
 	"crypto/rand"
-	"encoding/binary"
 	"sync"
+	"unsafe"
 )
-
-/* Index=0 is reserved for unset indecies
- *
- */
 
 type IndexTableEntry struct {
 	peer      *Peer
 	handshake *Handshake
-	keyPair   *Keypair
+	keypair   *Keypair
 }
 
 type IndexTable struct {
@@ -27,43 +23,44 @@ type IndexTable struct {
 }
 
 func randUint32() (uint32, error) {
-	var buff [4]byte
-	_, err := rand.Read(buff[:])
-	value := binary.LittleEndian.Uint32(buff[:])
-	return value, err
+	var integer [4]byte
+	_, err := rand.Read(integer[:])
+	return *(*uint32)(unsafe.Pointer(&integer[0])), err
 }
 
 func (table *IndexTable) Init() {
 	table.mutex.Lock()
+	defer table.mutex.Unlock()
 	table.table = make(map[uint32]IndexTableEntry)
-	table.mutex.Unlock()
 }
 
 func (table *IndexTable) Delete(index uint32) {
-	if index == 0 {
+	table.mutex.Lock()
+	defer table.mutex.Unlock()
+	delete(table.table, index)
+}
+
+func (table *IndexTable) SwapIndexForKeypair(index uint32, keypair *Keypair) {
+	table.mutex.Lock()
+	defer table.mutex.Unlock()
+	entry, ok := table.table[index]
+	if !ok {
 		return
 	}
-	table.mutex.Lock()
-	delete(table.table, index)
-	table.mutex.Unlock()
+	table.table[index] = IndexTableEntry{
+		peer:      entry.peer,
+		keypair:   keypair,
+		handshake: nil,
+	}
 }
 
-func (table *IndexTable) Insert(key uint32, value IndexTableEntry) {
-	table.mutex.Lock()
-	table.table[key] = value
-	table.mutex.Unlock()
-}
-
-func (table *IndexTable) NewIndex(peer *Peer) (uint32, error) {
+func (table *IndexTable) NewIndexForHandshake(peer *Peer, handshake *Handshake) (uint32, error) {
 	for {
 		// generate random index
 
 		index, err := randUint32()
 		if err != nil {
 			return index, err
-		}
-		if index == 0 {
-			continue
 		}
 
 		// check if index used
@@ -75,7 +72,7 @@ func (table *IndexTable) NewIndex(peer *Peer) (uint32, error) {
 			continue
 		}
 
-		// map index to handshake
+		// check again while locked
 
 		table.mutex.Lock()
 		_, found := table.table[index]
@@ -85,8 +82,8 @@ func (table *IndexTable) NewIndex(peer *Peer) (uint32, error) {
 		}
 		table.table[index] = IndexTableEntry{
 			peer:      peer,
-			handshake: &peer.handshake,
-			keyPair:   nil,
+			handshake: handshake,
+			keypair:   nil,
 		}
 		table.mutex.Unlock()
 		return index, nil

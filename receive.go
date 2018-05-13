@@ -31,7 +31,7 @@ type QueueInboundElement struct {
 	buffer   *[MaxMessageSize]byte
 	packet   []byte
 	counter  uint64
-	keyPair  *Keypair
+	keypair  *Keypair
 	endpoint Endpoint
 }
 
@@ -107,7 +107,7 @@ func (peer *Peer) keepKeyFreshReceiving() {
 	if peer.timers.sentLastMinuteHandshake {
 		return
 	}
-	kp := peer.keyPairs.Current()
+	kp := peer.keypairs.Current()
 	if kp != nil && kp.isInitiator && time.Now().Sub(kp.created) > (RejectAfterTime-KeepaliveTimeout-RekeyTimeout) {
 		peer.timers.sentLastMinuteHandshake = true
 		peer.SendHandshakeInitiation(false)
@@ -183,15 +183,15 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 			receiver := binary.LittleEndian.Uint32(
 				packet[MessageTransportOffsetReceiver:MessageTransportOffsetCounter],
 			)
-			value := device.indices.Lookup(receiver)
-			keyPair := value.keyPair
-			if keyPair == nil {
+			value := device.indexTable.Lookup(receiver)
+			keypair := value.keypair
+			if keypair == nil {
 				continue
 			}
 
 			// check key-pair expiry
 
-			if keyPair.created.Add(RejectAfterTime).Before(time.Now()) {
+			if keypair.created.Add(RejectAfterTime).Before(time.Now()) {
 				continue
 			}
 
@@ -201,7 +201,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 			elem := &QueueInboundElement{
 				packet:   packet,
 				buffer:   buffer,
-				keyPair:  keyPair,
+				keypair:  keypair,
 				dropped:  AtomicFalse,
 				endpoint: endpoint,
 			}
@@ -296,7 +296,7 @@ func (device *Device) RoutineDecryption() {
 
 			var err error
 			elem.counter = binary.LittleEndian.Uint64(counter)
-			elem.packet, err = elem.keyPair.receive.Open(
+			elem.packet, err = elem.keypair.receive.Open(
 				content[:0],
 				nonce[:],
 				content,
@@ -358,7 +358,7 @@ func (device *Device) RoutineHandshake() {
 
 			// lookup peer from index
 
-			entry := device.indices.Lookup(reply.Receiver)
+			entry := device.indexTable.Lookup(reply.Receiver)
 
 			if entry.peer == nil {
 				continue
@@ -587,7 +587,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 			// check for replay
 
-			if !elem.keyPair.replayFilter.ValidateCounter(elem.counter) {
+			if !elem.keypair.replayFilter.ValidateCounter(elem.counter) {
 				continue
 			}
 
@@ -599,9 +599,9 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 			// check if using new key-pair
 
-			kp := &peer.keyPairs
+			kp := &peer.keypairs
 			kp.mutex.Lock() //TODO: make this into an RW lock to reduce contention here for the equality check which is rarely true
-			if kp.next == elem.keyPair {
+			if kp.next == elem.keypair {
 				old := kp.previous
 				kp.previous = kp.current
 				device.DeleteKeypair(old)

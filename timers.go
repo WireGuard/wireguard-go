@@ -108,7 +108,7 @@ func expiredZeroKeyMaterial(peer *Peer) {
 	hs := &peer.handshake
 	hs.mutex.Lock()
 
-	kp := &peer.keyPairs
+	kp := &peer.keypairs
 	kp.mutex.Lock()
 
 	if kp.previous != nil {
@@ -125,7 +125,7 @@ func expiredZeroKeyMaterial(peer *Peer) {
 	}
 	kp.mutex.Unlock()
 
-	peer.device.indices.Delete(hs.localIndex)
+	peer.device.indexTable.Delete(hs.localIndex)
 	hs.Clear()
 	hs.mutex.Unlock()
 }

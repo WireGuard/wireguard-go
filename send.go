@@ -47,7 +47,7 @@ type QueueOutboundElement struct {
 	buffer  *[MaxMessageSize]byte // slice holding the packet data
 	packet  []byte                // slice of "buffer" (always!)
 	nonce   uint64                // nonce for encryption
-	keyPair *Keypair              // key-pair for encryption
+	keypair *Keypair              // key-pair for encryption
 	peer    *Peer                 // related peer
 }
 
@@ -161,7 +161,7 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
  *
  */
 func (peer *Peer) keepKeyFreshSending() {
-	kp := peer.keyPairs.Current()
+	kp := peer.keypairs.Current()
 	if kp == nil {
 		return
 	}
@@ -260,7 +260,7 @@ func (peer *Peer) FlushNonceQueue() {
  * Obs. A single instance per peer
  */
 func (peer *Peer) RoutineNonce() {
-	var keyPair *Keypair
+	var keypair *Keypair
 
 	device := peer.device
 	logDebug := device.log.Debug
@@ -291,9 +291,9 @@ func (peer *Peer) RoutineNonce() {
 			// wait for key pair
 
 			for {
-				keyPair = peer.keyPairs.Current()
-				if keyPair != nil && keyPair.sendNonce < RejectAfterMessages {
-					if time.Now().Sub(keyPair.created) < RejectAfterTime {
+				keypair = peer.keypairs.Current()
+				if keypair != nil && keypair.sendNonce < RejectAfterMessages {
+					if time.Now().Sub(keypair.created) < RejectAfterTime {
 						break
 					}
 				}
@@ -328,12 +328,12 @@ func (peer *Peer) RoutineNonce() {
 			// populate work element
 
 			elem.peer = peer
-			elem.nonce = atomic.AddUint64(&keyPair.sendNonce, 1) - 1
+			elem.nonce = atomic.AddUint64(&keypair.sendNonce, 1) - 1
 			// double check in case of race condition added by future code
 			if elem.nonce >= RejectAfterMessages {
 				goto NextPacket
 			}
-			elem.keyPair = keyPair
+			elem.keypair = keypair
 			elem.dropped = AtomicFalse
 			elem.mutex.Lock()
 
@@ -392,7 +392,7 @@ func (device *Device) RoutineEncryption() {
 			fieldNonce := header[8:16]
 
 			binary.LittleEndian.PutUint32(fieldType, MessageTransportType)
-			binary.LittleEndian.PutUint32(fieldReceiver, elem.keyPair.remoteIndex)
+			binary.LittleEndian.PutUint32(fieldReceiver, elem.keypair.remoteIndex)
 			binary.LittleEndian.PutUint64(fieldNonce, elem.nonce)
 
 			// pad content to multiple of 16
@@ -408,7 +408,7 @@ func (device *Device) RoutineEncryption() {
 			// encrypt content and release to consumer
 
 			binary.LittleEndian.PutUint64(nonce[4:], elem.nonce)
-			elem.packet = elem.keyPair.send.Seal(
+			elem.packet = elem.keypair.send.Seal(
 				header,
 				nonce[:],
 				elem.packet,

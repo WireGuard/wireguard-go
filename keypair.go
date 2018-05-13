@@ -44,6 +44,6 @@ func (kp *Keypairs) Current() *Keypair {
 
 func (device *Device) DeleteKeypair(key *Keypair) {
 	if key != nil {
-		device.indices.Delete(key.localIndex)
+		device.indexTable.Delete(key.localIndex)
 	}
 }
