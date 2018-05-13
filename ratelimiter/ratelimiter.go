@@ -58,12 +58,13 @@ func (rate *Ratelimiter) Init() {
 	// start garbage collection routine
 
 	go func() {
-		timer := time.NewTimer(time.Second)
+		ticker := time.NewTicker(time.Second)
 		for {
 			select {
 			case <-rate.stop:
+				ticker.Stop()
 				return
-			case <-timer.C:
+			case <-ticker.C:
 				func() {
 					rate.mutex.Lock()
 					defer rate.mutex.Unlock()
@@ -84,7 +85,6 @@ func (rate *Ratelimiter) Init() {
 						entry.mutex.Unlock()
 					}
 				}()
-				timer.Reset(time.Second)
 			}
 		}
 	}()
@@ -92,8 +92,8 @@ func (rate *Ratelimiter) Init() {
 
 func (rate *Ratelimiter) Allow(ip net.IP) bool {
 	var entry *RatelimiterEntry
-	var KeyIPv4 [net.IPv4len]byte
-	var KeyIPv6 [net.IPv6len]byte
+	var keyIPv4 [net.IPv4len]byte
+	var keyIPv6 [net.IPv6len]byte
 
 	// lookup entry
 
@@ -103,11 +103,11 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 	rate.mutex.RLock()
 
 	if IPv4 != nil {
-		copy(KeyIPv4[:], IPv4)
-		entry = rate.tableIPv4[KeyIPv4]
+		copy(keyIPv4[:], IPv4)
+		entry = rate.tableIPv4[keyIPv4]
 	} else {
-		copy(KeyIPv6[:], IPv6)
-		entry = rate.tableIPv6[KeyIPv6]
+		copy(keyIPv6[:], IPv6)
+		entry = rate.tableIPv6[keyIPv6]
 	}
 
 	rate.mutex.RUnlock()
@@ -115,14 +115,14 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 	// make new entry if not found
 
 	if entry == nil {
-		rate.mutex.Lock()
 		entry = new(RatelimiterEntry)
 		entry.tokens = maxTokens - packetCost
 		entry.lastTime = time.Now()
+		rate.mutex.Lock()
 		if IPv4 != nil {
-			rate.tableIPv4[KeyIPv4] = entry
+			rate.tableIPv4[keyIPv4] = entry
 		} else {
-			rate.tableIPv6[KeyIPv6] = entry
+			rate.tableIPv6[keyIPv6] = entry
 		}
 		rate.mutex.Unlock()
 		return true

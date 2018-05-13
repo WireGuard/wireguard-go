@@ -185,7 +185,7 @@ func (device *Device) IsUnderLoad() bool {
 	now := time.Now()
 	underLoad := len(device.queue.handshake) >= UnderLoadQueueSize
 	if underLoad {
-		device.rate.underLoadUntil.Store(now.Add(time.Second))
+		device.rate.underLoadUntil.Store(now.Add(UnderLoadAfterTime))
 		return true
 	}
 
@@ -276,7 +276,7 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 
 	device.peers.keyMap = make(map[NoisePublicKey]*Peer)
 
-	// initialize anti-DoS / anti-scanning features
+	// initialize rate limiter
 
 	device.rate.limiter.Init()
 	device.rate.underLoadUntil.Store(time.Time{})
