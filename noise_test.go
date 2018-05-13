@@ -36,8 +36,8 @@ func TestNoiseHandshake(t *testing.T) {
 	defer dev1.Close()
 	defer dev2.Close()
 
-	peer1, _ := dev2.NewPeer(dev1.noise.privateKey.publicKey())
-	peer2, _ := dev1.NewPeer(dev2.noise.privateKey.publicKey())
+	peer1, _ := dev2.NewPeer(dev1.staticIdentity.privateKey.publicKey())
+	peer2, _ := dev1.NewPeer(dev2.staticIdentity.privateKey.publicKey())
 
 	assertEqual(
 		t,
@@ -102,8 +102,8 @@ func TestNoiseHandshake(t *testing.T) {
 
 	t.Log("deriving keys")
 
-	key1 := peer1.DeriveNewKeypair()
-	key2 := peer2.DeriveNewKeypair()
+	key1 := peer1.BeginSymmetricSession()
+	key2 := peer2.BeginSymmetricSession()
 
 	if key1 == nil {
 		t.Fatal("failed to dervice keypair for peer 1")

@@ -19,7 +19,7 @@ const (
 
 type Peer struct {
 	isRunning                   AtomicBool
-	mutex                       sync.RWMutex
+	mutex                       sync.RWMutex // Mostly protects endpoint, but is generally taken whenever we modify peer
 	keypairs                    Keypairs
 	handshake                   Handshake
 	device                      *Device
@@ -42,7 +42,6 @@ type Peer struct {
 		handshakeAttempts       uint
 		needAnotherKeepalive    bool
 		sentLastMinuteHandshake bool
-		lastSentHandshake       time.Time
 	}
 
 	signals struct {
@@ -64,7 +63,7 @@ type Peer struct {
 		stop     chan struct{}  // size 0, stop all go routines in peer
 	}
 
-	mac CookieGenerator
+	cookieGenerator CookieGenerator
 }
 
 func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
@@ -75,11 +74,8 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 
 	// lock resources
 
-	device.state.mutex.Lock()
-	defer device.state.mutex.Unlock()
-
-	device.noise.mutex.RLock()
-	defer device.noise.mutex.RUnlock()
+	device.staticIdentity.mutex.RLock()
+	defer device.staticIdentity.mutex.RUnlock()
 
 	device.peers.mutex.Lock()
 	defer device.peers.mutex.Unlock()
@@ -96,7 +92,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	peer.mutex.Lock()
 	defer peer.mutex.Unlock()
 
-	peer.mac.Init(pk)
+	peer.cookieGenerator.Init(pk)
 	peer.device = device
 	peer.isRunning.Set(false)
 
@@ -113,7 +109,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
 	handshake.remoteStatic = pk
-	handshake.precomputedStaticStatic = device.noise.privateKey.sharedSecret(pk)
+	handshake.precomputedStaticStatic = device.staticIdentity.privateKey.sharedSecret(pk)
 	handshake.mutex.Unlock()
 
 	// reset endpoint
@@ -191,6 +187,7 @@ func (peer *Peer) Start() {
 	peer.queue.inbound = make(chan *QueueInboundElement, QueueInboundSize)
 
 	peer.timersInit()
+	peer.handshake.lastSentHandshake = time.Now().Add(-(RekeyTimeout + time.Second))
 	peer.signals.newKeypairArrived = make(chan struct{}, 1)
 	peer.signals.flushNonceQueue = make(chan struct{}, 1)
 
@@ -204,6 +201,32 @@ func (peer *Peer) Start() {
 	peer.isRunning.Set(true)
 }
 
+func (peer *Peer) ZeroAndFlushAll() {
+	device := peer.device
+
+	// clear key pairs
+
+	keypairs := &peer.keypairs
+	keypairs.mutex.Lock()
+	device.DeleteKeypair(keypairs.previous)
+	device.DeleteKeypair(keypairs.current)
+	device.DeleteKeypair(keypairs.next)
+	keypairs.previous = nil
+	keypairs.current = nil
+	keypairs.next = nil
+	keypairs.mutex.Unlock()
+
+	// clear handshake state
+
+	handshake := &peer.handshake
+	handshake.mutex.Lock()
+	device.indexTable.Delete(handshake.localIndex)
+	handshake.Clear()
+	handshake.mutex.Unlock()
+
+	peer.FlushNonceQueue()
+}
+
 func (peer *Peer) Stop() {
 
 	// prevent simultaneous start/stop operations
@@ -215,8 +238,7 @@ func (peer *Peer) Stop() {
 		return
 	}
 
-	device := peer.device
-	device.log.Debug.Println(peer, ": Stopping...")
+	peer.device.log.Debug.Println(peer, ": Stopping...")
 
 	peer.timersStop()
 
@@ -232,27 +254,5 @@ func (peer *Peer) Stop() {
 	close(peer.queue.outbound)
 	close(peer.queue.inbound)
 
-	// clear key pairs
-
-	kp := &peer.keypairs
-	kp.mutex.Lock()
-
-	device.DeleteKeypair(kp.previous)
-	device.DeleteKeypair(kp.current)
-	device.DeleteKeypair(kp.next)
-
-	kp.previous = nil
-	kp.current = nil
-	kp.next = nil
-	kp.mutex.Unlock()
-
-	// clear handshake state
-
-	hs := &peer.handshake
-	hs.mutex.Lock()
-	device.indexTable.Delete(hs.localIndex)
-	hs.Clear()
-	hs.mutex.Unlock()
-
-	peer.FlushNonceQueue()
+	peer.ZeroAndFlushAll()
 }

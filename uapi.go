@@ -46,19 +46,16 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 		device.net.mutex.RLock()
 		defer device.net.mutex.RUnlock()
 
-		device.noise.mutex.RLock()
-		defer device.noise.mutex.RUnlock()
+		device.staticIdentity.mutex.RLock()
+		defer device.staticIdentity.mutex.RUnlock()
 
-		device.routing.mutex.RLock()
-		defer device.routing.mutex.RUnlock()
-
-		device.peers.mutex.Lock()
-		defer device.peers.mutex.Unlock()
+		device.peers.mutex.RLock()
+		defer device.peers.mutex.RUnlock()
 
 		// serialize device related values
 
-		if !device.noise.privateKey.IsZero() {
-			send("private_key=" + device.noise.privateKey.ToHex())
+		if !device.staticIdentity.privateKey.IsZero() {
+			send("private_key=" + device.staticIdentity.privateKey.ToHex())
 		}
 
 		if device.net.port != 0 {
@@ -91,7 +88,7 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 			send(fmt.Sprintf("rx_bytes=%d", peer.stats.rxBytes))
 			send(fmt.Sprintf("persistent_keepalive_interval=%d", peer.persistentKeepaliveInterval))
 
-			for _, ip := range device.routing.table.EntriesForPeer(peer) {
+			for _, ip := range device.allowedips.EntriesForPeer(peer) {
 				send("allowed_ip=" + ip.String())
 			}
 
@@ -234,13 +231,12 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 				// ignore peer with public key of device
 
-				device.noise.mutex.RLock()
-				equals := device.noise.publicKey.Equals(publicKey)
-				device.noise.mutex.RUnlock()
+				device.staticIdentity.mutex.RLock()
+				dummy = device.staticIdentity.publicKey.Equals(publicKey)
+				device.staticIdentity.mutex.RUnlock()
 
-				if equals {
+				if dummy {
 					peer = &Peer{}
-					dummy = true
 				}
 
 				// find peer referenced
@@ -348,9 +344,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					continue
 				}
 
-				device.routing.mutex.Lock()
-				device.routing.table.RemoveByPeer(peer)
-				device.routing.mutex.Unlock()
+				device.allowedips.RemoveByPeer(peer)
 
 			case "allowed_ip":
 
@@ -367,9 +361,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				}
 
 				ones, _ := network.Mask.Size()
-				device.routing.mutex.Lock()
-				device.routing.table.Insert(network.IP, uint(ones), peer)
-				device.routing.mutex.Unlock()
+				device.allowedips.Insert(network.IP, uint(ones), peer)
 
 			default:
 				logError.Println("Invalid UAPI key (peer configuration):", key)

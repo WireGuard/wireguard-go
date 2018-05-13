@@ -121,52 +121,114 @@ func (peer *Peer) SendKeepalive() bool {
 	}
 }
 
-/* Sends a new handshake initiation message to the peer (endpoint)
- */
 func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	if !isRetry {
 		peer.timers.handshakeAttempts = 0
 	}
 
-	if time.Now().Sub(peer.timers.lastSentHandshake) < RekeyTimeout {
+	peer.handshake.mutex.RLock()
+	if time.Now().Sub(peer.handshake.lastSentHandshake) < RekeyTimeout {
+		peer.handshake.mutex.RUnlock()
 		return nil
 	}
-	peer.timers.lastSentHandshake = time.Now() //TODO: locking for this variable?
+	peer.handshake.mutex.RUnlock()
 
-	// create initiation message
-
-	msg, err := peer.device.CreateMessageInitiation(peer)
-	if err != nil {
-		return err
+	peer.handshake.mutex.Lock()
+	if time.Now().Sub(peer.handshake.lastSentHandshake) < RekeyTimeout {
+		peer.handshake.mutex.Unlock()
+		return nil
 	}
+	peer.handshake.lastSentHandshake = time.Now()
+	peer.handshake.mutex.Unlock()
 
 	peer.device.log.Debug.Println(peer, ": Sending handshake initiation")
 
-	// marshal handshake message
+	msg, err := peer.device.CreateMessageInitiation(peer)
+	if err != nil {
+		peer.device.log.Error.Println(peer, ": Failed to create initiation message:", err)
+		return err
+	}
 
 	var buff [MessageInitiationSize]byte
 	writer := bytes.NewBuffer(buff[:0])
 	binary.Write(writer, binary.LittleEndian, msg)
 	packet := writer.Bytes()
-	peer.mac.AddMacs(packet)
-
-	// send to endpoint
+	peer.cookieGenerator.AddMacs(packet)
 
 	peer.timersAnyAuthenticatedPacketTraversal()
+
+	err = peer.SendBuffer(packet)
+	if err != nil {
+		peer.device.log.Error.Println(peer, ": Failed to send handshake initiation", err)
+	}
 	peer.timersHandshakeInitiated()
-	return peer.SendBuffer(packet)
+
+	return err
 }
 
-/* Called when a new authenticated message has been send
- *
- */
+func (peer *Peer) SendHandshakeResponse() error {
+	peer.handshake.mutex.Lock()
+	peer.handshake.lastSentHandshake = time.Now()
+	peer.handshake.mutex.Unlock()
+
+	peer.device.log.Debug.Println(peer, ": Sending handshake response")
+
+	response, err := peer.device.CreateMessageResponse(peer)
+	if err != nil {
+		peer.device.log.Error.Println(peer, ": Failed to create response message:", err)
+		return err
+	}
+
+	var buff [MessageResponseSize]byte
+	writer := bytes.NewBuffer(buff[:0])
+	binary.Write(writer, binary.LittleEndian, response)
+	packet := writer.Bytes()
+	peer.cookieGenerator.AddMacs(packet)
+
+	err = peer.BeginSymmetricSession()
+	if err != nil {
+		peer.device.log.Error.Println(peer, ": Failed to derive keypair:", err)
+		return err
+	}
+
+	peer.timersSessionDerived()
+	peer.timersAnyAuthenticatedPacketTraversal()
+
+	err = peer.SendBuffer(packet)
+	if err != nil {
+		peer.device.log.Error.Println(peer, ": Failed to send handshake response", err)
+	}
+	return err
+}
+
+func (device *Device) SendHandshakeCookie(initiatingElem *QueueHandshakeElement) error {
+
+	device.log.Debug.Println("Sending cookie reply to:", initiatingElem.endpoint.DstToString())
+
+	sender := binary.LittleEndian.Uint32(initiatingElem.packet[4:8])
+	reply, err := device.cookieChecker.CreateReply(initiatingElem.packet, sender, initiatingElem.endpoint.DstToBytes())
+	if err != nil {
+		device.log.Error.Println("Failed to create cookie reply:", err)
+		return err
+	}
+
+	var buff [MessageCookieReplySize]byte
+	writer := bytes.NewBuffer(buff[:0])
+	binary.Write(writer, binary.LittleEndian, reply)
+	device.net.bind.Send(writer.Bytes(), initiatingElem.endpoint)
+	if err != nil {
+		device.log.Error.Println("Failed to send cookie reply:", err)
+	}
+	return err
+}
+
 func (peer *Peer) keepKeyFreshSending() {
-	kp := peer.keypairs.Current()
-	if kp == nil {
+	keypair := peer.keypairs.Current()
+	if keypair == nil {
 		return
 	}
-	nonce := atomic.LoadUint64(&kp.sendNonce)
-	if nonce > RekeyAfterMessages || (kp.isInitiator && time.Now().Sub(kp.created) > RekeyAfterTime) {
+	nonce := atomic.LoadUint64(&keypair.sendNonce)
+	if nonce > RekeyAfterMessages || (keypair.isInitiator && time.Now().Sub(keypair.created) > RekeyAfterTime) {
 		peer.SendHandshakeInitiation(false)
 	}
 }
@@ -217,14 +279,14 @@ func (device *Device) RoutineReadFromTUN() {
 				continue
 			}
 			dst := elem.packet[IPv4offsetDst : IPv4offsetDst+net.IPv4len]
-			peer = device.routing.table.LookupIPv4(dst)
+			peer = device.allowedips.LookupIPv4(dst)
 
 		case ipv6.Version:
 			if len(elem.packet) < ipv6.HeaderLen {
 				continue
 			}
 			dst := elem.packet[IPv6offsetDst : IPv6offsetDst+net.IPv6len]
-			peer = device.routing.table.LookupIPv6(dst)
+			peer = device.allowedips.LookupIPv6(dst)
 
 		default:
 			logDebug.Println("Received packet with unknown IP version")

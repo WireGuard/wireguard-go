@@ -74,9 +74,6 @@ func (device *Device) BindSetMark(mark uint32) error {
 	device.net.mutex.Lock()
 	defer device.net.mutex.Unlock()
 
-	device.peers.mutex.Lock()
-	defer device.peers.mutex.Unlock()
-
 	// check if modified
 
 	if device.net.fwmark == mark {
@@ -92,6 +89,18 @@ func (device *Device) BindSetMark(mark uint32) error {
 		}
 	}
 
+	// clear cached source addresses
+
+	device.peers.mutex.RLock()
+	for _, peer := range device.peers.keyMap {
+		peer.mutex.Lock()
+		defer peer.mutex.Unlock()
+		if peer.endpoint != nil {
+			peer.endpoint.ClearSrc()
+		}
+	}
+	device.peers.mutex.RUnlock()
+
 	return nil
 }
 
@@ -99,9 +108,6 @@ func (device *Device) BindUpdate() error {
 
 	device.net.mutex.Lock()
 	defer device.net.mutex.Unlock()
-
-	device.peers.mutex.Lock()
-	defer device.peers.mutex.Unlock()
 
 	// close existing sockets
 
@@ -135,6 +141,7 @@ func (device *Device) BindUpdate() error {
 
 		// clear cached source addresses
 
+		device.peers.mutex.RLock()
 		for _, peer := range device.peers.keyMap {
 			peer.mutex.Lock()
 			defer peer.mutex.Unlock()
@@ -142,6 +149,7 @@ func (device *Device) BindUpdate() error {
 				peer.endpoint.ClearSrc()
 			}
 		}
+		device.peers.mutex.RUnlock()
 
 		// start receiving routines
 

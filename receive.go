@@ -107,8 +107,8 @@ func (peer *Peer) keepKeyFreshReceiving() {
 	if peer.timers.sentLastMinuteHandshake {
 		return
 	}
-	kp := peer.keypairs.Current()
-	if kp != nil && kp.isInitiator && time.Now().Sub(kp.created) > (RejectAfterTime-KeepaliveTimeout-RekeyTimeout) {
+	keypair := peer.keypairs.Current()
+	if keypair != nil && keypair.isInitiator && time.Now().Sub(keypair.created) > (RejectAfterTime-KeepaliveTimeout-RekeyTimeout) {
 		peer.timers.sentLastMinuteHandshake = true
 		peer.SendHandshakeInitiation(false)
 	}
@@ -325,7 +325,6 @@ func (device *Device) RoutineHandshake() {
 
 	logDebug.Println("Routine: handshake worker - started")
 
-	var temp [MessageHandshakeSize]byte
 	var elem QueueHandshakeElement
 	var ok bool
 
@@ -367,52 +366,28 @@ func (device *Device) RoutineHandshake() {
 			// consume reply
 
 			if peer := entry.peer; peer.isRunning.Get() {
-				peer.mac.ConsumeReply(&reply)
+				peer.cookieGenerator.ConsumeReply(&reply)
 			}
 
 			continue
 
 		case MessageInitiationType, MessageResponseType:
 
-			// check mac fields and ratelimit
+			// check mac fields and maybe ratelimit
 
-			if !device.mac.CheckMAC1(elem.packet) {
+			if !device.cookieChecker.CheckMAC1(elem.packet) {
 				logDebug.Println("Received packet with invalid mac1")
 				continue
 			}
 
 			// endpoints destination address is the source of the datagram
 
-			srcBytes := elem.endpoint.DstToBytes()
-
 			if device.IsUnderLoad() {
 
 				// verify MAC2 field
 
-				if !device.mac.CheckMAC2(elem.packet, srcBytes) {
-
-					// construct cookie reply
-
-					logDebug.Println(
-						"Sending cookie reply to:",
-						elem.endpoint.DstToString(),
-					)
-
-					sender := binary.LittleEndian.Uint32(elem.packet[4:8])
-					reply, err := device.mac.CreateReply(elem.packet, sender, srcBytes)
-					if err != nil {
-						logError.Println("Failed to create cookie reply:", err)
-						continue
-					}
-
-					// marshal and send reply
-
-					writer := bytes.NewBuffer(temp[:0])
-					binary.Write(writer, binary.LittleEndian, reply)
-					device.net.bind.Send(writer.Bytes(), elem.endpoint)
-					if err != nil {
-						logDebug.Println("Failed to send cookie reply:", err)
-					}
+				if !device.cookieChecker.CheckMAC2(elem.packet, elem.endpoint.DstToBytes()) {
+					device.SendHandshakeCookie(&elem)
 					continue
 				}
 
@@ -467,34 +442,7 @@ func (device *Device) RoutineHandshake() {
 
 			logDebug.Println(peer, ": Received handshake initiation")
 
-			// create response
-
-			response, err := device.CreateMessageResponse(peer)
-			if err != nil {
-				logError.Println("Failed to create response message:", err)
-				continue
-			}
-
-			if peer.DeriveNewKeypair() != nil {
-				continue
-			}
-
-			logDebug.Println(peer, ": Sending handshake response")
-
-			writer := bytes.NewBuffer(temp[:0])
-			binary.Write(writer, binary.LittleEndian, response)
-			packet := writer.Bytes()
-			peer.mac.AddMacs(packet)
-
-			// send response
-
-			peer.timers.lastSentHandshake = time.Now()
-			err = peer.SendBuffer(packet)
-			if err == nil {
-				peer.timersAnyAuthenticatedPacketTraversal()
-			} else {
-				logError.Println(peer, ": Failed to send handshake response", err)
-			}
+			peer.SendHandshakeResponse()
 
 		case MessageResponseType:
 
@@ -534,10 +482,14 @@ func (device *Device) RoutineHandshake() {
 
 			// derive keypair
 
-			if peer.DeriveNewKeypair() != nil {
+			err = peer.BeginSymmetricSession()
+
+			if err != nil {
+				logError.Println(peer, ": Failed to derive keypair:", err)
 				continue
 			}
 
+			peer.timersSessionDerived()
 			peer.timersHandshakeComplete()
 			peer.SendKeepalive()
 			select {
@@ -640,7 +592,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				// verify IPv4 source
 
 				src := elem.packet[IPv4offsetSrc : IPv4offsetSrc+net.IPv4len]
-				if device.routing.table.LookupIPv4(src) != peer {
+				if device.allowedips.LookupIPv4(src) != peer {
 					logInfo.Println(
 						"IPv4 packet with disallowed source address from",
 						peer,
@@ -668,7 +620,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				// verify IPv6 source
 
 				src := elem.packet[IPv6offsetSrc : IPv6offsetSrc+net.IPv6len]
-				if device.routing.table.LookupIPv6(src) != peer {
+				if device.allowedips.LookupIPv6(src) != peer {
 					logInfo.Println(
 						peer,
 						"sent packet with disallowed IPv6 source",

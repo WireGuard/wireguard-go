@@ -104,30 +104,7 @@ func expiredNewHandshake(peer *Peer) {
 
 func expiredZeroKeyMaterial(peer *Peer) {
 	peer.device.log.Debug.Printf(":%s Removing all keys, since we haven't received a new one in %d seconds\n", peer, int((RejectAfterTime * 3).Seconds()))
-
-	hs := &peer.handshake
-	hs.mutex.Lock()
-
-	kp := &peer.keypairs
-	kp.mutex.Lock()
-
-	if kp.previous != nil {
-		peer.device.DeleteKeypair(kp.previous)
-		kp.previous = nil
-	}
-	if kp.current != nil {
-		peer.device.DeleteKeypair(kp.current)
-		kp.current = nil
-	}
-	if kp.next != nil {
-		peer.device.DeleteKeypair(kp.next)
-		kp.next = nil
-	}
-	kp.mutex.Unlock()
-
-	peer.device.indexTable.Delete(hs.localIndex)
-	hs.Clear()
-	hs.mutex.Unlock()
+	peer.ZeroAndFlushAll()
 }
 
 func expiredPersistentKeepalive(peer *Peer) {
@@ -209,7 +186,6 @@ func (peer *Peer) timersInit() {
 	peer.timers.handshakeAttempts = 0
 	peer.timers.sentLastMinuteHandshake = false
 	peer.timers.needAnotherKeepalive = false
-	peer.timers.lastSentHandshake = time.Now().Add(-(RekeyTimeout + time.Second))
 }
 
 func (peer *Peer) timersStop() {
