@@ -1,6 +1,6 @@
 all: wireguard-go
 
-wireguard-go: $(wildcard *.go)
+wireguard-go: $(wildcard *.go) $(wildcard */*.go)
 	go build -o $@
 
 clean:

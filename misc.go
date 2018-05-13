@@ -47,7 +47,7 @@ func toInt32(n uint32) int32 {
 	return int32(-(n & mask) + (n & ^mask))
 }
 
-func min(a uint, b uint) uint {
+func min(a, b uint) uint {
 	if a > b {
 		return b
 	}

@@ -6,6 +6,7 @@
 package main
 
 import (
+	"./rwcancel"
 	"errors"
 	"fmt"
 	"golang.org/x/sys/unix"
@@ -24,10 +25,11 @@ const (
 )
 
 type UAPIListener struct {
-	listener  net.Listener // unix socket listener
-	connNew   chan net.Conn
-	connErr   chan error
-	inotifyFd int
+	listener        net.Listener // unix socket listener
+	connNew         chan net.Conn
+	connErr         chan error
+	inotifyFd       int
+	inotifyRWCancel *rwcancel.RWCancel
 }
 
 func (l *UAPIListener) Accept() (net.Conn, error) {
@@ -45,10 +47,14 @@ func (l *UAPIListener) Accept() (net.Conn, error) {
 func (l *UAPIListener) Close() error {
 	err1 := unix.Close(l.inotifyFd)
 	err2 := l.listener.Close()
+	err3 := l.inotifyRWCancel.Cancel()
 	if err1 != nil {
 		return err1
 	}
-	return err2
+	if err2 != nil {
+		return err2
+	}
+	return err3
 }
 
 func (l *UAPIListener) Addr() net.Addr {
@@ -94,15 +100,25 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 		return nil, err
 	}
 
+	uapi.inotifyRWCancel, err = rwcancel.NewRWCancel(uapi.inotifyFd)
+	if err != nil {
+		unix.Close(uapi.inotifyFd)
+		return nil, err
+	}
+
 	go func(l *UAPIListener) {
-		var buff [4096]byte
+		var buff [0]byte
 		for {
 			// start with lstat to avoid race condition
 			if _, err := os.Lstat(socketPath); os.IsNotExist(err) {
 				l.connErr <- err
 				return
 			}
-			unix.Read(uapi.inotifyFd, buff[:])
+			_, err := uapi.inotifyRWCancel.Read(buff[:])
+			if err != nil {
+				l.connErr <- err
+				return
+			}
 		}
 	}(uapi)
 

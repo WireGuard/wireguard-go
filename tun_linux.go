@@ -11,6 +11,7 @@ package main
  */
 
 import (
+	"./rwcancel"
 	"bytes"
 	"encoding/binary"
 	"errors"
@@ -20,7 +21,6 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"syscall"
 	"time"
 	"unsafe"
 )
@@ -31,14 +31,13 @@ const (
 )
 
 type NativeTun struct {
-	fd            *os.File
-	index         int32         // if index
-	name          string        // name of interface
-	errors        chan error    // async error handling
-	events        chan TUNEvent // device related events
-	nopi          bool          // the device was pased IFF_NO_PI
-	closingReader *os.File
-	closingWriter *os.File
+	fd       *os.File
+	index    int32         // if index
+	name     string        // name of interface
+	errors   chan error    // async error handling
+	events   chan TUNEvent // device related events
+	nopi     bool          // the device was pased IFF_NO_PI
+	rwcancel *rwcancel.RWCancel
 }
 
 func (tun *NativeTun) File() *os.File {
@@ -305,43 +304,6 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 	return tun.fd.Write(buff)
 }
 
-type FdSet struct {
-	fdset unix.FdSet
-}
-
-func (fdset *FdSet) set(i int) {
-	bits := 32 << (^uint(0) >> 63)
-	fdset.fdset.Bits[i/bits] |= 1 << uint(i%bits)
-}
-
-func (fdset *FdSet) check(i int) bool {
-	bits := 32 << (^uint(0) >> 63)
-	return (fdset.fdset.Bits[i/bits] & (1 << uint(i%bits))) != 0
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func (tun *NativeTun) readyRead() bool {
-	readFd := int(tun.fd.Fd())
-	closeFd := int(tun.closingReader.Fd())
-	fdset := FdSet{}
-	fdset.set(readFd)
-	fdset.set(closeFd)
-	_, err := unix.Select(max(readFd, closeFd)+1, &fdset.fdset, nil, nil, nil)
-	if err != nil {
-		return false
-	}
-	if fdset.check(closeFd) {
-		return false
-	}
-	return fdset.check(readFd)
-}
-
 func (tun *NativeTun) doRead(buff []byte, offset int) (int, error) {
 	select {
 	case err := <-tun.errors:
@@ -360,24 +322,14 @@ func (tun *NativeTun) doRead(buff []byte, offset int) (int, error) {
 	}
 }
 
-/* https://golang.org/src/crypto/rand/eagain.go */
-func unixIsEAGAIN(err error) bool {
-	if pe, ok := err.(*os.PathError); ok {
-		if errno, ok := pe.Err.(syscall.Errno); ok && errno == syscall.EAGAIN {
-			return true
-		}
-	}
-	return false
-}
-
 func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	for {
 		n, err := tun.doRead(buff, offset)
-		if err == nil || !unixIsEAGAIN(err) {
+		if err == nil || !rwcancel.ErrorIsEAGAIN(err) {
 			return n, err
 		}
-		if !tun.readyRead() {
-			return 0, errors.New("Tun device closed")
+		if !tun.rwcancel.ReadyRead() {
+			return 0, errors.New("tun device closed")
 		}
 	}
 }
@@ -391,7 +343,7 @@ func (tun *NativeTun) Close() error {
 	if err != nil {
 		return err
 	}
-	tun.closingWriter.Write([]byte{0})
+	tun.rwcancel.Cancel()
 	close(tun.events)
 	return nil
 }
@@ -450,17 +402,12 @@ func CreateTUNFromFile(fd *os.File) (TUNDevice, error) {
 	}
 	var err error
 
-	err = unix.SetNonblock(int(fd.Fd()), true)
+	device.rwcancel, err = rwcancel.NewRWCancel(int(fd.Fd()))
 	if err != nil {
 		return nil, err
 	}
 
 	_, err = device.Name()
-	if err != nil {
-		return nil, err
-	}
-
-	device.closingReader, device.closingWriter, err = os.Pipe()
 	if err != nil {
 		return nil, err
 	}
