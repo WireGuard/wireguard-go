@@ -31,7 +31,7 @@ type testPairTrieLookup struct {
 	peer *Peer
 }
 
-func printTrie(t *testing.T, p *Trie) {
+func printTrie(t *testing.T, p *trieEntry) {
 	if p == nil {
 		return
 	}
@@ -63,7 +63,7 @@ func TestCommonBits(t *testing.T) {
 }
 
 func benchmarkTrie(peerNumber int, addressNumber int, addressLength int, b *testing.B) {
-	var trie *Trie
+	var trie *trieEntry
 	var peers []*Peer
 
 	rand.Seed(1)
@@ -79,13 +79,13 @@ func benchmarkTrie(peerNumber int, addressNumber int, addressLength int, b *test
 		rand.Read(addr[:])
 		cidr := uint(rand.Uint32() % (AddressLength * 8))
 		index := rand.Int() % peerNumber
-		trie = trie.Insert(addr[:], cidr, peers[index])
+		trie = trie.insert(addr[:], cidr, peers[index])
 	}
 
 	for n := 0; n < b.N; n += 1 {
 		var addr [AddressLength]byte
 		rand.Read(addr[:])
-		trie.Lookup(addr[:])
+		trie.lookup(addr[:])
 	}
 }
 
@@ -117,21 +117,21 @@ func TestTrieIPv4(t *testing.T) {
 	g := &Peer{}
 	h := &Peer{}
 
-	var trie *Trie
+	var trie *trieEntry
 
 	insert := func(peer *Peer, a, b, c, d byte, cidr uint) {
-		trie = trie.Insert([]byte{a, b, c, d}, cidr, peer)
+		trie = trie.insert([]byte{a, b, c, d}, cidr, peer)
 	}
 
 	assertEQ := func(peer *Peer, a, b, c, d byte) {
-		p := trie.Lookup([]byte{a, b, c, d})
+		p := trie.lookup([]byte{a, b, c, d})
 		if p != peer {
 			t.Error("Assert EQ failed")
 		}
 	}
 
 	assertNEQ := func(peer *Peer, a, b, c, d byte) {
-		p := trie.Lookup([]byte{a, b, c, d})
+		p := trie.lookup([]byte{a, b, c, d})
 		if p == peer {
 			t.Error("Assert NEQ failed")
 		}
@@ -173,7 +173,7 @@ func TestTrieIPv4(t *testing.T) {
 	assertEQ(a, 192, 0, 0, 0)
 	assertEQ(a, 255, 0, 0, 0)
 
-	trie = trie.RemovePeer(a)
+	trie = trie.removeByPeer(a)
 
 	assertNEQ(a, 1, 0, 0, 0)
 	assertNEQ(a, 64, 0, 0, 0)
@@ -186,7 +186,7 @@ func TestTrieIPv4(t *testing.T) {
 	insert(a, 192, 168, 0, 0, 16)
 	insert(a, 192, 168, 0, 0, 24)
 
-	trie = trie.RemovePeer(a)
+	trie = trie.removeByPeer(a)
 
 	assertNEQ(a, 192, 168, 0, 1)
 }
@@ -204,7 +204,7 @@ func TestTrieIPv6(t *testing.T) {
 	g := &Peer{}
 	h := &Peer{}
 
-	var trie *Trie
+	var trie *trieEntry
 
 	expand := func(a uint32) []byte {
 		var out [4]byte
@@ -221,7 +221,7 @@ func TestTrieIPv6(t *testing.T) {
 		addr = append(addr, expand(b)...)
 		addr = append(addr, expand(c)...)
 		addr = append(addr, expand(d)...)
-		trie = trie.Insert(addr, cidr, peer)
+		trie = trie.insert(addr, cidr, peer)
 	}
 
 	assertEQ := func(peer *Peer, a, b, c, d uint32) {
@@ -230,7 +230,7 @@ func TestTrieIPv6(t *testing.T) {
 		addr = append(addr, expand(b)...)
 		addr = append(addr, expand(c)...)
 		addr = append(addr, expand(d)...)
-		p := trie.Lookup(addr)
+		p := trie.lookup(addr)
 		if p != peer {
 			t.Error("Assert EQ failed")
 		}

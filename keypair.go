@@ -33,7 +33,7 @@ type Keypairs struct {
 	mutex    sync.RWMutex
 	current  *Keypair
 	previous *Keypair
-	next     *Keypair // not yet "confirmed by transport"
+	next     *Keypair
 }
 
 func (kp *Keypairs) Current() *Keypair {

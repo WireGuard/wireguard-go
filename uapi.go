@@ -91,7 +91,7 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 			send(fmt.Sprintf("rx_bytes=%d", peer.stats.rxBytes))
 			send(fmt.Sprintf("persistent_keepalive_interval=%d", peer.persistentKeepaliveInterval))
 
-			for _, ip := range device.routing.table.AllowedIPs(peer) {
+			for _, ip := range device.routing.table.EntriesForPeer(peer) {
 				send("allowed_ip=" + ip.String())
 			}
 
@@ -337,7 +337,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 			case "replace_allowed_ips":
 
-				logDebug.Println("UAPI: Removing all allowed IPs for peer:", peer)
+				logDebug.Println("UAPI: Removing all allowed EntriesForPeer for peer:", peer)
 
 				if value != "true" {
 					logError.Println("Failed to set replace_allowed_ips, invalid value:", value)
@@ -349,7 +349,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				}
 
 				device.routing.mutex.Lock()
-				device.routing.table.RemovePeer(peer)
+				device.routing.table.RemoveByPeer(peer)
 				device.routing.mutex.Unlock()
 
 			case "allowed_ip":

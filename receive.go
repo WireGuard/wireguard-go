@@ -600,20 +600,24 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			// check if using new key-pair
 
 			kp := &peer.keypairs
-			kp.mutex.Lock() //TODO: make this into an RW lock to reduce contention here for the equality check which is rarely true
 			if kp.next == elem.keypair {
-				old := kp.previous
-				kp.previous = kp.current
-				device.DeleteKeypair(old)
-				kp.current = kp.next
-				kp.next = nil
-				peer.timersHandshakeComplete()
-				select {
-				case peer.signals.newKeypairArrived <- struct{}{}:
-				default:
+				kp.mutex.Lock()
+				if kp.next != elem.keypair {
+					kp.mutex.Unlock()
+				} else {
+					old := kp.previous
+					kp.previous = kp.current
+					device.DeleteKeypair(old)
+					kp.current = kp.next
+					kp.next = nil
+					kp.mutex.Unlock()
+					peer.timersHandshakeComplete()
+					select {
+					case peer.signals.newKeypairArrived <- struct{}{}:
+					default:
+					}
 				}
 			}
-			kp.mutex.Unlock()
 
 			peer.keepKeyFreshReceiving()
 			peer.timersAnyAuthenticatedPacketTraversal()

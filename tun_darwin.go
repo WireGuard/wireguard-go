@@ -224,7 +224,9 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 }
 
 func (tun *NativeTun) Close() error {
-	return tun.fd.Close()
+	err := tun.fd.Close()
+	close(tun.events)
+	return err
 }
 
 func (tun *NativeTun) setMTU(n int) error {

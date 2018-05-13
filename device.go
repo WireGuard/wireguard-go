@@ -46,7 +46,7 @@ type Device struct {
 
 	routing struct {
 		mutex sync.RWMutex
-		table RoutingTable
+		table AllowedIPs
 	}
 
 	peers struct {
@@ -95,7 +95,7 @@ func unsafeRemovePeer(device *Device, peer *Peer, key NoisePublicKey) {
 
 	// stop routing and processing of packets
 
-	device.routing.table.RemovePeer(peer)
+	device.routing.table.RemoveByPeer(peer)
 	peer.Stop()
 
 	// remove from peer map

@@ -30,7 +30,7 @@ func loadExactHex(dst []byte, src string) error {
 		return err
 	}
 	if len(slice) != len(dst) {
-		return errors.New("Hex string does not fit the slice")
+		return errors.New("hex string does not fit the slice")
 	}
 	copy(dst, slice)
 	return nil

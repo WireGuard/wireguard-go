@@ -40,7 +40,7 @@ func NewLogger(level int, prepend string) *Logger {
 
 	logger.Debug = log.New(logDebug,
 		"DEBUG: "+prepend,
-		log.Ldate|log.Ltime|log.Lshortfile,
+		log.Ldate|log.Ltime,
 	)
 
 	logger.Info = log.New(logInfo,

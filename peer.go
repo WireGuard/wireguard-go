@@ -61,7 +61,7 @@ type Peer struct {
 		mutex    sync.Mutex     // held when stopping / starting routines
 		starting sync.WaitGroup // routines pending start
 		stopping sync.WaitGroup // routines pending stop
-		stop     chan struct{}  // size 0, stop all go-routines in peer
+		stop     chan struct{}  // size 0, stop all go routines in peer
 	}
 
 	mac CookieGenerator
@@ -70,7 +70,7 @@ type Peer struct {
 func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 
 	if device.isClosed.Get() {
-		return nil, errors.New("Device closed")
+		return nil, errors.New("device closed")
 	}
 
 	// lock resources
@@ -87,7 +87,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	// check if over limit
 
 	if len(device.peers.keyMap) >= MaxPeers {
-		return nil, errors.New("Too many peers")
+		return nil, errors.New("too many peers")
 	}
 
 	// create peer
@@ -104,7 +104,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 
 	_, ok := device.peers.keyMap[pk]
 	if ok {
-		return nil, errors.New("Adding existing peer")
+		return nil, errors.New("adding existing peer")
 	}
 	device.peers.keyMap[pk] = peer
 
@@ -134,26 +134,26 @@ func (peer *Peer) SendBuffer(buffer []byte) error {
 	defer peer.device.net.mutex.RUnlock()
 
 	if peer.device.net.bind == nil {
-		return errors.New("No bind")
+		return errors.New("no bind")
 	}
 
 	peer.mutex.RLock()
 	defer peer.mutex.RUnlock()
 
 	if peer.endpoint == nil {
-		return errors.New("No known endpoint for peer")
+		return errors.New("no known endpoint for peer")
 	}
 
 	return peer.device.net.bind.Send(buffer, peer.endpoint)
 }
 
-/* Returns a short string identifier for logging
- */
 func (peer *Peer) String() string {
-	return fmt.Sprintf(
-		"peer(%s)",
-		base64.StdEncoding.EncodeToString(peer.handshake.remoteStatic[:]),
-	)
+	base64Key := base64.StdEncoding.EncodeToString(peer.handshake.remoteStatic[:])
+	abbreviatedKey := "invalid"
+	if len(base64Key) == 44 {
+		abbreviatedKey = base64Key[0:4] + "..." + base64Key[40:44]
+	}
+	return fmt.Sprintf("peer(%s)", abbreviatedKey)
 }
 
 func (peer *Peer) Start() {

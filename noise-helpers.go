@@ -71,13 +71,12 @@ func isZero(val []byte) bool {
 	return acc == 1
 }
 
+/* This function is not used as pervasively as it should because this is mostly impossible in Go at the moment */
 func setZero(arr []byte) {
 	for i := range arr {
 		arr[i] = 0
 	}
 }
-
-/* curve25519 wrappers */
 
 func newPrivateKey() (sk NoisePrivateKey, err error) {
 	// clamping: https://cr.yp.to/ecdh.html

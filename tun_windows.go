@@ -125,7 +125,9 @@ func (f *NativeTUN) Events() chan TUNEvent {
 }
 
 func (f *NativeTUN) Close() error {
-	return windows.Close(f.fd)
+	close(f.events)
+	err := windows.Close(f.fd)
+	return err
 }
 
 func (f *NativeTUN) Write(b []byte) (int, error) {

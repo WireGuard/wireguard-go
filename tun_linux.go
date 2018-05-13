@@ -392,6 +392,7 @@ func (tun *NativeTun) Close() error {
 		return err
 	}
 	tun.closingWriter.Write([]byte{0})
+	close(tun.events)
 	return nil
 }
 
