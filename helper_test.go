@@ -25,8 +25,8 @@ func (tun *DummyTUN) File() *os.File {
 	return nil
 }
 
-func (tun *DummyTUN) Name() string {
-	return tun.name
+func (tun *DummyTUN) Name() (string, error) {
+	return tun.name, nil
 }
 
 func (tun *DummyTUN) MTU() (int, error) {
