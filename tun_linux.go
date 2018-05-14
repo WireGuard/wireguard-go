@@ -395,7 +395,7 @@ func CreateTUN(name string) (TUNDevice, error) {
 }
 
 func CreateTUNFromFile(fd *os.File) (TUNDevice, error) {
-	device := &NativeTun{
+	tun := &NativeTun{
 		fd:                      fd,
 		events:                  make(chan TUNEvent, 5),
 		errors:                  make(chan error, 5),
@@ -404,37 +404,38 @@ func CreateTUNFromFile(fd *os.File) (TUNDevice, error) {
 	}
 	var err error
 
-	device.rwcancel, err = rwcancel.NewRWCancel(int(fd.Fd()))
+	tun.rwcancel, err = rwcancel.NewRWCancel(int(fd.Fd()))
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = device.Name()
+	_, err = tun.Name()
 	if err != nil {
 		return nil, err
 	}
 
 	// start event listener
 
-	device.index, err = getIFIndex(device.name)
+	tun.index, err = getIFIndex(tun.name)
 	if err != nil {
 		return nil, err
 	}
+
+	tun.netlinkSock, err = createNetlinkSocket()
+	if err != nil {
+		return nil, err
+	}
+
+	go tun.RoutineNetlinkListener()
+	go tun.RoutineHackListener() // cross namespace
 
 	// set default MTU
 
-	err = device.setMTU(DefaultMTU)
+	err = tun.setMTU(DefaultMTU)
 	if err != nil {
+		tun.Close()
 		return nil, err
 	}
 
-	device.netlinkSock, err = createNetlinkSocket()
-	if err != nil {
-		return nil, err
-	}
-
-	go device.RoutineNetlinkListener()
-	go device.RoutineHackListener() // cross namespace
-
-	return device, nil
+	return tun, nil
 }

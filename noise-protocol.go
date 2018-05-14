@@ -121,11 +121,11 @@ func mixKey(dst *[blake2s.Size]byte, c *[blake2s.Size]byte, data []byte) {
 }
 
 func mixHash(dst *[blake2s.Size]byte, h *[blake2s.Size]byte, data []byte) {
-	hsh, _ := blake2s.New256(nil)
-	hsh.Write(h[:])
-	hsh.Write(data)
-	hsh.Sum(dst[:0])
-	hsh.Reset()
+	hash, _ := blake2s.New256(nil)
+	hash.Write(h[:])
+	hash.Write(data)
+	hash.Sum(dst[:0])
+	hash.Reset()
 }
 
 func (h *Handshake) Clear() {

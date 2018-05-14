@@ -186,7 +186,7 @@ func main() {
 		env = append(env, fmt.Sprintf("%s=4", ENV_WG_UAPI_FD))
 		env = append(env, fmt.Sprintf("%s=1", ENV_WG_PROCESS_FOREGROUND))
 		files := [3]*os.File{}
-		if os.Getenv("LOG_LEVEL") != "" {
+		if os.Getenv("LOG_LEVEL") != "" && logLevel != LogLevelSilent {
 			files[1] = os.Stdout
 			files[2] = os.Stderr
 		}

@@ -217,19 +217,6 @@ func (bind *NativeBind) Send(buff []byte, end Endpoint) error {
 	}
 }
 
-func rawAddrToIP4(addr *unix.SockaddrInet4) net.IP {
-	return net.IPv4(
-		addr.Addr[0],
-		addr.Addr[1],
-		addr.Addr[2],
-		addr.Addr[3],
-	)
-}
-
-func rawAddrToIP6(addr *unix.SockaddrInet6) net.IP {
-	return addr.Addr[:]
-}
-
 func (end *NativeEndpoint) SrcIP() net.IP {
 	if !end.isV6 {
 		return net.IPv4(
@@ -623,6 +610,10 @@ func (bind *NativeBind) routineRouteListener(device *Device) {
 						if peer.endpoint == nil || peer.endpoint.(*NativeEndpoint) == nil {
 							peer.mutex.RUnlock()
 							continue
+						}
+						if peer.endpoint.(*NativeEndpoint).isV6 || peer.endpoint.(*NativeEndpoint).src4().ifindex == 0 {
+							peer.mutex.RUnlock()
+							break
 						}
 						nlmsg := struct {
 							hdr     unix.NlMsghdr

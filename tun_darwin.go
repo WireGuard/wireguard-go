@@ -125,12 +125,6 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 		return nil, err
 	}
 
-	// set default MTU
-	err = tun.setMTU(DefaultMTU)
-	if err != nil {
-		return nil, err
-	}
-
 	tun.rwcancel, err = rwcancel.NewRWCancel(int(file.Fd()))
 	if err != nil {
 		return nil, err
@@ -173,6 +167,13 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 			}
 		}
 	}(tun)
+
+	// set default MTU
+	err = tun.setMTU(DefaultMTU)
+	if err != nil {
+		tun.Close()
+		return nil, err
+	}
 
 	return tun, nil
 }

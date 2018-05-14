@@ -225,15 +225,15 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 
 	for key, peer := range device.peers.keyMap {
 
-		hs := &peer.handshake
+		handshake := &peer.handshake
 
 		if rmKey {
-			hs.precomputedStaticStatic = [NoisePublicKeySize]byte{}
+			handshake.precomputedStaticStatic = [NoisePublicKeySize]byte{}
 		} else {
-			hs.precomputedStaticStatic = device.staticIdentity.privateKey.sharedSecret(hs.remoteStatic)
+			handshake.precomputedStaticStatic = device.staticIdentity.privateKey.sharedSecret(handshake.remoteStatic)
 		}
 
-		if isZero(hs.precomputedStaticStatic[:]) {
+		if isZero(handshake.precomputedStaticStatic[:]) {
 			unsafeRemovePeer(device, peer, key)
 		}
 	}
@@ -267,17 +267,11 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 
 	device.peers.keyMap = make(map[NoisePublicKey]*Peer)
 
-	// initialize rate limiter
-
 	device.rate.limiter.Init()
 	device.rate.underLoadUntil.Store(time.Time{})
 
-	// initialize staticIdentity & crypt-key routine
-
 	device.indexTable.Init()
 	device.allowedips.Reset()
-
-	// setup buffer pool
 
 	device.pool.messageBuffers = sync.Pool{
 		New: func() interface{} {

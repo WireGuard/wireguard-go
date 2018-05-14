@@ -48,19 +48,19 @@ func (st *CookieChecker) Init(pk NoisePublicKey) {
 	// mac1 state
 
 	func() {
-		hsh, _ := blake2s.New256(nil)
-		hsh.Write([]byte(WGLabelMAC1))
-		hsh.Write(pk[:])
-		hsh.Sum(st.mac1.key[:0])
+		hash, _ := blake2s.New256(nil)
+		hash.Write([]byte(WGLabelMAC1))
+		hash.Write(pk[:])
+		hash.Sum(st.mac1.key[:0])
 	}()
 
 	// mac2 state
 
 	func() {
-		hsh, _ := blake2s.New256(nil)
-		hsh.Write([]byte(WGLabelCookie))
-		hsh.Write(pk[:])
-		hsh.Sum(st.mac2.encryptionKey[:0])
+		hash, _ := blake2s.New256(nil)
+		hash.Write([]byte(WGLabelCookie))
+		hash.Write(pk[:])
+		hash.Sum(st.mac2.encryptionKey[:0])
 	}()
 
 	st.mac2.secretSet = time.Time{}
@@ -181,17 +181,17 @@ func (st *CookieGenerator) Init(pk NoisePublicKey) {
 	defer st.mutex.Unlock()
 
 	func() {
-		hsh, _ := blake2s.New256(nil)
-		hsh.Write([]byte(WGLabelMAC1))
-		hsh.Write(pk[:])
-		hsh.Sum(st.mac1.key[:0])
+		hash, _ := blake2s.New256(nil)
+		hash.Write([]byte(WGLabelMAC1))
+		hash.Write(pk[:])
+		hash.Sum(st.mac1.key[:0])
 	}()
 
 	func() {
-		hsh, _ := blake2s.New256(nil)
-		hsh.Write([]byte(WGLabelCookie))
-		hsh.Write(pk[:])
-		hsh.Sum(st.mac2.encryptionKey[:0])
+		hash, _ := blake2s.New256(nil)
+		hash.Write([]byte(WGLabelCookie))
+		hash.Write(pk[:])
+		hash.Sum(st.mac2.encryptionKey[:0])
 	}()
 
 	st.mac2.cookieSet = time.Time{}
