@@ -30,6 +30,10 @@ func printUsage() {
 }
 
 func warning() {
+	if os.Getenv(ENV_WG_PROCESS_FOREGROUND) == "1" {
+		return
+	}
+
 	shouldQuit := false
 
 	fmt.Fprintln(os.Stderr, "WARNING WARNING WARNING WARNING WARNING WARNING WARNING")
