@@ -9,7 +9,6 @@ import (
 	"errors"
 	"golang.org/x/sys/unix"
 	"os"
-	"runtime"
 	"syscall"
 )
 
@@ -51,10 +50,6 @@ func NewRWCancel(fd int) (*RWCancel, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	runtime.SetFinalizer(&rwcancel, func(rw *RWCancel) {
-		rw.Cancel()
-	})
 
 	return &rwcancel, nil
 }
