@@ -399,7 +399,7 @@ func CreateTUNFromFile(fd *os.File) (TUNDevice, error) {
 		fd:                      fd,
 		events:                  make(chan TUNEvent, 5),
 		errors:                  make(chan error, 5),
-		statusListenersShutdown: make(chan struct{}, 0),
+		statusListenersShutdown: make(chan struct{}),
 		nopi: false,
 	}
 	var err error

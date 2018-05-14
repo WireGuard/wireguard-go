@@ -117,7 +117,7 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 		mtu:                     1500,
 		events:                  make(chan TUNEvent, 10),
 		errors:                  make(chan error, 1),
-		statusListenersShutdown: make(chan struct{}, 0),
+		statusListenersShutdown: make(chan struct{}),
 	}
 
 	_, err := tun.Name()
