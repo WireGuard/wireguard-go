@@ -6,7 +6,9 @@
 package main
 
 import (
+	"./rwcancel"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
@@ -34,9 +36,10 @@ type sockaddrCtl struct {
 // NativeTun is a hack to work around the first 4 bytes "packet
 // information" because there doesn't seem to be an IFF_NO_PI for darwin.
 type NativeTun struct {
-	name string
-	fd   *os.File
-	mtu  int
+	name     string
+	fd       *os.File
+	rwcancel *rwcancel.RWCancel
+	mtu      int
 
 	events chan TUNEvent
 	errors chan error
@@ -121,6 +124,17 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 		return nil, err
 	}
 
+	// set default MTU
+	err = tun.setMTU(DefaultMTU)
+	if err != nil {
+		return nil, err
+	}
+
+	tun.rwcancel, err = rwcancel.NewRWCancel(int(file.Fd()))
+	if err != nil {
+		return nil, err
+	}
+
 	// TODO: Fix this very naive implementation
 	go func(tun *NativeTun) {
 		var (
@@ -153,10 +167,7 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 		}
 	}(tun)
 
-	// set default MTU
-	err = tun.setMTU(DefaultMTU)
-
-	return tun, err
+	return tun, nil
 }
 
 func (tun *NativeTun) Name() (string, error) {
@@ -190,14 +201,30 @@ func (tun *NativeTun) Events() chan TUNEvent {
 	return tun.events
 }
 
-func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
-
-	buff = buff[offset-4:]
-	n, err := tun.fd.Read(buff[:])
-	if n < 4 {
+func (tun *NativeTun) doRead(buff []byte, offset int) (int, error) {
+	select {
+	case err := <-tun.errors:
 		return 0, err
+	default:
+		buff := buff[offset-4:]
+		n, err := tun.fd.Read(buff[:])
+		if n < 4 {
+			return 0, err
+		}
+		return n - 4, err
 	}
-	return n - 4, err
+}
+
+func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
+	for {
+		n, err := tun.doRead(buff, offset)
+		if err == nil || !rwcancel.ErrorIsEAGAIN(err) {
+			return n, err
+		}
+		if !tun.rwcancel.ReadyRead() {
+			return 0, errors.New("tun device closed")
+		}
+	}
 }
 
 func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
@@ -224,9 +251,13 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 }
 
 func (tun *NativeTun) Close() error {
-	err := tun.fd.Close()
+	err1 := tun.rwcancel.Cancel()
+	err2 := tun.fd.Close()
 	close(tun.events)
-	return err
+	if err1 != nil {
+		return err1
+	}
+	return err2
 }
 
 func (tun *NativeTun) setMTU(n int) error {

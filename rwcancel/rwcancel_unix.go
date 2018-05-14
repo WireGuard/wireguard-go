@@ -77,7 +77,7 @@ func (rw *RWCancel) ReadyRead() bool {
 	fdset := fdSet{}
 	fdset.set(rw.fd)
 	fdset.set(closeFd)
-	_, err := unix.Select(max(rw.fd, closeFd)+1, &fdset.fdset, nil, nil, nil)
+	err := unixSelect(max(rw.fd, closeFd)+1, &fdset.fdset, nil, nil, nil)
 	if err != nil {
 		return false
 	}
@@ -92,7 +92,7 @@ func (rw *RWCancel) ReadyWrite() bool {
 	fdset := fdSet{}
 	fdset.set(rw.fd)
 	fdset.set(closeFd)
-	_, err := unix.Select(max(rw.fd, closeFd)+1, nil, &fdset.fdset, nil, nil)
+	err := unixSelect(max(rw.fd, closeFd)+1, nil, &fdset.fdset, nil, nil)
 	if err != nil {
 		return false
 	}
