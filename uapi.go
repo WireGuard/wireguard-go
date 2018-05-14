@@ -235,7 +235,6 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				dummy = device.staticIdentity.publicKey.Equals(publicKey)
 				device.staticIdentity.mutex.RUnlock()
 
-
 				if dummy {
 					peer = &Peer{}
 				} else {

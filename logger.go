@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	LogLevelError = iota
+	LogLevelSilent = iota
+	LogLevelError
 	LogLevelInfo
 	LogLevelDebug
 )
@@ -35,7 +36,10 @@ func NewLogger(level int, prepend string) *Logger {
 		if level >= LogLevelInfo {
 			return output, output, ioutil.Discard
 		}
-		return output, ioutil.Discard, ioutil.Discard
+		if level >= LogLevelError {
+			return output, ioutil.Discard, ioutil.Discard
+		}
+		return ioutil.Discard, ioutil.Discard, ioutil.Discard
 	}()
 
 	logger.Debug = log.New(logDebug,
