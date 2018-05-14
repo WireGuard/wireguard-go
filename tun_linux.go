@@ -31,15 +31,15 @@ const (
 )
 
 type NativeTun struct {
-	fd                   *os.File
-	index                int32         // if index
-	name                 string        // name of interface
-	errors               chan error    // async error handling
-	events               chan TUNEvent // device related events
-	nopi                 bool          // the device was pased IFF_NO_PI
-	rwcancel             *rwcancel.RWCancel
-	netlinkSock          int
-	shutdownHackListener chan struct{}
+	fd                      *os.File
+	index                   int32         // if index
+	name                    string        // name of interface
+	errors                  chan error    // async error handling
+	events                  chan TUNEvent // device related events
+	nopi                    bool          // the device was pased IFF_NO_PI
+	rwcancel                *rwcancel.RWCancel
+	netlinkSock             int
+	statusListenersShutdown chan struct{}
 }
 
 func (tun *NativeTun) File() *os.File {
@@ -63,7 +63,7 @@ func (tun *NativeTun) RoutineHackListener() {
 		}
 		select {
 		case <-time.After(time.Second / 10):
-		case <-tun.shutdownHackListener:
+		case <-tun.statusListenersShutdown:
 			return
 		}
 	}
@@ -92,6 +92,12 @@ func (tun *NativeTun) RoutineNetlinkListener() {
 		if err != nil {
 			tun.errors <- fmt.Errorf("failed to receive netlink message: %s", err.Error())
 			return
+		}
+
+		select {
+		case <-tun.statusListenersShutdown:
+			return
+		default:
 		}
 
 		for remain := msg[:msgn]; len(remain) >= unix.SizeofNlMsghdr; {
@@ -328,16 +334,19 @@ func (tun *NativeTun) Events() chan TUNEvent {
 }
 
 func (tun *NativeTun) Close() error {
-	err1 := tun.fd.Close()
-	err2 := closeUnblock(tun.netlinkSock)
-	tun.rwcancel.Cancel()
+	close(tun.statusListenersShutdown)
+	err1 := closeUnblock(tun.netlinkSock)
+	err2 := tun.fd.Close()
+	err3 := tun.rwcancel.Cancel()
 	close(tun.events)
-	close(tun.shutdownHackListener)
 
 	if err1 != nil {
 		return err1
 	}
-	return err2
+	if err2 != nil {
+		return err2
+	}
+	return err3
 }
 
 func CreateTUN(name string) (TUNDevice, error) {
@@ -387,11 +396,11 @@ func CreateTUN(name string) (TUNDevice, error) {
 
 func CreateTUNFromFile(fd *os.File) (TUNDevice, error) {
 	device := &NativeTun{
-		fd:                   fd,
-		events:               make(chan TUNEvent, 5),
-		errors:               make(chan error, 5),
-		shutdownHackListener: make(chan struct{}, 0),
-		nopi:                 false,
+		fd:                      fd,
+		events:                  make(chan TUNEvent, 5),
+		errors:                  make(chan error, 5),
+		statusListenersShutdown: make(chan struct{}, 0),
+		nopi: false,
 	}
 	var err error
 
