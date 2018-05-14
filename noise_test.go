@@ -102,16 +102,18 @@ func TestNoiseHandshake(t *testing.T) {
 
 	t.Log("deriving keys")
 
-	key1 := peer1.BeginSymmetricSession()
-	key2 := peer2.BeginSymmetricSession()
-
-	if key1 == nil {
-		t.Fatal("failed to dervice keypair for peer 1")
+	err = peer1.BeginSymmetricSession()
+	if err != nil {
+		t.Fatal("failed to derive keypair for peer 1", err)
 	}
 
-	if key2 == nil {
-		t.Fatal("failed to dervice keypair for peer 2")
+	err = peer2.BeginSymmetricSession()
+	if err != nil {
+		t.Fatal("failed to derive keypair for peer 2", err)
 	}
+
+	key1 := peer1.keypairs.next
+	key2 := peer2.keypairs.current
 
 	// encrypting / decryption test
 
