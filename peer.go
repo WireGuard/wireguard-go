@@ -25,8 +25,8 @@ type Peer struct {
 	device                      *Device
 	endpoint                    Endpoint
 	persistentKeepaliveInterval uint16
-	_                           uint32 // padding for alignment
 
+	// This must be 64-bit aligned, so make sure the above members come out to even alignment and pad accordingly
 	stats struct {
 		txBytes           uint64 // bytes send to peer (endpoint)
 		rxBytes           uint64 // bytes received from peer
