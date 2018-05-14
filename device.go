@@ -293,7 +293,7 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 
 	// prepare signals
 
-	device.signals.stop = make(chan struct{}, 1)
+	device.signals.stop = make(chan struct{}, 0)
 
 	// prepare net
 
