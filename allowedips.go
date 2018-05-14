@@ -16,7 +16,7 @@ import (
 type trieEntry struct {
 	cidr  uint
 	child [2]*trieEntry
-	bits  []byte
+	bits  net.IP
 	peer  *Peer
 
 	// index of "branching" bit
@@ -181,21 +181,11 @@ func (node *trieEntry) entriesForPeer(p *Peer, results []net.IPNet) []net.IPNet 
 		return results
 	}
 	if node.peer == p {
-		var mask net.IPNet
-		mask.Mask = net.CIDRMask(int(node.cidr), len(node.bits)*8)
-		if len(node.bits) == net.IPv4len {
-			mask.IP = net.IPv4(
-				node.bits[0],
-				node.bits[1],
-				node.bits[2],
-				node.bits[3],
-			)
-		} else if len(node.bits) == net.IPv6len {
-			mask.IP = node.bits
-		} else {
-			panic(errors.New("unexpected address length"))
-		}
-		results = append(results, mask)
+		mask := net.CIDRMask(int(node.cidr), len(node.bits)*8)
+		results = append(results, net.IPNet{
+			Mask: mask,
+			IP: node.bits.Mask(mask),
+		})
 	}
 	results = node.child[0].entriesForPeer(p, results)
 	results = node.child[1].entriesForPeer(p, results)
