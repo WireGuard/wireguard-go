@@ -57,7 +57,7 @@ func (l *UAPIListener) Close() error {
 }
 
 func (l *UAPIListener) Addr() net.Addr {
-	return nil
+	return l.listener.Addr()
 }
 
 func UAPIListen(name string, file *os.File) (net.Listener, error) {
@@ -73,6 +73,10 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 		listener: listener,
 		connNew:  make(chan net.Conn, 1),
 		connErr:  make(chan error, 1),
+	}
+
+	if unixListener, ok := listener.(*net.UnixListener); ok {
+		unixListener.SetUnlinkOnClose(true)
 	}
 
 	socketPath := path.Join(

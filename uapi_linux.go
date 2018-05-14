@@ -46,8 +46,8 @@ func (l *UAPIListener) Accept() (net.Conn, error) {
 
 func (l *UAPIListener) Close() error {
 	err1 := unix.Close(l.inotifyFd)
-	err2 := l.listener.Close()
-	err3 := l.inotifyRWCancel.Cancel()
+	err2 := l.inotifyRWCancel.Cancel()
+	err3 := l.listener.Close()
 	if err1 != nil {
 		return err1
 	}
@@ -58,7 +58,7 @@ func (l *UAPIListener) Close() error {
 }
 
 func (l *UAPIListener) Addr() net.Addr {
-	return nil
+	return l.listener.Addr()
 }
 
 func UAPIListen(name string, file *os.File) (net.Listener, error) {
@@ -68,6 +68,10 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 	listener, err := net.FileListener(file)
 	if err != nil {
 		return nil, err
+	}
+
+	if unixListener, ok := listener.(*net.UnixListener); ok {
+		unixListener.SetUnlinkOnClose(true)
 	}
 
 	uapi := &UAPIListener{
