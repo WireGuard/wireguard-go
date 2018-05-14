@@ -15,6 +15,7 @@
 package main
 
 import (
+	"./rwcancel"
 	"errors"
 	"golang.org/x/sys/unix"
 	"net"
@@ -55,10 +56,11 @@ func (endpoint *NativeEndpoint) dst6() *unix.SockaddrInet6 {
 }
 
 type NativeBind struct {
-	sock4       int
-	sock6       int
-	netlinkSock int
-	lastMark    uint32
+	sock4         int
+	sock6         int
+	netlinkSock   int
+	netlinkCancel *rwcancel.RWCancel
+	lastMark      uint32
 }
 
 var _ Endpoint = (*NativeEndpoint)(nil)
@@ -125,18 +127,23 @@ func CreateBind(port uint16, device *Device) (*NativeBind, uint16, error) {
 	if err != nil {
 		return nil, 0, err
 	}
+	bind.netlinkCancel, err = rwcancel.NewRWCancel(bind.netlinkSock)
+	if err != nil {
+		unix.Close(bind.netlinkSock)
+		return nil, 0, err
+	}
 
 	go bind.routineRouteListener(device)
 
 	bind.sock6, port, err = create6(port)
 	if err != nil {
-		unix.Close(bind.netlinkSock)
+		bind.netlinkCancel.Cancel()
 		return nil, port, err
 	}
 
 	bind.sock4, port, err = create4(port)
 	if err != nil {
-		unix.Close(bind.netlinkSock)
+		bind.netlinkCancel.Cancel()
 		unix.Close(bind.sock6)
 	}
 	return &bind, port, err
@@ -178,7 +185,8 @@ func closeUnblock(fd int) error {
 func (bind *NativeBind) Close() error {
 	err1 := closeUnblock(bind.sock6)
 	err2 := closeUnblock(bind.sock4)
-	err3 := closeUnblock(bind.netlinkSock)
+	err3 := bind.netlinkCancel.Cancel()
+
 	if err1 != nil {
 		return err1
 	}
@@ -539,8 +547,20 @@ func receive6(sock int, buff []byte, end *NativeEndpoint) (int, error) {
 func (bind *NativeBind) routineRouteListener(device *Device) {
 	var reqPeer map[uint32]*Peer
 
+	defer unix.Close(bind.netlinkSock)
+
 	for msg := make([]byte, 1<<16); ; {
-		msgn, _, _, _, err := unix.Recvmsg(bind.netlinkSock, msg[:], nil, 0)
+		var err error
+		var msgn int
+		for {
+			msgn, _, _, _, err = unix.Recvmsg(bind.netlinkSock, msg[:], nil, 0)
+			if err == nil || !rwcancel.ErrorIsEAGAIN(err) {
+				break
+			}
+			if !bind.netlinkCancel.ReadyRead() {
+				return
+			}
+		}
 		if err != nil {
 			return
 		}

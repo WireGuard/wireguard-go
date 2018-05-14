@@ -122,11 +122,13 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 
 	_, err := tun.Name()
 	if err != nil {
+		tun.fd.Close()
 		return nil, err
 	}
 
 	tun.rwcancel, err = rwcancel.NewRWCancel(int(file.Fd()))
 	if err != nil {
+		tun.fd.Close()
 		return nil, err
 	}
 

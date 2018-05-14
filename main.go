@@ -221,13 +221,9 @@ func main() {
 		return
 	}
 
-	// create wireguard device
-
 	device := NewDevice(tun, logger)
 
 	logger.Info.Println("Device started")
-
-	// start uapi listener
 
 	errs := make(chan error)
 	term := make(chan os.Signal)

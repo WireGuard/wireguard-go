@@ -31,14 +31,16 @@ const (
 )
 
 type NativeTun struct {
-	fd                      *os.File
-	index                   int32         // if index
-	name                    string        // name of interface
-	errors                  chan error    // async error handling
-	events                  chan TUNEvent // device related events
-	nopi                    bool          // the device was pased IFF_NO_PI
-	rwcancel                *rwcancel.RWCancel
-	netlinkSock             int
+	fd            *os.File
+	fdCancel      *rwcancel.RWCancel
+	index         int32         // if index
+	name          string        // name of interface
+	errors        chan error    // async error handling
+	events        chan TUNEvent // device related events
+	nopi          bool          // the device was pased IFF_NO_PI
+	netlinkSock   int
+	netlinkCancel *rwcancel.RWCancel
+
 	statusListenersShutdown chan struct{}
 }
 
@@ -86,9 +88,22 @@ func createNetlinkSocket() (int, error) {
 }
 
 func (tun *NativeTun) RoutineNetlinkListener() {
+	defer unix.Close(tun.netlinkSock)
+
 	for msg := make([]byte, 1<<16); ; {
 
-		msgn, _, _, _, err := unix.Recvmsg(tun.netlinkSock, msg[:], nil, 0)
+		var err error
+		var msgn int
+		for {
+			msgn, _, _, _, err = unix.Recvmsg(tun.netlinkSock, msg[:], nil, 0)
+			if err == nil || !rwcancel.ErrorIsEAGAIN(err) {
+				break
+			}
+			if !tun.netlinkCancel.ReadyRead() {
+				tun.errors <- fmt.Errorf("netlink socket closed: %s", err.Error())
+				return
+			}
+		}
 		if err != nil {
 			tun.errors <- fmt.Errorf("failed to receive netlink message: %s", err.Error())
 			return
@@ -323,7 +338,7 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 		if err == nil || !rwcancel.ErrorIsEAGAIN(err) {
 			return n, err
 		}
-		if !tun.rwcancel.ReadyRead() {
+		if !tun.fdCancel.ReadyRead() {
 			return 0, errors.New("tun device closed")
 		}
 	}
@@ -334,10 +349,13 @@ func (tun *NativeTun) Events() chan TUNEvent {
 }
 
 func (tun *NativeTun) Close() error {
+	var err1 error
 	close(tun.statusListenersShutdown)
-	err1 := closeUnblock(tun.netlinkSock)
+	if tun.netlinkCancel != nil {
+		err1 = tun.netlinkCancel.Cancel()
+	}
 	err2 := tun.fd.Close()
-	err3 := tun.rwcancel.Cancel()
+	err3 := tun.fdCancel.Cancel()
 	close(tun.events)
 
 	if err1 != nil {
@@ -404,13 +422,15 @@ func CreateTUNFromFile(fd *os.File) (TUNDevice, error) {
 	}
 	var err error
 
-	tun.rwcancel, err = rwcancel.NewRWCancel(int(fd.Fd()))
+	tun.fdCancel, err = rwcancel.NewRWCancel(int(fd.Fd()))
 	if err != nil {
+		tun.fd.Close()
 		return nil, err
 	}
 
 	_, err = tun.Name()
 	if err != nil {
+		tun.fd.Close()
 		return nil, err
 	}
 
@@ -423,6 +443,12 @@ func CreateTUNFromFile(fd *os.File) (TUNDevice, error) {
 
 	tun.netlinkSock, err = createNetlinkSocket()
 	if err != nil {
+		tun.fd.Close()
+		return nil, err
+	}
+	tun.netlinkCancel, err = rwcancel.NewRWCancel(tun.netlinkSock)
+	if err != nil {
+		tun.fd.Close()
 		return nil, err
 	}
 
