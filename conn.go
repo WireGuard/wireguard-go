@@ -123,7 +123,7 @@ func (device *Device) BindUpdate() error {
 
 		var err error
 		netc := &device.net
-		netc.bind, netc.port, err = CreateBind(netc.port)
+		netc.bind, netc.port, err = CreateBind(netc.port, device)
 		if err != nil {
 			netc.bind = nil
 			netc.port = 0

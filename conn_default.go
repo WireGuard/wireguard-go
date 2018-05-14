@@ -81,7 +81,7 @@ func listenNet(network string, port int) (*net.UDPConn, int, error) {
 	return conn, uaddr.Port, nil
 }
 
-func CreateBind(uport uint16) (Bind, uint16, error) {
+func CreateBind(uport uint16, device *Device) (Bind, uint16, error) {
 	var err error
 	var bind NativeBind
 
