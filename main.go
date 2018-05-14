@@ -191,8 +191,13 @@ func main() {
 		env = append(env, fmt.Sprintf("%s=1", ENV_WG_PROCESS_FOREGROUND))
 		files := [3]*os.File{}
 		if os.Getenv("LOG_LEVEL") != "" && logLevel != LogLevelSilent {
+			files[0], _ = os.Open(os.DevNull)
 			files[1] = os.Stdout
 			files[2] = os.Stderr
+		} else {
+			files[0], _ = os.Open(os.DevNull)
+			files[1], _ = os.Open(os.DevNull)
+			files[2], _ = os.Open(os.DevNull)
 		}
 		attr := &os.ProcAttr{
 			Files: []*os.File{
