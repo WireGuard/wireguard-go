@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
+	"io/ioutil"
 	"net"
 	"os"
 	"time"
@@ -104,7 +105,10 @@ func CreateTUN(name string) (TUNDevice, error) {
 	tun, err := CreateTUNFromFile(os.NewFile(uintptr(fd), ""))
 
 	if err == nil && name == "utun" {
-		fmt.Printf("OS assigned interface: %s\n", tun.(*NativeTun).name)
+		fname := os.Getenv("WG_DARWIN_UTUN_NAME_FILE")
+		if fname != "" {
+			ioutil.WriteFile(fname, []byte(tun.(*NativeTun).name+"\n"), 0400)
+		}
 	}
 
 	return tun, err

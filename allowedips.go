@@ -184,7 +184,7 @@ func (node *trieEntry) entriesForPeer(p *Peer, results []net.IPNet) []net.IPNet 
 		mask := net.CIDRMask(int(node.cidr), len(node.bits)*8)
 		results = append(results, net.IPNet{
 			Mask: mask,
-			IP: node.bits.Mask(mask),
+			IP:   node.bits.Mask(mask),
 		})
 	}
 	results = node.child[0].entriesForPeer(p, results)
