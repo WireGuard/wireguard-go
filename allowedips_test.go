@@ -106,7 +106,7 @@ func BenchmarkTrieIPv6Peers10Addresses10(b *testing.B) {
 }
 
 /* Test ported from kernel implementation:
- * selftest/routingtable.h
+ * selftest/allowedips.h
  */
 func TestTrieIPv4(t *testing.T) {
 	a := &Peer{}
@@ -192,7 +192,7 @@ func TestTrieIPv4(t *testing.T) {
 }
 
 /* Test ported from kernel implementation:
- * selftest/routingtable.h
+ * selftest/allowedips.h
  */
 func TestTrieIPv6(t *testing.T) {
 	a := &Peer{}
