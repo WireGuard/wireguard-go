@@ -36,13 +36,13 @@ type sockaddrCtl struct {
 // NativeTun is a hack to work around the first 4 bytes "packet
 // information" because there doesn't seem to be an IFF_NO_PI for darwin.
 type NativeTun struct {
-	name     string
-	fd       *os.File
-	rwcancel *rwcancel.RWCancel
-	mtu      int
-
-	events chan TUNEvent
-	errors chan error
+	name                    string
+	fd                      *os.File
+	rwcancel                *rwcancel.RWCancel
+	mtu                     int
+	events                  chan TUNEvent
+	errors                  chan error
+	statusListenersShutdown chan struct{}
 }
 
 var sockaddrCtlSize uintptr = 32
@@ -113,10 +113,11 @@ func CreateTUN(name string) (TUNDevice, error) {
 func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 
 	tun := &NativeTun{
-		fd:     file,
-		mtu:    1500,
-		events: make(chan TUNEvent, 10),
-		errors: make(chan error, 1),
+		fd:                      file,
+		mtu:                     1500,
+		events:                  make(chan TUNEvent, 10),
+		errors:                  make(chan error, 1),
+		statusListenersShutdown: make(chan struct{}, 0),
 	}
 
 	_, err := tun.Name()
@@ -142,7 +143,7 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 			statusMTU int
 		)
 
-		for ; ; time.Sleep(time.Second) {
+		for {
 			intr, err := net.InterfaceByName(tun.name)
 			if err != nil {
 				tun.errors <- err
@@ -164,6 +165,12 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 				tun.events <- TUNEventMTUUpdate
 			}
 			statusMTU = intr.MTU
+
+			select {
+			case <-time.After(time.Second / 10):
+			case <-tun.statusListenersShutdown:
+				return
+			}
 		}
 	}(tun)
 
@@ -251,6 +258,7 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 }
 
 func (tun *NativeTun) Close() error {
+	close(tun.statusListenersShutdown)
 	err1 := tun.rwcancel.Cancel()
 	err2 := tun.fd.Close()
 	close(tun.events)
