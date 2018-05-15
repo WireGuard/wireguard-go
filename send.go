@@ -107,7 +107,7 @@ func addToEncryptionQueue(
 /* Queues a keepalive if no packets are queued for peer
  */
 func (peer *Peer) SendKeepalive() bool {
-	if len(peer.queue.nonce) != 0 || peer.queue.packetInNonceQueueIsAwaitingKey {
+	if len(peer.queue.nonce) != 0 || peer.queue.packetInNonceQueueIsAwaitingKey || !peer.isRunning.Get() {
 		return false
 	}
 	elem := peer.device.NewOutboundElement()
