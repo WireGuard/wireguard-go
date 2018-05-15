@@ -331,7 +331,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 			case "replace_allowed_ips":
 
-				logDebug.Println("UAPI: Removing all allowed EntriesForPeer for peer:", peer)
+				logDebug.Println("UAPI: Removing all allowedips for peer:", peer)
 
 				if value != "true" {
 					logError.Println("Failed to set replace_allowed_ips, invalid value:", value)

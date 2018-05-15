@@ -92,7 +92,7 @@ func TestTrieRandomIPv4(t *testing.T) {
 		peer1 := slow.Lookup(addr[:])
 		peer2 := trie.lookup(addr[:])
 		if peer1 != peer2 {
-			t.Error("trieEntry did not match naive implementation, for:", addr)
+			t.Error("Trie did not match naive implementation, for:", addr)
 		}
 	}
 }
@@ -125,7 +125,7 @@ func TestTrieRandomIPv6(t *testing.T) {
 		peer1 := slow.Lookup(addr[:])
 		peer2 := trie.lookup(addr[:])
 		if peer1 != peer2 {
-			t.Error("trieEntry did not match naive implementation, for:", addr)
+			t.Error("Trie did not match naive implementation, for:", addr)
 		}
 	}
 }
