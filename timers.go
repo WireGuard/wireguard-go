@@ -9,6 +9,7 @@ package main
 
 import (
 	"math/rand"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -18,28 +19,52 @@ import (
  */
 
 type Timer struct {
-	timer     *time.Timer
-	isPending bool
+	timer         *time.Timer
+	modifyingLock sync.Mutex
+	runningLock   sync.Mutex
+	isPending     bool
 }
 
 func (peer *Peer) NewTimer(expirationFunction func(*Peer)) *Timer {
 	timer := &Timer{}
 	timer.timer = time.AfterFunc(time.Hour, func() {
+		timer.runningLock.Lock()
+
+		timer.modifyingLock.Lock()
+		if !timer.isPending {
+			timer.modifyingLock.Unlock()
+			timer.runningLock.Unlock()
+			return
+		}
 		timer.isPending = false
+		timer.modifyingLock.Unlock()
+
 		expirationFunction(peer)
+		timer.runningLock.Unlock()
 	})
 	timer.timer.Stop()
 	return timer
 }
 
 func (timer *Timer) Mod(d time.Duration) {
+	timer.modifyingLock.Lock()
 	timer.isPending = true
 	timer.timer.Reset(d)
+	timer.modifyingLock.Unlock()
 }
 
 func (timer *Timer) Del() {
+	timer.modifyingLock.Lock()
 	timer.isPending = false
 	timer.timer.Stop()
+	timer.modifyingLock.Unlock()
+}
+
+func (timer *Timer) DelSync() {
+	timer.Del()
+	timer.runningLock.Lock()
+	timer.Del()
+	timer.runningLock.Unlock()
 }
 
 func (peer *Peer) timersActive() bool {
@@ -189,9 +214,9 @@ func (peer *Peer) timersInit() {
 }
 
 func (peer *Peer) timersStop() {
-	peer.timers.retransmitHandshake.Del()
-	peer.timers.sendKeepalive.Del()
-	peer.timers.newHandshake.Del()
-	peer.timers.zeroKeyMaterial.Del()
-	peer.timers.persistentKeepalive.Del()
+	peer.timers.retransmitHandshake.DelSync()
+	peer.timers.sendKeepalive.DelSync()
+	peer.timers.newHandshake.DelSync()
+	peer.timers.zeroKeyMaterial.DelSync()
+	peer.timers.persistentKeepalive.DelSync()
 }
