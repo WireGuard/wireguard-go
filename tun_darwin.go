@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 	"time"
 	"unsafe"
 )
@@ -107,6 +108,7 @@ func CreateTUN(name string) (TUNDevice, error) {
 	if err == nil && name == "utun" {
 		fname := os.Getenv("WG_DARWIN_UTUN_NAME_FILE")
 		if fname != "" {
+			os.MkdirAll(filepath.Dir(fname), 0700)
 			ioutil.WriteFile(fname, []byte(tun.(*NativeTun).name+"\n"), 0400)
 		}
 	}
