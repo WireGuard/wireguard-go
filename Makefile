@@ -5,7 +5,6 @@ BINDIR ?= $(PREFIX)/bin
 all: wireguard-go
 
 wireguard-go: $(wildcard *.go) $(wildcard */*.go)
-	go get -d -v
 	go build -v -o $@
 
 install: wireguard-go
