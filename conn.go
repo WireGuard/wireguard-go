@@ -12,6 +12,10 @@ import (
 	"net"
 )
 
+const (
+	ConnRoutineNumber = 2
+)
+
 /* A Bind handles listening on a port for both IPv6 and IPv4 UDP traffic
  */
 type Bind interface {
@@ -153,6 +157,8 @@ func (device *Device) BindUpdate() error {
 
 		// start receiving routines
 
+		device.state.starting.Add(ConnRoutineNumber)
+		device.state.stopping.Add(ConnRoutineNumber)
 		go device.RoutineReceiveIncoming(ipv4.Version, netc.bind)
 		go device.RoutineReceiveIncoming(ipv6.Version, netc.bind)
 

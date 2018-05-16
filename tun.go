@@ -35,6 +35,8 @@ func (device *Device) RoutineTUNEventReader() {
 	logInfo := device.log.Info
 	logError := device.log.Error
 
+	device.state.starting.Done()
+
 	for event := range device.tun.device.Events() {
 		if event&TUNEventMTUUpdate != 0 {
 			mtu, err := device.tun.device.MTU()
@@ -63,4 +65,6 @@ func (device *Device) RoutineTUNEventReader() {
 			device.Down()
 		}
 	}
+
+	device.state.stopping.Done()
 }

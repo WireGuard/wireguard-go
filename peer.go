@@ -231,12 +231,14 @@ func (peer *Peer) Stop() {
 
 	// prevent simultaneous start/stop operations
 
-	peer.routines.mutex.Lock()
-	defer peer.routines.mutex.Unlock()
-
 	if !peer.isRunning.Swap(false) {
 		return
 	}
+
+	peer.routines.starting.Wait()
+
+	peer.routines.mutex.Lock()
+	defer peer.routines.mutex.Unlock()
 
 	peer.device.log.Debug.Println(peer, ": Stopping...")
 
@@ -244,7 +246,6 @@ func (peer *Peer) Stop() {
 
 	// stop & wait for ongoing peer routines
 
-	peer.routines.starting.Wait()
 	close(peer.routines.stop)
 	peer.routines.stopping.Wait()
 

@@ -247,9 +247,11 @@ func (device *Device) RoutineReadFromTUN() {
 
 	defer func() {
 		logDebug.Println("Routine: TUN reader - stopped")
+		device.state.stopping.Done()
 	}()
 
 	logDebug.Println("Routine: TUN reader - started")
+	device.state.starting.Done()
 
 	for {
 
@@ -424,6 +426,7 @@ func (device *Device) RoutineEncryption() {
 	}()
 
 	logDebug.Println("Routine: encryption worker - started")
+	device.state.starting.Done()
 
 	for {
 

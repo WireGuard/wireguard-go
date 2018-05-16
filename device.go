@@ -15,6 +15,7 @@ import (
 
 const (
 	DeviceRoutineNumberPerCPU = 3
+	DeviceRoutineNumberAdditional = 2
 )
 
 type Device struct {
@@ -25,6 +26,7 @@ type Device struct {
 	// synchronized resources (locks acquired in order)
 
 	state struct {
+		starting sync.WaitGroup
 		stopping sync.WaitGroup
 		mutex    sync.Mutex
 		changing AtomicBool
@@ -297,7 +299,10 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 	// start workers
 
 	cpus := runtime.NumCPU()
-	device.state.stopping.Add(DeviceRoutineNumberPerCPU * cpus)
+	device.state.starting.Wait()
+	device.state.stopping.Wait()
+	device.state.stopping.Add(DeviceRoutineNumberPerCPU * cpus + DeviceRoutineNumberAdditional)
+	device.state.starting.Add(DeviceRoutineNumberPerCPU * cpus + DeviceRoutineNumberAdditional)
 	for i := 0; i < cpus; i += 1 {
 		go device.RoutineEncryption()
 		go device.RoutineDecryption()
@@ -306,6 +311,8 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 
 	go device.RoutineReadFromTUN()
 	go device.RoutineTUNEventReader()
+
+	device.state.starting.Wait()
 
 	return device
 }
@@ -363,6 +370,9 @@ func (device *Device) Close() {
 	if device.isClosed.Swap(true) {
 		return
 	}
+
+	device.state.starting.Wait()
+
 	device.log.Info.Println("Device closing")
 	device.state.changing.Set(true)
 	device.state.mutex.Lock()
