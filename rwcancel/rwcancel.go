@@ -12,31 +12,17 @@ import (
 	"syscall"
 )
 
-type RWCancel struct {
-	fd            int
-	closingReader *os.File
-	closingWriter *os.File
-}
-
-type fdSet struct {
-	fdset unix.FdSet
-}
-
-func (fdset *fdSet) set(i int) {
-	bits := 32 << (^uint(0) >> 63)
-	fdset.fdset.Bits[i/bits] |= 1 << uint(i%bits)
-}
-
-func (fdset *fdSet) check(i int) bool {
-	bits := 32 << (^uint(0) >> 63)
-	return (fdset.fdset.Bits[i/bits] & (1 << uint(i%bits))) != 0
-}
-
 func max(a, b int) int {
 	if a > b {
 		return a
 	}
 	return b
+}
+
+type RWCancel struct {
+	fd            int
+	closingReader *os.File
+	closingWriter *os.File
 }
 
 func NewRWCancel(fd int) (*RWCancel, error) {
