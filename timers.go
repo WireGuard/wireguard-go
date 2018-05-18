@@ -134,9 +134,6 @@ func expiredZeroKeyMaterial(peer *Peer) {
 
 func expiredPersistentKeepalive(peer *Peer) {
 	if peer.persistentKeepaliveInterval > 0 {
-		if peer.timersActive() {
-			peer.timers.sendKeepalive.Del()
-		}
 		peer.SendKeepalive()
 	}
 }
