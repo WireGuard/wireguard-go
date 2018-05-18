@@ -157,6 +157,7 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	peer.cookieGenerator.AddMacs(packet)
 
 	peer.timersAnyAuthenticatedPacketTraversal()
+	peer.timersAnyAuthenticatedPacketSent()
 
 	err = peer.SendBuffer(packet)
 	if err != nil {
@@ -194,6 +195,7 @@ func (peer *Peer) SendHandshakeResponse() error {
 
 	peer.timersSessionDerived()
 	peer.timersAnyAuthenticatedPacketTraversal()
+	peer.timersAnyAuthenticatedPacketSent()
 
 	err = peer.SendBuffer(packet)
 	if err != nil {
@@ -544,6 +546,9 @@ func (peer *Peer) RoutineSequentialSender() {
 				continue
 			}
 
+			peer.timersAnyAuthenticatedPacketTraversal()
+			peer.timersAnyAuthenticatedPacketSent()
+
 			// send message and return buffer to pool
 
 			length := uint64(len(elem.packet))
@@ -555,9 +560,6 @@ func (peer *Peer) RoutineSequentialSender() {
 			}
 			atomic.AddUint64(&peer.stats.txBytes, length)
 
-			// update timers
-
-			peer.timersAnyAuthenticatedPacketTraversal()
 			if len(elem.packet) != MessageKeepaliveSize {
 				peer.timersDataSent()
 			}

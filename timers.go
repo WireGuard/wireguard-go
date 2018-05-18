@@ -143,10 +143,6 @@ func expiredPersistentKeepalive(peer *Peer) {
 
 /* Should be called after an authenticated data packet is sent. */
 func (peer *Peer) timersDataSent() {
-	if peer.timersActive() {
-		peer.timers.sendKeepalive.Del()
-	}
-
 	if peer.timersActive() && !peer.timers.newHandshake.isPending {
 		peer.timers.newHandshake.Mod(KeepaliveTimeout + RekeyTimeout)
 	}
@@ -163,7 +159,14 @@ func (peer *Peer) timersDataReceived() {
 	}
 }
 
-/* Should be called after any type of authenticated packet is received -- keepalive or data. */
+/* Should be called after any type of authenticated packet is sent -- keepalive, data, or handshake. */
+func (peer *Peer) timersAnyAuthenticatedPacketSent() {
+	if peer.timersActive() {
+		peer.timers.sendKeepalive.Del()
+	}
+}
+
+/* Should be called after any type of authenticated packet is received -- keepalive, data, or handshake. */
 func (peer *Peer) timersAnyAuthenticatedPacketReceived() {
 	if peer.timersActive() {
 		peer.timers.newHandshake.Del()
@@ -173,7 +176,6 @@ func (peer *Peer) timersAnyAuthenticatedPacketReceived() {
 /* Should be called after a handshake initiation message is sent. */
 func (peer *Peer) timersHandshakeInitiated() {
 	if peer.timersActive() {
-		peer.timers.sendKeepalive.Del()
 		peer.timers.retransmitHandshake.Mod(RekeyTimeout + time.Millisecond*time.Duration(rand.Int31n(RekeyTimeoutJitterMaxMs)))
 	}
 }
@@ -195,7 +197,7 @@ func (peer *Peer) timersSessionDerived() {
 	}
 }
 
-/* Should be called before a packet with authentication -- data, keepalive, either handshake -- is sent, or after one is received. */
+/* Should be called before a packet with authentication -- keepalive, data, or handshake -- is sent, or after one is received. */
 func (peer *Peer) timersAnyAuthenticatedPacketTraversal() {
 	if peer.persistentKeepaliveInterval > 0 && peer.timersActive() {
 		peer.timers.persistentKeepalive.Mod(time.Duration(peer.persistentKeepaliveInterval) * time.Second)
