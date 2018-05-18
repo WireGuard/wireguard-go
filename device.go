@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	DeviceRoutineNumberPerCPU = 3
+	DeviceRoutineNumberPerCPU     = 3
 	DeviceRoutineNumberAdditional = 2
 )
 
@@ -301,8 +301,8 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 	cpus := runtime.NumCPU()
 	device.state.starting.Wait()
 	device.state.stopping.Wait()
-	device.state.stopping.Add(DeviceRoutineNumberPerCPU * cpus + DeviceRoutineNumberAdditional)
-	device.state.starting.Add(DeviceRoutineNumberPerCPU * cpus + DeviceRoutineNumberAdditional)
+	device.state.stopping.Add(DeviceRoutineNumberPerCPU*cpus + DeviceRoutineNumberAdditional)
+	device.state.starting.Add(DeviceRoutineNumberPerCPU*cpus + DeviceRoutineNumberAdditional)
 	for i := 0; i < cpus; i += 1 {
 		go device.RoutineEncryption()
 		go device.RoutineDecryption()
