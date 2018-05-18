@@ -58,6 +58,10 @@ func parseEndpoint(s string) (*net.UDPAddr, error) {
 	if err != nil {
 		return nil, err
 	}
+	ip4 := addr.IP.To4()
+	if ip4 != nil {
+		addr.IP = ip4
+	}
 	return addr, err
 }
 

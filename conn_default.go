@@ -45,7 +45,10 @@ func (e *NativeEndpoint) SrcIP() net.IP {
 
 func (e *NativeEndpoint) DstToBytes() []byte {
 	addr := (*net.UDPAddr)(e)
-	out := addr.IP
+	out := addr.IP.To4()
+	if out == nil {
+		out = addr.IP
+	}
 	out = append(out, byte(addr.Port&0xff))
 	out = append(out, byte((addr.Port>>8)&0xff))
 	return out
@@ -112,6 +115,9 @@ func (bind *NativeBind) Close() error {
 
 func (bind *NativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
 	n, endpoint, err := bind.ipv4.ReadFromUDP(buff)
+	if endpoint != nil {
+		endpoint.IP = endpoint.IP.To4()
+	}
 	return n, (*NativeEndpoint)(endpoint), err
 }
 
@@ -123,10 +129,10 @@ func (bind *NativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
 func (bind *NativeBind) Send(buff []byte, endpoint Endpoint) error {
 	var err error
 	nend := endpoint.(*NativeEndpoint)
-	if nend.IP.To16() != nil {
-		_, err = bind.ipv6.WriteToUDP(buff, (*net.UDPAddr)(nend))
-	} else {
+	if nend.IP.To4() != nil {
 		_, err = bind.ipv4.WriteToUDP(buff, (*net.UDPAddr)(nend))
+	} else {
+		_, err = bind.ipv6.WriteToUDP(buff, (*net.UDPAddr)(nend))
 	}
 	return err
 }
