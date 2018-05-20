@@ -162,16 +162,12 @@ func (device *Device) Up() {
 		return
 	}
 
-	device.state.mutex.Lock()
 	device.isUp.Set(true)
-	device.state.mutex.Unlock()
 	deviceUpdateState(device)
 }
 
 func (device *Device) Down() {
-	device.state.mutex.Lock()
 	device.isUp.Set(false)
-	device.state.mutex.Unlock()
 	deviceUpdateState(device)
 }
 
