@@ -16,7 +16,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"time"
 	"unsafe"
 )
 
@@ -38,16 +37,66 @@ type sockaddrCtl struct {
 // NativeTun is a hack to work around the first 4 bytes "packet
 // information" because there doesn't seem to be an IFF_NO_PI for darwin.
 type NativeTun struct {
-	name                    string
-	fd                      *os.File
-	rwcancel                *rwcancel.RWCancel
-	mtu                     int
-	events                  chan TUNEvent
-	errors                  chan error
-	statusListenersShutdown chan struct{}
+	name        string
+	fd          *os.File
+	rwcancel    *rwcancel.RWCancel
+	mtu         int
+	events      chan TUNEvent
+	errors      chan error
+	routeSocket int
 }
 
 var sockaddrCtlSize uintptr = 32
+
+func (tun *NativeTun) RoutineRouteListener(tunIfindex int) {
+	var (
+		statusUp  bool
+		statusMTU int
+	)
+
+	data := make([]byte, os.Getpagesize())
+	for {
+		n, err := unix.Read(tun.routeSocket, data)
+		if err != nil {
+			tun.errors <- err
+			return
+		}
+
+		if n < 14 {
+			continue
+		}
+
+		if data[3 /* type */] != 0xe /* RTM_IFINFO */ {
+			continue
+		}
+		ifindex := int(*(*uint16)(unsafe.Pointer(&data[12 /* ifindex */])))
+		if ifindex != tunIfindex {
+			continue
+		}
+
+		iface, err := net.InterfaceByIndex(ifindex)
+		if err != nil {
+			tun.errors <- err
+			return
+		}
+
+		// Up / Down event
+		up := (iface.Flags & net.FlagUp) != 0
+		if up != statusUp && up {
+			tun.events <- TUNEventUp
+		}
+		if up != statusUp && !up {
+			tun.events <- TUNEventDown
+		}
+		statusUp = up
+
+		// MTU changes
+		if iface.MTU != statusMTU {
+			tun.events <- TUNEventMTUUpdate
+		}
+		statusMTU = iface.MTU
+	}
+}
 
 func CreateTUN(name string) (TUNDevice, error) {
 	ifIndex := -1
@@ -118,14 +167,26 @@ func CreateTUN(name string) (TUNDevice, error) {
 func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 
 	tun := &NativeTun{
-		fd:                      file,
-		mtu:                     1500,
-		events:                  make(chan TUNEvent, 10),
-		errors:                  make(chan error, 1),
-		statusListenersShutdown: make(chan struct{}),
+		fd:     file,
+		mtu:    1500,
+		events: make(chan TUNEvent, 10),
+		errors: make(chan error, 1),
 	}
 
-	_, err := tun.Name()
+	name, err := tun.Name()
+	if err != nil {
+		tun.fd.Close()
+		return nil, err
+	}
+
+
+	tunIfindex, err := func() (int, error) {
+		iface, err := net.InterfaceByName(name)
+		if err != nil {
+			return -1, err
+		}
+		return iface.Index, nil
+	}()
 	if err != nil {
 		tun.fd.Close()
 		return nil, err
@@ -137,43 +198,13 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 		return nil, err
 	}
 
-	// TODO: Fix this very naive implementation
-	go func(tun *NativeTun) {
-		var (
-			statusUp  bool
-			statusMTU int
-		)
+	tun.routeSocket, err = unix.Socket(unix.AF_ROUTE, unix.SOCK_RAW, unix.AF_UNSPEC)
+	if err != nil {
+		tun.fd.Close()
+		return nil, err
+	}
 
-		for {
-			intr, err := net.InterfaceByName(tun.name)
-			if err != nil {
-				tun.errors <- err
-				return
-			}
-
-			// Up / Down event
-			up := (intr.Flags & net.FlagUp) != 0
-			if up != statusUp && up {
-				tun.events <- TUNEventUp
-			}
-			if up != statusUp && !up {
-				tun.events <- TUNEventDown
-			}
-			statusUp = up
-
-			// MTU changes
-			if intr.MTU != statusMTU {
-				tun.events <- TUNEventMTUUpdate
-			}
-			statusMTU = intr.MTU
-
-			select {
-			case <-time.After(time.Second / 10):
-			case <-tun.statusListenersShutdown:
-				return
-			}
-		}
-	}(tun)
+	go tun.RoutineRouteListener(tunIfindex)
 
 	// set default MTU
 	err = tun.setMTU(DefaultMTU)
@@ -266,14 +297,22 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 }
 
 func (tun *NativeTun) Close() error {
-	close(tun.statusListenersShutdown)
+	var err3 error
 	err1 := tun.rwcancel.Cancel()
 	err2 := tun.fd.Close()
+	if tun.routeSocket != -1 {
+		// Surprisingly, on Darwin, simply closing a route socket is enough to unblock it.
+		// We don't even need to call shutdown, or use a rwcancel.
+		err3 = unix.Close(tun.routeSocket)
+	}
 	close(tun.events)
 	if err1 != nil {
 		return err1
 	}
-	return err2
+	if err2 != nil {
+		return err2
+	}
+	return err3
 }
 
 func (tun *NativeTun) setMTU(n int) error {
