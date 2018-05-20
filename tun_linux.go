@@ -65,7 +65,7 @@ func (tun *NativeTun) RoutineHackListener() {
 			return
 		}
 		select {
-		case <-time.After(time.Second / 10):
+		case <-time.After(time.Second):
 		case <-tun.statusListenersShutdown:
 			return
 		}
