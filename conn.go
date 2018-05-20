@@ -75,6 +75,7 @@ func unsafeCloseBind(device *Device) error {
 		err = netc.bind.Close()
 		netc.bind = nil
 	}
+	netc.stopping.Wait()
 	return err
 }
 
@@ -162,10 +163,11 @@ func (device *Device) BindUpdate() error {
 
 		// start receiving routines
 
-		device.state.starting.Add(ConnRoutineNumber)
-		device.state.stopping.Add(ConnRoutineNumber)
+		device.net.starting.Add(ConnRoutineNumber)
+		device.net.stopping.Add(ConnRoutineNumber)
 		go device.RoutineReceiveIncoming(ipv4.Version, netc.bind)
 		go device.RoutineReceiveIncoming(ipv6.Version, netc.bind)
+		device.net.starting.Wait()
 
 		device.log.Debug.Println("UDP bind has been updated")
 	}

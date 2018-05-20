@@ -125,11 +125,11 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 	logDebug := device.log.Debug
 	defer func() {
 		logDebug.Println("Routine: receive incoming IPv" + strconv.Itoa(IP) + " - stopped")
-		device.state.stopping.Done()
+		device.net.stopping.Done()
 	}()
 
 	logDebug.Println("Routine: receive incoming IPv" + strconv.Itoa(IP) + " - starting")
-	device.state.starting.Done()
+	device.net.starting.Done()
 
 	// receive datagrams until conn is closed
 
