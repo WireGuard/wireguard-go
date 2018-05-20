@@ -89,7 +89,10 @@ func createNetlinkSocket() (int, error) {
 }
 
 func (tun *NativeTun) RoutineNetlinkListener() {
-	defer unix.Close(tun.netlinkSock)
+	defer func() {
+		unix.Close(tun.netlinkSock)
+		close(tun.events)
+	}()
 
 	for msg := make([]byte, 1<<16); ; {
 
@@ -357,7 +360,6 @@ func (tun *NativeTun) Close() error {
 	}
 	err2 := tun.fd.Close()
 	err3 := tun.fdCancel.Cancel()
-	close(tun.events)
 
 	if err1 != nil {
 		return err1

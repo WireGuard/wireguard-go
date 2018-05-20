@@ -53,6 +53,8 @@ func (tun *NativeTun) RoutineRouteListener(tunIfindex int) {
 		statusMTU int
 	)
 
+	defer close(tun.events)
+
 	data := make([]byte, os.Getpagesize())
 	for {
 		n, err := unix.Read(tun.routeSocket, data)
@@ -302,7 +304,6 @@ func (tun *NativeTun) Close() error {
 		// We don't even need to call shutdown, or use a rwcancel.
 		err3 = unix.Close(tun.routeSocket)
 	}
-	close(tun.events)
 	if err1 != nil {
 		return err1
 	}
