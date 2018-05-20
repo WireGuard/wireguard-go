@@ -54,7 +54,7 @@ type Peer struct {
 		nonce                           chan *QueueOutboundElement // nonce / pre-handshake queue
 		outbound                        chan *QueueOutboundElement // sequential ordering of work
 		inbound                         chan *QueueInboundElement  // sequential ordering of work
-		packetInNonceQueueIsAwaitingKey bool
+		packetInNonceQueueIsAwaitingKey AtomicBool
 	}
 
 	routines struct {

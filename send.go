@@ -108,7 +108,7 @@ func addToEncryptionQueue(
 /* Queues a keepalive if no packets are queued for peer
  */
 func (peer *Peer) SendKeepalive() bool {
-	if len(peer.queue.nonce) != 0 || peer.queue.packetInNonceQueueIsAwaitingKey || !peer.isRunning.Get() {
+	if len(peer.queue.nonce) != 0 || peer.queue.packetInNonceQueueIsAwaitingKey.Get() || !peer.isRunning.Get() {
 		return false
 	}
 	elem := peer.device.NewOutboundElement()
@@ -304,7 +304,7 @@ func (device *Device) RoutineReadFromTUN() {
 		// insert into nonce/pre-handshake queue
 
 		if peer.isRunning.Get() {
-			if peer.queue.packetInNonceQueueIsAwaitingKey {
+			if peer.queue.packetInNonceQueueIsAwaitingKey.Get() {
 				peer.SendHandshakeInitiation(false)
 			}
 			addToOutboundQueue(peer.queue.nonce, elem)
@@ -334,7 +334,7 @@ func (peer *Peer) RoutineNonce() {
 
 	defer func() {
 		logDebug.Println(peer, ": Routine: nonce worker - stopped")
-		peer.queue.packetInNonceQueueIsAwaitingKey = false
+		peer.queue.packetInNonceQueueIsAwaitingKey.Set(false)
 		peer.routines.stopping.Done()
 	}()
 
@@ -353,7 +353,7 @@ func (peer *Peer) RoutineNonce() {
 
 	for {
 	NextPacket:
-		peer.queue.packetInNonceQueueIsAwaitingKey = false
+		peer.queue.packetInNonceQueueIsAwaitingKey.Set(false)
 
 		select {
 		case <-peer.routines.stop:
@@ -381,7 +381,7 @@ func (peer *Peer) RoutineNonce() {
 						break
 					}
 				}
-				peer.queue.packetInNonceQueueIsAwaitingKey = true
+				peer.queue.packetInNonceQueueIsAwaitingKey.Set(true)
 
 				// no suitable key pair, request for new handshake
 
@@ -408,7 +408,7 @@ func (peer *Peer) RoutineNonce() {
 					return
 				}
 			}
-			peer.queue.packetInNonceQueueIsAwaitingKey = false
+			peer.queue.packetInNonceQueueIsAwaitingKey.Set(false)
 
 			// populate work element
 
