@@ -20,7 +20,7 @@ import (
 
 type Timer struct {
 	timer         *time.Timer
-	modifyingLock sync.Mutex
+	modifyingLock sync.RWMutex
 	runningLock   sync.Mutex
 	isPending     bool
 }
@@ -67,6 +67,12 @@ func (timer *Timer) DelSync() {
 	timer.runningLock.Unlock()
 }
 
+func (timer *Timer) IsPending() bool {
+	timer.modifyingLock.RLock()
+	defer timer.modifyingLock.RUnlock()
+	return timer.isPending
+}
+
 func (peer *Peer) timersActive() bool {
 	return peer.isRunning.Get() && peer.device != nil && peer.device.isUp.Get() && len(peer.device.peers.keyMap) > 0
 }
@@ -87,7 +93,7 @@ func expiredRetransmitHandshake(peer *Peer) {
 		/* We set a timer for destroying any residue that might be left
 		 * of a partial exchange.
 		 */
-		if peer.timersActive() && !peer.timers.zeroKeyMaterial.isPending {
+		if peer.timersActive() && !peer.timers.zeroKeyMaterial.IsPending() {
 			peer.timers.zeroKeyMaterial.Mod(RejectAfterTime * 3)
 		}
 	} else {
@@ -140,7 +146,7 @@ func expiredPersistentKeepalive(peer *Peer) {
 
 /* Should be called after an authenticated data packet is sent. */
 func (peer *Peer) timersDataSent() {
-	if peer.timersActive() && !peer.timers.newHandshake.isPending {
+	if peer.timersActive() && !peer.timers.newHandshake.IsPending() {
 		peer.timers.newHandshake.Mod(KeepaliveTimeout + RekeyTimeout)
 	}
 }
@@ -148,7 +154,7 @@ func (peer *Peer) timersDataSent() {
 /* Should be called after an authenticated data packet is received. */
 func (peer *Peer) timersDataReceived() {
 	if peer.timersActive() {
-		if !peer.timers.sendKeepalive.isPending {
+		if !peer.timers.sendKeepalive.IsPending() {
 			peer.timers.sendKeepalive.Mod(KeepaliveTimeout)
 		} else {
 			peer.timers.needAnotherKeepalive = true
