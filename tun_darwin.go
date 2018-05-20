@@ -40,7 +40,6 @@ type NativeTun struct {
 	name        string
 	fd          *os.File
 	rwcancel    *rwcancel.RWCancel
-	mtu         int
 	events      chan TUNEvent
 	errors      chan error
 	routeSocket int
@@ -168,7 +167,6 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 
 	tun := &NativeTun{
 		fd:     file,
-		mtu:    1500,
 		events: make(chan TUNEvent, 10),
 		errors: make(chan error, 1),
 	}
