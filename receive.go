@@ -105,12 +105,12 @@ func (device *Device) addToHandshakeQueue(
  * NOTE: Not thread safe, but called by sequential receiver!
  */
 func (peer *Peer) keepKeyFreshReceiving() {
-	if peer.timers.sentLastMinuteHandshake {
+	if peer.timers.sentLastMinuteHandshake.Get() {
 		return
 	}
 	keypair := peer.keypairs.Current()
 	if keypair != nil && keypair.isInitiator && time.Now().Sub(keypair.created) > (RejectAfterTime-KeepaliveTimeout-RekeyTimeout) {
-		peer.timers.sentLastMinuteHandshake = true
+		peer.timers.sentLastMinuteHandshake.Set(true)
 		peer.SendHandshakeInitiation(false)
 	}
 }

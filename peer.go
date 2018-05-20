@@ -40,9 +40,9 @@ type Peer struct {
 		newHandshake            *Timer
 		zeroKeyMaterial         *Timer
 		persistentKeepalive     *Timer
-		handshakeAttempts       uint
-		needAnotherKeepalive    bool
-		sentLastMinuteHandshake bool
+		handshakeAttempts       uint32
+		needAnotherKeepalive    AtomicBool
+		sentLastMinuteHandshake AtomicBool
 	}
 
 	signals struct {

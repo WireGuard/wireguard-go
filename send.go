@@ -124,7 +124,7 @@ func (peer *Peer) SendKeepalive() bool {
 
 func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	if !isRetry {
-		peer.timers.handshakeAttempts = 0
+		atomic.StoreUint32(&peer.timers.handshakeAttempts, 0)
 	}
 
 	peer.handshake.mutex.RLock()
