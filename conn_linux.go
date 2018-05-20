@@ -21,6 +21,7 @@ import (
 	"golang.org/x/sys/unix"
 	"net"
 	"strconv"
+	"sync"
 	"unsafe"
 )
 
@@ -551,6 +552,7 @@ func (bind *NativeBind) routineRouteListener(device *Device) {
 		endpoint *Endpoint
 	}
 	var reqPeer map[uint32]peerEndpointPtr
+	var reqPeerLock sync.Mutex
 
 	defer unix.Close(bind.netlinkSock)
 
@@ -596,10 +598,13 @@ func (bind *NativeBind) routineRouteListener(device *Device) {
 							}
 							if attrhdr.Type == unix.RTA_OIF && attrhdr.Len == unix.SizeofRtAttr+4 {
 								ifidx := *(*uint32)(unsafe.Pointer(&attr[unix.SizeofRtAttr]))
+								reqPeerLock.Lock()
 								if reqPeer == nil {
+									reqPeerLock.Unlock()
 									break
 								}
 								pePtr, ok := reqPeer[hdr.Seq]
+								reqPeerLock.Unlock()
 								if !ok {
 									break
 								}
@@ -620,7 +625,9 @@ func (bind *NativeBind) routineRouteListener(device *Device) {
 					}
 					break
 				}
+				reqPeerLock.Lock()
 				reqPeer = make(map[uint32]peerEndpointPtr)
+				reqPeerLock.Unlock()
 				go func() {
 					device.peers.mutex.RLock()
 					i := uint32(1)
@@ -671,10 +678,12 @@ func (bind *NativeBind) routineRouteListener(device *Device) {
 							uint32(bind.lastMark),
 						}
 						nlmsg.hdr.Len = uint32(unsafe.Sizeof(nlmsg))
+						reqPeerLock.Lock()
 						reqPeer[i] = peerEndpointPtr{
 							peer:     peer,
 							endpoint: &peer.endpoint,
 						}
+						reqPeerLock.Unlock()
 						peer.mutex.RUnlock()
 						i++
 						_, err := bind.netlinkCancel.Write((*[unsafe.Sizeof(nlmsg)]byte)(unsafe.Pointer(&nlmsg))[:])
