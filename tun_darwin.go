@@ -177,7 +177,6 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 		return nil, err
 	}
 
-
 	tunIfindex, err := func() (int, error) {
 		iface, err := net.InterfaceByName(name)
 		if err != nil {

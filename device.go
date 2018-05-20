@@ -37,10 +37,10 @@ type Device struct {
 	net struct {
 		starting sync.WaitGroup
 		stopping sync.WaitGroup
-		mutex  sync.RWMutex
-		bind   Bind   // bind interface
-		port   uint16 // listening port
-		fwmark uint32 // mark value (0 = disabled)
+		mutex    sync.RWMutex
+		bind     Bind   // bind interface
+		port     uint16 // listening port
+		fwmark   uint32 // mark value (0 = disabled)
 	}
 
 	staticIdentity struct {
