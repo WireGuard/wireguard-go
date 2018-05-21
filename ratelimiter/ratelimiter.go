@@ -27,7 +27,7 @@ type RatelimiterEntry struct {
 
 type Ratelimiter struct {
 	mutex     sync.RWMutex
-	stop      chan struct{}
+	stopReset chan struct{}
 	tableIPv4 map[[net.IPv4len]byte]*RatelimiterEntry
 	tableIPv6 map[[net.IPv6len]byte]*RatelimiterEntry
 }
@@ -36,8 +36,8 @@ func (rate *Ratelimiter) Close() {
 	rate.mutex.Lock()
 	defer rate.mutex.Unlock()
 
-	if rate.stop != nil {
-		close(rate.stop)
+	if rate.stopReset != nil {
+		close(rate.stopReset)
 	}
 }
 
@@ -47,11 +47,11 @@ func (rate *Ratelimiter) Init() {
 
 	// stop any ongoing garbage collection routine
 
-	if rate.stop != nil {
-		close(rate.stop)
+	if rate.stopReset != nil {
+		close(rate.stopReset)
 	}
 
-	rate.stop = make(chan struct{})
+	rate.stopReset = make(chan struct{})
 	rate.tableIPv4 = make(map[[net.IPv4len]byte]*RatelimiterEntry)
 	rate.tableIPv6 = make(map[[net.IPv6len]byte]*RatelimiterEntry)
 
@@ -59,11 +59,16 @@ func (rate *Ratelimiter) Init() {
 
 	go func() {
 		ticker := time.NewTicker(time.Second)
+		ticker.Stop()
 		for {
 			select {
-			case <-rate.stop:
+			case _, ok := <-rate.stopReset:
 				ticker.Stop()
-				return
+				if ok {
+					ticker = time.NewTicker(time.Second)
+				} else {
+					return
+				}
 			case <-ticker.C:
 				func() {
 					rate.mutex.Lock()
@@ -83,6 +88,10 @@ func (rate *Ratelimiter) Init() {
 							delete(rate.tableIPv6, key)
 						}
 						entry.mutex.Unlock()
+					}
+
+					if len(rate.tableIPv4) == 0 && len(rate.tableIPv6) == 0 {
+						ticker.Stop()
 					}
 				}()
 			}
@@ -121,8 +130,14 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 		rate.mutex.Lock()
 		if IPv4 != nil {
 			rate.tableIPv4[keyIPv4] = entry
+			if len(rate.tableIPv4) == 1 && len(rate.tableIPv6) == 0 {
+				rate.stopReset <- struct{}{}
+			}
 		} else {
 			rate.tableIPv6[keyIPv6] = entry
+			if len(rate.tableIPv6) == 1 && len(rate.tableIPv4) == 0 {
+				rate.stopReset <- struct{}{}
+			}
 		}
 		rate.mutex.Unlock()
 		return true
