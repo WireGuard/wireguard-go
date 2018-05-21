@@ -441,8 +441,7 @@ func (tun *NativeTun) Close() error {
 	err2 := tun.fd.Close()
 	err3 := tunDestroy(tun.name)
 	if tun.routeSocket != -1 {
-		// Surprisingly, on FreeBSD, simply closing a route socket is enough to unblock it.
-		// We don't even need to call shutdown, or use a rwcancel. TODO: CONFIRM THIS CLAIM. IT WAS TRUE ON DARWIN BUT...
+		unix.Shutdown(tun.routeSocket, unix.SHUT_RDWR)
 		err4 = unix.Close(tun.routeSocket)
 		tun.routeSocket = -1
 	} else if tun.events != nil {
