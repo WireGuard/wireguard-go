@@ -40,7 +40,7 @@ It is currently a work in progress to strip out the beginnings of an experiment 
 
 ### FreeBSD
 
-This will run on FreeBSD.
+This will run on FreeBSD. It does not yet support sticky sockets. Fwmark is mapped to `SO\_USER\_COOKIE`.
 
 ## Building
 
