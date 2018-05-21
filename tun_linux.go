@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 	"unsafe"
 )
@@ -32,16 +33,16 @@ const (
 )
 
 type NativeTun struct {
-	fd            *os.File
-	fdCancel      *rwcancel.RWCancel
-	index         int32         // if index
-	name          string        // name of interface
-	errors        chan error    // async error handling
-	events        chan TUNEvent // device related events
-	nopi          bool          // the device was pased IFF_NO_PI
-	netlinkSock   int
-	netlinkCancel *rwcancel.RWCancel
-
+	fd                      *os.File
+	fdCancel                *rwcancel.RWCancel
+	index                   int32         // if index
+	name                    string        // name of interface
+	errors                  chan error    // async error handling
+	events                  chan TUNEvent // device related events
+	nopi                    bool          // the device was pased IFF_NO_PI
+	netlinkSock             int
+	netlinkCancel           *rwcancel.RWCancel
+	hackListenerClosed      sync.Mutex
 	statusListenersShutdown chan struct{}
 }
 
@@ -50,6 +51,7 @@ func (tun *NativeTun) File() *os.File {
 }
 
 func (tun *NativeTun) RoutineHackListener() {
+	defer tun.hackListenerClosed.Unlock()
 	/* This is needed for the detection to work across network namespaces
 	 * If you are reading this and know a better method, please get in touch.
 	 */
@@ -91,6 +93,7 @@ func createNetlinkSocket() (int, error) {
 func (tun *NativeTun) RoutineNetlinkListener() {
 	defer func() {
 		unix.Close(tun.netlinkSock)
+		tun.hackListenerClosed.Lock()
 		close(tun.events)
 	}()
 
@@ -455,6 +458,7 @@ func CreateTUNFromFile(fd *os.File) (TUNDevice, error) {
 		return nil, err
 	}
 
+	tun.hackListenerClosed.Lock()
 	go tun.RoutineNetlinkListener()
 	go tun.RoutineHackListener() // cross namespace
 
