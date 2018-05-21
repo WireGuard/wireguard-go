@@ -147,7 +147,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					logError.Println("Failed to set private_key:", err)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
-				logDebug.Println("UAPI: Updating device private key")
+				logDebug.Println("UAPI: Updating private key")
 				device.SetPrivateKey(sk)
 
 			case "listen_port":
@@ -211,7 +211,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				device.RemoveAllPeers()
 
 			default:
-				logError.Println("Invalid UAPI key (device configuration):", key)
+				logError.Println("Invalid UAPI device key:", key)
 				return &IPCError{Code: ipcErrorInvalid}
 			}
 		}
@@ -226,7 +226,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				var publicKey NoisePublicKey
 				err := publicKey.FromHex(value)
 				if err != nil {
-					logError.Println("Failed to get peer by public_key:", err)
+					logError.Println("Failed to get peer by public key:", err)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 
@@ -248,7 +248,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 						logError.Println("Failed to create new peer:", err)
 						return &IPCError{Code: ipcErrorInvalid}
 					}
-					logDebug.Println("UAPI: Created new peer:", peer)
+					logDebug.Println(peer, "- UAPI: Created")
 				}
 
 			case "remove":
@@ -260,7 +260,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 				if !dummy {
-					logDebug.Println("UAPI: Removing peer:", peer)
+					logDebug.Println(peer, "- UAPI: Removing")
 					device.RemovePeer(peer.handshake.remoteStatic)
 				}
 				peer = &Peer{}
@@ -270,14 +270,14 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 				// update PSK
 
-				logDebug.Println("UAPI: Updating pre-shared key for peer:", peer)
+				logDebug.Println(peer, "- UAPI: Updating preshared key")
 
 				peer.handshake.mutex.Lock()
 				err := peer.handshake.presharedKey.FromHex(value)
 				peer.handshake.mutex.Unlock()
 
 				if err != nil {
-					logError.Println("Failed to set preshared_key:", err)
+					logError.Println("Failed to set preshared key:", err)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 
@@ -285,7 +285,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 				// set endpoint destination
 
-				logDebug.Println("UAPI: Updating endpoint for peer:", peer)
+				logDebug.Println(peer, "- UAPI: Updating endpoint")
 
 				err := func() error {
 					peer.mutex.Lock()
@@ -307,11 +307,11 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 				// update persistent keepalive interval
 
-				logDebug.Println("UAPI: Updating persistent_keepalive_interval for peer:", peer)
+				logDebug.Println(peer, "- UAPI: Updating persistent keepalive interva")
 
 				secs, err := strconv.ParseUint(value, 10, 16)
 				if err != nil {
-					logError.Println("Failed to set persistent_keepalive_interval:", err)
+					logError.Println("Failed to set persistent keepalive interval:", err)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 
@@ -332,10 +332,10 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 			case "replace_allowed_ips":
 
-				logDebug.Println("UAPI: Removing all allowedips for peer:", peer)
+				logDebug.Println(peer, "- UAPI: Removing all allowedips")
 
 				if value != "true" {
-					logError.Println("Failed to set replace_allowed_ips, invalid value:", value)
+					logError.Println("Failed to replace allowedips, invalid value:", value)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 
@@ -347,11 +347,11 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 			case "allowed_ip":
 
-				logDebug.Println("UAPI: Adding allowed_ip to peer:", peer)
+				logDebug.Println(peer, "- UAPI: Adding allowedip")
 
 				_, network, err := net.ParseCIDR(value)
 				if err != nil {
-					logError.Println("Failed to set allowed_ip:", err)
+					logError.Println("Failed to set allowed ip:", err)
 					return &IPCError{Code: ipcErrorInvalid}
 				}
 
@@ -363,7 +363,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 				device.allowedips.Insert(network.IP, uint(ones), peer)
 
 			default:
-				logError.Println("Invalid UAPI key (peer configuration):", key)
+				logError.Println("Invalid UAPI peer key:", key)
 				return &IPCError{Code: ipcErrorInvalid}
 			}
 		}
@@ -397,11 +397,11 @@ func ipcHandle(device *Device, socket net.Conn) {
 
 	switch op {
 	case "set=1\n":
-		device.log.Debug.Println("Config, set operation")
+		device.log.Debug.Println("UAPI: Set operation")
 		status = ipcSetOperation(device, buffered)
 
 	case "get=1\n":
-		device.log.Debug.Println("Config, get operation")
+		device.log.Debug.Println("UAPI: Get operation")
 		status = ipcGetOperation(device, buffered)
 
 	default:
