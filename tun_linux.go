@@ -357,9 +357,13 @@ func (tun *NativeTun) Events() chan TUNEvent {
 
 func (tun *NativeTun) Close() error {
 	var err1 error
-	close(tun.statusListenersShutdown)
-	if tun.netlinkCancel != nil {
-		err1 = tun.netlinkCancel.Cancel()
+	if tun.statusListenersShutdown != nil {
+		close(tun.statusListenersShutdown)
+		if tun.netlinkCancel != nil {
+			err1 = tun.netlinkCancel.Cancel()
+		}
+	} else if tun.events != nil {
+		close(tun.events)
 	}
 	err2 := tun.fd.Close()
 	err3 := tun.fdCancel.Cancel()
