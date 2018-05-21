@@ -298,8 +298,7 @@ func (tun *NativeTun) Close() error {
 	err1 := tun.rwcancel.Cancel()
 	err2 := tun.fd.Close()
 	if tun.routeSocket != -1 {
-		// Surprisingly, on Darwin, simply closing a route socket is enough to unblock it.
-		// We don't even need to call shutdown, or use a rwcancel.
+		unix.Shutdown(tun.routeSocket, unix.SHUT_RDWR)
 		err3 = unix.Close(tun.routeSocket)
 		tun.routeSocket = -1
 	} else if tun.events != nil {
