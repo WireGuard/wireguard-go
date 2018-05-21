@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"runtime"
 	"strconv"
+	"syscall"
 )
 
 const (
@@ -236,7 +237,7 @@ func main() {
 	logger.Info.Println("Device started")
 
 	errs := make(chan error)
-	term := make(chan os.Signal)
+	term := make(chan os.Signal, 1)
 
 	uapi, err := UAPIListen(interfaceName, fileUAPI)
 	if err != nil {
@@ -259,7 +260,7 @@ func main() {
 
 	// wait for program to terminate
 
-	signal.Notify(term, os.Kill)
+	signal.Notify(term, syscall.SIGTERM)
 	signal.Notify(term, os.Interrupt)
 
 	select {
