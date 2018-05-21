@@ -264,8 +264,10 @@ func (device *Device) RoutineReadFromTUN() {
 		size, err := device.tun.device.Read(elem.buffer[:], offset)
 
 		if err != nil {
-			logError.Println("Failed to read packet from TUN device:", err)
-			device.Close()
+			if !device.isClosed.Get() {
+				logError.Println("Failed to read packet from TUN device:", err)
+				device.Close()
+			}
 			return
 		}
 

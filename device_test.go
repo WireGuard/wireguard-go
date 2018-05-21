@@ -26,8 +26,8 @@ func TestDevice(t *testing.T) {
 		t.Error("failed to create tun:", err.Error())
 	}
 
-	println(tun1)
-	println(tun2)
+	_ = tun1
+	_ = tun2
 
 	// prepare endpoints
 
@@ -41,8 +41,8 @@ func TestDevice(t *testing.T) {
 		t.Error("failed to create endpoint:", err.Error())
 	}
 
-	println(end1)
-	println(end2)
+	_ = end1
+	_ = end2
 
 	// create binds
 
