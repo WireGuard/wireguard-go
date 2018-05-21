@@ -151,10 +151,10 @@ func (bind *NativeBind) SetMark(mark uint32) error {
 			return err2
 		}
 		err3 := fd4.Control(func(fd uintptr) {
-			err1 = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, 0x1014 /* unix.SO_SETFIB */, int(mark))
+			err1 = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, 0x1015 /* unix.SO_USER_COOKIE */, int(mark))
 		})
 		err4 := fd6.Control(func(fd uintptr) {
-			err2 = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, 0x1014 /* unix.SO_SETFIB */, int(mark))
+			err2 = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, 0x1015 /* unix.SO_USER_COOKIE */, int(mark))
 		})
 		if err1 != nil {
 			return err1
