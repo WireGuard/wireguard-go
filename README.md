@@ -40,7 +40,7 @@ It is currently a work in progress to strip out the beginnings of an experiment 
 
 ### FreeBSD
 
-Work in progress, but nothing yet to share.
+This will run on FreeBSD.
 
 ## Building
 

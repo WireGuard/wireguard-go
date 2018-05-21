@@ -9,7 +9,9 @@
 package main
 
 import (
+	"golang.org/x/sys/unix"
 	"net"
+	"runtime"
 )
 
 /* This code is meant to be a temporary solution
@@ -138,6 +140,35 @@ func (bind *NativeBind) Send(buff []byte, endpoint Endpoint) error {
 	return err
 }
 
-func (bind *NativeBind) SetMark(_ uint32) error {
+func (bind *NativeBind) SetMark(mark uint32) error {
+	if runtime.GOOS == "freebsd" {
+		fd4, err1 := bind.ipv4.SyscallConn()
+		fd6, err2 := bind.ipv6.SyscallConn()
+		if err1 != nil {
+			return err1
+		}
+		if err2 != nil {
+			return err2
+		}
+		err3 := fd4.Control(func(fd uintptr) {
+			err1 = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, 0x1014 /* unix.SO_SETFIB */, int(mark))
+		})
+		err4 := fd6.Control(func(fd uintptr) {
+			err2 = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, 0x1014 /* unix.SO_SETFIB */, int(mark))
+		})
+		if err1 != nil {
+			return err1
+		}
+		if err2 != nil {
+			return err2
+		}
+		if err3 != nil {
+			return err3
+		}
+		if err4 != nil {
+			return err4
+		}
+		return nil
+	}
 	return nil
 }

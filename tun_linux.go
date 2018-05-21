@@ -227,7 +227,7 @@ func (tun *NativeTun) setMTU(n int) error {
 	)
 
 	if errno != 0 {
-		return errors.New("Failed to set MTU of TUN device")
+		return errors.New("failed to set MTU of TUN device")
 	}
 
 	return nil
@@ -260,7 +260,7 @@ func (tun *NativeTun) MTU() (int, error) {
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)
 	if errno != 0 {
-		return 0, errors.New("Failed to get MTU of TUN device: " + strconv.FormatInt(int64(errno), 10))
+		return 0, errors.New("failed to get MTU of TUN device: " + strconv.FormatInt(int64(errno), 10))
 	}
 
 	// convert result to signed 32-bit int
@@ -282,7 +282,7 @@ func (tun *NativeTun) Name() (string, error) {
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)
 	if errno != 0 {
-		return "", errors.New("Failed to get name of TUN device: " + strconv.FormatInt(int64(errno), 10))
+		return "", errors.New("failed to get name of TUN device: " + strconv.FormatInt(int64(errno), 10))
 	}
 	nullStr := ifr[:]
 	i := bytes.IndexByte(nullStr, 0)

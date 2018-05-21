@@ -34,8 +34,6 @@ type sockaddrCtl struct {
 	scReserved [5]uint32
 }
 
-// NativeTun is a hack to work around the first 4 bytes "packet
-// information" because there doesn't seem to be an IFF_NO_PI for darwin.
 type NativeTun struct {
 	name        string
 	fd          *os.File
@@ -67,7 +65,7 @@ func (tun *NativeTun) RoutineRouteListener(tunIfindex int) {
 			continue
 		}
 
-		if data[3 /* type */] != 0xe /* RTM_IFINFO */ {
+		if data[3 /* type */] != unix.RTM_IFINFO {
 			continue
 		}
 		ifindex := int(*(*uint16)(unsafe.Pointer(&data[12 /* ifindex */])))
@@ -347,7 +345,7 @@ func (tun *NativeTun) setMTU(n int) error {
 	)
 
 	if errno != 0 {
-		return fmt.Errorf("Failed to set MTU on %s", tun.name)
+		return fmt.Errorf("failed to set MTU on %s", tun.name)
 	}
 
 	return nil
@@ -380,7 +378,7 @@ func (tun *NativeTun) MTU() (int, error) {
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)
 	if errno != 0 {
-		return 0, fmt.Errorf("Failed to get MTU on %s", tun.name)
+		return 0, fmt.Errorf("failed to get MTU on %s", tun.name)
 	}
 
 	// convert result to signed 32-bit int
