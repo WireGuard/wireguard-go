@@ -100,8 +100,8 @@ func (tun *NativeTun) RoutineRouteListener(tunIfindex int) {
 func CreateTUN(name string) (TUNDevice, error) {
 	ifIndex := -1
 	if name != "utun" {
-		fmt.Sscanf(name, "utun%d", &ifIndex)
-		if ifIndex < 0 {
+		_, err := fmt.Sscanf(name, "utun%d", &ifIndex)
+		if err != nil || ifIndex < 0 {
 			return nil, fmt.Errorf("Interface name must be utun[0-9]*")
 		}
 	}
