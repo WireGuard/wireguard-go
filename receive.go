@@ -445,7 +445,7 @@ func (device *Device) RoutineHandshake() {
 			peer.endpoint = elem.endpoint
 			peer.mutex.Unlock()
 
-			logDebug.Println(peer, ": Received handshake initiation")
+			logDebug.Println(peer, "- Received handshake initiation")
 
 			peer.SendHandshakeResponse()
 
@@ -478,7 +478,7 @@ func (device *Device) RoutineHandshake() {
 			peer.endpoint = elem.endpoint
 			peer.mutex.Unlock()
 
-			logDebug.Println(peer, ": Received handshake response")
+			logDebug.Println(peer, "- Received handshake response")
 
 			// update timers
 
@@ -490,7 +490,7 @@ func (device *Device) RoutineHandshake() {
 			err = peer.BeginSymmetricSession()
 
 			if err != nil {
-				logError.Println(peer, ": Failed to derive keypair:", err)
+				logError.Println(peer, "- Failed to derive keypair:", err)
 				continue
 			}
 
@@ -513,11 +513,11 @@ func (peer *Peer) RoutineSequentialReceiver() {
 	logDebug := device.log.Debug
 
 	defer func() {
-		logDebug.Println(peer, ": Routine: sequential receiver - stopped")
+		logDebug.Println(peer, "- Routine: sequential receiver - stopped")
 		peer.routines.stopping.Done()
 	}()
 
-	logDebug.Println(peer, ": Routine: sequential receiver - started")
+	logDebug.Println(peer, "- Routine: sequential receiver - started")
 
 	peer.routines.starting.Done()
 
@@ -570,7 +570,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			// check for keepalive
 
 			if len(elem.packet) == 0 {
-				logDebug.Println(peer, ": Receiving keepalive packet")
+				logDebug.Println(peer, "- Receiving keepalive packet")
 				continue
 			}
 			peer.timersDataReceived()
