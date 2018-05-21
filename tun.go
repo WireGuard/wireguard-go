@@ -33,9 +33,11 @@ type TUNDevice interface {
 
 func (device *Device) RoutineTUNEventReader() {
 	setUp := false
+	logDebug := device.log.Debug
 	logInfo := device.log.Info
 	logError := device.log.Error
 
+	logDebug.Println("Routine: event worker - started")
 	device.state.starting.Done()
 
 	for event := range device.tun.device.Events() {
@@ -67,5 +69,6 @@ func (device *Device) RoutineTUNEventReader() {
 		}
 	}
 
+	logDebug.Println("Routine: event worker - stopped")
 	device.state.stopping.Done()
 }

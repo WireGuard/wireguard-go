@@ -8,6 +8,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"testing"
 )
@@ -40,6 +41,8 @@ func (tun *DummyTUN) Write(d []byte, offset int) (int, error) {
 }
 
 func (tun *DummyTUN) Close() error {
+	close(tun.events)
+	close(tun.packets)
 	return nil
 }
 
@@ -48,7 +51,10 @@ func (tun *DummyTUN) Events() chan TUNEvent {
 }
 
 func (tun *DummyTUN) Read(d []byte, offset int) (int, error) {
-	t := <-tun.packets
+	t, ok := <-tun.packets
+	if !ok {
+		return 0, errors.New("device closed")
+	}
 	copy(d[offset:], t)
 	return len(t), nil
 }
@@ -57,6 +63,7 @@ func CreateDummyTUN(name string) (TUNDevice, error) {
 	var dummy DummyTUN
 	dummy.mtu = 0
 	dummy.packets = make(chan []byte, 100)
+	dummy.events = make(chan TUNEvent, 10)
 	return &dummy, nil
 }
 
