@@ -1,14 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0
  *
  * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
- * Copyright (C) 2017-2018 Mathias N. Hall-Andersen <mathias@hall-andersen.dk>.
  */
 
 package main
 
 import (
 	"./rwcancel"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"golang.org/x/net/ipv6"
@@ -16,23 +14,18 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"syscall"
 	"unsafe"
 )
 
-const utunControlName = "com.apple.net.utun_control"
-
-// _CTLIOCGINFO value derived from /usr/include/sys/{kern_control,ioccom}.h
-const _CTLIOCGINFO = (0x40000000 | 0x80000000) | ((100 & 0x1fff) << 16) | uint32(byte('N'))<<8 | 3
-
-// sockaddr_ctl specifeid in /usr/include/sys/kern_control.h
-type sockaddrCtl struct {
-	scLen      uint8
-	scFamily   uint8
-	ssSysaddr  uint16
-	scID       uint32
-	scUnit     uint32
-	scReserved [5]uint32
+// Structure for iface mtu get/set ioctls
+type ifreq_mtu struct {
+	Name [unix.IFNAMSIZ]byte
+	MTU  uint32
+	Pad0 [12]byte
 }
+
+const _TUNSIFMODE = 0x8004745d
 
 type NativeTun struct {
 	name        string
@@ -42,8 +35,6 @@ type NativeTun struct {
 	errors      chan error
 	routeSocket int
 }
-
-var sockaddrCtlSize uintptr = 32
 
 func (tun *NativeTun) RoutineRouteListener(tunIfindex int) {
 	var (
@@ -61,14 +52,14 @@ func (tun *NativeTun) RoutineRouteListener(tunIfindex int) {
 			return
 		}
 
-		if n < 14 {
+		if n < 8 {
 			continue
 		}
 
 		if data[3 /* type */] != unix.RTM_IFINFO {
 			continue
 		}
-		ifindex := int(*(*uint16)(unsafe.Pointer(&data[12 /* ifindex */])))
+		ifindex := int(*(*uint16)(unsafe.Pointer(&data[6 /* ifindex */])))
 		if ifindex != tunIfindex {
 			continue
 		}
@@ -97,63 +88,61 @@ func (tun *NativeTun) RoutineRouteListener(tunIfindex int) {
 	}
 }
 
+func errorIsEBUSY(err error) bool {
+	if pe, ok := err.(*os.PathError); ok {
+		if errno, ok := pe.Err.(syscall.Errno); ok && errno == syscall.EBUSY {
+			return true
+		}
+	}
+	if errno, ok := err.(syscall.Errno); ok && errno == syscall.EBUSY {
+		return true
+	}
+	return false
+}
+
 func CreateTUN(name string) (TUNDevice, error) {
 	ifIndex := -1
-	if name != "utun" {
-		_, err := fmt.Sscanf(name, "utun%d", &ifIndex)
+	if name != "tun" {
+		_, err := fmt.Sscanf(name, "tun%d", &ifIndex)
 		if err != nil || ifIndex < 0 {
-			return nil, fmt.Errorf("Interface name must be utun[0-9]*")
+			return nil, fmt.Errorf("Interface name must be tun[0-9]*")
 		}
 	}
 
-	fd, err := unix.Socket(unix.AF_SYSTEM, unix.SOCK_DGRAM, 2)
+	var tunfile *os.File
+	var err error
+
+	if ifIndex != -1 {
+		tunfile, err = os.OpenFile(fmt.Sprintf("/dev/tun%d", ifIndex), unix.O_RDWR, 0)
+	} else {
+		for ifIndex = 0; ifIndex < 256; ifIndex += 1 {
+			tunfile, err = os.OpenFile(fmt.Sprintf("/dev/tun%d", ifIndex), unix.O_RDWR, 0)
+			if err == nil || !errorIsEBUSY(err) {
+				break
+			}
+		}
+	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	var ctlInfo = &struct {
-		ctlID   uint32
-		ctlName [96]byte
-	}{}
-
-	copy(ctlInfo.ctlName[:], []byte(utunControlName))
-
+	// Set TUN iface to broadcast mode
+	ifmodemode := unix.IFF_BROADCAST
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
-		uintptr(fd),
-		uintptr(_CTLIOCGINFO),
-		uintptr(unsafe.Pointer(ctlInfo)),
+		uintptr(tunfile.Fd()),
+		uintptr(_TUNSIFMODE),
+		uintptr(unsafe.Pointer(&ifmodemode)),
 	)
 
 	if errno != 0 {
-		return nil, fmt.Errorf("_CTLIOCGINFO: %v", errno)
+		return nil, fmt.Errorf("error %s", errno.Error())
 	}
 
-	sc := sockaddrCtl{
-		scLen:     uint8(sockaddrCtlSize),
-		scFamily:  unix.AF_SYSTEM,
-		ssSysaddr: 2,
-		scID:      ctlInfo.ctlID,
-		scUnit:    uint32(ifIndex) + 1,
-	}
+	tun, err := CreateTUNFromFile(tunfile)
 
-	scPointer := unsafe.Pointer(&sc)
-
-	_, _, errno = unix.RawSyscall(
-		unix.SYS_CONNECT,
-		uintptr(fd),
-		uintptr(scPointer),
-		uintptr(sockaddrCtlSize),
-	)
-
-	if errno != 0 {
-		return nil, fmt.Errorf("SYS_CONNECT: %v", errno)
-	}
-
-	tun, err := CreateTUNFromFile(os.NewFile(uintptr(fd), ""))
-
-	if err == nil && name == "utun" {
+	if err == nil && name == "tun" {
 		fname := os.Getenv("WG_TUN_NAME_FILE")
 		if fname != "" {
 			ioutil.WriteFile(fname, []byte(tun.(*NativeTun).name+"\n"), 0400)
@@ -214,25 +203,13 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 }
 
 func (tun *NativeTun) Name() (string, error) {
-
-	var ifName struct {
-		name [16]byte
+	gostat, err := tun.fd.Stat()
+	if err != nil {
+		tun.name = ""
+		return "", err
 	}
-	ifNameSize := uintptr(16)
-
-	_, _, errno := unix.Syscall6(
-		unix.SYS_GETSOCKOPT,
-		uintptr(tun.fd.Fd()),
-		2, /* #define SYSPROTO_CONTROL 2 */
-		2, /* #define UTUN_OPT_IFNAME 2 */
-		uintptr(unsafe.Pointer(&ifName)),
-		uintptr(unsafe.Pointer(&ifNameSize)), 0)
-
-	if errno != 0 {
-		return "", fmt.Errorf("SYS_GETSOCKOPT: %v", errno)
-	}
-
-	tun.name = string(ifName.name[:ifNameSize-1])
+	stat := gostat.Sys().(*syscall.Stat_t)
+	tun.name = fmt.Sprintf("tun%d", stat.Rdev%256)
 	return tun.name, nil
 }
 
@@ -314,7 +291,6 @@ func (tun *NativeTun) Close() error {
 }
 
 func (tun *NativeTun) setMTU(n int) error {
-
 	// open datagram socket
 
 	var fd int
@@ -333,14 +309,15 @@ func (tun *NativeTun) setMTU(n int) error {
 
 	// do ioctl call
 
-	var ifr [32]byte
-	copy(ifr[:], tun.name)
-	binary.LittleEndian.PutUint32(ifr[16:20], uint32(n))
+	var ifr ifreq_mtu
+	copy(ifr.Name[:], tun.name)
+	ifr.MTU = uint32(n)
+
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
 		uintptr(fd),
 		uintptr(unix.SIOCSIFMTU),
-		uintptr(unsafe.Pointer(&ifr[0])),
+		uintptr(unsafe.Pointer(&ifr)),
 	)
 
 	if errno != 0 {
@@ -351,7 +328,6 @@ func (tun *NativeTun) setMTU(n int) error {
 }
 
 func (tun *NativeTun) MTU() (int, error) {
-
 	// open datagram socket
 
 	fd, err := unix.Socket(
@@ -367,24 +343,24 @@ func (tun *NativeTun) MTU() (int, error) {
 	defer unix.Close(fd)
 
 	// do ioctl call
+	var ifr ifreq_mtu
+	copy(ifr.Name[:], tun.name)
 
-	var ifr [64]byte
-	copy(ifr[:], tun.name)
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
 		uintptr(fd),
 		uintptr(unix.SIOCGIFMTU),
-		uintptr(unsafe.Pointer(&ifr[0])),
+		uintptr(unsafe.Pointer(&ifr)),
 	)
 	if errno != 0 {
 		return 0, fmt.Errorf("failed to get MTU on %s", tun.name)
 	}
 
 	// convert result to signed 32-bit int
-
-	val := binary.LittleEndian.Uint32(ifr[16:20])
-	if val >= (1 << 31) {
-		return int(val-(1<<31)) - (1 << 31), nil
+	mtu := ifr.MTU
+	if mtu >= (1 << 31) {
+		return int(mtu-(1<<31)) - (1 << 31), nil
 	}
-	return int(val), nil
+	return int(mtu), nil
+
 }

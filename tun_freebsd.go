@@ -306,12 +306,7 @@ func CreateTUN(name string) (TUNDevice, error) {
 		return nil, fmt.Errorf("failed to rename %s to %s: %s", assignedName, name, errno.Error())
 	}
 
-	tun, err := CreateTUNFromFile(tunfile)
-
-	if err != nil {
-		return nil, err
-	}
-	return tun, err
+	return CreateTUNFromFile(tunfile)
 }
 
 func CreateTUNFromFile(file *os.File) (TUNDevice, error) {

@@ -1,4 +1,4 @@
-// +build darwin freebsd
+// +build darwin freebsd openbsd
 
 /* SPDX-License-Identifier: GPL-2.0
  *

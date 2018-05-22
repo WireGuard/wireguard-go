@@ -32,7 +32,7 @@ This will run on Linux; however **YOU SHOULD NOT RUN THIS ON LINUX**. Instead us
 
 ### macOS
 
-This runs on macOS using the utun driver. It does not yet support sticky sockets, and won't support fwmarks because of Darwin limitations. Since the utun driver cannot have arbitrary interface names, you must either use `utun[0-9]+` for an explicit interface name or `utun` to have the kernel select one for you. If you choose `utun` as the interface name, and the environment variable `WG_DARWIN_UTUN_NAME_FILE` is defined, then the actual name of the interface chosen by the kernel is written to the file specified by that variable.
+This runs on macOS using the utun driver. It does not yet support sticky sockets, and won't support fwmarks because of Darwin limitations. Since the utun driver cannot have arbitrary interface names, you must either use `utun[0-9]+` for an explicit interface name or `utun` to have the kernel select one for you. If you choose `utun` as the interface name, and the environment variable `WG_TUN_NAME_FILE` is defined, then the actual name of the interface chosen by the kernel is written to the file specified by that variable.
 
 ### Windows
 
@@ -41,6 +41,10 @@ It is currently a work in progress to strip out the beginnings of an experiment 
 ### FreeBSD
 
 This will run on FreeBSD. It does not yet support sticky sockets. Fwmark is mapped to `SO\_USER\_COOKIE`.
+
+### OpenBSD
+
+This will run on OpenBSD. It does not yet support sticky sockets. Fwmark is mapped to `SO\_RTABLE`. Since the tun driver cannot have arbitrary interface names, you must either use `tun[0-9]+` for an explicit interface name or `tun` to have the program select one for you. If you choose `tun` as the interface name, and the environment variable `WG_TUN_NAME_FILE` is defined, then the actual name of the interface chosen by the kernel is written to the file specified by that variable.
 
 ## Building
 
