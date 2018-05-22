@@ -1,4 +1,4 @@
-// +build !linux
+// +build !linux android
 
 /* SPDX-License-Identifier: GPL-2.0
  *
@@ -143,9 +143,12 @@ func (bind *NativeBind) Send(buff []byte, endpoint Endpoint) error {
 var fwmarkIoctl int
 
 func init() {
-	if runtime.GOOS == "freebsd" {
+	switch runtime.GOOS {
+	case "linux", "android":
+		fwmarkIoctl = 36 /* unix.SO_MARK */
+	case "freebsd":
 		fwmarkIoctl = 0x1015 /* unix.SO_USER_COOKIE */
-	} else if runtime.GOOS == "openbsd" {
+	case "openbsd":
 		fwmarkIoctl = 0x1021 /* unix.SO_RTABLE */
 	}
 }
