@@ -7,10 +7,10 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
-  revision = "2491c5de3490fced2f6cff376127c667efeed857"
+  revision = "8e0cdda24ed423affc8f35c241e5e9b16180338e"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
-  revision = "7c87d13f8e835d2fb3a70a2912c811ed0c1d241b"
+  revision = "7f59abf37be6a6007f075af1bc7f16f137bc176b"
 
