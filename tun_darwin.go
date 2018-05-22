@@ -380,11 +380,5 @@ func (tun *NativeTun) MTU() (int, error) {
 		return 0, fmt.Errorf("failed to get MTU on %s", tun.name)
 	}
 
-	// convert result to signed 32-bit int
-
-	val := binary.LittleEndian.Uint32(ifr[16:20])
-	if val >= (1 << 31) {
-		return int(val-(1<<31)) - (1 << 31), nil
-	}
-	return int(val), nil
+	return int(*(*int32)(unsafe.Pointer(&ifr[16]))), nil
 }

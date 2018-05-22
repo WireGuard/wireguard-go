@@ -515,11 +515,5 @@ func (tun *NativeTun) MTU() (int, error) {
 		return 0, fmt.Errorf("failed to get MTU on %s", tun.name)
 	}
 
-	// convert result to signed 32-bit int
-	mtu := ifr.MTU
-	if mtu >= (1 << 31) {
-		return int(mtu-(1<<31)) - (1 << 31), nil
-	}
-	return int(mtu), nil
-
+	return int(*(*int32)(unsafe.Pointer(&ifr.MTU))), nil
 }

@@ -15,6 +15,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"unsafe"
 )
 
 const (
@@ -101,11 +102,13 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 
 	go func(l *UAPIListener) {
 		event := unix.Kevent_t{
-			Ident:  uint64(uapi.keventFd),
 			Filter: unix.EVFILT_VNODE,
 			Flags:  unix.EV_ADD | unix.EV_ENABLE | unix.EV_ONESHOT,
 			Fflags: unix.NOTE_WRITE,
 		}
+		// Allow this assignment to work with both the 32-bit and 64-bit version
+		// of the above struct. If you know another way, please submit a patch.
+		*(*uintptr)(unsafe.Pointer(&event.Ident)) = uintptr(uapi.keventFd)
 		events := make([]unix.Kevent_t, 1)
 		n := 1
 		var kerr error
