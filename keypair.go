@@ -7,6 +7,7 @@
 package main
 
 import (
+	"./replay"
 	"crypto/cipher"
 	"sync"
 	"time"
@@ -23,7 +24,7 @@ type Keypair struct {
 	sendNonce    uint64
 	send         cipher.AEAD
 	receive      cipher.AEAD
-	replayFilter ReplayFilter
+	replayFilter replay.ReplayFilter
 	isInitiator  bool
 	created      time.Time
 	localIndex   uint32

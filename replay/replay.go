@@ -4,9 +4,7 @@
  * Copyright (C) 2017-2018 Mathias N. Hall-Andersen <mathias@hall-andersen.dk>.
  */
 
-package main
-
-/* Copyright (C) 2015-2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved. */
+package replay
 
 /* Implementation of RFC6479
  * https://tools.ietf.org/html/rfc6479
@@ -32,6 +30,13 @@ const (
 	BacktrackWords = CounterBitsTotal / _WordSize
 )
 
+func minUint64(a uint64, b uint64) uint64 {
+	if a > b {
+		return b
+	}
+	return a
+}
+
 type ReplayFilter struct {
 	counter   uint64
 	backtrack [BacktrackWords]uintptr
@@ -42,8 +47,8 @@ func (filter *ReplayFilter) Init() {
 	filter.backtrack[0] = 0
 }
 
-func (filter *ReplayFilter) ValidateCounter(counter uint64) bool {
-	if counter >= RejectAfterMessages {
+func (filter *ReplayFilter) ValidateCounter(counter uint64, limit uint64) bool {
+	if counter >= limit {
 		return false
 	}
 

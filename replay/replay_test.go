@@ -4,7 +4,7 @@
  * Copyright (C) 2017-2018 Mathias N. Hall-Andersen <mathias@hall-andersen.dk>.
  */
 
-package main
+package replay
 
 import (
 	"testing"
@@ -15,6 +15,8 @@ import (
  *
  */
 
+const RejectAfterMessages = (1 << 64) - (1 << 4) - 1
+
 func TestReplay(t *testing.T) {
 	var filter ReplayFilter
 
@@ -23,7 +25,7 @@ func TestReplay(t *testing.T) {
 	testNumber := 0
 	T := func(n uint64, v bool) {
 		testNumber++
-		if filter.ValidateCounter(n) != v {
+		if filter.ValidateCounter(n, RejectAfterMessages) != v {
 			t.Fatal("Test", testNumber, "failed", n, v)
 		}
 	}
