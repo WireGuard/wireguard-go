@@ -8,6 +8,7 @@ package main
 
 import (
 	"./ratelimiter"
+	"./tun"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -80,7 +81,7 @@ type Device struct {
 	}
 
 	tun struct {
-		device TUNDevice
+		device tun.TUNDevice
 		mtu    int32
 	}
 }
@@ -250,7 +251,7 @@ func (device *Device) PutMessageBuffer(msg *[MaxMessageSize]byte) {
 	device.pool.messageBuffers.Put(msg)
 }
 
-func NewDevice(tun TUNDevice, logger *Logger) *Device {
+func NewDevice(tunDevice tun.TUNDevice, logger *Logger) *Device {
 	device := new(Device)
 
 	device.isUp.Set(false)
@@ -258,7 +259,7 @@ func NewDevice(tun TUNDevice, logger *Logger) *Device {
 
 	device.log = logger
 
-	device.tun.device = tun
+	device.tun.device = tunDevice
 	mtu, err := device.tun.device.MTU()
 	if err != nil {
 		logger.Error.Println("Trouble determining MTU, assuming default:", err)

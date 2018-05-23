@@ -41,13 +41,6 @@ func (a *AtomicBool) Set(val bool) {
 	atomic.StoreInt32(&a.flag, flag)
 }
 
-/* Integer manipulation */
-
-func toInt32(n uint32) int32 {
-	mask := uint32(1 << 31)
-	return int32(-(n & mask) + (n & ^mask))
-}
-
 func min(a, b uint) uint {
 	if a > b {
 		return b

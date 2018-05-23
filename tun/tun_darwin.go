@@ -4,11 +4,10 @@
  * Copyright (C) 2017-2018 Mathias N. Hall-Andersen <mathias@hall-andersen.dk>.
  */
 
-package main
+package tun
 
 import (
-	"./rwcancel"
-	"encoding/binary"
+	"../rwcancel"
 	"errors"
 	"fmt"
 	"golang.org/x/net/ipv6"
@@ -34,7 +33,7 @@ type sockaddrCtl struct {
 	scReserved [5]uint32
 }
 
-type NativeTun struct {
+type nativeTun struct {
 	name        string
 	fd          *os.File
 	rwcancel    *rwcancel.RWCancel
@@ -45,7 +44,7 @@ type NativeTun struct {
 
 var sockaddrCtlSize uintptr = 32
 
-func (tun *NativeTun) RoutineRouteListener(tunIfindex int) {
+func (tun *nativeTun) routineRouteListener(tunIfindex int) {
 	var (
 		statusUp  bool
 		statusMTU int
@@ -97,7 +96,7 @@ func (tun *NativeTun) RoutineRouteListener(tunIfindex int) {
 	}
 }
 
-func CreateTUN(name string) (TUNDevice, error) {
+func CreateTUN(name string, mtu int) (TUNDevice, error) {
 	ifIndex := -1
 	if name != "utun" {
 		_, err := fmt.Sscanf(name, "utun%d", &ifIndex)
@@ -151,21 +150,21 @@ func CreateTUN(name string) (TUNDevice, error) {
 		return nil, fmt.Errorf("SYS_CONNECT: %v", errno)
 	}
 
-	tun, err := CreateTUNFromFile(os.NewFile(uintptr(fd), ""))
+	tun, err := CreateTUNFromFile(os.NewFile(uintptr(fd), ""), mtu)
 
 	if err == nil && name == "utun" {
 		fname := os.Getenv("WG_TUN_NAME_FILE")
 		if fname != "" {
-			ioutil.WriteFile(fname, []byte(tun.(*NativeTun).name+"\n"), 0400)
+			ioutil.WriteFile(fname, []byte(tun.(*nativeTun).name+"\n"), 0400)
 		}
 	}
 
 	return tun, err
 }
 
-func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
+func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 
-	tun := &NativeTun{
+	tun := &nativeTun{
 		fd:     file,
 		events: make(chan TUNEvent, 10),
 		errors: make(chan error, 1),
@@ -201,10 +200,9 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 		return nil, err
 	}
 
-	go tun.RoutineRouteListener(tunIfindex)
+	go tun.routineRouteListener(tunIfindex)
 
-	// set default MTU
-	err = tun.setMTU(DefaultMTU)
+	err = tun.setMTU(mtu)
 	if err != nil {
 		tun.Close()
 		return nil, err
@@ -213,7 +211,7 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 	return tun, nil
 }
 
-func (tun *NativeTun) Name() (string, error) {
+func (tun *nativeTun) Name() (string, error) {
 
 	var ifName struct {
 		name [16]byte
@@ -236,15 +234,15 @@ func (tun *NativeTun) Name() (string, error) {
 	return tun.name, nil
 }
 
-func (tun *NativeTun) File() *os.File {
+func (tun *nativeTun) File() *os.File {
 	return tun.fd
 }
 
-func (tun *NativeTun) Events() chan TUNEvent {
+func (tun *nativeTun) Events() chan TUNEvent {
 	return tun.events
 }
 
-func (tun *NativeTun) doRead(buff []byte, offset int) (int, error) {
+func (tun *nativeTun) doRead(buff []byte, offset int) (int, error) {
 	select {
 	case err := <-tun.errors:
 		return 0, err
@@ -258,7 +256,7 @@ func (tun *NativeTun) doRead(buff []byte, offset int) (int, error) {
 	}
 }
 
-func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
+func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 	for {
 		n, err := tun.doRead(buff, offset)
 		if err == nil || !rwcancel.ErrorIsEAGAIN(err) {
@@ -270,7 +268,7 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	}
 }
 
-func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
+func (tun *nativeTun) Write(buff []byte, offset int) (int, error) {
 
 	// reserve space for header
 
@@ -293,7 +291,7 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 	return tun.fd.Write(buff)
 }
 
-func (tun *NativeTun) Close() error {
+func (tun *nativeTun) Close() error {
 	var err3 error
 	err1 := tun.rwcancel.Cancel()
 	err2 := tun.fd.Close()
@@ -313,7 +311,7 @@ func (tun *NativeTun) Close() error {
 	return err3
 }
 
-func (tun *NativeTun) setMTU(n int) error {
+func (tun *nativeTun) setMTU(n int) error {
 
 	// open datagram socket
 
@@ -335,7 +333,7 @@ func (tun *NativeTun) setMTU(n int) error {
 
 	var ifr [32]byte
 	copy(ifr[:], tun.name)
-	binary.LittleEndian.PutUint32(ifr[16:20], uint32(n))
+	*(*uint32)(unsafe.Pointer(&ifr[unix.IFNAMSIZ])) = uint32(n)
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
 		uintptr(fd),
@@ -350,7 +348,7 @@ func (tun *NativeTun) setMTU(n int) error {
 	return nil
 }
 
-func (tun *NativeTun) MTU() (int, error) {
+func (tun *nativeTun) MTU() (int, error) {
 
 	// open datagram socket
 

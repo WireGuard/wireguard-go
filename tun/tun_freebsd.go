@@ -3,10 +3,10 @@
  * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  */
 
-package main
+package tun
 
 import (
-	"./rwcancel"
+	"../rwcancel"
 	"bytes"
 	"errors"
 	"fmt"
@@ -48,7 +48,7 @@ type ifstat struct {
 	Ascii   [_IFSTATMAX]byte
 }
 
-type NativeTun struct {
+type nativeTun struct {
 	name        string
 	fd          *os.File
 	rwcancel    *rwcancel.RWCancel
@@ -57,7 +57,7 @@ type NativeTun struct {
 	routeSocket int
 }
 
-func (tun *NativeTun) RoutineRouteListener(tunIfindex int) {
+func (tun *nativeTun) routineRouteListener(tunIfindex int) {
 	var (
 		statusUp  bool
 		statusMTU int
@@ -221,7 +221,7 @@ func tunDestroy(name string) error {
 	return nil
 }
 
-func CreateTUN(name string) (TUNDevice, error) {
+func CreateTUN(name string, mtu int) (TUNDevice, error) {
 	if len(name) > unix.IFNAMSIZ-1 {
 		return nil, errors.New("interface name too long")
 	}
@@ -306,12 +306,12 @@ func CreateTUN(name string) (TUNDevice, error) {
 		return nil, fmt.Errorf("failed to rename %s to %s: %s", assignedName, name, errno.Error())
 	}
 
-	return CreateTUNFromFile(tunfile)
+	return CreateTUNFromFile(tunfile, mtu)
 }
 
-func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
+func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 
-	tun := &NativeTun{
+	tun := &nativeTun{
 		fd:     file,
 		events: make(chan TUNEvent, 10),
 		errors: make(chan error, 1),
@@ -347,10 +347,9 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 		return nil, err
 	}
 
-	go tun.RoutineRouteListener(tunIfindex)
+	go tun.routineRouteListener(tunIfindex)
 
-	// set default MTU
-	err = tun.setMTU(DefaultMTU)
+	err = tun.setMTU(mtu)
 	if err != nil {
 		tun.Close()
 		return nil, err
@@ -359,7 +358,7 @@ func CreateTUNFromFile(file *os.File) (TUNDevice, error) {
 	return tun, nil
 }
 
-func (tun *NativeTun) Name() (string, error) {
+func (tun *nativeTun) Name() (string, error) {
 	name, err := tunName(tun.fd.Fd())
 	if err != nil {
 		return "", err
@@ -368,15 +367,15 @@ func (tun *NativeTun) Name() (string, error) {
 	return name, nil
 }
 
-func (tun *NativeTun) File() *os.File {
+func (tun *nativeTun) File() *os.File {
 	return tun.fd
 }
 
-func (tun *NativeTun) Events() chan TUNEvent {
+func (tun *nativeTun) Events() chan TUNEvent {
 	return tun.events
 }
 
-func (tun *NativeTun) doRead(buff []byte, offset int) (int, error) {
+func (tun *nativeTun) doRead(buff []byte, offset int) (int, error) {
 	select {
 	case err := <-tun.errors:
 		return 0, err
@@ -390,7 +389,7 @@ func (tun *NativeTun) doRead(buff []byte, offset int) (int, error) {
 	}
 }
 
-func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
+func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 	for {
 		n, err := tun.doRead(buff, offset)
 		if err == nil || !rwcancel.ErrorIsEAGAIN(err) {
@@ -402,7 +401,7 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	}
 }
 
-func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
+func (tun *nativeTun) Write(buff []byte, offset int) (int, error) {
 
 	// reserve space for header
 
@@ -425,7 +424,7 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 	return tun.fd.Write(buff)
 }
 
-func (tun *NativeTun) Close() error {
+func (tun *nativeTun) Close() error {
 	var err4 error
 	err1 := tun.rwcancel.Cancel()
 	err2 := tun.fd.Close()
@@ -449,7 +448,7 @@ func (tun *NativeTun) Close() error {
 	return err4
 }
 
-func (tun *NativeTun) setMTU(n int) error {
+func (tun *nativeTun) setMTU(n int) error {
 	// open datagram socket
 
 	var fd int
@@ -486,7 +485,7 @@ func (tun *NativeTun) setMTU(n int) error {
 	return nil
 }
 
-func (tun *NativeTun) MTU() (int, error) {
+func (tun *nativeTun) MTU() (int, error) {
 	// open datagram socket
 
 	fd, err := unix.Socket(

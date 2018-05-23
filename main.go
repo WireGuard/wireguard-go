@@ -7,6 +7,7 @@
 package main
 
 import (
+	"./tun"
 	"fmt"
 	"os"
 	"os/signal"
@@ -125,10 +126,10 @@ func main() {
 
 	// open TUN device (or use supplied fd)
 
-	tun, err := func() (TUNDevice, error) {
+	tun, err := func() (tun.TUNDevice, error) {
 		tunFdStr := os.Getenv(ENV_WG_TUN_FD)
 		if tunFdStr == "" {
-			return CreateTUN(interfaceName)
+			return tun.CreateTUN(interfaceName, DefaultMTU)
 		}
 
 		// construct tun device from supplied fd
@@ -139,7 +140,7 @@ func main() {
 		}
 
 		file := os.NewFile(uintptr(fd), "")
-		return CreateTUNFromFile(file)
+		return tun.CreateTUNFromFile(file, DefaultMTU)
 	}()
 
 	if err == nil {
