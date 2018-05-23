@@ -1,2 +1,4 @@
 wireguard-go
 vendor
+.gopath
+ireallywantobuildon_linux.go

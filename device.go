@@ -7,8 +7,8 @@
 package main
 
 import (
-	"./ratelimiter"
-	"./tun"
+	"git.zx2c4.com/wireguard-go/ratelimiter"
+	"git.zx2c4.com/wireguard-go/tun"
 	"runtime"
 	"sync"
 	"sync/atomic"

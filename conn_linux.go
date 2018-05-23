@@ -18,7 +18,7 @@
 package main
 
 import (
-	"./rwcancel"
+	"git.zx2c4.com/wireguard-go/rwcancel"
 	"errors"
 	"golang.org/x/sys/unix"
 	"net"

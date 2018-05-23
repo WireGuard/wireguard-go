@@ -48,13 +48,11 @@ This will run on OpenBSD. It does not yet support sticky sockets. Fwmark is mapp
 
 ## Building
 
-You can satisfy dependencies with either `go get -d -v` or `dep ensure -vendor-only`. Then run `make`. As this is a Go project, a `GOPATH` is required. For example, wireguard-go can be built with:
+This requires an installation of [go](https://golang.org) and of [dep](https://github.com/golang/dep). If dep is not installed, it will be downloaded and built as part of the build process.
 
 ```
 $ git clone https://git.zx2c4.com/wireguard-go
 $ cd wireguard-go
-$ export GOPATH="$PWD/gopath"
-$ go get -d -v
 $ make
 ```
 

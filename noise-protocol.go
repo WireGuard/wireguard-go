@@ -7,7 +7,7 @@
 package main
 
 import (
-	"./tai64n"
+	"git.zx2c4.com/wireguard-go/tai64n"
 	"errors"
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20poly1305"

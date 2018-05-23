@@ -7,7 +7,7 @@
 package main
 
 import (
-	"./tun"
+	"git.zx2c4.com/wireguard-go/tun"
 	"fmt"
 	"os"
 	"os/signal"

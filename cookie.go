@@ -7,7 +7,7 @@
 package main
 
 import (
-	"./xchacha20poly1305"
+	"git.zx2c4.com/wireguard-go/xchacha20poly1305"
 	"crypto/hmac"
 	"crypto/rand"
 	"golang.org/x/crypto/blake2s"
