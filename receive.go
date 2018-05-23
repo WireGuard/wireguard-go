@@ -466,7 +466,7 @@ func (device *Device) RoutineHandshake() {
 			peer := device.ConsumeMessageResponse(&msg)
 			if peer == nil {
 				logInfo.Println(
-					"Recieved invalid response message from",
+					"Received invalid response message from",
 					elem.endpoint.DstToString(),
 				)
 				continue
