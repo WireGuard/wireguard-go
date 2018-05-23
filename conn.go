@@ -66,8 +66,6 @@ func parseEndpoint(s string) (*net.UDPAddr, error) {
 	return addr, err
 }
 
-/* Must hold device and net lock
- */
 func unsafeCloseBind(device *Device) error {
 	var err error
 	netc := &device.net
