@@ -150,7 +150,7 @@ func UAPIOpen(name string) (*os.File, error) {
 
 	// check if path exist
 
-	err := os.MkdirAll(socketDirectory, 0700)
+	err := os.MkdirAll(socketDirectory, 0755)
 	if err != nil && !os.IsExist(err) {
 		return nil, err
 	}
@@ -167,6 +167,7 @@ func UAPIOpen(name string) (*os.File, error) {
 		return nil, err
 	}
 
+	oldUmask := unix.Umask(0077)
 	listener, err := func() (*net.UnixListener, error) {
 
 		// initial connection attempt
@@ -191,6 +192,7 @@ func UAPIOpen(name string) (*os.File, error) {
 		}
 		return net.ListenUnix("unix", addr)
 	}()
+	unix.Umask(oldUmask)
 
 	if err != nil {
 		return nil, err
