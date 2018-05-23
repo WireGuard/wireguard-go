@@ -22,7 +22,7 @@ GO_IMPORT_PATH := git.zx2c4.com/wireguard-go
 	ln -s ../../.. .gopath/src/$(GO_IMPORT_PATH)
 	touch $@
 
-vendor/.created: Gopkg.toml Gopkg.lock .gopath/.created
+vendor/.created: Gopkg.toml Gopkg.lock | .gopath/.created
 	command -v dep >/dev/null || go get -v github.com/golang/dep/cmd/dep
 	cd .gopath/src/$(GO_IMPORT_PATH) && dep ensure -vendor-only -v
 	touch $@
@@ -36,7 +36,7 @@ install: wireguard-go
 clean:
 	rm -f wireguard-go
 
-update-dep:
+update-dep: | .gopath/.created
 	command -v dep >/dev/null || go get -v github.com/golang/dep/cmd/dep
 	cd .gopath/src/$(GO_IMPORT_PATH) && dep ensure -update -v
 
