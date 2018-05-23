@@ -584,7 +584,7 @@ func (bind *NativeBind) routineRouteListener(device *Device) {
 
 			switch hdr.Type {
 			case unix.RTM_NEWROUTE, unix.RTM_DELROUTE:
-				if hdr.Seq <= MaxPeers {
+				if hdr.Seq <= MaxPeers && hdr.Seq > 0 {
 					if uint(len(remain)) < uint(hdr.Len) {
 						break
 					}
