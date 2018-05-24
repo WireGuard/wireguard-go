@@ -36,7 +36,7 @@ vendor/.created: Gopkg.toml Gopkg.lock | .gopath/.created
 	touch $@
 
 wireguard-go: $(wildcard *.go) $(wildcard */*.go) .gopath/.created vendor/.created version.go
-	go build $(GO_BUILD_EXTRA_ARGS) -v $(GO_IMPORT_PATH)
+	go build -v $(GO_IMPORT_PATH)
 
 install: wireguard-go
 	@install -v -d "$(DESTDIR)$(BINDIR)" && install -v -m 0755 wireguard-go "$(DESTDIR)$(BINDIR)/wireguard-go"
