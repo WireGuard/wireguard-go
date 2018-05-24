@@ -40,15 +40,16 @@ func NewRWCancel(fd int) (*RWCancel, error) {
 	return &rwcancel, nil
 }
 
-/* https://golang.org/src/crypto/rand/eagain.go */
-func ErrorIsEAGAIN(err error) bool {
+func RetryAfterError(err error) bool {
 	if pe, ok := err.(*os.PathError); ok {
-		if errno, ok := pe.Err.(syscall.Errno); ok && errno == syscall.EAGAIN {
+		err = pe.Err
+	}
+	if errno, ok := err.(syscall.Errno); ok {
+		switch errno {
+		case syscall.EAGAIN, syscall.EINTR:
 			return true
 		}
-	}
-	if errno, ok := err.(syscall.Errno); ok && errno == syscall.EAGAIN {
-		return true
+
 	}
 	return false
 }
@@ -86,7 +87,7 @@ func (rw *RWCancel) ReadyWrite() bool {
 func (rw *RWCancel) Read(p []byte) (n int, err error) {
 	for {
 		n, err := unix.Read(rw.fd, p)
-		if err == nil || !ErrorIsEAGAIN(err) {
+		if err == nil || !RetryAfterError(err) {
 			return n, err
 		}
 		if !rw.ReadyRead() {
@@ -98,7 +99,7 @@ func (rw *RWCancel) Read(p []byte) (n int, err error) {
 func (rw *RWCancel) Write(p []byte) (n int, err error) {
 	for {
 		n, err := unix.Write(rw.fd, p)
-		if err == nil || !ErrorIsEAGAIN(err) {
+		if err == nil || !RetryAfterError(err) {
 			return n, err
 		}
 		if !rw.ReadyWrite() {

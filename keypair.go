@@ -7,8 +7,8 @@
 package main
 
 import (
-	"git.zx2c4.com/wireguard-go/replay"
 	"crypto/cipher"
+	"git.zx2c4.com/wireguard-go/replay"
 	"sync"
 	"time"
 )

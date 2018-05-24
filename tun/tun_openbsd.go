@@ -6,9 +6,9 @@
 package tun
 
 import (
-	"git.zx2c4.com/wireguard-go/rwcancel"
 	"errors"
 	"fmt"
+	"git.zx2c4.com/wireguard-go/rwcancel"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
 	"io/ioutil"
@@ -46,8 +46,12 @@ func (tun *nativeTun) routineRouteListener(tunIfindex int) {
 
 	data := make([]byte, os.Getpagesize())
 	for {
+	retry:
 		n, err := unix.Read(tun.routeSocket, data)
 		if err != nil {
+			if errno, ok := err.(syscall.Errno); ok && errno == syscall.EINTR {
+				goto retry
+			}
 			tun.errors <- err
 			return
 		}
@@ -90,9 +94,7 @@ func (tun *nativeTun) routineRouteListener(tunIfindex int) {
 
 func errorIsEBUSY(err error) bool {
 	if pe, ok := err.(*os.PathError); ok {
-		if errno, ok := pe.Err.(syscall.Errno); ok && errno == syscall.EBUSY {
-			return true
-		}
+		err = pe.Err
 	}
 	if errno, ok := err.(syscall.Errno); ok && errno == syscall.EBUSY {
 		return true
@@ -237,7 +239,7 @@ func (tun *nativeTun) doRead(buff []byte, offset int) (int, error) {
 func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 	for {
 		n, err := tun.doRead(buff, offset)
-		if err == nil || !rwcancel.ErrorIsEAGAIN(err) {
+		if err == nil || !rwcancel.RetryAfterError(err) {
 			return n, err
 		}
 		if !tun.rwcancel.ReadyRead() {

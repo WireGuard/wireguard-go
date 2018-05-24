@@ -12,10 +12,10 @@ package tun
  */
 
 import (
-	"git.zx2c4.com/wireguard-go/rwcancel"
 	"bytes"
 	"errors"
 	"fmt"
+	"git.zx2c4.com/wireguard-go/rwcancel"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
 	"net"
@@ -102,7 +102,7 @@ func (tun *nativeTun) routineNetlinkListener() {
 		var msgn int
 		for {
 			msgn, _, _, _, err = unix.Recvmsg(tun.netlinkSock, msg[:], nil, 0)
-			if err == nil || !rwcancel.ErrorIsEAGAIN(err) {
+			if err == nil || !rwcancel.RetryAfterError(err) {
 				break
 			}
 			if !tun.netlinkCancel.ReadyRead() {
@@ -334,7 +334,7 @@ func (tun *nativeTun) doRead(buff []byte, offset int) (int, error) {
 func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 	for {
 		n, err := tun.doRead(buff, offset)
-		if err == nil || !rwcancel.ErrorIsEAGAIN(err) {
+		if err == nil || !rwcancel.RetryAfterError(err) {
 			return n, err
 		}
 		if !tun.fdCancel.ReadyRead() {

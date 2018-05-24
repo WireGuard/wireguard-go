@@ -7,9 +7,9 @@
 package main
 
 import (
-	"git.zx2c4.com/wireguard-go/rwcancel"
 	"errors"
 	"fmt"
+	"git.zx2c4.com/wireguard-go/rwcancel"
 	"golang.org/x/sys/unix"
 	"net"
 	"os"

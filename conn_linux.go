@@ -18,8 +18,8 @@
 package main
 
 import (
-	"git.zx2c4.com/wireguard-go/rwcancel"
 	"errors"
+	"git.zx2c4.com/wireguard-go/rwcancel"
 	"golang.org/x/sys/unix"
 	"net"
 	"strconv"
@@ -563,7 +563,7 @@ func (bind *NativeBind) routineRouteListener(device *Device) {
 		var msgn int
 		for {
 			msgn, _, _, _, err = unix.Recvmsg(bind.netlinkSock, msg[:], nil, 0)
-			if err == nil || !rwcancel.ErrorIsEAGAIN(err) {
+			if err == nil || !rwcancel.RetryAfterError(err) {
 				break
 			}
 			if !bind.netlinkCancel.ReadyRead() {
