@@ -5,8 +5,6 @@ BINDIR ?= $(PREFIX)/bin
 ifeq ($(shell go env GOOS),linux)
 ifeq ($(wildcard .git),)
 $(error Do not build this for Linux. Instead use the Linux kernel module. See wireguard.com/install/ for more info.)
-else
-$(shell printf 'package main\nconst UseTheKernelModuleInstead = 0xdeadbabe\n' > ireallywantobuildon_linux.go)
 endif
 endif
 
