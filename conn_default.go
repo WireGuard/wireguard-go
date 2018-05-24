@@ -1,4 +1,4 @@
-// +build !linux android
+// +build !linux
 
 /* SPDX-License-Identifier: GPL-2.0
  *
