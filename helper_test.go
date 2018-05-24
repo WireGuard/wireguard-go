@@ -9,6 +9,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"git.zx2c4.com/wireguard-go/tun"
 	"os"
 	"testing"
 )
@@ -20,7 +21,7 @@ type DummyTUN struct {
 	name    string
 	mtu     int
 	packets chan []byte
-	events  chan TUNEvent
+	events  chan tun.TUNEvent
 }
 
 func (tun *DummyTUN) File() *os.File {
@@ -46,7 +47,7 @@ func (tun *DummyTUN) Close() error {
 	return nil
 }
 
-func (tun *DummyTUN) Events() chan TUNEvent {
+func (tun *DummyTUN) Events() chan tun.TUNEvent {
 	return tun.events
 }
 
@@ -59,11 +60,11 @@ func (tun *DummyTUN) Read(d []byte, offset int) (int, error) {
 	return len(t), nil
 }
 
-func CreateDummyTUN(name string) (TUNDevice, error) {
+func CreateDummyTUN(name string) (tun.TUNDevice, error) {
 	var dummy DummyTUN
 	dummy.mtu = 0
 	dummy.packets = make(chan []byte, 100)
-	dummy.events = make(chan TUNEvent, 10)
+	dummy.events = make(chan tun.TUNEvent, 10)
 	return &dummy, nil
 }
 
