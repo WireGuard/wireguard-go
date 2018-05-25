@@ -439,8 +439,8 @@ func (tun *nativeTun) Close() error {
 		err4 = renameTun(tun.name,tun.origName)
 	}
 	
-	err1 := tun.rwcancel.Cancel()
 	err2 := tun.fd.Close()
+	err1 := tun.rwcancel.Cancel()
 	if tun.routeSocket != -1 {
 		unix.Shutdown(tun.routeSocket, unix.SHUT_RDWR)
 		err4 = unix.Close(tun.routeSocket)
