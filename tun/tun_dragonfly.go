@@ -23,6 +23,8 @@ import (
 const _TUNSIFHEAD = 0x80047460
 const _TUNSIFMODE = 0x8004745e
 const _TUNSIFPID = 0x2000745f
+const _FIONBIO = 0x8004667e
+const _FIOASYNC = 0x8004667d
 
 // Iface status string max len
 const _IFSTATMAX = 800
@@ -269,9 +271,19 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 		return nil, err
 	}
 
+	var errno syscall.Errno;
+	
+	ifbiomode := 1
+	_, _, errno = unix.Syscall(
+		unix.SYS_IOCTL,
+		uintptr(tunfd),
+		uintptr(_FIOASYNC),
+		uintptr(unsafe.Pointer(&ifbiomode)),
+	)
+	
 	// Enable ifhead mode, otherwise tun will complain if it gets a non-AF_INET packet
 	ifheadmode := 1
-	_, _, errno := unix.Syscall(
+	_, _, errno = unix.Syscall(
 		unix.SYS_IOCTL,
 		uintptr(tunfd),
 		uintptr(_TUNSIFHEAD),
@@ -390,7 +402,7 @@ func (tun *nativeTun) doRead(buff []byte, offset int) (int, error) {
 	default:
 		buff := buff[offset-4:]
 		n, err := tun.fd.Read(buff[:])
-		if n < 4 {
+		if n < 4  && n > 0{
 			return 0, err
 		}
 		return n - 4, err
