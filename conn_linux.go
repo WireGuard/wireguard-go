@@ -1,3 +1,5 @@
+// +build !android
+
 /* SPDX-License-Identifier: GPL-2.0
  *
  * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
@@ -58,12 +60,11 @@ func (endpoint *NativeEndpoint) dst6() *unix.SockaddrInet6 {
 }
 
 type NativeBind struct {
-	sock4                        int
-	sock6                        int
-	netlinkSock                  int
-	netlinkCancel                *rwcancel.RWCancel
-	lastMark                     uint32
-	clearSourceOnAllRouteChanges bool
+	sock4         int
+	sock6         int
+	netlinkSock   int
+	netlinkCancel *rwcancel.RWCancel
+	lastMark      uint32
 }
 
 var _ Endpoint = (*NativeEndpoint)(nil)
@@ -583,16 +584,6 @@ func (bind *NativeBind) routineRouteListener(device *Device) {
 
 			switch hdr.Type {
 			case unix.RTM_NEWROUTE, unix.RTM_DELROUTE:
-				if bind.clearSourceOnAllRouteChanges {
-					for _, peer := range device.peers.keyMap {
-						peer.mutex.Lock()
-						if peer.endpoint != nil && peer.endpoint.(*NativeEndpoint) != nil {
-							peer.endpoint.(*NativeEndpoint).ClearSrc()
-						}
-						peer.mutex.Unlock()
-					}
-					break
-				}
 				if hdr.Seq <= MaxPeers && hdr.Seq > 0 {
 					if uint(len(remain)) < uint(hdr.Len) {
 						break

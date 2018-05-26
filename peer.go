@@ -258,3 +258,14 @@ func (peer *Peer) Stop() {
 
 	peer.ZeroAndFlushAll()
 }
+
+var roamingDisabled bool
+
+func (peer *Peer) SetEndpointFromPacket(endpoint Endpoint) {
+	if roamingDisabled {
+		return
+	}
+	peer.mutex.Lock()
+	peer.endpoint = endpoint
+	peer.mutex.Unlock()
+}

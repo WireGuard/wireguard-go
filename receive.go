@@ -440,10 +440,7 @@ func (device *Device) RoutineHandshake() {
 			peer.timersAnyAuthenticatedPacketReceived()
 
 			// update endpoint
-
-			peer.mutex.Lock()
-			peer.endpoint = elem.endpoint
-			peer.mutex.Unlock()
+			peer.SetEndpointFromPacket(elem.endpoint)
 
 			logDebug.Println(peer, "- Received handshake initiation")
 
@@ -473,10 +470,7 @@ func (device *Device) RoutineHandshake() {
 			}
 
 			// update endpoint
-
-			peer.mutex.Lock()
-			peer.endpoint = elem.endpoint
-			peer.mutex.Unlock()
+			peer.SetEndpointFromPacket(elem.endpoint)
 
 			logDebug.Println(peer, "- Received handshake response")
 
@@ -549,10 +543,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			}
 
 			// update endpoint
-
-			peer.mutex.Lock()
-			peer.endpoint = elem.endpoint
-			peer.mutex.Unlock()
+			peer.SetEndpointFromPacket(elem.endpoint)
 
 			// check if using new keypair
 			if peer.ReceivedWithKeypair(elem.keypair) {
