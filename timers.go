@@ -134,7 +134,7 @@ func expiredNewHandshake(peer *Peer) {
 }
 
 func expiredZeroKeyMaterial(peer *Peer) {
-	peer.device.log.Debug.Printf(":%s Removing all keys, since we haven't received a new one in %d seconds\n", peer, int((RejectAfterTime * 3).Seconds()))
+	peer.device.log.Debug.Printf("%s: Removing all keys, since we haven't received a new one in %d seconds\n", peer, int((RejectAfterTime * 3).Seconds()))
 	peer.ZeroAndFlushAll()
 }
 
