@@ -129,19 +129,6 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 		return nil, err
 	}
 
-	// Set TUN iface to broadcast mode
-	ifmodemode := unix.IFF_BROADCAST
-	_, _, errno := unix.Syscall(
-		unix.SYS_IOCTL,
-		uintptr(tunfile.Fd()),
-		uintptr(_TUNSIFMODE),
-		uintptr(unsafe.Pointer(&ifmodemode)),
-	)
-
-	if errno != 0 {
-		return nil, fmt.Errorf("error %s", errno.Error())
-	}
-
 	tun, err := CreateTUNFromFile(tunfile, mtu)
 
 	if err == nil && name == "tun" {

@@ -262,19 +262,6 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 		return nil, fmt.Errorf("error %s", errno.Error())
 	}
 
-	// Set TUN iface to broadcast mode. TUN inferfaces on freebsd come up in point to point by default
-	ifmodemode := unix.IFF_BROADCAST
-	_, _, errno = unix.Syscall(
-		unix.SYS_IOCTL,
-		uintptr(tunfd),
-		uintptr(_TUNSIFMODE),
-		uintptr(unsafe.Pointer(&ifmodemode)),
-	)
-
-	if errno != 0 {
-		return nil, fmt.Errorf("error %s", errno.Error())
-	}
-
 	// Rename tun interface
 
 	// Open control socket
