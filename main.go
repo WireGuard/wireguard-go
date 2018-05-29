@@ -160,6 +160,8 @@ func main() {
 		fmt.Sprintf("(%s) ", interfaceName),
 	)
 
+	logger.Info.Println("Starting wireguard-go version", WireGuardGoVersion)
+
 	logger.Debug.Println("Debug log enabled")
 
 	if err != nil {
