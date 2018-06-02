@@ -30,7 +30,7 @@ version.go:
 
 vendor/.created: Gopkg.toml Gopkg.lock | .gopath/.created
 	command -v dep >/dev/null || go get -v github.com/golang/dep/cmd/dep
-	cd .gopath/src/$(GO_IMPORT_PATH) && dep ensure -vendor-only -v
+	export PWD; cd .gopath/src/$(GO_IMPORT_PATH) && dep ensure -vendor-only -v
 	touch $@
 
 wireguard-go: $(wildcard *.go) $(wildcard */*.go) .gopath/.created vendor/.created version.go
