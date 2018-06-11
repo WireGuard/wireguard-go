@@ -24,6 +24,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"syscall"
 	"unsafe"
 )
 
@@ -140,40 +141,45 @@ func CreateBind(port uint16, device *Device) (*NativeBind, uint16, error) {
 	go bind.routineRouteListener(device)
 
 	bind.sock6, port, err = create6(port)
-	if err != nil {
+	if err != nil && err != syscall.EAFNOSUPPORT {
 		bind.netlinkCancel.Cancel()
-		return nil, port, err
+		return nil, 0, err
 	}
 
 	bind.sock4, port, err = create4(port)
-	if err != nil {
+	if err != nil && err != syscall.EAFNOSUPPORT {
 		bind.netlinkCancel.Cancel()
 		unix.Close(bind.sock6)
+		return nil, 0, err
 	}
-	return &bind, port, err
+	return &bind, port, nil
 }
 
 func (bind *NativeBind) SetMark(value uint32) error {
-	err := unix.SetsockoptInt(
-		bind.sock6,
-		unix.SOL_SOCKET,
-		unix.SO_MARK,
-		int(value),
-	)
+	if bind.sock6 != -1 {
+		err := unix.SetsockoptInt(
+			bind.sock6,
+			unix.SOL_SOCKET,
+			unix.SO_MARK,
+			int(value),
+		)
 
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
-	err = unix.SetsockoptInt(
-		bind.sock4,
-		unix.SOL_SOCKET,
-		unix.SO_MARK,
-		int(value),
-	)
+	if bind.sock4 != -1 {
+		err := unix.SetsockoptInt(
+			bind.sock4,
+			unix.SOL_SOCKET,
+			unix.SO_MARK,
+			int(value),
+		)
 
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	bind.lastMark = value
@@ -187,9 +193,14 @@ func closeUnblock(fd int) error {
 }
 
 func (bind *NativeBind) Close() error {
-	err1 := closeUnblock(bind.sock6)
-	err2 := closeUnblock(bind.sock4)
-	err3 := bind.netlinkCancel.Cancel()
+	var err1, err2, err3 error
+	if bind.sock6 != -1 {
+		err1 = closeUnblock(bind.sock6)
+	}
+	if bind.sock4 != -1 {
+		err2 = closeUnblock(bind.sock4)
+	}
+	err3 = bind.netlinkCancel.Cancel()
 
 	if err1 != nil {
 		return err1
@@ -202,6 +213,9 @@ func (bind *NativeBind) Close() error {
 
 func (bind *NativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
 	var end NativeEndpoint
+	if bind.sock6 == -1 {
+		return 0, nil, syscall.EAFNOSUPPORT
+	}
 	n, err := receive6(
 		bind.sock6,
 		buff,
@@ -212,6 +226,9 @@ func (bind *NativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
 
 func (bind *NativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
 	var end NativeEndpoint
+	if bind.sock4 == -1 {
+		return 0, nil, syscall.EAFNOSUPPORT
+	}
 	n, err := receive4(
 		bind.sock4,
 		buff,
@@ -223,8 +240,14 @@ func (bind *NativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
 func (bind *NativeBind) Send(buff []byte, end Endpoint) error {
 	nend := end.(*NativeEndpoint)
 	if !nend.isV6 {
+		if bind.sock4 == -1 {
+			return syscall.EAFNOSUPPORT
+		}
 		return send4(bind.sock4, nend, buff)
 	} else {
+		if bind.sock6 == -1 {
+			return syscall.EAFNOSUPPORT
+		}
 		return send6(bind.sock6, nend, buff)
 	}
 }
