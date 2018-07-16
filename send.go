@@ -521,6 +521,7 @@ func (peer *Peer) RoutineSequentialSender() {
 	device := peer.device
 
 	logDebug := device.log.Debug
+	logError := device.log.Error
 
 	defer func() {
 		logDebug.Println(peer, "- Routine: sequential sender - stopped")
@@ -557,7 +558,7 @@ func (peer *Peer) RoutineSequentialSender() {
 			err := peer.SendBuffer(elem.packet)
 			device.PutMessageBuffer(elem.buffer)
 			if err != nil {
-				logDebug.Println("Failed to send authenticated packet to peer", peer)
+				logError.Println(peer, "- Failed to send data packet", err)
 				continue
 			}
 			atomic.AddUint64(&peer.stats.txBytes, length)
