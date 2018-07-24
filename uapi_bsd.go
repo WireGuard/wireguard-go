@@ -18,12 +18,13 @@ import (
 	"unsafe"
 )
 
+var socketDirectory = "/var/run/wireguard"
+
 const (
 	ipcErrorIO        = -int64(unix.EIO)
 	ipcErrorProtocol  = -int64(unix.EPROTO)
 	ipcErrorInvalid   = -int64(unix.EINVAL)
 	ipcErrorPortInUse = -int64(unix.EADDRINUSE)
-	socketDirectory   = "/var/run/wireguard"
 	socketName        = "%s.sock"
 )
 
