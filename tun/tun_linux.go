@@ -4,8 +4,6 @@
  * Copyright (C) 2017-2018 Mathias N. Hall-Andersen <mathias@hall-andersen.dk>.
  */
 
-/* Copyright 2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved. */
-
 package tun
 
 /* Implementation of the TUN device interface for linux
