@@ -75,6 +75,7 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 			send("public_key=" + peer.handshake.remoteStatic.ToHex())
 			send("preshared_key=" + peer.handshake.presharedKey.ToHex())
+			send("protocol_version=1")
 			if peer.endpoint != nil {
 				send("endpoint=" + peer.endpoint.DstToString())
 			}
@@ -361,6 +362,13 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 				ones, _ := network.Mask.Size()
 				device.allowedips.Insert(network.IP, uint(ones), peer)
+
+			case "protocol_version":
+
+				if value != "1" {
+					logError.Println("Invalid protocol version:", value)
+					return &IPCError{Code: ipcErrorInvalid}
+				}
 
 			default:
 				logError.Println("Invalid UAPI peer key:", key)
