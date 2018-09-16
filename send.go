@@ -74,8 +74,7 @@ func addToNonceQueue(queue chan *QueueOutboundElement, element *QueueOutboundEle
 		default:
 			select {
 			case old := <-queue:
-				old.Drop()
-				device.PutMessageBuffer(element.buffer)
+				device.PutMessageBuffer(old.buffer)
 			default:
 			}
 		}
@@ -97,7 +96,6 @@ func addToOutboundAndEncryptionQueues(outboundQueue chan *QueueOutboundElement, 
 		element.peer.device.PutMessageBuffer(element.buffer)
 	}
 }
-
 
 /* Queues a keepalive if no packets are queued for peer
  */

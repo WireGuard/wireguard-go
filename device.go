@@ -19,8 +19,7 @@ const (
 	DeviceRoutineNumberAdditional = 2
 )
 
-
-const preallocatedBuffers = 0
+var preallocatedBuffers = 0
 
 type Device struct {
 	isUp     AtomicBool // device is (going) up

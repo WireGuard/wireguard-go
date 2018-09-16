@@ -279,6 +279,7 @@ func (device *Device) RoutineDecryption() {
 			if err != nil {
 				elem.Drop()
 				device.PutMessageBuffer(elem.buffer)
+				elem.buffer = nil
 				elem.mutex.Unlock()
 			}
 			elem.mutex.Unlock()
@@ -294,18 +295,25 @@ func (device *Device) RoutineHandshake() {
 	logError := device.log.Error
 	logDebug := device.log.Debug
 
+	var elem QueueHandshakeElement
+	var ok bool
+
 	defer func() {
 		logDebug.Println("Routine: handshake worker - stopped")
 		device.state.stopping.Done()
+		if elem.buffer != nil {
+			device.PutMessageBuffer(elem.buffer)
+		}
 	}()
 
 	logDebug.Println("Routine: handshake worker - started")
 	device.state.starting.Done()
 
-	var elem QueueHandshakeElement
-	var ok bool
-
 	for {
+		if elem.buffer != nil {
+			device.PutMessageBuffer(elem.buffer)
+		}
+
 		select {
 		case elem, ok = <-device.queue.handshake:
 		case <-device.signals.stop:
@@ -478,9 +486,14 @@ func (peer *Peer) RoutineSequentialReceiver() {
 	logError := device.log.Error
 	logDebug := device.log.Debug
 
+	var elem *QueueInboundElement
+
 	defer func() {
 		logDebug.Println(peer, "- Routine: sequential receiver - stopped")
 		peer.routines.stopping.Done()
+		if elem != nil && elem.buffer != nil {
+			device.PutMessageBuffer(elem.buffer)
+		}
 	}()
 
 	logDebug.Println(peer, "- Routine: sequential receiver - started")
@@ -488,6 +501,9 @@ func (peer *Peer) RoutineSequentialReceiver() {
 	peer.routines.starting.Done()
 
 	for {
+		if elem != nil && elem.buffer != nil {
+			device.PutMessageBuffer(elem.buffer)
+		}
 
 		select {
 
@@ -608,7 +624,6 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			_, err := device.tun.device.Write(
 				elem.buffer[:offset+len(elem.packet)],
 				offset)
-			device.PutMessageBuffer(elem.buffer)
 			if err != nil {
 				logError.Println("Failed to write packet to TUN device:", err)
 			}
