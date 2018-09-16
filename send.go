@@ -54,7 +54,7 @@ type QueueOutboundElement struct {
 func (device *Device) NewOutboundElement() *QueueOutboundElement {
 	return &QueueOutboundElement{
 		dropped: AtomicFalse,
-		buffer:  device.pool.messageBuffers.Get().(*[MaxMessageSize]byte),
+		buffer:  device.GetMessageBuffer(),
 	}
 }
 
