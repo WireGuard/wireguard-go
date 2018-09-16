@@ -27,6 +27,10 @@ import (
 	"unsafe"
 )
 
+const (
+	FD_ERR = -1
+)
+
 type IPv4Source struct {
 	src     [4]byte
 	ifindex int32
@@ -126,6 +130,7 @@ func createNetlinkRouteSocket() (int, error) {
 func CreateBind(port uint16, device *Device) (*NativeBind, uint16, error) {
 	var err error
 	var bind NativeBind
+	var newPort uint16
 
 	bind.netlinkSock, err = createNetlinkRouteSocket()
 	if err != nil {
@@ -139,18 +144,35 @@ func CreateBind(port uint16, device *Device) (*NativeBind, uint16, error) {
 
 	go bind.routineRouteListener(device)
 
-	bind.sock6, port, err = create6(port)
-	if err != nil && err != syscall.EAFNOSUPPORT {
-		bind.netlinkCancel.Cancel()
-		return nil, 0, err
+	// attempt ipv6 bind, update port if succesful
+
+	bind.sock6, newPort, err = create6(port)
+	if err != nil {
+		if err != syscall.EAFNOSUPPORT {
+			bind.netlinkCancel.Cancel()
+			return nil, 0, err
+		}
+	} else {
+		port = newPort
 	}
 
-	bind.sock4, port, err = create4(port)
-	if err != nil && err != syscall.EAFNOSUPPORT {
-		bind.netlinkCancel.Cancel()
-		unix.Close(bind.sock6)
-		return nil, 0, err
+	// attempt ipv4 bind, update port if succesful
+
+	bind.sock4, newPort, err = create4(port)
+	if err != nil {
+		if err != syscall.EAFNOSUPPORT {
+			bind.netlinkCancel.Cancel()
+			unix.Close(bind.sock6)
+			return nil, 0, err
+		}
+	} else {
+		port = newPort
 	}
+
+	if bind.sock4 == FD_ERR && bind.sock6 == FD_ERR {
+		return nil, 0, errors.New("ipv4 and ipv6 not supported")
+	}
+
 	return &bind, port, nil
 }
 
@@ -334,7 +356,7 @@ func create4(port uint16) (int, uint16, error) {
 	)
 
 	if err != nil {
-		return -1, 0, err
+		return FD_ERR, 0, err
 	}
 
 	addr := unix.SockaddrInet4{
@@ -365,7 +387,7 @@ func create4(port uint16) (int, uint16, error) {
 		return unix.Bind(fd, &addr)
 	}(); err != nil {
 		unix.Close(fd)
-		return -1, 0, err
+		return FD_ERR, 0, err
 	}
 
 	return fd, uint16(addr.Port), err
@@ -382,7 +404,7 @@ func create6(port uint16) (int, uint16, error) {
 	)
 
 	if err != nil {
-		return -1, 0, err
+		return FD_ERR, 0, err
 	}
 
 	// set sockopts and bind
@@ -424,7 +446,7 @@ func create6(port uint16) (int, uint16, error) {
 
 	}(); err != nil {
 		unix.Close(fd)
-		return -1, 0, err
+		return FD_ERR, 0, err
 	}
 
 	return fd, uint16(addr.Port), err
