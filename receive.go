@@ -147,7 +147,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 
 			// check size
 
-			if len(packet) < MessageTransportType {
+			if len(packet) < MessageTransportSize {
 				continue
 			}
 
