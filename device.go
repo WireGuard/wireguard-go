@@ -19,8 +19,6 @@ const (
 	DeviceRoutineNumberAdditional = 2
 )
 
-var preallocatedBuffers = 0
-
 type Device struct {
 	isUp     AtomicBool // device is (going) up
 	isClosed AtomicBool // device is closed? (acting as guard)
@@ -68,8 +66,12 @@ type Device struct {
 	}
 
 	pool struct {
-		messageBuffers *sync.Pool
-		reuseChan      chan interface{}
+		messageBufferPool        *sync.Pool
+		messageBufferReuseChan   chan *[MaxMessageSize]byte
+		inboundElementPool       *sync.Pool
+		inboundElementReuseChan  chan *QueueInboundElement
+		outboundElementPool      *sync.Pool
+		outboundElementReuseChan chan *QueueOutboundElement
 	}
 
 	queue struct {
@@ -245,22 +247,6 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 	return nil
 }
 
-func (device *Device) GetMessageBuffer() *[MaxMessageSize]byte {
-	if preallocatedBuffers == 0 {
-		return device.pool.messageBuffers.Get().(*[MaxMessageSize]byte)
-	} else {
-		return (<-device.pool.reuseChan).(*[MaxMessageSize]byte)
-	}
-}
-
-func (device *Device) PutMessageBuffer(msg *[MaxMessageSize]byte) {
-	if preallocatedBuffers == 0 {
-		device.pool.messageBuffers.Put(msg)
-	} else {
-		device.pool.reuseChan <- msg
-	}
-}
-
 func NewDevice(tunDevice tun.TUNDevice, logger *Logger) *Device {
 	device := new(Device)
 
@@ -285,18 +271,7 @@ func NewDevice(tunDevice tun.TUNDevice, logger *Logger) *Device {
 	device.indexTable.Init()
 	device.allowedips.Reset()
 
-	if preallocatedBuffers == 0 {
-		device.pool.messageBuffers = &sync.Pool{
-			New: func() interface{} {
-				return new([MaxMessageSize]byte)
-			},
-		}
-	} else {
-		device.pool.reuseChan = make(chan interface{}, preallocatedBuffers)
-		for i := 0; i < preallocatedBuffers; i += 1 {
-			device.pool.reuseChan <- new([MaxMessageSize]byte)
-		}
-	}
+	device.PopulatePools()
 
 	// create queues
 
