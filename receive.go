@@ -247,7 +247,6 @@ func (device *Device) RoutineDecryption() {
 			// check if dropped
 
 			if elem.IsDropped() {
-				device.PutInboundElement(elem)
 				continue
 			}
 
@@ -281,7 +280,6 @@ func (device *Device) RoutineDecryption() {
 			if err != nil {
 				elem.Drop()
 				device.PutMessageBuffer(elem.buffer)
-				elem.buffer = nil
 			}
 			elem.mutex.Unlock()
 		}
@@ -313,6 +311,7 @@ func (device *Device) RoutineHandshake() {
 	for {
 		if elem.buffer != nil {
 			device.PutMessageBuffer(elem.buffer)
+			elem.buffer = nil
 		}
 
 		select {
@@ -494,7 +493,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		logDebug.Println(peer, "- Routine: sequential receiver - stopped")
 		peer.routines.stopping.Done()
 		if elem != nil {
-			if elem.buffer != nil {
+			if !elem.IsDropped() {
 				device.PutMessageBuffer(elem.buffer)
 			}
 			device.PutInboundElement(elem)
@@ -507,10 +506,11 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 	for {
 		if elem != nil {
-			if elem.buffer != nil {
+			if !elem.IsDropped() {
 				device.PutMessageBuffer(elem.buffer)
 			}
 			device.PutInboundElement(elem)
+			elem = nil
 		}
 
 		select {

@@ -377,10 +377,11 @@ func (device *Device) Close() {
 
 	close(device.signals.stop)
 
+	device.RemoveAllPeers()
+
 	device.state.stopping.Wait()
 	device.FlushPacketQueues()
 
-	device.RemoveAllPeers()
 	device.rate.limiter.Close()
 
 	device.state.changing.Set(false)

@@ -341,12 +341,6 @@ func (peer *Peer) RoutineNonce() {
 	device := peer.device
 	logDebug := device.log.Debug
 
-	defer func() {
-		logDebug.Println(peer, "- Routine: nonce worker - stopped")
-		peer.queue.packetInNonceQueueIsAwaitingKey.Set(false)
-		peer.routines.stopping.Done()
-	}()
-
 	flush := func() {
 		for {
 			select {
@@ -358,6 +352,13 @@ func (peer *Peer) RoutineNonce() {
 			}
 		}
 	}
+
+	defer func() {
+		flush()
+		logDebug.Println(peer, "- Routine: nonce worker - stopped")
+		peer.queue.packetInNonceQueueIsAwaitingKey.Set(false)
+		peer.routines.stopping.Done()
+	}()
 
 	peer.routines.starting.Done()
 	logDebug.Println(peer, "- Routine: nonce worker - started")
@@ -461,6 +462,19 @@ func (device *Device) RoutineEncryption() {
 	logDebug := device.log.Debug
 
 	defer func() {
+		for {
+			select {
+			case elem, ok := <-device.queue.encryption:
+				if ok && !elem.IsDropped() {
+					elem.Drop()
+					device.PutMessageBuffer(elem.buffer)
+					elem.mutex.Unlock()
+				}
+			default:
+				goto out
+			}
+		}
+	out:
 		logDebug.Println("Routine: encryption worker - stopped")
 		device.state.stopping.Done()
 	}()
@@ -485,7 +499,6 @@ func (device *Device) RoutineEncryption() {
 			// check if dropped
 
 			if elem.IsDropped() {
-				device.PutOutboundElement(elem)
 				continue
 			}
 
@@ -540,6 +553,22 @@ func (peer *Peer) RoutineSequentialSender() {
 	logError := device.log.Error
 
 	defer func() {
+		for {
+			select {
+			case elem, ok := <-peer.queue.outbound:
+				if ok {
+					if !elem.IsDropped() {
+						device.PutMessageBuffer(elem.buffer)
+						elem.Drop()
+					}
+					device.PutOutboundElement(elem)
+					elem.mutex.Unlock()
+				}
+			default:
+				goto out
+			}
+		}
+	out:
 		logDebug.Println(peer, "- Routine: sequential sender - stopped")
 		peer.routines.stopping.Done()
 	}()
