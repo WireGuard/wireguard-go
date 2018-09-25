@@ -7,10 +7,8 @@ package main
 
 import "sync"
 
-var preallocatedBuffers = 0
-
 func (device *Device) PopulatePools() {
-	if preallocatedBuffers == 0 {
+	if PreallocatedBuffersPerPool == 0 {
 		device.pool.messageBufferPool = &sync.Pool{
 			New: func() interface{} {
 				return new([MaxMessageSize]byte)
@@ -27,23 +25,23 @@ func (device *Device) PopulatePools() {
 			},
 		}
 	} else {
-		device.pool.messageBufferReuseChan = make(chan *[MaxMessageSize]byte, preallocatedBuffers)
-		for i := 0; i < preallocatedBuffers; i += 1 {
+		device.pool.messageBufferReuseChan = make(chan *[MaxMessageSize]byte, PreallocatedBuffersPerPool)
+		for i := 0; i < PreallocatedBuffersPerPool; i += 1 {
 			device.pool.messageBufferReuseChan <- new([MaxMessageSize]byte)
 		}
-		device.pool.inboundElementReuseChan = make(chan *QueueInboundElement, preallocatedBuffers)
-		for i := 0; i < preallocatedBuffers; i += 1 {
+		device.pool.inboundElementReuseChan = make(chan *QueueInboundElement, PreallocatedBuffersPerPool)
+		for i := 0; i < PreallocatedBuffersPerPool; i += 1 {
 			device.pool.inboundElementReuseChan <- new(QueueInboundElement)
 		}
-		device.pool.outboundElementReuseChan = make(chan *QueueOutboundElement, preallocatedBuffers)
-		for i := 0; i < preallocatedBuffers; i += 1 {
+		device.pool.outboundElementReuseChan = make(chan *QueueOutboundElement, PreallocatedBuffersPerPool)
+		for i := 0; i < PreallocatedBuffersPerPool; i += 1 {
 			device.pool.outboundElementReuseChan <- new(QueueOutboundElement)
 		}
 	}
 }
 
 func (device *Device) GetMessageBuffer() *[MaxMessageSize]byte {
-	if preallocatedBuffers == 0 {
+	if PreallocatedBuffersPerPool == 0 {
 		return device.pool.messageBufferPool.Get().(*[MaxMessageSize]byte)
 	} else {
 		return <-device.pool.messageBufferReuseChan
@@ -51,7 +49,7 @@ func (device *Device) GetMessageBuffer() *[MaxMessageSize]byte {
 }
 
 func (device *Device) PutMessageBuffer(msg *[MaxMessageSize]byte) {
-	if preallocatedBuffers == 0 {
+	if PreallocatedBuffersPerPool == 0 {
 		device.pool.messageBufferPool.Put(msg)
 	} else {
 		device.pool.messageBufferReuseChan <- msg
@@ -59,7 +57,7 @@ func (device *Device) PutMessageBuffer(msg *[MaxMessageSize]byte) {
 }
 
 func (device *Device) GetInboundElement() *QueueInboundElement {
-	if preallocatedBuffers == 0 {
+	if PreallocatedBuffersPerPool == 0 {
 		return device.pool.inboundElementPool.Get().(*QueueInboundElement)
 	} else {
 		return <-device.pool.inboundElementReuseChan
@@ -67,7 +65,7 @@ func (device *Device) GetInboundElement() *QueueInboundElement {
 }
 
 func (device *Device) PutInboundElement(msg *QueueInboundElement) {
-	if preallocatedBuffers == 0 {
+	if PreallocatedBuffersPerPool == 0 {
 		device.pool.inboundElementPool.Put(msg)
 	} else {
 		device.pool.inboundElementReuseChan <- msg
@@ -75,7 +73,7 @@ func (device *Device) PutInboundElement(msg *QueueInboundElement) {
 }
 
 func (device *Device) GetOutboundElement() *QueueOutboundElement {
-	if preallocatedBuffers == 0 {
+	if PreallocatedBuffersPerPool == 0 {
 		return device.pool.outboundElementPool.Get().(*QueueOutboundElement)
 	} else {
 		return <-device.pool.outboundElementReuseChan
@@ -83,7 +81,7 @@ func (device *Device) GetOutboundElement() *QueueOutboundElement {
 }
 
 func (device *Device) PutOutboundElement(msg *QueueOutboundElement) {
-	if preallocatedBuffers == 0 {
+	if PreallocatedBuffersPerPool == 0 {
 		device.pool.outboundElementPool.Put(msg)
 	} else {
 		device.pool.outboundElementReuseChan <- msg

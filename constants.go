@@ -26,17 +26,13 @@ const (
 	PaddingMultiple         = 16
 )
 
-/* Implementation specific constants */
-
 const (
-	QueueOutboundSize  = 1024
-	QueueInboundSize   = 1024
-	QueueHandshakeSize = 1024
-	MaxSegmentSize     = (1 << 16) - 1                         // largest possible UDP datagram
-	MinMessageSize     = MessageKeepaliveSize                  // minimum size of transport message (keepalive)
-	MaxMessageSize     = MaxSegmentSize                        // maximum size of transport message
-	MaxContentSize     = MaxSegmentSize - MessageTransportSize // maximum size of transport message content
+	MinMessageSize = MessageKeepaliveSize                  // minimum size of transport message (keepalive)
+	MaxMessageSize = MaxSegmentSize                        // maximum size of transport message
+	MaxContentSize = MaxSegmentSize - MessageTransportSize // maximum size of transport message content
 )
+
+/* Implementation constants */
 
 const (
 	UnderLoadQueueSize = QueueHandshakeSize / 8
