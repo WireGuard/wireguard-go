@@ -1,2 +1,2 @@
 package main
-const WireGuardGoVersion = "0.0.20180613"
+const WireGuardGoVersion = "0.0.20181001"
