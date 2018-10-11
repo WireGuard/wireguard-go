@@ -2,6 +2,7 @@ PREFIX ?= /usr
 DESTDIR ?=
 BINDIR ?= $(PREFIX)/bin
 export GOPATH ?= $(CURDIR)/.gopath
+export GO111MODULE := on
 
 default: generate-version-and-build
 
