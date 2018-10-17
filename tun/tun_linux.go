@@ -29,7 +29,8 @@ const (
 )
 
 type nativeTun struct {
-	fd                      *os.File
+	tunFile                 *os.File
+	fd                      uintptr
 	fdCancel                *rwcancel.RWCancel
 	index                   int32         // if index
 	name                    string        // name of interface
@@ -43,7 +44,7 @@ type nativeTun struct {
 }
 
 func (tun *nativeTun) File() *os.File {
-	return tun.fd
+	return tun.tunFile
 }
 
 func (tun *nativeTun) routineHackListener() {
@@ -51,7 +52,7 @@ func (tun *nativeTun) routineHackListener() {
 	/* This is needed for the detection to work across network namespaces
 	 * If you are reading this and know a better method, please get in touch.
 	 */
-	fd := int(tun.fd.Fd())
+	fd := int(tun.fd)
 	for {
 		_, err := unix.Write(fd, nil)
 		switch err {
@@ -266,7 +267,7 @@ func (tun *nativeTun) Name() (string, error) {
 	var ifr [ifReqSize]byte
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
-		tun.fd.Fd(),
+		tun.fd,
 		uintptr(unix.TUNGETIFF),
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)
@@ -307,7 +308,7 @@ func (tun *nativeTun) Write(buff []byte, offset int) (int, error) {
 
 	// write
 
-	return tun.fd.Write(buff)
+	return tun.tunFile.Write(buff)
 }
 
 func (tun *nativeTun) doRead(buff []byte, offset int) (int, error) {
@@ -316,10 +317,10 @@ func (tun *nativeTun) doRead(buff []byte, offset int) (int, error) {
 		return 0, err
 	default:
 		if tun.nopi {
-			return tun.fd.Read(buff[offset:])
+			return tun.tunFile.Read(buff[offset:])
 		} else {
 			buff := buff[offset-4:]
-			n, err := tun.fd.Read(buff[:])
+			n, err := tun.tunFile.Read(buff[:])
 			if n < 4 {
 				return 0, err
 			}
@@ -354,7 +355,7 @@ func (tun *nativeTun) Close() error {
 	} else if tun.events != nil {
 		close(tun.events)
 	}
-	err2 := tun.fd.Close()
+	err2 := tun.tunFile.Close()
 	err3 := tun.fdCancel.Cancel()
 
 	if err1 != nil {
@@ -413,23 +414,24 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 
 func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 	tun := &nativeTun{
-		fd:                      file,
+		tunFile:                 file,
+		fd:                      file.Fd(),
 		events:                  make(chan TUNEvent, 5),
 		errors:                  make(chan error, 5),
 		statusListenersShutdown: make(chan struct{}),
-		nopi: false,
+		nopi:                    false,
 	}
 	var err error
 
-	tun.fdCancel, err = rwcancel.NewRWCancel(int(file.Fd()))
+	tun.fdCancel, err = rwcancel.NewRWCancel(int(tun.fd))
 	if err != nil {
-		tun.fd.Close()
+		tun.tunFile.Close()
 		return nil, err
 	}
 
 	_, err = tun.Name()
 	if err != nil {
-		tun.fd.Close()
+		tun.tunFile.Close()
 		return nil, err
 	}
 
@@ -442,12 +444,12 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 
 	tun.netlinkSock, err = createNetlinkSocket()
 	if err != nil {
-		tun.fd.Close()
+		tun.tunFile.Close()
 		return nil, err
 	}
 	tun.netlinkCancel, err = rwcancel.NewRWCancel(tun.netlinkSock)
 	if err != nil {
-		tun.fd.Close()
+		tun.tunFile.Close()
 		return nil, err
 	}
 

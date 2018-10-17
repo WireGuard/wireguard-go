@@ -29,7 +29,7 @@ const _TUNSIFMODE = 0x8004745d
 
 type nativeTun struct {
 	name        string
-	fd          *os.File
+	tunFile     *os.File
 	rwcancel    *rwcancel.RWCancel
 	events      chan TUNEvent
 	errors      chan error
@@ -144,14 +144,14 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 
 	tun := &nativeTun{
-		fd:     file,
-		events: make(chan TUNEvent, 10),
-		errors: make(chan error, 1),
+		tunFile: file,
+		events:  make(chan TUNEvent, 10),
+		errors:  make(chan error, 1),
 	}
 
 	name, err := tun.Name()
 	if err != nil {
-		tun.fd.Close()
+		tun.tunFile.Close()
 		return nil, err
 	}
 
@@ -163,19 +163,19 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 		return iface.Index, nil
 	}()
 	if err != nil {
-		tun.fd.Close()
+		tun.tunFile.Close()
 		return nil, err
 	}
 
 	tun.rwcancel, err = rwcancel.NewRWCancel(int(file.Fd()))
 	if err != nil {
-		tun.fd.Close()
+		tun.tunFile.Close()
 		return nil, err
 	}
 
 	tun.routeSocket, err = unix.Socket(unix.AF_ROUTE, unix.SOCK_RAW, unix.AF_UNSPEC)
 	if err != nil {
-		tun.fd.Close()
+		tun.tunFile.Close()
 		return nil, err
 	}
 
@@ -191,7 +191,7 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 }
 
 func (tun *nativeTun) Name() (string, error) {
-	gostat, err := tun.fd.Stat()
+	gostat, err := tun.tunFile.Stat()
 	if err != nil {
 		tun.name = ""
 		return "", err
@@ -202,7 +202,7 @@ func (tun *nativeTun) Name() (string, error) {
 }
 
 func (tun *nativeTun) File() *os.File {
-	return tun.fd
+	return tun.tunFile
 }
 
 func (tun *nativeTun) Events() chan TUNEvent {
@@ -215,7 +215,7 @@ func (tun *nativeTun) doRead(buff []byte, offset int) (int, error) {
 		return 0, err
 	default:
 		buff := buff[offset-4:]
-		n, err := tun.fd.Read(buff[:])
+		n, err := tun.tunFile.Read(buff[:])
 		if n < 4 {
 			return 0, err
 		}
@@ -255,13 +255,13 @@ func (tun *nativeTun) Write(buff []byte, offset int) (int, error) {
 
 	// write
 
-	return tun.fd.Write(buff)
+	return tun.tunFile.Write(buff)
 }
 
 func (tun *nativeTun) Close() error {
 	var err3 error
 	err1 := tun.rwcancel.Cancel()
-	err2 := tun.fd.Close()
+	err2 := tun.tunFile.Close()
 	if tun.routeSocket != -1 {
 		unix.Shutdown(tun.routeSocket, unix.SHUT_RDWR)
 		err3 = unix.Close(tun.routeSocket)

@@ -51,7 +51,8 @@ type ifstat struct {
 
 type nativeTun struct {
 	name        string
-	fd          *os.File
+	tunFile     *os.File
+	fd          uintptr
 	rwcancel    *rwcancel.RWCancel
 	events      chan TUNEvent
 	errors      chan error
@@ -237,15 +238,15 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 		return nil, fmt.Errorf("interface %s already exists", name)
 	}
 
-	tunfile, err := os.OpenFile("/dev/tun", unix.O_RDWR, 0)
+	tunFile, err := os.OpenFile("/dev/tun", unix.O_RDWR, 0)
 
 	if err != nil {
 		return nil, err
 	}
-	tunfd := tunfile.Fd()
+	tunfd := tunFile.Fd()
 	assignedName, err := tunName(tunfd)
 	if err != nil {
-		tunfile.Close()
+		tunFile.Close()
 		return nil, err
 	}
 
@@ -293,25 +294,26 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 		uintptr(unsafe.Pointer(&ifr)),
 	)
 	if errno != 0 {
-		tunfile.Close()
+		tunFile.Close()
 		tunDestroy(name)
 		return nil, fmt.Errorf("failed to rename %s to %s: %s", assignedName, name, errno.Error())
 	}
 
-	return CreateTUNFromFile(tunfile, mtu)
+	return CreateTUNFromFile(tunFile, mtu)
 }
 
 func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 
 	tun := &nativeTun{
-		fd:     file,
-		events: make(chan TUNEvent, 10),
-		errors: make(chan error, 1),
+		tunFile: file,
+		fd:      file.Fd(),
+		events:  make(chan TUNEvent, 10),
+		errors:  make(chan error, 1),
 	}
 
 	name, err := tun.Name()
 	if err != nil {
-		tun.fd.Close()
+		tun.tunFile.Close()
 		return nil, err
 	}
 
@@ -323,19 +325,19 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 		return iface.Index, nil
 	}()
 	if err != nil {
-		tun.fd.Close()
+		tun.tunFile.Close()
 		return nil, err
 	}
 
-	tun.rwcancel, err = rwcancel.NewRWCancel(int(file.Fd()))
+	tun.rwcancel, err = rwcancel.NewRWCancel(int(tun.fd))
 	if err != nil {
-		tun.fd.Close()
+		tun.tunFile.Close()
 		return nil, err
 	}
 
 	tun.routeSocket, err = unix.Socket(unix.AF_ROUTE, unix.SOCK_RAW, unix.AF_UNSPEC)
 	if err != nil {
-		tun.fd.Close()
+		tun.tunFile.Close()
 		return nil, err
 	}
 
@@ -351,7 +353,7 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 }
 
 func (tun *nativeTun) Name() (string, error) {
-	name, err := tunName(tun.fd.Fd())
+	name, err := tunName(tun.fd)
 	if err != nil {
 		return "", err
 	}
@@ -360,7 +362,7 @@ func (tun *nativeTun) Name() (string, error) {
 }
 
 func (tun *nativeTun) File() *os.File {
-	return tun.fd
+	return tun.tunFile
 }
 
 func (tun *nativeTun) Events() chan TUNEvent {
@@ -373,7 +375,7 @@ func (tun *nativeTun) doRead(buff []byte, offset int) (int, error) {
 		return 0, err
 	default:
 		buff := buff[offset-4:]
-		n, err := tun.fd.Read(buff[:])
+		n, err := tun.tunFile.Read(buff[:])
 		if n < 4 {
 			return 0, err
 		}
@@ -413,13 +415,13 @@ func (tun *nativeTun) Write(buff []byte, offset int) (int, error) {
 
 	// write
 
-	return tun.fd.Write(buff)
+	return tun.tunFile.Write(buff)
 }
 
 func (tun *nativeTun) Close() error {
 	var err4 error
 	err1 := tun.rwcancel.Cancel()
-	err2 := tun.fd.Close()
+	err2 := tun.tunFile.Close()
 	err3 := tunDestroy(tun.name)
 	if tun.routeSocket != -1 {
 		unix.Shutdown(tun.routeSocket, unix.SHUT_RDWR)
