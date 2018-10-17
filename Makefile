@@ -4,7 +4,7 @@ BINDIR ?= $(PREFIX)/bin
 export GOPATH ?= $(CURDIR)/.gopath
 export GO111MODULE := on
 
-default: generate-version-and-build
+all: generate-version-and-build
 
 ifeq ($(shell go env GOOS)|$(wildcard .git),linux|)
 $(error Do not build this for Linux. Instead use the Linux kernel module. See wireguard.com/install/ for more info.)
@@ -39,4 +39,4 @@ install: wireguard-go
 clean:
 	rm -f wireguard-go
 
-.PHONY: default clean install generate-version-and-build
+.PHONY: all clean install generate-version-and-build
