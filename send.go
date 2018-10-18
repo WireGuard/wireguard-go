@@ -562,7 +562,6 @@ func (peer *Peer) RoutineSequentialSender() {
 						elem.Drop()
 					}
 					device.PutOutboundElement(elem)
-					elem.mutex.Unlock()
 				}
 			default:
 				goto out
