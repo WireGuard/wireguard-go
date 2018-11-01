@@ -97,7 +97,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 		device.net.stopping.Done()
 	}()
 
-	logDebug.Println("Routine: receive incoming IPv" + strconv.Itoa(IP) + " - starting")
+	logDebug.Println("Routine: receive incoming IPv" + strconv.Itoa(IP) + " - started")
 	device.net.starting.Done()
 
 	// receive datagrams until conn is closed
