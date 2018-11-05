@@ -307,7 +307,7 @@ func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 
 				// update persistent keepalive interval
 
-				logDebug.Println(peer, "- UAPI: Updating persistent keepalive interva")
+				logDebug.Println(peer, "- UAPI: Updating persistent keepalive interval")
 
 				secs, err := strconv.ParseUint(value, 10, 16)
 				if err != nil {
