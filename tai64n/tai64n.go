@@ -20,7 +20,7 @@ func Now() Timestamp {
 	var tai64n Timestamp
 	now := time.Now()
 	secs := base + uint64(now.Unix())
-	nano := uint32(now.UnixNano())
+	nano := uint32(now.Nanosecond())
 	binary.BigEndian.PutUint64(tai64n[:], secs)
 	binary.BigEndian.PutUint32(tai64n[8:], nano)
 	return tai64n
