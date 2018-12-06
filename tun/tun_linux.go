@@ -368,17 +368,7 @@ func (tun *nativeTun) Close() error {
 }
 
 func CreateTUN(name string, mtu int) (TUNDevice, error) {
-
-	// open clone device
-
-	// HACK: we open it as a raw Fd first, so that f.nonblock=false
-	// when we make it into a file object.
 	nfd, err := unix.Open(cloneDevicePath, os.O_RDWR, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	err = unix.SetNonblock(nfd, true)
 	if err != nil {
 		return nil, err
 	}
