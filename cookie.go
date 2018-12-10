@@ -8,7 +8,6 @@ package main
 import (
 	"crypto/hmac"
 	"crypto/rand"
-	"git.zx2c4.com/wireguard-go/xchacha20poly1305"
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20poly1305"
 	"sync"
@@ -163,13 +162,8 @@ func (st *CookieChecker) CreateReply(
 		return nil, err
 	}
 
-	xchacha20poly1305.Encrypt(
-		reply.Cookie[:0],
-		&reply.Nonce,
-		cookie[:],
-		msg[smac1:smac2],
-		&st.mac2.encryptionKey,
-	)
+	xchapoly, _ := chacha20poly1305.NewX(st.mac2.encryptionKey[:])
+	xchapoly.Seal(reply.Cookie[:0], reply.Nonce[:], cookie[:], msg[smac1:smac2])
 
 	st.mutex.RUnlock()
 
@@ -207,13 +201,8 @@ func (st *CookieGenerator) ConsumeReply(msg *MessageCookieReply) bool {
 
 	var cookie [blake2s.Size128]byte
 
-	_, err := xchacha20poly1305.Decrypt(
-		cookie[:0],
-		&msg.Nonce,
-		msg.Cookie[:],
-		st.mac2.lastMAC1[:],
-		&st.mac2.encryptionKey,
-	)
+	xchapoly, _ := chacha20poly1305.NewX(st.mac2.encryptionKey[:])
+	_, err := xchapoly.Open(cookie[:0], msg.Nonce[:], msg.Cookie[:], st.mac2.lastMAC1[:])
 
 	if err != nil {
 		return false

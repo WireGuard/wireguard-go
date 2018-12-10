@@ -89,7 +89,7 @@ type MessageTransport struct {
 type MessageCookieReply struct {
 	Type     uint32
 	Receiver uint32
-	Nonce    [24]byte
+	Nonce    [chacha20poly1305.NonceSizeX]byte
 	Cookie   [blake2s.Size128 + poly1305.TagSize]byte
 }
 
