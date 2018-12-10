@@ -1,7 +1,7 @@
 module git.zx2c4.com/wireguard-go
 
 require (
-	golang.org/x/crypto v0.0.0-20181001203147-e3636079e1a4
-	golang.org/x/net v0.0.0-20181005035420-146acd28ed58
-	golang.org/x/sys v0.0.0-20181005133103-4497e2df6f9e
+	golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9
+	golang.org/x/net v0.0.0-20181207154023-610586996380
+	golang.org/x/sys v0.0.0-20181210030007-2a47403f2ae5
 )
