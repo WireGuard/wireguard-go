@@ -8,10 +8,8 @@
 package main
 
 import (
-	"golang.org/x/sys/unix"
 	"net"
 	"os"
-	"runtime"
 	"syscall"
 )
 
@@ -170,48 +168,4 @@ func (bind *NativeBind) Send(buff []byte, endpoint Endpoint) error {
 		_, err = bind.ipv6.WriteToUDP(buff, (*net.UDPAddr)(nend))
 	}
 	return err
-}
-
-var fwmarkIoctl int
-
-func init() {
-	switch runtime.GOOS {
-	case "linux", "android":
-		fwmarkIoctl = 36 /* unix.SO_MARK */
-	case "freebsd":
-		fwmarkIoctl = 0x1015 /* unix.SO_USER_COOKIE */
-	case "openbsd":
-		fwmarkIoctl = 0x1021 /* unix.SO_RTABLE */
-	}
-}
-
-func (bind *NativeBind) SetMark(mark uint32) error {
-	if fwmarkIoctl == 0 {
-		return nil
-	}
-	if bind.ipv4 != nil {
-		fd, err := bind.ipv4.SyscallConn()
-		if err != nil {
-			return err
-		}
-		err = fd.Control(func(fd uintptr) {
-			err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, fwmarkIoctl, int(mark))
-		})
-		if err != nil {
-			return err
-		}
-	}
-	if bind.ipv6 != nil {
-		fd, err := bind.ipv6.SyscallConn()
-		if err != nil {
-			return err
-		}
-		err = fd.Control(func(fd uintptr) {
-			err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, fwmarkIoctl, int(mark))
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
