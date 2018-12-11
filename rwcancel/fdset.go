@@ -13,10 +13,10 @@ type fdSet struct {
 
 func (fdset *fdSet) set(i int) {
 	bits := 32 << (^uint(0) >> 63)
-	fdset.fdset.X__fds_bits[i/bits] |= 1 << uint(i%bits)
+	fdset.fdset.Bits[i/bits] |= 1 << uint(i%bits)
 }
 
 func (fdset *fdSet) check(i int) bool {
 	bits := 32 << (^uint(0) >> 63)
-	return (fdset.fdset.X__fds_bits[i/bits] & (1 << uint(i%bits))) != 0
+	return (fdset.fdset.Bits[i/bits] & (1 << uint(i%bits))) != 0
 }
