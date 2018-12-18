@@ -206,7 +206,7 @@ func (peer *Peer) SendHandshakeResponse() error {
 
 func (device *Device) SendHandshakeCookie(initiatingElem *QueueHandshakeElement) error {
 
-	device.log.Debug.Println("Sending cookie reply to:", initiatingElem.endpoint.DstToString())
+	device.log.Debug.Println("Sending cookie response for denied handshake message for", initiatingElem.endpoint.DstToString())
 
 	sender := binary.LittleEndian.Uint32(initiatingElem.packet[4:8])
 	reply, err := device.cookieChecker.CreateReply(initiatingElem.packet, sender, initiatingElem.endpoint.DstToBytes())

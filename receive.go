@@ -351,7 +351,10 @@ func (device *Device) RoutineHandshake() {
 			// consume reply
 
 			if peer := entry.peer; peer.isRunning.Get() {
-				peer.cookieGenerator.ConsumeReply(&reply)
+				logDebug.Println("Receiving cookie response from ", elem.endpoint.DstToString())
+				if !peer.cookieGenerator.ConsumeReply(&reply) {
+					logDebug.Println("Could not decrypt invalid cookie response")
+				}
 			}
 
 			continue
