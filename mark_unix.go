@@ -26,6 +26,7 @@ func init() {
 }
 
 func (bind *NativeBind) SetMark(mark uint32) error {
+	var operr error
 	if fwmarkIoctl == 0 {
 		return nil
 	}
@@ -35,8 +36,11 @@ func (bind *NativeBind) SetMark(mark uint32) error {
 			return err
 		}
 		err = fd.Control(func(fd uintptr) {
-			err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, fwmarkIoctl, int(mark))
+			operr = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, fwmarkIoctl, int(mark))
 		})
+		if err == nil {
+			err = operr
+		}
 		if err != nil {
 			return err
 		}
@@ -47,8 +51,11 @@ func (bind *NativeBind) SetMark(mark uint32) error {
 			return err
 		}
 		err = fd.Control(func(fd uintptr) {
-			err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, fwmarkIoctl, int(mark))
+			operr = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, fwmarkIoctl, int(mark))
 		})
+		if err == nil {
+			err = operr
+		}
 		if err != nil {
 			return err
 		}
