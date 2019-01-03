@@ -19,7 +19,7 @@ const (
 
 type Peer struct {
 	isRunning                   AtomicBool
-	mutex                       sync.RWMutex // Mostly protects endpoint, but is generally taken whenever we modify peer
+	sync.RWMutex                // Mostly protects endpoint, but is generally taken whenever we modify peer
 	keypairs                    Keypairs
 	handshake                   Handshake
 	device                      *Device
@@ -57,10 +57,10 @@ type Peer struct {
 	}
 
 	routines struct {
-		mutex    sync.Mutex     // held when stopping / starting routines
-		starting sync.WaitGroup // routines pending start
-		stopping sync.WaitGroup // routines pending stop
-		stop     chan struct{}  // size 0, stop all go routines in peer
+		sync.Mutex                // held when stopping / starting routines
+		starting   sync.WaitGroup // routines pending start
+		stopping   sync.WaitGroup // routines pending stop
+		stop       chan struct{}  // size 0, stop all go routines in peer
 	}
 
 	cookieGenerator CookieGenerator
@@ -74,11 +74,11 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 
 	// lock resources
 
-	device.staticIdentity.mutex.RLock()
-	defer device.staticIdentity.mutex.RUnlock()
+	device.staticIdentity.RLock()
+	defer device.staticIdentity.RUnlock()
 
-	device.peers.mutex.Lock()
-	defer device.peers.mutex.Unlock()
+	device.peers.Lock()
+	defer device.peers.Unlock()
 
 	// check if over limit
 
@@ -89,8 +89,8 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	// create peer
 
 	peer := new(Peer)
-	peer.mutex.Lock()
-	defer peer.mutex.Unlock()
+	peer.Lock()
+	defer peer.Unlock()
 
 	peer.cookieGenerator.Init(pk)
 	peer.device = device
@@ -126,15 +126,15 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 }
 
 func (peer *Peer) SendBuffer(buffer []byte) error {
-	peer.device.net.mutex.RLock()
-	defer peer.device.net.mutex.RUnlock()
+	peer.device.net.RLock()
+	defer peer.device.net.RUnlock()
 
 	if peer.device.net.bind == nil {
 		return errors.New("no bind")
 	}
 
-	peer.mutex.RLock()
-	defer peer.mutex.RUnlock()
+	peer.RLock()
+	defer peer.RUnlock()
 
 	if peer.endpoint == nil {
 		return errors.New("no known endpoint for peer")
@@ -162,8 +162,8 @@ func (peer *Peer) Start() {
 
 	// prevent simultaneous start/stop operations
 
-	peer.routines.mutex.Lock()
-	defer peer.routines.mutex.Unlock()
+	peer.routines.Lock()
+	defer peer.routines.Unlock()
 
 	if peer.isRunning.Get() {
 		return
@@ -207,14 +207,14 @@ func (peer *Peer) ZeroAndFlushAll() {
 	// clear key pairs
 
 	keypairs := &peer.keypairs
-	keypairs.mutex.Lock()
+	keypairs.Lock()
 	device.DeleteKeypair(keypairs.previous)
 	device.DeleteKeypair(keypairs.current)
 	device.DeleteKeypair(keypairs.next)
 	keypairs.previous = nil
 	keypairs.current = nil
 	keypairs.next = nil
-	keypairs.mutex.Unlock()
+	keypairs.Unlock()
 
 	// clear handshake state
 
@@ -237,8 +237,8 @@ func (peer *Peer) Stop() {
 
 	peer.routines.starting.Wait()
 
-	peer.routines.mutex.Lock()
-	defer peer.routines.mutex.Unlock()
+	peer.routines.Lock()
+	defer peer.routines.Unlock()
 
 	peer.device.log.Debug.Println(peer, "- Stopping...")
 
@@ -264,7 +264,7 @@ func (peer *Peer) SetEndpointFromPacket(endpoint Endpoint) {
 	if roamingDisabled {
 		return
 	}
-	peer.mutex.Lock()
+	peer.Lock()
 	peer.endpoint = endpoint
-	peer.mutex.Unlock()
+	peer.Unlock()
 }

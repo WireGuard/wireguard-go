@@ -17,11 +17,11 @@ const (
 )
 
 type AtomicBool struct {
-	flag int32
+	int32
 }
 
 func (a *AtomicBool) Get() bool {
-	return atomic.LoadInt32(&a.flag) == AtomicTrue
+	return atomic.LoadInt32(&a.int32) == AtomicTrue
 }
 
 func (a *AtomicBool) Swap(val bool) bool {
@@ -29,7 +29,7 @@ func (a *AtomicBool) Swap(val bool) bool {
 	if val {
 		flag = AtomicTrue
 	}
-	return atomic.SwapInt32(&a.flag, flag) == AtomicTrue
+	return atomic.SwapInt32(&a.int32, flag) == AtomicTrue
 }
 
 func (a *AtomicBool) Set(val bool) {
@@ -37,7 +37,7 @@ func (a *AtomicBool) Set(val bool) {
 	if val {
 		flag = AtomicTrue
 	}
-	atomic.StoreInt32(&a.flag, flag)
+	atomic.StoreInt32(&a.int32, flag)
 }
 
 func min(a, b uint) uint {

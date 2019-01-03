@@ -78,8 +78,8 @@ func unsafeCloseBind(device *Device) error {
 
 func (device *Device) BindSetMark(mark uint32) error {
 
-	device.net.mutex.Lock()
-	defer device.net.mutex.Unlock()
+	device.net.Lock()
+	defer device.net.Unlock()
 
 	// check if modified
 
@@ -98,23 +98,23 @@ func (device *Device) BindSetMark(mark uint32) error {
 
 	// clear cached source addresses
 
-	device.peers.mutex.RLock()
+	device.peers.RLock()
 	for _, peer := range device.peers.keyMap {
-		peer.mutex.Lock()
-		defer peer.mutex.Unlock()
+		peer.Lock()
+		defer peer.Unlock()
 		if peer.endpoint != nil {
 			peer.endpoint.ClearSrc()
 		}
 	}
-	device.peers.mutex.RUnlock()
+	device.peers.RUnlock()
 
 	return nil
 }
 
 func (device *Device) BindUpdate() error {
 
-	device.net.mutex.Lock()
-	defer device.net.mutex.Unlock()
+	device.net.Lock()
+	defer device.net.Unlock()
 
 	// close existing sockets
 
@@ -148,15 +148,15 @@ func (device *Device) BindUpdate() error {
 
 		// clear cached source addresses
 
-		device.peers.mutex.RLock()
+		device.peers.RLock()
 		for _, peer := range device.peers.keyMap {
-			peer.mutex.Lock()
-			defer peer.mutex.Unlock()
+			peer.Lock()
+			defer peer.Unlock()
 			if peer.endpoint != nil {
 				peer.endpoint.ClearSrc()
 			}
 		}
-		device.peers.mutex.RUnlock()
+		device.peers.RUnlock()
 
 		// start receiving routines
 
@@ -173,8 +173,8 @@ func (device *Device) BindUpdate() error {
 }
 
 func (device *Device) BindClose() error {
-	device.net.mutex.Lock()
+	device.net.Lock()
 	err := unsafeCloseBind(device)
-	device.net.mutex.Unlock()
+	device.net.Unlock()
 	return err
 }

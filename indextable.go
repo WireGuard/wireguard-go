@@ -18,7 +18,7 @@ type IndexTableEntry struct {
 }
 
 type IndexTable struct {
-	mutex sync.RWMutex
+	sync.RWMutex
 	table map[uint32]IndexTableEntry
 }
 
@@ -29,20 +29,20 @@ func randUint32() (uint32, error) {
 }
 
 func (table *IndexTable) Init() {
-	table.mutex.Lock()
-	defer table.mutex.Unlock()
+	table.Lock()
+	defer table.Unlock()
 	table.table = make(map[uint32]IndexTableEntry)
 }
 
 func (table *IndexTable) Delete(index uint32) {
-	table.mutex.Lock()
-	defer table.mutex.Unlock()
+	table.Lock()
+	defer table.Unlock()
 	delete(table.table, index)
 }
 
 func (table *IndexTable) SwapIndexForKeypair(index uint32, keypair *Keypair) {
-	table.mutex.Lock()
-	defer table.mutex.Unlock()
+	table.Lock()
+	defer table.Unlock()
 	entry, ok := table.table[index]
 	if !ok {
 		return
@@ -65,19 +65,19 @@ func (table *IndexTable) NewIndexForHandshake(peer *Peer, handshake *Handshake) 
 
 		// check if index used
 
-		table.mutex.RLock()
+		table.RLock()
 		_, ok := table.table[index]
-		table.mutex.RUnlock()
+		table.RUnlock()
 		if ok {
 			continue
 		}
 
 		// check again while locked
 
-		table.mutex.Lock()
+		table.Lock()
 		_, found := table.table[index]
 		if found {
-			table.mutex.Unlock()
+			table.Unlock()
 			continue
 		}
 		table.table[index] = IndexTableEntry{
@@ -85,13 +85,13 @@ func (table *IndexTable) NewIndexForHandshake(peer *Peer, handshake *Handshake) 
 			handshake: handshake,
 			keypair:   nil,
 		}
-		table.mutex.Unlock()
+		table.Unlock()
 		return index, nil
 	}
 }
 
 func (table *IndexTable) Lookup(id uint32) IndexTableEntry {
-	table.mutex.RLock()
-	defer table.mutex.RUnlock()
+	table.RLock()
+	defer table.RUnlock()
 	return table.table[id]
 }

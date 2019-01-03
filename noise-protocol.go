@@ -154,8 +154,8 @@ func init() {
 
 func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, error) {
 
-	device.staticIdentity.mutex.RLock()
-	defer device.staticIdentity.mutex.RUnlock()
+	device.staticIdentity.RLock()
+	defer device.staticIdentity.RUnlock()
 
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
@@ -241,8 +241,8 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 		return nil
 	}
 
-	device.staticIdentity.mutex.RLock()
-	defer device.staticIdentity.mutex.RUnlock()
+	device.staticIdentity.RLock()
+	defer device.staticIdentity.RUnlock()
 
 	mixHash(&hash, &InitialHash, device.staticIdentity.publicKey[:])
 	mixHash(&hash, &hash, msg.Ephemeral[:])
@@ -423,8 +423,8 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 
 		// lock private key for reading
 
-		device.staticIdentity.mutex.RLock()
-		defer device.staticIdentity.mutex.RUnlock()
+		device.staticIdentity.RLock()
+		defer device.staticIdentity.RUnlock()
 
 		// finish 3-way DH
 
@@ -554,8 +554,8 @@ func (peer *Peer) BeginSymmetricSession() error {
 	// rotate key pairs
 
 	keypairs := &peer.keypairs
-	keypairs.mutex.Lock()
-	defer keypairs.mutex.Unlock()
+	keypairs.Lock()
+	defer keypairs.Unlock()
 
 	previous := keypairs.previous
 	next := keypairs.next
@@ -586,8 +586,8 @@ func (peer *Peer) ReceivedWithKeypair(receivedKeypair *Keypair) bool {
 	if keypairs.next != receivedKeypair {
 		return false
 	}
-	keypairs.mutex.Lock()
-	defer keypairs.mutex.Unlock()
+	keypairs.Lock()
+	defer keypairs.Unlock()
 	if keypairs.next != receivedKeypair {
 		return false
 	}

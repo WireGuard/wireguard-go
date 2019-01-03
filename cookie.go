@@ -15,8 +15,8 @@ import (
 )
 
 type CookieChecker struct {
-	mutex sync.RWMutex
-	mac1  struct {
+	sync.RWMutex
+	mac1 struct {
 		key [blake2s.Size]byte
 	}
 	mac2 struct {
@@ -27,8 +27,8 @@ type CookieChecker struct {
 }
 
 type CookieGenerator struct {
-	mutex sync.RWMutex
-	mac1  struct {
+	sync.RWMutex
+	mac1 struct {
 		key [blake2s.Size]byte
 	}
 	mac2 struct {
@@ -41,8 +41,8 @@ type CookieGenerator struct {
 }
 
 func (st *CookieChecker) Init(pk NoisePublicKey) {
-	st.mutex.Lock()
-	defer st.mutex.Unlock()
+	st.Lock()
+	defer st.Unlock()
 
 	// mac1 state
 
@@ -66,8 +66,8 @@ func (st *CookieChecker) Init(pk NoisePublicKey) {
 }
 
 func (st *CookieChecker) CheckMAC1(msg []byte) bool {
-	st.mutex.RLock()
-	defer st.mutex.RUnlock()
+	st.RLock()
+	defer st.RUnlock()
 
 	size := len(msg)
 	smac2 := size - blake2s.Size128
@@ -83,8 +83,8 @@ func (st *CookieChecker) CheckMAC1(msg []byte) bool {
 }
 
 func (st *CookieChecker) CheckMAC2(msg []byte, src []byte) bool {
-	st.mutex.RLock()
-	defer st.mutex.RUnlock()
+	st.RLock()
+	defer st.RUnlock()
 
 	if time.Now().Sub(st.mac2.secretSet) > CookieRefreshTime {
 		return false
@@ -119,21 +119,21 @@ func (st *CookieChecker) CreateReply(
 	src []byte,
 ) (*MessageCookieReply, error) {
 
-	st.mutex.RLock()
+	st.RLock()
 
 	// refresh cookie secret
 
 	if time.Now().Sub(st.mac2.secretSet) > CookieRefreshTime {
-		st.mutex.RUnlock()
-		st.mutex.Lock()
+		st.RUnlock()
+		st.Lock()
 		_, err := rand.Read(st.mac2.secret[:])
 		if err != nil {
-			st.mutex.Unlock()
+			st.Unlock()
 			return nil, err
 		}
 		st.mac2.secretSet = time.Now()
-		st.mutex.Unlock()
-		st.mutex.RLock()
+		st.Unlock()
+		st.RLock()
 	}
 
 	// derive cookie
@@ -158,21 +158,21 @@ func (st *CookieChecker) CreateReply(
 
 	_, err := rand.Read(reply.Nonce[:])
 	if err != nil {
-		st.mutex.RUnlock()
+		st.RUnlock()
 		return nil, err
 	}
 
 	xchapoly, _ := chacha20poly1305.NewX(st.mac2.encryptionKey[:])
 	xchapoly.Seal(reply.Cookie[:0], reply.Nonce[:], cookie[:], msg[smac1:smac2])
 
-	st.mutex.RUnlock()
+	st.RUnlock()
 
 	return reply, nil
 }
 
 func (st *CookieGenerator) Init(pk NoisePublicKey) {
-	st.mutex.Lock()
-	defer st.mutex.Unlock()
+	st.Lock()
+	defer st.Unlock()
 
 	func() {
 		hash, _ := blake2s.New256(nil)
@@ -192,8 +192,8 @@ func (st *CookieGenerator) Init(pk NoisePublicKey) {
 }
 
 func (st *CookieGenerator) ConsumeReply(msg *MessageCookieReply) bool {
-	st.mutex.Lock()
-	defer st.mutex.Unlock()
+	st.Lock()
+	defer st.Unlock()
 
 	if !st.mac2.hasLastMAC1 {
 		return false
@@ -223,8 +223,8 @@ func (st *CookieGenerator) AddMacs(msg []byte) {
 	mac1 := msg[smac1:smac2]
 	mac2 := msg[smac2:]
 
-	st.mutex.Lock()
-	defer st.mutex.Unlock()
+	st.Lock()
+	defer st.Unlock()
 
 	// set mac1
 

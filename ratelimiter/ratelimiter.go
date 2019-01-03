@@ -20,21 +20,21 @@ const (
 )
 
 type RatelimiterEntry struct {
-	mutex    sync.Mutex
+	sync.Mutex
 	lastTime time.Time
 	tokens   int64
 }
 
 type Ratelimiter struct {
-	mutex     sync.RWMutex
+	sync.RWMutex
 	stopReset chan struct{}
 	tableIPv4 map[[net.IPv4len]byte]*RatelimiterEntry
 	tableIPv6 map[[net.IPv6len]byte]*RatelimiterEntry
 }
 
 func (rate *Ratelimiter) Close() {
-	rate.mutex.Lock()
-	defer rate.mutex.Unlock()
+	rate.Lock()
+	defer rate.Unlock()
 
 	if rate.stopReset != nil {
 		close(rate.stopReset)
@@ -42,8 +42,8 @@ func (rate *Ratelimiter) Close() {
 }
 
 func (rate *Ratelimiter) Init() {
-	rate.mutex.Lock()
-	defer rate.mutex.Unlock()
+	rate.Lock()
+	defer rate.Unlock()
 
 	// stop any ongoing garbage collection routine
 
@@ -71,23 +71,23 @@ func (rate *Ratelimiter) Init() {
 				}
 			case <-ticker.C:
 				func() {
-					rate.mutex.Lock()
-					defer rate.mutex.Unlock()
+					rate.Lock()
+					defer rate.Unlock()
 
 					for key, entry := range rate.tableIPv4 {
-						entry.mutex.Lock()
+						entry.Lock()
 						if time.Now().Sub(entry.lastTime) > garbageCollectTime {
 							delete(rate.tableIPv4, key)
 						}
-						entry.mutex.Unlock()
+						entry.Unlock()
 					}
 
 					for key, entry := range rate.tableIPv6 {
-						entry.mutex.Lock()
+						entry.Lock()
 						if time.Now().Sub(entry.lastTime) > garbageCollectTime {
 							delete(rate.tableIPv6, key)
 						}
-						entry.mutex.Unlock()
+						entry.Unlock()
 					}
 
 					if len(rate.tableIPv4) == 0 && len(rate.tableIPv6) == 0 {
@@ -109,7 +109,7 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 	IPv4 := ip.To4()
 	IPv6 := ip.To16()
 
-	rate.mutex.RLock()
+	rate.RLock()
 
 	if IPv4 != nil {
 		copy(keyIPv4[:], IPv4)
@@ -119,7 +119,7 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 		entry = rate.tableIPv6[keyIPv6]
 	}
 
-	rate.mutex.RUnlock()
+	rate.RUnlock()
 
 	// make new entry if not found
 
@@ -127,7 +127,7 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 		entry = new(RatelimiterEntry)
 		entry.tokens = maxTokens - packetCost
 		entry.lastTime = time.Now()
-		rate.mutex.Lock()
+		rate.Lock()
 		if IPv4 != nil {
 			rate.tableIPv4[keyIPv4] = entry
 			if len(rate.tableIPv4) == 1 && len(rate.tableIPv6) == 0 {
@@ -139,13 +139,13 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 				rate.stopReset <- struct{}{}
 			}
 		}
-		rate.mutex.Unlock()
+		rate.Unlock()
 		return true
 	}
 
 	// add tokens to entry
 
-	entry.mutex.Lock()
+	entry.Lock()
 	now := time.Now()
 	entry.tokens += now.Sub(entry.lastTime).Nanoseconds()
 	entry.lastTime = now
@@ -157,9 +157,9 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 
 	if entry.tokens > packetCost {
 		entry.tokens -= packetCost
-		entry.mutex.Unlock()
+		entry.Unlock()
 		return true
 	}
-	entry.mutex.Unlock()
+	entry.Unlock()
 	return false
 }

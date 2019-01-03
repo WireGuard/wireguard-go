@@ -26,8 +26,8 @@ type QueueHandshakeElement struct {
 }
 
 type QueueInboundElement struct {
-	dropped  int32
-	mutex    sync.Mutex
+	dropped int32
+	sync.Mutex
 	buffer   *[MaxMessageSize]byte
 	packet   []byte
 	counter  uint64
@@ -51,7 +51,7 @@ func (device *Device) addToInboundAndDecryptionQueues(inboundQueue chan *QueueIn
 			return true
 		default:
 			element.Drop()
-			element.mutex.Unlock()
+			element.Unlock()
 			return false
 		}
 	default:
@@ -177,8 +177,8 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 			elem.dropped = AtomicFalse
 			elem.endpoint = endpoint
 			elem.counter = 0
-			elem.mutex = sync.Mutex{}
-			elem.mutex.Lock()
+			elem.Mutex = sync.Mutex{}
+			elem.Lock()
 
 			// add to decryption queues
 
@@ -281,7 +281,7 @@ func (device *Device) RoutineDecryption() {
 				elem.Drop()
 				device.PutMessageBuffer(elem.buffer)
 			}
-			elem.mutex.Unlock()
+			elem.Unlock()
 		}
 	}
 }
@@ -529,7 +529,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 			// wait for decryption
 
-			elem.mutex.Lock()
+			elem.Lock()
 
 			if elem.IsDropped() {
 				continue

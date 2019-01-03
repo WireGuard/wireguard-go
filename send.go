@@ -43,7 +43,7 @@ import (
 
 type QueueOutboundElement struct {
 	dropped int32
-	mutex   sync.Mutex
+	sync.Mutex
 	buffer  *[MaxMessageSize]byte // slice holding the packet data
 	packet  []byte                // slice of "buffer" (always!)
 	nonce   uint64                // nonce for encryption
@@ -55,7 +55,7 @@ func (device *Device) NewOutboundElement() *QueueOutboundElement {
 	elem := device.GetOutboundElement()
 	elem.dropped = AtomicFalse
 	elem.buffer = device.GetMessageBuffer()
-	elem.mutex = sync.Mutex{}
+	elem.Mutex = sync.Mutex{}
 	elem.nonce = 0
 	elem.keypair = nil
 	elem.peer = nil
@@ -95,7 +95,7 @@ func addToOutboundAndEncryptionQueues(outboundQueue chan *QueueOutboundElement, 
 		default:
 			element.Drop()
 			element.peer.device.PutMessageBuffer(element.buffer)
-			element.mutex.Unlock()
+			element.Unlock()
 		}
 	default:
 		element.peer.device.PutMessageBuffer(element.buffer)
@@ -442,7 +442,7 @@ func (peer *Peer) RoutineNonce() {
 
 			elem.keypair = keypair
 			elem.dropped = AtomicFalse
-			elem.mutex.Lock()
+			elem.Lock()
 
 			// add to parallel and sequential queue
 			addToOutboundAndEncryptionQueues(peer.queue.outbound, device.queue.encryption, elem)
@@ -468,7 +468,7 @@ func (device *Device) RoutineEncryption() {
 				if ok && !elem.IsDropped() {
 					elem.Drop()
 					device.PutMessageBuffer(elem.buffer)
-					elem.mutex.Unlock()
+					elem.Unlock()
 				}
 			default:
 				goto out
@@ -535,7 +535,7 @@ func (device *Device) RoutineEncryption() {
 				elem.packet,
 				nil,
 			)
-			elem.mutex.Unlock()
+			elem.Unlock()
 		}
 	}
 }
@@ -588,7 +588,7 @@ func (peer *Peer) RoutineSequentialSender() {
 				return
 			}
 
-			elem.mutex.Lock()
+			elem.Lock()
 			if elem.IsDropped() {
 				device.PutOutboundElement(elem)
 				continue

@@ -654,17 +654,17 @@ func (bind *NativeBind) routineRouteListener(device *Device) {
 								if !ok {
 									break
 								}
-								pePtr.peer.mutex.Lock()
+								pePtr.peer.Lock()
 								if &pePtr.peer.endpoint != pePtr.endpoint {
-									pePtr.peer.mutex.Unlock()
+									pePtr.peer.Unlock()
 									break
 								}
 								if uint32(pePtr.peer.endpoint.(*NativeEndpoint).src4().ifindex) == ifidx {
-									pePtr.peer.mutex.Unlock()
+									pePtr.peer.Unlock()
 									break
 								}
 								pePtr.peer.endpoint.(*NativeEndpoint).ClearSrc()
-								pePtr.peer.mutex.Unlock()
+								pePtr.peer.Unlock()
 							}
 							attr = attr[attrhdr.Len:]
 						}
@@ -675,16 +675,16 @@ func (bind *NativeBind) routineRouteListener(device *Device) {
 				reqPeer = make(map[uint32]peerEndpointPtr)
 				reqPeerLock.Unlock()
 				go func() {
-					device.peers.mutex.RLock()
+					device.peers.RLock()
 					i := uint32(1)
 					for _, peer := range device.peers.keyMap {
-						peer.mutex.RLock()
+						peer.RLock()
 						if peer.endpoint == nil || peer.endpoint.(*NativeEndpoint) == nil {
-							peer.mutex.RUnlock()
+							peer.RUnlock()
 							continue
 						}
 						if peer.endpoint.(*NativeEndpoint).isV6 || peer.endpoint.(*NativeEndpoint).src4().ifindex == 0 {
-							peer.mutex.RUnlock()
+							peer.RUnlock()
 							break
 						}
 						nlmsg := struct {
@@ -730,14 +730,14 @@ func (bind *NativeBind) routineRouteListener(device *Device) {
 							endpoint: &peer.endpoint,
 						}
 						reqPeerLock.Unlock()
-						peer.mutex.RUnlock()
+						peer.RUnlock()
 						i++
 						_, err := bind.netlinkCancel.Write((*[unsafe.Sizeof(nlmsg)]byte)(unsafe.Pointer(&nlmsg))[:])
 						if err != nil {
 							break
 						}
 					}
-					device.peers.mutex.RUnlock()
+					device.peers.RUnlock()
 				}()
 			}
 			remain = remain[hdr.Len:]

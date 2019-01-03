@@ -19,7 +19,7 @@ import (
  */
 
 type Timer struct {
-	timer         *time.Timer
+	*time.Timer
 	modifyingLock sync.RWMutex
 	runningLock   sync.Mutex
 	isPending     bool
@@ -27,7 +27,7 @@ type Timer struct {
 
 func (peer *Peer) NewTimer(expirationFunction func(*Peer)) *Timer {
 	timer := &Timer{}
-	timer.timer = time.AfterFunc(time.Hour, func() {
+	timer.Timer = time.AfterFunc(time.Hour, func() {
 		timer.runningLock.Lock()
 
 		timer.modifyingLock.Lock()
@@ -42,21 +42,21 @@ func (peer *Peer) NewTimer(expirationFunction func(*Peer)) *Timer {
 		expirationFunction(peer)
 		timer.runningLock.Unlock()
 	})
-	timer.timer.Stop()
+	timer.Stop()
 	return timer
 }
 
 func (timer *Timer) Mod(d time.Duration) {
 	timer.modifyingLock.Lock()
 	timer.isPending = true
-	timer.timer.Reset(d)
+	timer.Reset(d)
 	timer.modifyingLock.Unlock()
 }
 
 func (timer *Timer) Del() {
 	timer.modifyingLock.Lock()
 	timer.isPending = false
-	timer.timer.Stop()
+	timer.Stop()
 	timer.modifyingLock.Unlock()
 }
 
@@ -101,11 +101,11 @@ func expiredRetransmitHandshake(peer *Peer) {
 		peer.device.log.Debug.Printf("%s - Handshake did not complete after %d seconds, retrying (try %d)\n", peer, int(RekeyTimeout.Seconds()), atomic.LoadUint32(&peer.timers.handshakeAttempts)+1)
 
 		/* We clear the endpoint address src address, in case this is the cause of trouble. */
-		peer.mutex.Lock()
+		peer.Lock()
 		if peer.endpoint != nil {
 			peer.endpoint.ClearSrc()
 		}
-		peer.mutex.Unlock()
+		peer.Unlock()
 
 		peer.SendHandshakeInitiation(true)
 	}
@@ -124,11 +124,11 @@ func expiredSendKeepalive(peer *Peer) {
 func expiredNewHandshake(peer *Peer) {
 	peer.device.log.Debug.Printf("%s - Retrying handshake because we stopped hearing back after %d seconds\n", peer, int((KeepaliveTimeout + RekeyTimeout).Seconds()))
 	/* We clear the endpoint address src address, in case this is the cause of trouble. */
-	peer.mutex.Lock()
+	peer.Lock()
 	if peer.endpoint != nil {
 		peer.endpoint.ClearSrc()
 	}
-	peer.mutex.Unlock()
+	peer.Unlock()
 	peer.SendHandshakeInitiation(false)
 
 }
