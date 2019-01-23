@@ -28,7 +28,7 @@ func (s *IPCError) ErrorCode() int64 {
 	return s.int64
 }
 
-func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
+func ipcGetOperation(device *Device, socket *bufio.Writer) *IPCError {
 
 	device.log.Debug.Println("UAPI: Processing get operation")
 
@@ -108,7 +108,7 @@ func ipcGetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
 	return nil
 }
 
-func ipcSetOperation(device *Device, socket *bufio.ReadWriter) *IPCError {
+func ipcSetOperation(device *Device, socket *bufio.Reader) *IPCError {
 	scanner := bufio.NewScanner(socket)
 	logError := device.log.Error
 	logDebug := device.log.Debug
@@ -403,11 +403,11 @@ func ipcHandle(device *Device, socket net.Conn) {
 	switch op {
 	case "set=1\n":
 		device.log.Debug.Println("UAPI: Set operation")
-		status = ipcSetOperation(device, buffered)
+		status = ipcSetOperation(device, buffered.Reader)
 
 	case "get=1\n":
 		device.log.Debug.Println("UAPI: Get operation")
-		status = ipcGetOperation(device, buffered)
+		status = ipcGetOperation(device, buffered.Writer)
 
 	default:
 		device.log.Error.Println("Invalid UAPI operation:", op)
