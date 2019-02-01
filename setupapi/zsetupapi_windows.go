@@ -39,12 +39,13 @@ func errnoErr(e syscall.Errno) error {
 var (
 	modsetupapi = windows.NewLazySystemDLL("setupapi.dll")
 
-	procSetupDiGetClassDevsExW       = modsetupapi.NewProc("SetupDiGetClassDevsExW")
-	procSetupDiDestroyDeviceInfoList = modsetupapi.NewProc("SetupDiDestroyDeviceInfoList")
+	procSetupDiGetClassDevsExW          = modsetupapi.NewProc("SetupDiGetClassDevsExW")
+	procSetupDiDestroyDeviceInfoList    = modsetupapi.NewProc("SetupDiDestroyDeviceInfoList")
+	procSetupDiGetDeviceInfoListDetailW = modsetupapi.NewProc("SetupDiGetDeviceInfoListDetailW")
 )
 
-func setupDiGetClassDevsEx(ClassGuid *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) {
-	r0, _, e1 := syscall.Syscall9(procSetupDiGetClassDevsExW.Addr(), 7, uintptr(unsafe.Pointer(ClassGuid)), uintptr(unsafe.Pointer(Enumerator)), uintptr(hwndParent), uintptr(Flags), uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(MachineName)), uintptr(reserved), 0, 0)
+func setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) {
+	r0, _, e1 := syscall.Syscall9(procSetupDiGetClassDevsExW.Addr(), 7, uintptr(unsafe.Pointer(ClassGUID)), uintptr(unsafe.Pointer(Enumerator)), uintptr(hwndParent), uintptr(Flags), uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(MachineName)), uintptr(reserved), 0, 0)
 	handle = DevInfo(r0)
 	if handle == DevInfo(windows.InvalidHandle) {
 		if e1 != 0 {
@@ -58,6 +59,18 @@ func setupDiGetClassDevsEx(ClassGuid *windows.GUID, Enumerator *uint16, hwndPare
 
 func SetupDiDestroyDeviceInfoList(DeviceInfoSet DevInfo) (err error) {
 	r1, _, e1 := syscall.Syscall(procSetupDiDestroyDeviceInfoList.Addr(), 1, uintptr(DeviceInfoSet), 0, 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func setupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo, DeviceInfoSetDetailData *SP_DEVINFO_LIST_DETAIL_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiGetDeviceInfoListDetailW.Addr(), 2, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoSetDetailData)), 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
