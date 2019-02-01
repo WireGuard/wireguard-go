@@ -135,3 +135,27 @@ func TestSetupDiOpenDevRegKey(t *testing.T) {
 		defer key.Close()
 	}
 }
+
+func TestSetupDiGetDeviceInstallParams(t *testing.T) {
+	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, DIGCF_PRESENT, DevInfo(0), "")
+	if err != nil {
+		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
+	}
+	defer devInfoList.Close()
+
+	var data SP_DEVINFO_DATA
+	for i := 0; true; i++ {
+		err := SetupDiEnumDeviceInfo(devInfoList, i, &data)
+		if err != nil {
+			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+				break
+			}
+			continue
+		}
+
+		_, err = SetupDiGetDeviceInstallParams(devInfoList, &data)
+		if err != nil {
+			t.Errorf("Error calling SetupDiOpenDevRegKey: %s", err.Error())
+		}
+	}
+}
