@@ -46,6 +46,8 @@ var (
 	procSetupDiOpenDevRegKey            = modsetupapi.NewProc("SetupDiOpenDevRegKey")
 	procSetupDiGetDeviceInstallParamsW  = modsetupapi.NewProc("SetupDiGetDeviceInstallParamsW")
 	procSetupDiSetDeviceInstallParamsW  = modsetupapi.NewProc("SetupDiSetDeviceInstallParamsW")
+	procSetupDiGetClassInstallParamsW   = modsetupapi.NewProc("SetupDiGetClassInstallParamsW")
+	procSetupDiSetClassInstallParamsW   = modsetupapi.NewProc("SetupDiSetClassInstallParamsW")
 )
 
 func setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) {
@@ -124,6 +126,30 @@ func setupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEV
 
 func setupDiSetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) {
 	r1, _, e1 := syscall.Syscall(procSetupDiSetDeviceInstallParamsW.Addr(), 3, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(DeviceInstallParams)))
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func SetupDiGetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32, RequiredSize *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiGetClassInstallParamsW.Addr(), 5, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(ClassInstallParams)), uintptr(ClassInstallParamsSize), uintptr(unsafe.Pointer(RequiredSize)), 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func SetupDiSetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiSetClassInstallParamsW.Addr(), 4, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(ClassInstallParams)), uintptr(ClassInstallParamsSize), 0, 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
