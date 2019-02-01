@@ -42,6 +42,7 @@ var (
 	procSetupDiGetClassDevsExW          = modsetupapi.NewProc("SetupDiGetClassDevsExW")
 	procSetupDiDestroyDeviceInfoList    = modsetupapi.NewProc("SetupDiDestroyDeviceInfoList")
 	procSetupDiGetDeviceInfoListDetailW = modsetupapi.NewProc("SetupDiGetDeviceInfoListDetailW")
+	procSetupDiEnumDeviceInfo           = modsetupapi.NewProc("SetupDiEnumDeviceInfo")
 )
 
 func setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) {
@@ -69,8 +70,20 @@ func SetupDiDestroyDeviceInfoList(DeviceInfoSet DevInfo) (err error) {
 	return
 }
 
-func setupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo, DeviceInfoSetDetailData *SP_DEVINFO_LIST_DETAIL_DATA) (err error) {
+func setupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo, DeviceInfoSetDetailData *_SP_DEVINFO_LIST_DETAIL_DATA) (err error) {
 	r1, _, e1 := syscall.Syscall(procSetupDiGetDeviceInfoListDetailW.Addr(), 2, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoSetDetailData)), 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func setupDiEnumDeviceInfo(DeviceInfoSet DevInfo, MemberIndex uint32, DeviceInfoData *_SP_DEVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiEnumDeviceInfo.Addr(), 3, uintptr(DeviceInfoSet), uintptr(MemberIndex), uintptr(unsafe.Pointer(DeviceInfoData)))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)

@@ -37,8 +37,7 @@ const (
 	SP_MAX_MACHINENAME_LENGTH = windows.MAX_PATH + 3
 )
 
-// SP_DEVINFO_LIST_DETAIL_DATA is a structure for detailed information on a device information set (used for SetupDiGetDeviceInfoListDetail which supercedes the functionality of SetupDiGetDeviceInfoListClass).
-type SP_DEVINFO_LIST_DETAIL_DATA struct {
+type _SP_DEVINFO_LIST_DETAIL_DATA struct {
 	Size                uint32
 	ClassGUID           windows.GUID
 	RemoteMachineHandle windows.Handle
@@ -50,4 +49,17 @@ type DevInfoListDetailData struct {
 	ClassGUID           windows.GUID
 	RemoteMachineHandle windows.Handle
 	RemoteMachineName   string
+}
+
+type _SP_DEVINFO_DATA struct {
+	Size      uint32
+	ClassGUID windows.GUID
+	DevInst   uint32 // DEVINST handle
+	_         uintptr
+}
+
+// DevInfoData is a device information structure (references a device instance that is a member of a device information set)
+type DevInfoData struct {
+	ClassGUID windows.GUID
+	DevInst   uint32 // DEVINST handle
 }
