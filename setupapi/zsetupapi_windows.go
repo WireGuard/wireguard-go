@@ -39,22 +39,26 @@ func errnoErr(e syscall.Errno) error {
 var (
 	modsetupapi = windows.NewLazySystemDLL("setupapi.dll")
 
-	procSetupDiGetClassDevsExW = modsetupapi.NewProc("SetupDiGetClassDevsExW")
+	procSetupDiGetClassDevsExW       = modsetupapi.NewProc("SetupDiGetClassDevsExW")
+	procSetupDiDestroyDeviceInfoList = modsetupapi.NewProc("SetupDiDestroyDeviceInfoList")
 )
 
-func setupDiGetClassDevsEx(ClassGuid *windows.GUID, Enumerator *string, hwndParent uintptr, Flags uint32, DeviceInfoSet uintptr, MachineName string, reserved uint32) (handle windows.Handle, err error) {
-	var _p0 *uint16
-	_p0, err = syscall.UTF16PtrFromString(MachineName)
-	if err != nil {
-		return
+func setupDiGetClassDevsEx(ClassGuid *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) {
+	r0, _, e1 := syscall.Syscall9(procSetupDiGetClassDevsExW.Addr(), 7, uintptr(unsafe.Pointer(ClassGuid)), uintptr(unsafe.Pointer(Enumerator)), uintptr(hwndParent), uintptr(Flags), uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(MachineName)), uintptr(reserved), 0, 0)
+	handle = DevInfo(r0)
+	if handle == DevInfo(windows.InvalidHandle) {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
 	}
-	return _setupDiGetClassDevsEx(ClassGuid, Enumerator, hwndParent, Flags, DeviceInfoSet, _p0, reserved)
+	return
 }
 
-func _setupDiGetClassDevsEx(ClassGuid *windows.GUID, Enumerator *string, hwndParent uintptr, Flags uint32, DeviceInfoSet uintptr, MachineName *uint16, reserved uint32) (handle windows.Handle, err error) {
-	r0, _, e1 := syscall.Syscall9(procSetupDiGetClassDevsExW.Addr(), 7, uintptr(unsafe.Pointer(ClassGuid)), uintptr(unsafe.Pointer(Enumerator)), uintptr(hwndParent), uintptr(Flags), uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(MachineName)), uintptr(reserved), 0, 0)
-	handle = windows.Handle(r0)
-	if handle == 0 {
+func SetupDiDestroyDeviceInfoList(DeviceInfoSet DevInfo) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiDestroyDeviceInfoList.Addr(), 1, uintptr(DeviceInfoSet), 0, 0)
+	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
 		} else {
