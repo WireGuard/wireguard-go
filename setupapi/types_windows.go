@@ -51,15 +51,28 @@ type DevInfoListDetailData struct {
 	RemoteMachineName   string
 }
 
-type _SP_DEVINFO_DATA struct {
+// SP_DEVINFO_DATA is a device information structure (references a device instance that is a member of a device information set)
+type SP_DEVINFO_DATA struct {
 	Size      uint32
 	ClassGUID windows.GUID
 	DevInst   uint32 // DEVINST handle
 	_         uintptr
 }
 
-// DevInfoData is a device information structure (references a device instance that is a member of a device information set)
-type DevInfoData struct {
-	ClassGUID windows.GUID
-	DevInst   uint32 // DEVINST handle
-}
+// DICS_FLAG specifies the scope of a device property change
+type DICS_FLAG uint32
+
+const (
+	DICS_FLAG_GLOBAL         DICS_FLAG = 0x00000001 // make change in all hardware profiles
+	DICS_FLAG_CONFIGSPECIFIC DICS_FLAG = 0x00000002 // make change in specified profile only
+	DICS_FLAG_CONFIGGENERAL  DICS_FLAG = 0x00000004 // 1 or more hardware profile-specific changes to follow
+)
+
+// DIREG specifies values for SetupDiCreateDevRegKey, SetupDiOpenDevRegKey, and SetupDiDeleteDevRegKey.
+type DIREG uint32
+
+const (
+	DIREG_DEV  DIREG = 0x00000001 // Open/Create/Delete device key
+	DIREG_DRV  DIREG = 0x00000002 // Open/Create/Delete driver key
+	DIREG_BOTH DIREG = 0x00000004 // Delete both driver and Device key
+)

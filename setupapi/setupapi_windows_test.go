@@ -43,7 +43,7 @@ func TestSetupDiGetDeviceInfoListDetailLocal(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
 	}
-	defer SetupDiDestroyDeviceInfoList(devInfoList)
+	defer devInfoList.Close()
 
 	data, err := SetupDiGetDeviceInfoListDetail(devInfoList)
 	if err != nil {
@@ -68,7 +68,7 @@ func TestSetupDiGetDeviceInfoListDetailRemote(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
 	}
-	defer SetupDiDestroyDeviceInfoList(devInfoList)
+	defer devInfoList.Close()
 
 	data, err := SetupDiGetDeviceInfoListDetail(devInfoList)
 	if err != nil {
@@ -93,10 +93,11 @@ func TestSetupDiEnumDeviceInfo(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
 	}
-	defer SetupDiDestroyDeviceInfoList(devInfoList)
+	defer devInfoList.Close()
 
+	var data SP_DEVINFO_DATA
 	for i := 0; true; i++ {
-		data, err := SetupDiEnumDeviceInfo(devInfoList, i)
+		err := SetupDiEnumDeviceInfo(devInfoList, i, &data)
 		if err != nil {
 			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
 				break
@@ -107,5 +108,30 @@ func TestSetupDiEnumDeviceInfo(t *testing.T) {
 		if data.ClassGUID != deviceClassNetGUID {
 			t.Error("SetupDiEnumDeviceInfo returned different class GUID")
 		}
+	}
+}
+
+func TestSetupDiOpenDevRegKey(t *testing.T) {
+	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, DIGCF_PRESENT, DevInfo(0), "")
+	if err != nil {
+		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
+	}
+	defer devInfoList.Close()
+
+	var data SP_DEVINFO_DATA
+	for i := 0; true; i++ {
+		err := SetupDiEnumDeviceInfo(devInfoList, i, &data)
+		if err != nil {
+			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+				break
+			}
+			continue
+		}
+
+		key, err := SetupDiOpenDevRegKey(devInfoList, &data, DICS_FLAG_GLOBAL, 0, DIREG_DRV, windows.KEY_READ)
+		if err != nil {
+			t.Errorf("Error calling SetupDiOpenDevRegKey: %s", err.Error())
+		}
+		defer key.Close()
 	}
 }
