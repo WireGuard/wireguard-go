@@ -9,6 +9,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// DIGCF flags controll what is included in the device information set built by SetupDiGetClassDevs
 type DIGCF uint32
 
 const (
@@ -19,9 +20,10 @@ const (
 	DIGCF_DEVICEINTERFACE DIGCF = 0x00000010
 )
 
+// DevInfo holds reference to device information set
 type DevInfo windows.Handle
 
-// SetupDiDestroyDeviceInfoList function deletes a device information set and frees all associated memory.
+// Close function deletes a device information set and frees all associated memory.
 func (h DevInfo) Close() error {
 	if h != DevInfo(windows.InvalidHandle) {
 		return SetupDiDestroyDeviceInfoList(h)
