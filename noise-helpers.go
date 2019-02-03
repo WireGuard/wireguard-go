@@ -78,12 +78,14 @@ func setZero(arr []byte) {
 	}
 }
 
-func newPrivateKey() (sk NoisePrivateKey, err error) {
-	// clamping: https://cr.yp.to/ecdh.html
-	_, err = rand.Read(sk[:])
+func (sk *NoisePrivateKey) clamp() {
 	sk[0] &= 248
-	sk[31] &= 127
-	sk[31] |= 64
+	sk[31] = (sk[31] & 127) | 64
+}
+
+func newPrivateKey() (sk NoisePrivateKey, err error) {
+	_, err = rand.Read(sk[:])
+	sk.clamp()
 	return
 }
 

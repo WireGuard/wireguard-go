@@ -45,8 +45,10 @@ func (key NoisePrivateKey) Equals(tar NoisePrivateKey) bool {
 	return subtle.ConstantTimeCompare(key[:], tar[:]) == 1
 }
 
-func (key *NoisePrivateKey) FromHex(src string) error {
-	return loadExactHex(key[:], src)
+func (key *NoisePrivateKey) FromHex(src string) (err error) {
+	err = loadExactHex(key[:], src)
+	key.clamp()
+	return
 }
 
 func (key NoisePrivateKey) ToHex() string {
