@@ -70,6 +70,29 @@ func TestSetupDiClassGuidsFromNameEx(t *testing.T) {
 	}
 }
 
+func TestSetupDiCreateDeviceInfoListEx(t *testing.T) {
+	devInfoList, err := SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, "")
+	if err == nil {
+		devInfoList.Close()
+	} else {
+		t.Errorf("Error calling SetupDiCreateDeviceInfoListEx: %s", err.Error())
+	}
+
+	devInfoList, err = SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, computerName)
+	if err == nil {
+		devInfoList.Close()
+	} else {
+		t.Errorf("Error calling SetupDiCreateDeviceInfoListEx: %s", err.Error())
+	}
+
+	devInfoList, err = SetupDiCreateDeviceInfoListEx(nil, 0, "")
+	if err == nil {
+		devInfoList.Close()
+	} else {
+		t.Errorf("Error calling SetupDiCreateDeviceInfoListEx(nil): %s", err.Error())
+	}
+}
+
 func TestSetupDiGetClassDevsEx(t *testing.T) {
 	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "PCI", 0, DIGCF_PRESENT, DevInfo(0), computerName)
 	if err == nil {

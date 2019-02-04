@@ -15,6 +15,7 @@ import (
 
 //sys	setupDiClassNameFromGuidEx(ClassGUID *windows.GUID, ClassName *uint16, ClassNameSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) = setupapi.SetupDiClassNameFromGuidExW
 //sys	setupDiClassGuidsFromNameEx(ClassName *uint16, ClassGuidList *windows.GUID, ClassGuidListSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) = setupapi.SetupDiClassGuidsFromNameExW
+//sys	setupDiCreateDeviceInfoListEx(ClassGUID *windows.GUID, hwndParent uintptr, MachineName *uint16, Reserved uintptr) (handle DevInfo, err error) [failretval==DevInfo(windows.InvalidHandle)] = setupapi.SetupDiCreateDeviceInfoListExW
 //sys	setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) [failretval==DevInfo(windows.InvalidHandle)] = setupapi.SetupDiGetClassDevsExW
 //sys	SetupDiDestroyDeviceInfoList(DeviceInfoSet DevInfo) (err error) = setupapi.SetupDiDestroyDeviceInfoList
 //sys	setupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo, DeviceInfoSetDetailData *_SP_DEVINFO_LIST_DETAIL_DATA) (err error) = setupapi.SetupDiGetDeviceInfoListDetailW
@@ -82,6 +83,18 @@ func SetupDiClassGuidsFromNameEx(ClassName string, MachineName string) (ClassGui
 	}
 
 	return
+}
+
+// SetupDiCreateDeviceInfoListEx function creates an empty device information set on a remote or a local computer and optionally associates the set with a device setup class.
+func SetupDiCreateDeviceInfoListEx(ClassGUID *windows.GUID, hwndParent uintptr, MachineName string) (handle DevInfo, err error) {
+	var machineNameUTF16 *uint16
+	if MachineName != "" {
+		machineNameUTF16, err = syscall.UTF16PtrFromString(MachineName)
+		if err != nil {
+			return
+		}
+	}
+	return setupDiCreateDeviceInfoListEx(ClassGUID, hwndParent, machineNameUTF16, 0)
 }
 
 // SetupDiGetClassDevsEx function returns a handle to a device information set that contains requested device information elements for a local or a remote computer.
