@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-//sys	setupDiClassNameFromGuid(ClassGUID *windows.GUID, ClassName *uint16, ClassNameSize uint32, RequiredSize *uint32) (err error) = setupapi.SetupDiClassNameFromGuidW
+//sys	setupDiClassNameFromGuidEx(ClassGUID *windows.GUID, ClassName *uint16, ClassNameSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) = setupapi.SetupDiClassNameFromGuidExW
 //sys	setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) [failretval==DevInfo(windows.InvalidHandle)] = setupapi.SetupDiGetClassDevsExW
 //sys	SetupDiDestroyDeviceInfoList(DeviceInfoSet DevInfo) (err error) = setupapi.SetupDiDestroyDeviceInfoList
 //sys	setupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo, DeviceInfoSetDetailData *_SP_DEVINFO_LIST_DETAIL_DATA) (err error) = setupapi.SetupDiGetDeviceInfoListDetailW
@@ -25,11 +25,19 @@ import (
 //sys	SetupDiSetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32) (err error) = setupapi.SetupDiSetClassInstallParamsW
 //sys	SetupDiCallClassInstaller(InstallFunction DI_FUNCTION, DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (err error) = setupapi.SetupDiCallClassInstaller
 
-// SetupDiClassNameFromGuid function retrieves the class name associated with a class GUID.
-func SetupDiClassNameFromGuid(ClassGUID *windows.GUID) (ClassName string, err error) {
+// SetupDiClassNameFromGuidEx function retrieves the class name associated with a class GUID. The class can be installed on a local or remote computer.
+func SetupDiClassNameFromGuidEx(ClassGUID *windows.GUID, MachineName string) (ClassName string, err error) {
 	var _p0 [MAX_CLASS_NAME_LEN]uint16
 
-	err = setupDiClassNameFromGuid(ClassGUID, &_p0[0], MAX_CLASS_NAME_LEN, nil)
+	var _p1 *uint16
+	if MachineName != "" {
+		_p1, err = syscall.UTF16PtrFromString(MachineName)
+		if err != nil {
+			return
+		}
+	}
+
+	err = setupDiClassNameFromGuidEx(ClassGUID, &_p0[0], MAX_CLASS_NAME_LEN, nil, _p1, 0)
 	if err != nil {
 		return
 	}

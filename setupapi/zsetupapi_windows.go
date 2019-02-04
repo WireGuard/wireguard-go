@@ -39,7 +39,7 @@ func errnoErr(e syscall.Errno) error {
 var (
 	modsetupapi = windows.NewLazySystemDLL("setupapi.dll")
 
-	procSetupDiClassNameFromGuidW       = modsetupapi.NewProc("SetupDiClassNameFromGuidW")
+	procSetupDiClassNameFromGuidExW     = modsetupapi.NewProc("SetupDiClassNameFromGuidExW")
 	procSetupDiGetClassDevsExW          = modsetupapi.NewProc("SetupDiGetClassDevsExW")
 	procSetupDiDestroyDeviceInfoList    = modsetupapi.NewProc("SetupDiDestroyDeviceInfoList")
 	procSetupDiGetDeviceInfoListDetailW = modsetupapi.NewProc("SetupDiGetDeviceInfoListDetailW")
@@ -52,8 +52,8 @@ var (
 	procSetupDiCallClassInstaller       = modsetupapi.NewProc("SetupDiCallClassInstaller")
 )
 
-func setupDiClassNameFromGuid(ClassGUID *windows.GUID, ClassName *uint16, ClassNameSize uint32, RequiredSize *uint32) (err error) {
-	r1, _, e1 := syscall.Syscall6(procSetupDiClassNameFromGuidW.Addr(), 4, uintptr(unsafe.Pointer(ClassGUID)), uintptr(unsafe.Pointer(ClassName)), uintptr(ClassNameSize), uintptr(unsafe.Pointer(RequiredSize)), 0, 0)
+func setupDiClassNameFromGuidEx(ClassGUID *windows.GUID, ClassName *uint16, ClassNameSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiClassNameFromGuidExW.Addr(), 6, uintptr(unsafe.Pointer(ClassGUID)), uintptr(unsafe.Pointer(ClassName)), uintptr(ClassNameSize), uintptr(unsafe.Pointer(RequiredSize)), uintptr(unsafe.Pointer(MachineName)), uintptr(Reserved))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)

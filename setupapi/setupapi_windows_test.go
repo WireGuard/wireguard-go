@@ -20,20 +20,27 @@ func init() {
 	computerName, _ = windows.ComputerName()
 }
 
-func TestSetupDiClassNameFromGuid(t *testing.T) {
-	className, err := SetupDiClassNameFromGuid(&deviceClassNetGUID)
+func TestSetupDiClassNameFromGuidEx(t *testing.T) {
+	className, err := SetupDiClassNameFromGuidEx(&deviceClassNetGUID, "")
 	if err != nil {
-		t.Errorf("Error calling SetupDiClassNameFromGuid: %s", err.Error())
+		t.Errorf("Error calling SetupDiClassNameFromGuidEx: %s", err.Error())
 	} else if strings.ToLower(className) != "net" {
-		t.Errorf("SetupDiClassNameFromGuid(%x) should return \"Net\"", deviceClassNetGUID)
+		t.Errorf("SetupDiClassNameFromGuidEx(%x) should return \"Net\"", deviceClassNetGUID)
 	}
 
-	_, err = SetupDiClassNameFromGuid(nil)
+	className, err = SetupDiClassNameFromGuidEx(&deviceClassNetGUID, computerName)
+	if err != nil {
+		t.Errorf("Error calling SetupDiClassNameFromGuidEx: %s", err.Error())
+	} else if strings.ToLower(className) != "net" {
+		t.Errorf("SetupDiClassNameFromGuidEx(%x) should return \"Net\"", deviceClassNetGUID)
+	}
+
+	_, err = SetupDiClassNameFromGuidEx(nil, "")
 	if err == nil {
-		t.Errorf("SetupDiClassNameFromGuid(nil) should fail")
+		t.Errorf("SetupDiClassNameFromGuidEx(nil) should fail")
 	} else {
 		if errWin, ok := err.(syscall.Errno); !ok || errWin != 1784 /*ERROR_INVALID_USER_BUFFER*/ {
-			t.Errorf("SetupDiClassNameFromGuid(nil) should fail with ERROR_INVALID_USER_BUFFER")
+			t.Errorf("SetupDiClassNameFromGuidEx(nil) should fail with ERROR_INVALID_USER_BUFFER")
 		}
 	}
 }
