@@ -45,6 +45,31 @@ func TestSetupDiClassNameFromGuidEx(t *testing.T) {
 	}
 }
 
+func TestSetupDiClassGuidsFromNameEx(t *testing.T) {
+	ClassGUIDs, err := SetupDiClassGuidsFromNameEx("Net", "")
+	if err != nil {
+		t.Errorf("Error calling SetupDiClassGuidsFromNameEx: %s", err.Error())
+	} else {
+		found := false
+		for i := range ClassGUIDs {
+			if ClassGUIDs[i] == deviceClassNetGUID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("SetupDiClassGuidsFromNameEx(\"Net\") should return %x", deviceClassNetGUID)
+		}
+	}
+
+	ClassGUIDs, err = SetupDiClassGuidsFromNameEx("foobar-34274a51-a6e6-45f0-80d6-c62be96dd5fe", computerName)
+	if err != nil {
+		t.Errorf("Error calling SetupDiClassGuidsFromNameEx: %s", err.Error())
+	} else if len(ClassGUIDs) != 0 {
+		t.Errorf("SetupDiClassGuidsFromNameEx(\"foobar-34274a51-a6e6-45f0-80d6-c62be96dd5fe\") should return an empty GUID set")
+	}
+}
+
 func TestSetupDiGetClassDevsEx(t *testing.T) {
 	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "PCI", 0, DIGCF_PRESENT, DevInfo(0), computerName)
 	if err == nil {

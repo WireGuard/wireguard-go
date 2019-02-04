@@ -14,6 +14,7 @@ import (
 )
 
 //sys	setupDiClassNameFromGuidEx(ClassGUID *windows.GUID, ClassName *uint16, ClassNameSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) = setupapi.SetupDiClassNameFromGuidExW
+//sys	setupDiClassGuidsFromNameEx(ClassName *uint16, ClassGuidList *windows.GUID, ClassGuidListSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) = setupapi.SetupDiClassGuidsFromNameExW
 //sys	setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) [failretval==DevInfo(windows.InvalidHandle)] = setupapi.SetupDiGetClassDevsExW
 //sys	SetupDiDestroyDeviceInfoList(DeviceInfoSet DevInfo) (err error) = setupapi.SetupDiDestroyDeviceInfoList
 //sys	setupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo, DeviceInfoSetDetailData *_SP_DEVINFO_LIST_DETAIL_DATA) (err error) = setupapi.SetupDiGetDeviceInfoListDetailW
@@ -43,6 +44,42 @@ func SetupDiClassNameFromGuidEx(ClassGUID *windows.GUID, MachineName string) (Cl
 	}
 
 	ClassName = windows.UTF16ToString(_p0[:])
+	return
+}
+
+// SetupDiClassGuidsFromNameEx function retrieves the GUIDs associated with the specified class name. This resulting list contains the classes currently installed on a local or remote computer.
+func SetupDiClassGuidsFromNameEx(ClassName string, MachineName string) (ClassGuidList []windows.GUID, err error) {
+	_p0, err := syscall.UTF16PtrFromString(ClassName)
+	if err != nil {
+		return
+	}
+
+	var _p1 [4]windows.GUID
+	var _p1reqSize uint32
+
+	var _p2 *uint16
+	if MachineName != "" {
+		_p2, err = syscall.UTF16PtrFromString(MachineName)
+		if err != nil {
+			return
+		}
+	}
+
+	err = setupDiClassGuidsFromNameEx(_p0, &_p1[0], 4, &_p1reqSize, _p2, 0)
+	if err == nil {
+		// The GUID array was sufficiently big. Return its slice.
+		return _p1[:_p1reqSize], nil
+	}
+
+	if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
+		// The GUID array was too small. Now that we got the required size, create another one big enough and retry.
+		_p1 := make([]windows.GUID, _p1reqSize)
+		err = setupDiClassGuidsFromNameEx(_p0, &_p1[0], _p1reqSize, &_p1reqSize, _p2, 0)
+		if err == nil {
+			return _p1[:_p1reqSize], nil
+		}
+	}
+
 	return
 }
 
