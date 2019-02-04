@@ -99,18 +99,18 @@ func TestSetupDiGetDeviceInfoListDetailLocal(t *testing.T) {
 	data, err := SetupDiGetDeviceInfoListDetail(devInfoList)
 	if err != nil {
 		t.Errorf("Error calling SetupDiGetDeviceInfoListDetail: %s", err.Error())
-	}
+	} else {
+		if data.ClassGUID != deviceClassNetGUID {
+			t.Error("SetupDiGetDeviceInfoListDetail returned different class GUID")
+		}
 
-	if data.ClassGUID != deviceClassNetGUID {
-		t.Error("SetupDiGetDeviceInfoListDetail returned different class GUID")
-	}
+		if data.RemoteMachineHandle != windows.Handle(0) {
+			t.Error("SetupDiGetDeviceInfoListDetail returned non-NULL remote machine handle")
+		}
 
-	if data.RemoteMachineHandle != windows.Handle(0) {
-		t.Error("SetupDiGetDeviceInfoListDetail returned non-NULL remote machine handle")
-	}
-
-	if data.RemoteMachineName != "" {
-		t.Error("SetupDiGetDeviceInfoListDetail returned non-NULL remote machine name")
+		if data.RemoteMachineName != "" {
+			t.Error("SetupDiGetDeviceInfoListDetail returned non-NULL remote machine name")
+		}
 	}
 }
 
@@ -124,18 +124,18 @@ func TestSetupDiGetDeviceInfoListDetailRemote(t *testing.T) {
 	data, err := SetupDiGetDeviceInfoListDetail(devInfoList)
 	if err != nil {
 		t.Errorf("Error calling SetupDiGetDeviceInfoListDetail: %s", err.Error())
-	}
+	} else {
+		if data.ClassGUID != deviceClassNetGUID {
+			t.Error("SetupDiGetDeviceInfoListDetail returned different class GUID")
+		}
 
-	if data.ClassGUID != deviceClassNetGUID {
-		t.Error("SetupDiGetDeviceInfoListDetail returned different class GUID")
-	}
+		if data.RemoteMachineHandle == windows.Handle(0) {
+			t.Error("SetupDiGetDeviceInfoListDetail returned NULL remote machine handle")
+		}
 
-	if data.RemoteMachineHandle == windows.Handle(0) {
-		t.Error("SetupDiGetDeviceInfoListDetail returned NULL remote machine handle")
-	}
-
-	if data.RemoteMachineName != computerName {
-		t.Error("SetupDiGetDeviceInfoListDetail returned different remote machine name")
+		if data.RemoteMachineName != computerName {
+			t.Error("SetupDiGetDeviceInfoListDetail returned different remote machine name")
+		}
 	}
 }
 
