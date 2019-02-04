@@ -9,6 +9,17 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+const (
+	MAX_DEVICE_ID_LEN   = 200
+	MAX_DEVNODE_ID_LEN  = MAX_DEVICE_ID_LEN
+	MAX_GUID_STRING_LEN = 39 // 38 chars + terminator null
+	MAX_CLASS_NAME_LEN  = 32
+	MAX_PROFILE_LEN     = 80
+	MAX_CONFIG_VALUE    = 9999
+	MAX_INSTANCE_VALUE  = 9999
+	CONFIGMG_VERSION    = 0x0400
+)
+
 // DIGCF flags controll what is included in the device information set built by SetupDiGetClassDevs
 type DIGCF uint32
 

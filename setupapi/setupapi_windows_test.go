@@ -6,6 +6,7 @@
 package setupapi
 
 import (
+	"strings"
 	"syscall"
 	"testing"
 
@@ -17,6 +18,24 @@ var computerName string
 
 func init() {
 	computerName, _ = windows.ComputerName()
+}
+
+func TestSetupDiClassNameFromGuid(t *testing.T) {
+	className, err := SetupDiClassNameFromGuid(&deviceClassNetGUID)
+	if err != nil {
+		t.Errorf("Error calling SetupDiClassNameFromGuid: %s", err.Error())
+	} else if strings.ToLower(className) != "net" {
+		t.Errorf("SetupDiClassNameFromGuid(%x) should return \"Net\"", deviceClassNetGUID)
+	}
+
+	_, err = SetupDiClassNameFromGuid(nil)
+	if err == nil {
+		t.Errorf("SetupDiClassNameFromGuid(nil) should fail")
+	} else {
+		if errWin, ok := err.(syscall.Errno); !ok || errWin != 1784 /*ERROR_INVALID_USER_BUFFER*/ {
+			t.Errorf("SetupDiClassNameFromGuid(nil) should fail with ERROR_INVALID_USER_BUFFER")
+		}
+	}
 }
 
 func TestSetupDiGetClassDevsEx(t *testing.T) {

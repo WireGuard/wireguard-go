@@ -39,6 +39,7 @@ func errnoErr(e syscall.Errno) error {
 var (
 	modsetupapi = windows.NewLazySystemDLL("setupapi.dll")
 
+	procSetupDiClassNameFromGuidW       = modsetupapi.NewProc("SetupDiClassNameFromGuidW")
 	procSetupDiGetClassDevsExW          = modsetupapi.NewProc("SetupDiGetClassDevsExW")
 	procSetupDiDestroyDeviceInfoList    = modsetupapi.NewProc("SetupDiDestroyDeviceInfoList")
 	procSetupDiGetDeviceInfoListDetailW = modsetupapi.NewProc("SetupDiGetDeviceInfoListDetailW")
@@ -50,6 +51,18 @@ var (
 	procSetupDiSetClassInstallParamsW   = modsetupapi.NewProc("SetupDiSetClassInstallParamsW")
 	procSetupDiCallClassInstaller       = modsetupapi.NewProc("SetupDiCallClassInstaller")
 )
+
+func setupDiClassNameFromGuid(ClassGUID *windows.GUID, ClassName *uint16, ClassNameSize uint32, RequiredSize *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiClassNameFromGuidW.Addr(), 4, uintptr(unsafe.Pointer(ClassGUID)), uintptr(unsafe.Pointer(ClassName)), uintptr(ClassNameSize), uintptr(unsafe.Pointer(RequiredSize)), 0, 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
 
 func setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) {
 	r0, _, e1 := syscall.Syscall9(procSetupDiGetClassDevsExW.Addr(), 7, uintptr(unsafe.Pointer(ClassGUID)), uintptr(unsafe.Pointer(Enumerator)), uintptr(hwndParent), uintptr(Flags), uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(MachineName)), uintptr(reserved), 0, 0)
