@@ -28,55 +28,56 @@ import (
 
 // SetupDiClassNameFromGuidEx function retrieves the class name associated with a class GUID. The class can be installed on a local or remote computer.
 func SetupDiClassNameFromGuidEx(ClassGUID *windows.GUID, MachineName string) (ClassName string, err error) {
-	var _p0 [MAX_CLASS_NAME_LEN]uint16
+	var classNameUTF16 [MAX_CLASS_NAME_LEN]uint16
 
-	var _p1 *uint16
+	var machineNameUTF16 *uint16
 	if MachineName != "" {
-		_p1, err = syscall.UTF16PtrFromString(MachineName)
+		machineNameUTF16, err = syscall.UTF16PtrFromString(MachineName)
 		if err != nil {
 			return
 		}
 	}
 
-	err = setupDiClassNameFromGuidEx(ClassGUID, &_p0[0], MAX_CLASS_NAME_LEN, nil, _p1, 0)
+	err = setupDiClassNameFromGuidEx(ClassGUID, &classNameUTF16[0], MAX_CLASS_NAME_LEN, nil, machineNameUTF16, 0)
 	if err != nil {
 		return
 	}
 
-	ClassName = windows.UTF16ToString(_p0[:])
+	ClassName = windows.UTF16ToString(classNameUTF16[:])
 	return
 }
 
 // SetupDiClassGuidsFromNameEx function retrieves the GUIDs associated with the specified class name. This resulting list contains the classes currently installed on a local or remote computer.
 func SetupDiClassGuidsFromNameEx(ClassName string, MachineName string) (ClassGuidList []windows.GUID, err error) {
-	_p0, err := syscall.UTF16PtrFromString(ClassName)
+	classNameUTF16, err := syscall.UTF16PtrFromString(ClassName)
 	if err != nil {
 		return
 	}
 
-	var _p1 [4]windows.GUID
-	var _p1reqSize uint32
+	const bufLen = 4
+	var buf [bufLen]windows.GUID
+	var bufCount uint32
 
-	var _p2 *uint16
+	var machineNameUTF16 *uint16
 	if MachineName != "" {
-		_p2, err = syscall.UTF16PtrFromString(MachineName)
+		machineNameUTF16, err = syscall.UTF16PtrFromString(MachineName)
 		if err != nil {
 			return
 		}
 	}
 
-	err = setupDiClassGuidsFromNameEx(_p0, &_p1[0], 4, &_p1reqSize, _p2, 0)
+	err = setupDiClassGuidsFromNameEx(classNameUTF16, &buf[0], bufLen, &bufCount, machineNameUTF16, 0)
 	if err == nil {
 		// The GUID array was sufficiently big. Return its slice.
-		return _p1[:_p1reqSize], nil
+		return buf[:bufCount], nil
 	}
 
 	if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
 		// The GUID array was too small. Now that we got the required size, create another one big enough and retry.
-		_p1 := make([]windows.GUID, _p1reqSize)
-		err = setupDiClassGuidsFromNameEx(_p0, &_p1[0], _p1reqSize, &_p1reqSize, _p2, 0)
+		buf := make([]windows.GUID, bufCount)
+		err = setupDiClassGuidsFromNameEx(classNameUTF16, &buf[0], bufCount, &bufCount, machineNameUTF16, 0)
 		if err == nil {
-			return _p1[:_p1reqSize], nil
+			return buf[:bufCount], nil
 		}
 	}
 
@@ -85,37 +86,37 @@ func SetupDiClassGuidsFromNameEx(ClassName string, MachineName string) (ClassGui
 
 // SetupDiGetClassDevsEx function returns a handle to a device information set that contains requested device information elements for a local or a remote computer.
 func SetupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator string, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName string) (handle DevInfo, err error) {
-	var _p0 *uint16
+	var enumeratorUTF16 *uint16
 	if Enumerator != "" {
-		_p0, err = syscall.UTF16PtrFromString(Enumerator)
+		enumeratorUTF16, err = syscall.UTF16PtrFromString(Enumerator)
 		if err != nil {
 			return
 		}
 	}
-	var _p1 *uint16
+	var machineNameUTF16 *uint16
 	if MachineName != "" {
-		_p1, err = syscall.UTF16PtrFromString(MachineName)
+		machineNameUTF16, err = syscall.UTF16PtrFromString(MachineName)
 		if err != nil {
 			return
 		}
 	}
-	return setupDiGetClassDevsEx(ClassGUID, _p0, hwndParent, Flags, DeviceInfoSet, _p1, 0)
+	return setupDiGetClassDevsEx(ClassGUID, enumeratorUTF16, hwndParent, Flags, DeviceInfoSet, machineNameUTF16, 0)
 }
 
 // SetupDiGetDeviceInfoListDetail function retrieves information associated with a device information set including the class GUID, remote computer handle, and remote computer name.
 func SetupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo) (data *DevInfoListDetailData, err error) {
-	var _p0 _SP_DEVINFO_LIST_DETAIL_DATA
-	_p0.Size = uint32(unsafe.Sizeof(_p0))
+	var _data _SP_DEVINFO_LIST_DETAIL_DATA
+	_data.Size = uint32(unsafe.Sizeof(_data))
 
-	err = setupDiGetDeviceInfoListDetail(DeviceInfoSet, &_p0)
+	err = setupDiGetDeviceInfoListDetail(DeviceInfoSet, &_data)
 	if err != nil {
 		return
 	}
 
 	data = &DevInfoListDetailData{
-		ClassGUID:           _p0.ClassGUID,
-		RemoteMachineHandle: _p0.RemoteMachineHandle,
-		RemoteMachineName:   windows.UTF16ToString(_p0.RemoteMachineName[:]),
+		ClassGUID:           _data.ClassGUID,
+		RemoteMachineHandle: _data.RemoteMachineHandle,
+		RemoteMachineName:   windows.UTF16ToString(_data.RemoteMachineName[:]),
 	}
 	return
 }
@@ -134,29 +135,29 @@ func SetupDiOpenDevRegKey(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA
 
 // SetupDiGetDeviceInstallParams function retrieves device installation parameters for a device information set or a particular device information element.
 func SetupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (data *DevInstallParams, err error) {
-	var DeviceInstallParams _SP_DEVINSTALL_PARAMS
-	DeviceInstallParams.Size = uint32(unsafe.Sizeof(DeviceInstallParams))
+	var _data _SP_DEVINSTALL_PARAMS
+	_data.Size = uint32(unsafe.Sizeof(_data))
 
-	err = setupDiGetDeviceInstallParams(DeviceInfoSet, DeviceInfoData, &DeviceInstallParams)
+	err = setupDiGetDeviceInstallParams(DeviceInfoSet, DeviceInfoData, &_data)
 	if err != nil {
 		return
 	}
 
 	data = &DevInstallParams{
-		Flags:                    DeviceInstallParams.Flags,
-		FlagsEx:                  DeviceInstallParams.FlagsEx,
-		hwndParent:               DeviceInstallParams.hwndParent,
-		InstallMsgHandler:        DeviceInstallParams.InstallMsgHandler,
-		InstallMsgHandlerContext: DeviceInstallParams.InstallMsgHandlerContext,
-		FileQueue:                DeviceInstallParams.FileQueue,
-		DriverPath:               windows.UTF16ToString(DeviceInstallParams.DriverPath[:]),
+		Flags:                    _data.Flags,
+		FlagsEx:                  _data.FlagsEx,
+		hwndParent:               _data.hwndParent,
+		InstallMsgHandler:        _data.InstallMsgHandler,
+		InstallMsgHandlerContext: _data.InstallMsgHandlerContext,
+		FileQueue:                _data.FileQueue,
+		DriverPath:               windows.UTF16ToString(_data.DriverPath[:]),
 	}
 	return
 }
 
 // SetupDiSetDeviceInstallParams function sets device installation parameters for a device information set or a particular device information element.
 func SetupDiSetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *DevInstallParams) (err error) {
-	data := _SP_DEVINSTALL_PARAMS{
+	_data := _SP_DEVINSTALL_PARAMS{
 		Flags:                    DeviceInstallParams.Flags,
 		FlagsEx:                  DeviceInstallParams.FlagsEx,
 		hwndParent:               DeviceInstallParams.hwndParent,
@@ -164,13 +165,13 @@ func SetupDiSetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEV
 		InstallMsgHandlerContext: DeviceInstallParams.InstallMsgHandlerContext,
 		FileQueue:                DeviceInstallParams.FileQueue,
 	}
-	data.Size = uint32(unsafe.Sizeof(data))
+	_data.Size = uint32(unsafe.Sizeof(_data))
 
-	_p0, err := syscall.UTF16FromString(DeviceInstallParams.DriverPath)
+	driverPathUTF16, err := syscall.UTF16FromString(DeviceInstallParams.DriverPath)
 	if err != nil {
 		return
 	}
-	copy(data.DriverPath[:], _p0)
+	copy(_data.DriverPath[:], driverPathUTF16)
 
-	return setupDiSetDeviceInstallParams(DeviceInfoSet, DeviceInfoData, &data)
+	return setupDiSetDeviceInstallParams(DeviceInfoSet, DeviceInfoData, &_data)
 }
