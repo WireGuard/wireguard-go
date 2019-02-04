@@ -20,7 +20,15 @@ const (
 	CONFIGMG_VERSION    = 0x0400
 )
 
-// DIGCF flags controll what is included in the device information set built by SetupDiGetClassDevs
+// DICD flags control SetupDiCreateDeviceInfo
+type DICD uint32
+
+const (
+	DICD_GENERATE_ID       DICD = 0x00000001
+	DICD_INHERIT_CLASSDRVS DICD = 0x00000002
+)
+
+// DIGCF flags control what is included in the device information set built by SetupDiGetClassDevs
 type DIGCF uint32
 
 const (

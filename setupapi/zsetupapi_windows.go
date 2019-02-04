@@ -41,6 +41,7 @@ var (
 
 	procSetupDiClassNameFromGuidExW     = modsetupapi.NewProc("SetupDiClassNameFromGuidExW")
 	procSetupDiClassGuidsFromNameExW    = modsetupapi.NewProc("SetupDiClassGuidsFromNameExW")
+	procSetupDiCreateDeviceInfoW        = modsetupapi.NewProc("SetupDiCreateDeviceInfoW")
 	procSetupDiCreateDeviceInfoListExW  = modsetupapi.NewProc("SetupDiCreateDeviceInfoListExW")
 	procSetupDiGetClassDevsExW          = modsetupapi.NewProc("SetupDiGetClassDevsExW")
 	procSetupDiDestroyDeviceInfoList    = modsetupapi.NewProc("SetupDiDestroyDeviceInfoList")
@@ -68,6 +69,18 @@ func setupDiClassNameFromGuidEx(ClassGUID *windows.GUID, ClassName *uint16, Clas
 
 func setupDiClassGuidsFromNameEx(ClassName *uint16, ClassGuidList *windows.GUID, ClassGuidListSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) {
 	r1, _, e1 := syscall.Syscall6(procSetupDiClassGuidsFromNameExW.Addr(), 6, uintptr(unsafe.Pointer(ClassName)), uintptr(unsafe.Pointer(ClassGuidList)), uintptr(ClassGuidListSize), uintptr(unsafe.Pointer(RequiredSize)), uintptr(unsafe.Pointer(MachineName)), uintptr(Reserved))
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func setupDiCreateDeviceInfo(DeviceInfoSet DevInfo, DeviceName *uint16, ClassGUID *windows.GUID, DeviceDescription *uint16, hwndParent uintptr, CreationFlags DICD, DeviceInfoData *SP_DEVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall9(procSetupDiCreateDeviceInfoW.Addr(), 7, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceName)), uintptr(unsafe.Pointer(ClassGUID)), uintptr(unsafe.Pointer(DeviceDescription)), uintptr(hwndParent), uintptr(CreationFlags), uintptr(unsafe.Pointer(DeviceInfoData)), 0, 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)

@@ -15,6 +15,7 @@ import (
 
 //sys	setupDiClassNameFromGuidEx(ClassGUID *windows.GUID, ClassName *uint16, ClassNameSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) = setupapi.SetupDiClassNameFromGuidExW
 //sys	setupDiClassGuidsFromNameEx(ClassName *uint16, ClassGuidList *windows.GUID, ClassGuidListSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) = setupapi.SetupDiClassGuidsFromNameExW
+//sys	setupDiCreateDeviceInfo(DeviceInfoSet DevInfo, DeviceName *uint16, ClassGUID *windows.GUID, DeviceDescription *uint16, hwndParent uintptr, CreationFlags DICD, DeviceInfoData *SP_DEVINFO_DATA) (err error) = setupapi.SetupDiCreateDeviceInfoW
 //sys	setupDiCreateDeviceInfoListEx(ClassGUID *windows.GUID, hwndParent uintptr, MachineName *uint16, Reserved uintptr) (handle DevInfo, err error) [failretval==DevInfo(windows.InvalidHandle)] = setupapi.SetupDiCreateDeviceInfoListExW
 //sys	setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) [failretval==DevInfo(windows.InvalidHandle)] = setupapi.SetupDiGetClassDevsExW
 //sys	SetupDiDestroyDeviceInfoList(DeviceInfoSet DevInfo) (err error) = setupapi.SetupDiDestroyDeviceInfoList
@@ -83,6 +84,27 @@ func SetupDiClassGuidsFromNameEx(ClassName string, MachineName string) (ClassGui
 	}
 
 	return
+}
+
+// SetupDiCreateDeviceInfo function creates a new device information element and adds it as a new member to the specified device information set.
+func SetupDiCreateDeviceInfo(DeviceInfoSet DevInfo, DeviceName string, ClassGUID *windows.GUID, DeviceDescription string, hwndParent uintptr, CreationFlags DICD) (DeviceInfoData *SP_DEVINFO_DATA, err error) {
+	deviceNameUTF16, err := syscall.UTF16PtrFromString(DeviceName)
+	if err != nil {
+		return
+	}
+
+	var deviceDescriptionUTF16 *uint16
+	if DeviceDescription != "" {
+		deviceDescriptionUTF16, err = syscall.UTF16PtrFromString(DeviceDescription)
+		if err != nil {
+			return
+		}
+	}
+
+	data := SP_DEVINFO_DATA{}
+	data.Size = uint32(unsafe.Sizeof(data))
+
+	return &data, setupDiCreateDeviceInfo(DeviceInfoSet, deviceNameUTF16, ClassGUID, deviceDescriptionUTF16, hwndParent, CreationFlags, &data)
 }
 
 // SetupDiCreateDeviceInfoListEx function creates an empty device information set on a remote or a local computer and optionally associates the set with a device setup class.

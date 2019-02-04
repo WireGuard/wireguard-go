@@ -70,6 +70,29 @@ func TestSetupDiClassGuidsFromNameEx(t *testing.T) {
 	}
 }
 
+func TestSetupDiCreateDeviceInfo(t *testing.T) {
+	devInfoList, err := SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, computerName)
+	if err != nil {
+		t.Errorf("Error calling SetupDiCreateDeviceInfoListEx: %s", err.Error())
+	}
+	defer devInfoList.Close()
+
+	deviceClassNetName, err := SetupDiClassNameFromGuidEx(&deviceClassNetGUID, computerName)
+	if err != nil {
+		t.Errorf("Error calling SetupDiClassNameFromGuidEx: %s", err.Error())
+	}
+
+	devInfoData, err := SetupDiCreateDeviceInfo(devInfoList, deviceClassNetName, &deviceClassNetGUID, "This is a test device", 0, DICD_GENERATE_ID)
+	if err != nil {
+		// Access denied is expected, as the SetupDiCreateDeviceInfo() require elevation to succeed.
+		if errWin, ok := err.(syscall.Errno); !ok || errWin != windows.ERROR_ACCESS_DENIED {
+			t.Errorf("Error calling SetupDiCreateDeviceInfo: %s", err.Error())
+		}
+	} else if devInfoData.ClassGUID != deviceClassNetGUID {
+		t.Error("SetupDiCreateDeviceInfo returned different class GUID")
+	}
+}
+
 func TestSetupDiCreateDeviceInfoListEx(t *testing.T) {
 	devInfoList, err := SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, "")
 	if err == nil {
