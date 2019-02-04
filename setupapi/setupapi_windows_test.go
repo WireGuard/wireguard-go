@@ -21,17 +21,17 @@ func init() {
 }
 
 func TestSetupDiClassNameFromGuidEx(t *testing.T) {
-	className, err := SetupDiClassNameFromGuidEx(&deviceClassNetGUID, "")
+	deviceClassNetName, err := SetupDiClassNameFromGuidEx(&deviceClassNetGUID, "")
 	if err != nil {
 		t.Errorf("Error calling SetupDiClassNameFromGuidEx: %s", err.Error())
-	} else if strings.ToLower(className) != "net" {
+	} else if strings.ToLower(deviceClassNetName) != "net" {
 		t.Errorf("SetupDiClassNameFromGuidEx(%x) should return \"Net\"", deviceClassNetGUID)
 	}
 
-	className, err = SetupDiClassNameFromGuidEx(&deviceClassNetGUID, computerName)
+	deviceClassNetName, err = SetupDiClassNameFromGuidEx(&deviceClassNetGUID, computerName)
 	if err != nil {
 		t.Errorf("Error calling SetupDiClassNameFromGuidEx: %s", err.Error())
-	} else if strings.ToLower(className) != "net" {
+	} else if strings.ToLower(deviceClassNetName) != "net" {
 		t.Errorf("SetupDiClassNameFromGuidEx(%x) should return \"Net\"", deviceClassNetGUID)
 	}
 

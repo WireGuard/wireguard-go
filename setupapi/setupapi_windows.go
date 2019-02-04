@@ -104,7 +104,7 @@ func SetupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator string, hwndParen
 }
 
 // SetupDiGetDeviceInfoListDetail function retrieves information associated with a device information set including the class GUID, remote computer handle, and remote computer name.
-func SetupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo) (data *DevInfoListDetailData, err error) {
+func SetupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo) (DeviceInfoSetDetailData *DevInfoListDetailData, err error) {
 	var _data _SP_DEVINFO_LIST_DETAIL_DATA
 	_data.Size = uint32(unsafe.Sizeof(_data))
 
@@ -113,12 +113,11 @@ func SetupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo) (data *DevInfoListDet
 		return
 	}
 
-	data = &DevInfoListDetailData{
+	return &DevInfoListDetailData{
 		ClassGUID:           _data.ClassGUID,
 		RemoteMachineHandle: _data.RemoteMachineHandle,
 		RemoteMachineName:   windows.UTF16ToString(_data.RemoteMachineName[:]),
-	}
-	return
+	}, nil
 }
 
 // SetupDiEnumDeviceInfo function returns a SP_DEVINFO_DATA structure that specifies a device information element in a device information set.
@@ -136,7 +135,7 @@ func SetupDiOpenDevRegKey(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA
 }
 
 // SetupDiGetDeviceInstallParams function retrieves device installation parameters for a device information set or a particular device information element.
-func SetupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (data *DevInstallParams, err error) {
+func SetupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (DeviceInstallParams *DevInstallParams, err error) {
 	var _data _SP_DEVINSTALL_PARAMS
 	_data.Size = uint32(unsafe.Sizeof(_data))
 
@@ -145,7 +144,7 @@ func SetupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEV
 		return
 	}
 
-	data = &DevInstallParams{
+	return &DevInstallParams{
 		Flags:                    _data.Flags,
 		FlagsEx:                  _data.FlagsEx,
 		hwndParent:               _data.hwndParent,
@@ -153,8 +152,7 @@ func SetupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEV
 		InstallMsgHandlerContext: _data.InstallMsgHandlerContext,
 		FileQueue:                _data.FileQueue,
 		DriverPath:               windows.UTF16ToString(_data.DriverPath[:]),
-	}
-	return
+	}, nil
 }
 
 // SetupDiSetDeviceInstallParams function sets device installation parameters for a device information set or a particular device information element.
