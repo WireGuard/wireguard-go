@@ -53,6 +53,8 @@ var (
 	procSetupDiSetClassInstallParamsW   = modsetupapi.NewProc("SetupDiSetClassInstallParamsW")
 	procSetupDiClassNameFromGuidExW     = modsetupapi.NewProc("SetupDiClassNameFromGuidExW")
 	procSetupDiClassGuidsFromNameExW    = modsetupapi.NewProc("SetupDiClassGuidsFromNameExW")
+	procSetupDiGetSelectedDevice        = modsetupapi.NewProc("SetupDiGetSelectedDevice")
+	procSetupDiSetSelectedDevice        = modsetupapi.NewProc("SetupDiSetSelectedDevice")
 )
 
 func setupDiCreateDeviceInfoListEx(ClassGUID *windows.GUID, hwndParent uintptr, MachineName *uint16, Reserved uintptr) (handle DevInfo, err error) {
@@ -216,6 +218,30 @@ func setupDiClassNameFromGuidEx(ClassGUID *windows.GUID, ClassName *uint16, Clas
 
 func setupDiClassGuidsFromNameEx(ClassName *uint16, ClassGuidList *windows.GUID, ClassGuidListSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) {
 	r1, _, e1 := syscall.Syscall6(procSetupDiClassGuidsFromNameExW.Addr(), 6, uintptr(unsafe.Pointer(ClassName)), uintptr(unsafe.Pointer(ClassGuidList)), uintptr(ClassGuidListSize), uintptr(unsafe.Pointer(RequiredSize)), uintptr(unsafe.Pointer(MachineName)), uintptr(Reserved))
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func setupDiGetSelectedDevice(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiGetSelectedDevice.Addr(), 2, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func SetupDiSetSelectedDevice(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiSetSelectedDevice.Addr(), 2, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)

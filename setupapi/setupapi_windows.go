@@ -227,3 +227,16 @@ func SetupDiClassGuidsFromNameEx(ClassName string, MachineName string) (ClassGui
 
 	return
 }
+
+//sys	setupDiGetSelectedDevice(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (err error) = setupapi.SetupDiGetSelectedDevice
+
+// SetupDiGetSelectedDevice function retrieves the selected device information element in a device information set.
+func SetupDiGetSelectedDevice(DeviceInfoSet DevInfo) (DeviceInfoData *SP_DEVINFO_DATA, err error) {
+	data := SP_DEVINFO_DATA{}
+	data.Size = uint32(unsafe.Sizeof(data))
+
+	return &data, setupDiGetSelectedDevice(DeviceInfoSet, &data)
+}
+
+// SetupDiSetSelectedDevice function sets a device information element as the selected member of a device information set. This function is typically used by an installation wizard.
+//sys	SetupDiSetSelectedDevice(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (err error) = setupapi.SetupDiSetSelectedDevice

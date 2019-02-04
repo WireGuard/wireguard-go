@@ -251,3 +251,42 @@ func TestSetupDiClassGuidsFromNameEx(t *testing.T) {
 		t.Errorf("SetupDiClassGuidsFromNameEx(\"foobar-34274a51-a6e6-45f0-80d6-c62be96dd5fe\") should return an empty GUID set")
 	}
 }
+
+func TestSetupDiGetSelectedDevice(t *testing.T) {
+	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, DIGCF_PRESENT, DevInfo(0), "")
+	if err != nil {
+		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
+	}
+	defer devInfoList.Close()
+
+	for i := 0; true; i++ {
+		data, err := SetupDiEnumDeviceInfo(devInfoList, i)
+		if err != nil {
+			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+				break
+			}
+			continue
+		}
+
+		err = SetupDiSetSelectedDevice(devInfoList, data)
+		if err != nil {
+			t.Errorf("Error calling SetupDiSetSelectedDevice: %s", err.Error())
+		}
+
+		data2, err := SetupDiGetSelectedDevice(devInfoList)
+		if err != nil {
+			t.Errorf("Error calling SetupDiGetSelectedDevice: %s", err.Error())
+		} else if *data != *data2 {
+			t.Error("SetupDiGetSelectedDevice returned different data than was set by SetupDiSetSelectedDevice")
+		}
+	}
+
+	err = SetupDiSetSelectedDevice(devInfoList, nil)
+	if err == nil {
+		t.Errorf("SetupDiSetSelectedDevice(nil) should fail")
+	} else {
+		if errWin, ok := err.(syscall.Errno); !ok || errWin != 87 /*ERROR_INVALID_PARAMETER*/ {
+			t.Errorf("SetupDiSetSelectedDevice(nil) should fail with ERROR_INVALID_USER_BUFFER")
+		}
+	}
+}
