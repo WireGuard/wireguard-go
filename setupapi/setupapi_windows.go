@@ -122,9 +122,11 @@ func SetupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo) (data *DevInfoListDet
 }
 
 // SetupDiEnumDeviceInfo function returns a SP_DEVINFO_DATA structure that specifies a device information element in a device information set.
-func SetupDiEnumDeviceInfo(DeviceInfoSet DevInfo, MemberIndex int, data *SP_DEVINFO_DATA) error {
-	data.Size = uint32(unsafe.Sizeof(*data))
-	return setupDiEnumDeviceInfo(DeviceInfoSet, uint32(MemberIndex), data)
+func SetupDiEnumDeviceInfo(DeviceInfoSet DevInfo, MemberIndex int) (DeviceInfoData *SP_DEVINFO_DATA, err error) {
+	data := SP_DEVINFO_DATA{}
+	data.Size = uint32(unsafe.Sizeof(data))
+
+	return &data, setupDiEnumDeviceInfo(DeviceInfoSet, uint32(MemberIndex), &data)
 }
 
 // SetupDiOpenDevRegKey function opens a registry key for device-specific configuration information.

@@ -146,9 +146,8 @@ func TestSetupDiEnumDeviceInfo(t *testing.T) {
 	}
 	defer devInfoList.Close()
 
-	var data SP_DEVINFO_DATA
 	for i := 0; true; i++ {
-		err := SetupDiEnumDeviceInfo(devInfoList, i, &data)
+		data, err := SetupDiEnumDeviceInfo(devInfoList, i)
 		if err != nil {
 			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
 				break
@@ -169,9 +168,8 @@ func TestSetupDiOpenDevRegKey(t *testing.T) {
 	}
 	defer devInfoList.Close()
 
-	var data SP_DEVINFO_DATA
 	for i := 0; true; i++ {
-		err := SetupDiEnumDeviceInfo(devInfoList, i, &data)
+		data, err := SetupDiEnumDeviceInfo(devInfoList, i)
 		if err != nil {
 			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
 				break
@@ -179,7 +177,7 @@ func TestSetupDiOpenDevRegKey(t *testing.T) {
 			continue
 		}
 
-		key, err := SetupDiOpenDevRegKey(devInfoList, &data, DICS_FLAG_GLOBAL, 0, DIREG_DRV, windows.KEY_READ)
+		key, err := SetupDiOpenDevRegKey(devInfoList, data, DICS_FLAG_GLOBAL, 0, DIREG_DRV, windows.KEY_READ)
 		if err != nil {
 			t.Errorf("Error calling SetupDiOpenDevRegKey: %s", err.Error())
 		}
@@ -194,9 +192,8 @@ func TestSetupDiGetDeviceInstallParams(t *testing.T) {
 	}
 	defer devInfoList.Close()
 
-	var data SP_DEVINFO_DATA
 	for i := 0; true; i++ {
-		err := SetupDiEnumDeviceInfo(devInfoList, i, &data)
+		data, err := SetupDiEnumDeviceInfo(devInfoList, i)
 		if err != nil {
 			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
 				break
@@ -204,7 +201,7 @@ func TestSetupDiGetDeviceInstallParams(t *testing.T) {
 			continue
 		}
 
-		_, err = SetupDiGetDeviceInstallParams(devInfoList, &data)
+		_, err = SetupDiGetDeviceInstallParams(devInfoList, data)
 		if err != nil {
 			t.Errorf("Error calling SetupDiOpenDevRegKey: %s", err.Error())
 		}
