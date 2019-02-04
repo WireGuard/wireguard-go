@@ -13,20 +13,160 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-//sys	setupDiClassNameFromGuidEx(ClassGUID *windows.GUID, ClassName *uint16, ClassNameSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) = setupapi.SetupDiClassNameFromGuidExW
-//sys	setupDiClassGuidsFromNameEx(ClassName *uint16, ClassGuidList *windows.GUID, ClassGuidListSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) = setupapi.SetupDiClassGuidsFromNameExW
-//sys	setupDiCreateDeviceInfo(DeviceInfoSet DevInfo, DeviceName *uint16, ClassGUID *windows.GUID, DeviceDescription *uint16, hwndParent uintptr, CreationFlags DICD, DeviceInfoData *SP_DEVINFO_DATA) (err error) = setupapi.SetupDiCreateDeviceInfoW
 //sys	setupDiCreateDeviceInfoListEx(ClassGUID *windows.GUID, hwndParent uintptr, MachineName *uint16, Reserved uintptr) (handle DevInfo, err error) [failretval==DevInfo(windows.InvalidHandle)] = setupapi.SetupDiCreateDeviceInfoListExW
-//sys	setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) [failretval==DevInfo(windows.InvalidHandle)] = setupapi.SetupDiGetClassDevsExW
-//sys	SetupDiDestroyDeviceInfoList(DeviceInfoSet DevInfo) (err error) = setupapi.SetupDiDestroyDeviceInfoList
+
+// SetupDiCreateDeviceInfoListEx function creates an empty device information set on a remote or a local computer and optionally associates the set with a device setup class.
+func SetupDiCreateDeviceInfoListEx(ClassGUID *windows.GUID, hwndParent uintptr, MachineName string) (handle DevInfo, err error) {
+	var machineNameUTF16 *uint16
+	if MachineName != "" {
+		machineNameUTF16, err = syscall.UTF16PtrFromString(MachineName)
+		if err != nil {
+			return
+		}
+	}
+	return setupDiCreateDeviceInfoListEx(ClassGUID, hwndParent, machineNameUTF16, 0)
+}
+
 //sys	setupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo, DeviceInfoSetDetailData *_SP_DEVINFO_LIST_DETAIL_DATA) (err error) = setupapi.SetupDiGetDeviceInfoListDetailW
+
+// SetupDiGetDeviceInfoListDetail function retrieves information associated with a device information set including the class GUID, remote computer handle, and remote computer name.
+func SetupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo) (DeviceInfoSetDetailData *DevInfoListDetailData, err error) {
+	var _data _SP_DEVINFO_LIST_DETAIL_DATA
+	_data.Size = uint32(unsafe.Sizeof(_data))
+
+	err = setupDiGetDeviceInfoListDetail(DeviceInfoSet, &_data)
+	if err != nil {
+		return
+	}
+
+	return &DevInfoListDetailData{
+		ClassGUID:           _data.ClassGUID,
+		RemoteMachineHandle: _data.RemoteMachineHandle,
+		RemoteMachineName:   windows.UTF16ToString(_data.RemoteMachineName[:]),
+	}, nil
+}
+
+//sys	setupDiCreateDeviceInfo(DeviceInfoSet DevInfo, DeviceName *uint16, ClassGUID *windows.GUID, DeviceDescription *uint16, hwndParent uintptr, CreationFlags DICD, DeviceInfoData *SP_DEVINFO_DATA) (err error) = setupapi.SetupDiCreateDeviceInfoW
+
+// SetupDiCreateDeviceInfo function creates a new device information element and adds it as a new member to the specified device information set.
+func SetupDiCreateDeviceInfo(DeviceInfoSet DevInfo, DeviceName string, ClassGUID *windows.GUID, DeviceDescription string, hwndParent uintptr, CreationFlags DICD) (DeviceInfoData *SP_DEVINFO_DATA, err error) {
+	deviceNameUTF16, err := syscall.UTF16PtrFromString(DeviceName)
+	if err != nil {
+		return
+	}
+
+	var deviceDescriptionUTF16 *uint16
+	if DeviceDescription != "" {
+		deviceDescriptionUTF16, err = syscall.UTF16PtrFromString(DeviceDescription)
+		if err != nil {
+			return
+		}
+	}
+
+	data := SP_DEVINFO_DATA{}
+	data.Size = uint32(unsafe.Sizeof(data))
+
+	return &data, setupDiCreateDeviceInfo(DeviceInfoSet, deviceNameUTF16, ClassGUID, deviceDescriptionUTF16, hwndParent, CreationFlags, &data)
+}
+
 //sys	setupDiEnumDeviceInfo(DeviceInfoSet DevInfo, MemberIndex uint32, DeviceInfoData *SP_DEVINFO_DATA) (err error) = setupapi.SetupDiEnumDeviceInfo
-//sys	setupDiOpenDevRegKey(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Scope DICS_FLAG, HwProfile uint32, KeyType DIREG, samDesired uint32) (key windows.Handle, err error) [failretval==windows.InvalidHandle] = setupapi.SetupDiOpenDevRegKey
-//sys	setupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) = setupapi.SetupDiGetDeviceInstallParamsW
-//sys	setupDiSetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) = setupapi.SetupDiSetDeviceInstallParamsW
-//sys	SetupDiGetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32, RequiredSize *uint32) (err error) = setupapi.SetupDiGetClassInstallParamsW
-//sys	SetupDiSetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32) (err error) = setupapi.SetupDiSetClassInstallParamsW
+
+// SetupDiEnumDeviceInfo function returns a SP_DEVINFO_DATA structure that specifies a device information element in a device information set.
+func SetupDiEnumDeviceInfo(DeviceInfoSet DevInfo, MemberIndex int) (DeviceInfoData *SP_DEVINFO_DATA, err error) {
+	data := SP_DEVINFO_DATA{}
+	data.Size = uint32(unsafe.Sizeof(data))
+
+	return &data, setupDiEnumDeviceInfo(DeviceInfoSet, uint32(MemberIndex), &data)
+}
+
+// SetupDiDestroyDeviceInfoList function deletes a device information set and frees all associated memory.
+//sys	SetupDiDestroyDeviceInfoList(DeviceInfoSet DevInfo) (err error) = setupapi.SetupDiDestroyDeviceInfoList
+
+//sys	setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) [failretval==DevInfo(windows.InvalidHandle)] = setupapi.SetupDiGetClassDevsExW
+
+// SetupDiGetClassDevsEx function returns a handle to a device information set that contains requested device information elements for a local or a remote computer.
+func SetupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator string, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName string) (handle DevInfo, err error) {
+	var enumeratorUTF16 *uint16
+	if Enumerator != "" {
+		enumeratorUTF16, err = syscall.UTF16PtrFromString(Enumerator)
+		if err != nil {
+			return
+		}
+	}
+	var machineNameUTF16 *uint16
+	if MachineName != "" {
+		machineNameUTF16, err = syscall.UTF16PtrFromString(MachineName)
+		if err != nil {
+			return
+		}
+	}
+	return setupDiGetClassDevsEx(ClassGUID, enumeratorUTF16, hwndParent, Flags, DeviceInfoSet, machineNameUTF16, 0)
+}
+
+// SetupDiCallClassInstaller function calls the appropriate class installer, and any registered co-installers, with the specified installation request (DIF code).
 //sys	SetupDiCallClassInstaller(InstallFunction DI_FUNCTION, DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (err error) = setupapi.SetupDiCallClassInstaller
+
+//sys	setupDiOpenDevRegKey(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Scope DICS_FLAG, HwProfile uint32, KeyType DIREG, samDesired uint32) (key windows.Handle, err error) [failretval==windows.InvalidHandle] = setupapi.SetupDiOpenDevRegKey
+
+// SetupDiOpenDevRegKey function opens a registry key for device-specific configuration information.
+func SetupDiOpenDevRegKey(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Scope DICS_FLAG, HwProfile uint32, KeyType DIREG, samDesired uint32) (key registry.Key, err error) {
+	handle, err := setupDiOpenDevRegKey(DeviceInfoSet, DeviceInfoData, Scope, HwProfile, KeyType, samDesired)
+	return registry.Key(handle), err
+}
+
+//sys	setupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) = setupapi.SetupDiGetDeviceInstallParamsW
+
+// SetupDiGetDeviceInstallParams function retrieves device installation parameters for a device information set or a particular device information element.
+func SetupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (DeviceInstallParams *DevInstallParams, err error) {
+	var _data _SP_DEVINSTALL_PARAMS
+	_data.Size = uint32(unsafe.Sizeof(_data))
+
+	err = setupDiGetDeviceInstallParams(DeviceInfoSet, DeviceInfoData, &_data)
+	if err != nil {
+		return
+	}
+
+	return &DevInstallParams{
+		Flags:                    _data.Flags,
+		FlagsEx:                  _data.FlagsEx,
+		hwndParent:               _data.hwndParent,
+		InstallMsgHandler:        _data.InstallMsgHandler,
+		InstallMsgHandlerContext: _data.InstallMsgHandlerContext,
+		FileQueue:                _data.FileQueue,
+		DriverPath:               windows.UTF16ToString(_data.DriverPath[:]),
+	}, nil
+}
+
+// SetupDiGetClassInstallParams function retrieves class installation parameters for a device information set or a particular device information element.
+//sys	SetupDiGetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32, RequiredSize *uint32) (err error) = setupapi.SetupDiGetClassInstallParamsW
+
+//sys	setupDiSetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) = setupapi.SetupDiSetDeviceInstallParamsW
+
+// SetupDiSetDeviceInstallParams function sets device installation parameters for a device information set or a particular device information element.
+func SetupDiSetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *DevInstallParams) (err error) {
+	_data := _SP_DEVINSTALL_PARAMS{
+		Flags:                    DeviceInstallParams.Flags,
+		FlagsEx:                  DeviceInstallParams.FlagsEx,
+		hwndParent:               DeviceInstallParams.hwndParent,
+		InstallMsgHandler:        DeviceInstallParams.InstallMsgHandler,
+		InstallMsgHandlerContext: DeviceInstallParams.InstallMsgHandlerContext,
+		FileQueue:                DeviceInstallParams.FileQueue,
+	}
+	_data.Size = uint32(unsafe.Sizeof(_data))
+
+	driverPathUTF16, err := syscall.UTF16FromString(DeviceInstallParams.DriverPath)
+	if err != nil {
+		return
+	}
+	copy(_data.DriverPath[:], driverPathUTF16)
+
+	return setupDiSetDeviceInstallParams(DeviceInfoSet, DeviceInfoData, &_data)
+}
+
+// SetupDiSetClassInstallParams function sets or clears class install parameters for a device information set or a particular device information element.
+//sys	SetupDiSetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32) (err error) = setupapi.SetupDiSetClassInstallParamsW
+
+//sys	setupDiClassNameFromGuidEx(ClassGUID *windows.GUID, ClassName *uint16, ClassNameSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) = setupapi.SetupDiClassNameFromGuidExW
 
 // SetupDiClassNameFromGuidEx function retrieves the class name associated with a class GUID. The class can be installed on a local or remote computer.
 func SetupDiClassNameFromGuidEx(ClassGUID *windows.GUID, MachineName string) (ClassName string, err error) {
@@ -48,6 +188,8 @@ func SetupDiClassNameFromGuidEx(ClassGUID *windows.GUID, MachineName string) (Cl
 	ClassName = windows.UTF16ToString(classNameUTF16[:])
 	return
 }
+
+//sys	setupDiClassGuidsFromNameEx(ClassName *uint16, ClassGuidList *windows.GUID, ClassGuidListSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) = setupapi.SetupDiClassGuidsFromNameExW
 
 // SetupDiClassGuidsFromNameEx function retrieves the GUIDs associated with the specified class name. This resulting list contains the classes currently installed on a local or remote computer.
 func SetupDiClassGuidsFromNameEx(ClassName string, MachineName string) (ClassGuidList []windows.GUID, err error) {
@@ -84,129 +226,4 @@ func SetupDiClassGuidsFromNameEx(ClassName string, MachineName string) (ClassGui
 	}
 
 	return
-}
-
-// SetupDiCreateDeviceInfo function creates a new device information element and adds it as a new member to the specified device information set.
-func SetupDiCreateDeviceInfo(DeviceInfoSet DevInfo, DeviceName string, ClassGUID *windows.GUID, DeviceDescription string, hwndParent uintptr, CreationFlags DICD) (DeviceInfoData *SP_DEVINFO_DATA, err error) {
-	deviceNameUTF16, err := syscall.UTF16PtrFromString(DeviceName)
-	if err != nil {
-		return
-	}
-
-	var deviceDescriptionUTF16 *uint16
-	if DeviceDescription != "" {
-		deviceDescriptionUTF16, err = syscall.UTF16PtrFromString(DeviceDescription)
-		if err != nil {
-			return
-		}
-	}
-
-	data := SP_DEVINFO_DATA{}
-	data.Size = uint32(unsafe.Sizeof(data))
-
-	return &data, setupDiCreateDeviceInfo(DeviceInfoSet, deviceNameUTF16, ClassGUID, deviceDescriptionUTF16, hwndParent, CreationFlags, &data)
-}
-
-// SetupDiCreateDeviceInfoListEx function creates an empty device information set on a remote or a local computer and optionally associates the set with a device setup class.
-func SetupDiCreateDeviceInfoListEx(ClassGUID *windows.GUID, hwndParent uintptr, MachineName string) (handle DevInfo, err error) {
-	var machineNameUTF16 *uint16
-	if MachineName != "" {
-		machineNameUTF16, err = syscall.UTF16PtrFromString(MachineName)
-		if err != nil {
-			return
-		}
-	}
-	return setupDiCreateDeviceInfoListEx(ClassGUID, hwndParent, machineNameUTF16, 0)
-}
-
-// SetupDiGetClassDevsEx function returns a handle to a device information set that contains requested device information elements for a local or a remote computer.
-func SetupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator string, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName string) (handle DevInfo, err error) {
-	var enumeratorUTF16 *uint16
-	if Enumerator != "" {
-		enumeratorUTF16, err = syscall.UTF16PtrFromString(Enumerator)
-		if err != nil {
-			return
-		}
-	}
-	var machineNameUTF16 *uint16
-	if MachineName != "" {
-		machineNameUTF16, err = syscall.UTF16PtrFromString(MachineName)
-		if err != nil {
-			return
-		}
-	}
-	return setupDiGetClassDevsEx(ClassGUID, enumeratorUTF16, hwndParent, Flags, DeviceInfoSet, machineNameUTF16, 0)
-}
-
-// SetupDiGetDeviceInfoListDetail function retrieves information associated with a device information set including the class GUID, remote computer handle, and remote computer name.
-func SetupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo) (DeviceInfoSetDetailData *DevInfoListDetailData, err error) {
-	var _data _SP_DEVINFO_LIST_DETAIL_DATA
-	_data.Size = uint32(unsafe.Sizeof(_data))
-
-	err = setupDiGetDeviceInfoListDetail(DeviceInfoSet, &_data)
-	if err != nil {
-		return
-	}
-
-	return &DevInfoListDetailData{
-		ClassGUID:           _data.ClassGUID,
-		RemoteMachineHandle: _data.RemoteMachineHandle,
-		RemoteMachineName:   windows.UTF16ToString(_data.RemoteMachineName[:]),
-	}, nil
-}
-
-// SetupDiEnumDeviceInfo function returns a SP_DEVINFO_DATA structure that specifies a device information element in a device information set.
-func SetupDiEnumDeviceInfo(DeviceInfoSet DevInfo, MemberIndex int) (DeviceInfoData *SP_DEVINFO_DATA, err error) {
-	data := SP_DEVINFO_DATA{}
-	data.Size = uint32(unsafe.Sizeof(data))
-
-	return &data, setupDiEnumDeviceInfo(DeviceInfoSet, uint32(MemberIndex), &data)
-}
-
-// SetupDiOpenDevRegKey function opens a registry key for device-specific configuration information.
-func SetupDiOpenDevRegKey(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Scope DICS_FLAG, HwProfile uint32, KeyType DIREG, samDesired uint32) (key registry.Key, err error) {
-	handle, err := setupDiOpenDevRegKey(DeviceInfoSet, DeviceInfoData, Scope, HwProfile, KeyType, samDesired)
-	return registry.Key(handle), err
-}
-
-// SetupDiGetDeviceInstallParams function retrieves device installation parameters for a device information set or a particular device information element.
-func SetupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (DeviceInstallParams *DevInstallParams, err error) {
-	var _data _SP_DEVINSTALL_PARAMS
-	_data.Size = uint32(unsafe.Sizeof(_data))
-
-	err = setupDiGetDeviceInstallParams(DeviceInfoSet, DeviceInfoData, &_data)
-	if err != nil {
-		return
-	}
-
-	return &DevInstallParams{
-		Flags:                    _data.Flags,
-		FlagsEx:                  _data.FlagsEx,
-		hwndParent:               _data.hwndParent,
-		InstallMsgHandler:        _data.InstallMsgHandler,
-		InstallMsgHandlerContext: _data.InstallMsgHandlerContext,
-		FileQueue:                _data.FileQueue,
-		DriverPath:               windows.UTF16ToString(_data.DriverPath[:]),
-	}, nil
-}
-
-// SetupDiSetDeviceInstallParams function sets device installation parameters for a device information set or a particular device information element.
-func SetupDiSetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *DevInstallParams) (err error) {
-	_data := _SP_DEVINSTALL_PARAMS{
-		Flags:                    DeviceInstallParams.Flags,
-		FlagsEx:                  DeviceInstallParams.FlagsEx,
-		hwndParent:               DeviceInstallParams.hwndParent,
-		InstallMsgHandler:        DeviceInstallParams.InstallMsgHandler,
-		InstallMsgHandlerContext: DeviceInstallParams.InstallMsgHandlerContext,
-		FileQueue:                DeviceInstallParams.FileQueue,
-	}
-	_data.Size = uint32(unsafe.Sizeof(_data))
-
-	driverPathUTF16, err := syscall.UTF16FromString(DeviceInstallParams.DriverPath)
-	if err != nil {
-		return
-	}
-	copy(_data.DriverPath[:], driverPathUTF16)
-
-	return setupDiSetDeviceInstallParams(DeviceInfoSet, DeviceInfoData, &_data)
 }

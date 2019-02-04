@@ -20,24 +20,13 @@ const (
 	CONFIGMG_VERSION    = 0x0400
 )
 
-// DICD flags control SetupDiCreateDeviceInfo
-type DICD uint32
-
 const (
-	DICD_GENERATE_ID       DICD = 0x00000001
-	DICD_INHERIT_CLASSDRVS DICD = 0x00000002
+	// SP_MAX_MACHINENAME_LENGTH defines maximum length of a machine name in the format expected by ConfigMgr32 CM_Connect_Machine (i.e., "\\\\MachineName\0").
+	SP_MAX_MACHINENAME_LENGTH = windows.MAX_PATH + 3
 )
 
-// DIGCF flags control what is included in the device information set built by SetupDiGetClassDevs
-type DIGCF uint32
-
-const (
-	DIGCF_DEFAULT         DIGCF = 0x00000001 // only valid with DIGCF_DEVICEINTERFACE
-	DIGCF_PRESENT         DIGCF = 0x00000002
-	DIGCF_ALLCLASSES      DIGCF = 0x00000004
-	DIGCF_PROFILE         DIGCF = 0x00000008
-	DIGCF_DEVICEINTERFACE DIGCF = 0x00000010
-)
+// HSPFILEQ is type for setup file queue
+type HSPFILEQ uintptr
 
 // DevInfo holds reference to device information set
 type DevInfo windows.Handle
@@ -47,10 +36,13 @@ func (h DevInfo) Close() error {
 	return SetupDiDestroyDeviceInfoList(h)
 }
 
-const (
-	// SP_MAX_MACHINENAME_LENGTH defines maximum length of a machine name in the format expected by ConfigMgr32 CM_Connect_Machine (i.e., "\\\\MachineName\0").
-	SP_MAX_MACHINENAME_LENGTH = windows.MAX_PATH + 3
-)
+// SP_DEVINFO_DATA is a device information structure (references a device instance that is a member of a device information set)
+type SP_DEVINFO_DATA struct {
+	Size      uint32
+	ClassGUID windows.GUID
+	DevInst   uint32 // DEVINST handle
+	_         uintptr
+}
 
 type _SP_DEVINFO_LIST_DETAIL_DATA struct {
 	Size                uint32
@@ -66,31 +58,74 @@ type DevInfoListDetailData struct {
 	RemoteMachineName   string
 }
 
-// SP_DEVINFO_DATA is a device information structure (references a device instance that is a member of a device information set)
-type SP_DEVINFO_DATA struct {
-	Size      uint32
-	ClassGUID windows.GUID
-	DevInst   uint32 // DEVINST handle
-	_         uintptr
+// DI_FUNCTION is function type for device installer
+type DI_FUNCTION uint32
+
+const (
+	DIF_SELECTDEVICE                   DI_FUNCTION = 0x00000001
+	DIF_INSTALLDEVICE                  DI_FUNCTION = 0x00000002
+	DIF_ASSIGNRESOURCES                DI_FUNCTION = 0x00000003
+	DIF_PROPERTIES                     DI_FUNCTION = 0x00000004
+	DIF_REMOVE                         DI_FUNCTION = 0x00000005
+	DIF_FIRSTTIMESETUP                 DI_FUNCTION = 0x00000006
+	DIF_FOUNDDEVICE                    DI_FUNCTION = 0x00000007
+	DIF_SELECTCLASSDRIVERS             DI_FUNCTION = 0x00000008
+	DIF_VALIDATECLASSDRIVERS           DI_FUNCTION = 0x00000009
+	DIF_INSTALLCLASSDRIVERS            DI_FUNCTION = 0x0000000A
+	DIF_CALCDISKSPACE                  DI_FUNCTION = 0x0000000B
+	DIF_DESTROYPRIVATEDATA             DI_FUNCTION = 0x0000000C
+	DIF_VALIDATEDRIVER                 DI_FUNCTION = 0x0000000D
+	DIF_DETECT                         DI_FUNCTION = 0x0000000F
+	DIF_INSTALLWIZARD                  DI_FUNCTION = 0x00000010
+	DIF_DESTROYWIZARDDATA              DI_FUNCTION = 0x00000011
+	DIF_PROPERTYCHANGE                 DI_FUNCTION = 0x00000012
+	DIF_ENABLECLASS                    DI_FUNCTION = 0x00000013
+	DIF_DETECTVERIFY                   DI_FUNCTION = 0x00000014
+	DIF_INSTALLDEVICEFILES             DI_FUNCTION = 0x00000015
+	DIF_UNREMOVE                       DI_FUNCTION = 0x00000016
+	DIF_SELECTBESTCOMPATDRV            DI_FUNCTION = 0x00000017
+	DIF_ALLOW_INSTALL                  DI_FUNCTION = 0x00000018
+	DIF_REGISTERDEVICE                 DI_FUNCTION = 0x00000019
+	DIF_NEWDEVICEWIZARD_PRESELECT      DI_FUNCTION = 0x0000001A
+	DIF_NEWDEVICEWIZARD_SELECT         DI_FUNCTION = 0x0000001B
+	DIF_NEWDEVICEWIZARD_PREANALYZE     DI_FUNCTION = 0x0000001C
+	DIF_NEWDEVICEWIZARD_POSTANALYZE    DI_FUNCTION = 0x0000001D
+	DIF_NEWDEVICEWIZARD_FINISHINSTALL  DI_FUNCTION = 0x0000001E
+	DIF_INSTALLINTERFACES              DI_FUNCTION = 0x00000020
+	DIF_DETECTCANCEL                   DI_FUNCTION = 0x00000021
+	DIF_REGISTER_COINSTALLERS          DI_FUNCTION = 0x00000022
+	DIF_ADDPROPERTYPAGE_ADVANCED       DI_FUNCTION = 0x00000023
+	DIF_ADDPROPERTYPAGE_BASIC          DI_FUNCTION = 0x00000024
+	DIF_TROUBLESHOOTER                 DI_FUNCTION = 0x00000026
+	DIF_POWERMESSAGEWAKE               DI_FUNCTION = 0x00000027
+	DIF_ADDREMOTEPROPERTYPAGE_ADVANCED DI_FUNCTION = 0x00000028
+	DIF_UPDATEDRIVER_UI                DI_FUNCTION = 0x00000029
+	DIF_FINISHINSTALL_ACTION           DI_FUNCTION = 0x0000002A
+)
+
+type _SP_DEVINSTALL_PARAMS struct {
+	Size                     uint32
+	Flags                    DI_FLAGS
+	FlagsEx                  DI_FLAGSEX
+	hwndParent               uintptr
+	InstallMsgHandler        uintptr
+	InstallMsgHandlerContext uintptr
+	FileQueue                HSPFILEQ
+	_                        uintptr
+	_                        uint32
+	DriverPath               [windows.MAX_PATH]uint16
 }
 
-// DICS_FLAG specifies the scope of a device property change
-type DICS_FLAG uint32
-
-const (
-	DICS_FLAG_GLOBAL         DICS_FLAG = 0x00000001 // make change in all hardware profiles
-	DICS_FLAG_CONFIGSPECIFIC DICS_FLAG = 0x00000002 // make change in specified profile only
-	DICS_FLAG_CONFIGGENERAL  DICS_FLAG = 0x00000004 // 1 or more hardware profile-specific changes to follow
-)
-
-// DIREG specifies values for SetupDiCreateDevRegKey, SetupDiOpenDevRegKey, and SetupDiDeleteDevRegKey.
-type DIREG uint32
-
-const (
-	DIREG_DEV  DIREG = 0x00000001 // Open/Create/Delete device key
-	DIREG_DRV  DIREG = 0x00000002 // Open/Create/Delete driver key
-	DIREG_BOTH DIREG = 0x00000004 // Delete both driver and Device key
-)
+// DevInstallParams is device installation parameters structure (associated with a particular device information element, or globally with a device information set)
+type DevInstallParams struct {
+	Flags                    DI_FLAGS
+	FlagsEx                  DI_FLAGSEX
+	hwndParent               uintptr
+	InstallMsgHandler        uintptr
+	InstallMsgHandlerContext uintptr
+	FileQueue                HSPFILEQ
+	DriverPath               string
+}
 
 // DI_FLAGS is SP_DEVINSTALL_PARAMS.Flags values
 type DI_FLAGS uint32
@@ -197,80 +232,45 @@ const (
 	DI_FLAGSEX_SEARCH_PUBLISHED_INFS    DI_FLAGSEX = 0x80000000 // Tell SetupDiBuildDriverInfoList to do a "published INF" search
 )
 
-// HSPFILEQ is type for setup file queue
-type HSPFILEQ uintptr
-
-type _SP_DEVINSTALL_PARAMS struct {
-	Size                     uint32
-	Flags                    DI_FLAGS
-	FlagsEx                  DI_FLAGSEX
-	hwndParent               uintptr
-	InstallMsgHandler        uintptr
-	InstallMsgHandlerContext uintptr
-	FileQueue                HSPFILEQ
-	_                        uintptr
-	_                        uint32
-	DriverPath               [windows.MAX_PATH]uint16
-}
-
-// DevInstallParams is device installation parameters structure (associated with a particular device information element, or globally with a device information set)
-type DevInstallParams struct {
-	Flags                    DI_FLAGS
-	FlagsEx                  DI_FLAGSEX
-	hwndParent               uintptr
-	InstallMsgHandler        uintptr
-	InstallMsgHandlerContext uintptr
-	FileQueue                HSPFILEQ
-	DriverPath               string
-}
-
-// DI_FUNCTION is function type for device installer
-type DI_FUNCTION uint32
-
-const (
-	DIF_SELECTDEVICE                   DI_FUNCTION = 0x00000001
-	DIF_INSTALLDEVICE                  DI_FUNCTION = 0x00000002
-	DIF_ASSIGNRESOURCES                DI_FUNCTION = 0x00000003
-	DIF_PROPERTIES                     DI_FUNCTION = 0x00000004
-	DIF_REMOVE                         DI_FUNCTION = 0x00000005
-	DIF_FIRSTTIMESETUP                 DI_FUNCTION = 0x00000006
-	DIF_FOUNDDEVICE                    DI_FUNCTION = 0x00000007
-	DIF_SELECTCLASSDRIVERS             DI_FUNCTION = 0x00000008
-	DIF_VALIDATECLASSDRIVERS           DI_FUNCTION = 0x00000009
-	DIF_INSTALLCLASSDRIVERS            DI_FUNCTION = 0x0000000A
-	DIF_CALCDISKSPACE                  DI_FUNCTION = 0x0000000B
-	DIF_DESTROYPRIVATEDATA             DI_FUNCTION = 0x0000000C
-	DIF_VALIDATEDRIVER                 DI_FUNCTION = 0x0000000D
-	DIF_DETECT                         DI_FUNCTION = 0x0000000F
-	DIF_INSTALLWIZARD                  DI_FUNCTION = 0x00000010
-	DIF_DESTROYWIZARDDATA              DI_FUNCTION = 0x00000011
-	DIF_PROPERTYCHANGE                 DI_FUNCTION = 0x00000012
-	DIF_ENABLECLASS                    DI_FUNCTION = 0x00000013
-	DIF_DETECTVERIFY                   DI_FUNCTION = 0x00000014
-	DIF_INSTALLDEVICEFILES             DI_FUNCTION = 0x00000015
-	DIF_UNREMOVE                       DI_FUNCTION = 0x00000016
-	DIF_SELECTBESTCOMPATDRV            DI_FUNCTION = 0x00000017
-	DIF_ALLOW_INSTALL                  DI_FUNCTION = 0x00000018
-	DIF_REGISTERDEVICE                 DI_FUNCTION = 0x00000019
-	DIF_NEWDEVICEWIZARD_PRESELECT      DI_FUNCTION = 0x0000001A
-	DIF_NEWDEVICEWIZARD_SELECT         DI_FUNCTION = 0x0000001B
-	DIF_NEWDEVICEWIZARD_PREANALYZE     DI_FUNCTION = 0x0000001C
-	DIF_NEWDEVICEWIZARD_POSTANALYZE    DI_FUNCTION = 0x0000001D
-	DIF_NEWDEVICEWIZARD_FINISHINSTALL  DI_FUNCTION = 0x0000001E
-	DIF_INSTALLINTERFACES              DI_FUNCTION = 0x00000020
-	DIF_DETECTCANCEL                   DI_FUNCTION = 0x00000021
-	DIF_REGISTER_COINSTALLERS          DI_FUNCTION = 0x00000022
-	DIF_ADDPROPERTYPAGE_ADVANCED       DI_FUNCTION = 0x00000023
-	DIF_ADDPROPERTYPAGE_BASIC          DI_FUNCTION = 0x00000024
-	DIF_TROUBLESHOOTER                 DI_FUNCTION = 0x00000026
-	DIF_POWERMESSAGEWAKE               DI_FUNCTION = 0x00000027
-	DIF_ADDREMOTEPROPERTYPAGE_ADVANCED DI_FUNCTION = 0x00000028
-	DIF_UPDATEDRIVER_UI                DI_FUNCTION = 0x00000029
-	DIF_FINISHINSTALL_ACTION           DI_FUNCTION = 0x0000002A
-)
-
 // SP_CLASSINSTALL_HEADER is the first member of any class install parameters structure. It contains the device installation request code that defines the format of the rest of the install parameters structure.
 type SP_CLASSINSTALL_HEADER struct {
 	Size            uint32
 	InstallFunction DI_FUNCTION
 }
+
+// DICS_FLAG specifies the scope of a device property change
+type DICS_FLAG uint32
+
+const (
+	DICS_FLAG_GLOBAL         DICS_FLAG = 0x00000001 // make change in all hardware profiles
+	DICS_FLAG_CONFIGSPECIFIC DICS_FLAG = 0x00000002 // make change in specified profile only
+	DICS_FLAG_CONFIGGENERAL  DICS_FLAG = 0x00000004 // 1 or more hardware profile-specific changes to follow
+)
+
+// DICD flags control SetupDiCreateDeviceInfo
+type DICD uint32
+
+const (
+	DICD_GENERATE_ID       DICD = 0x00000001
+	DICD_INHERIT_CLASSDRVS DICD = 0x00000002
+)
+
+// DIGCF flags control what is included in the device information set built by SetupDiGetClassDevs
+type DIGCF uint32
+
+const (
+	DIGCF_DEFAULT         DIGCF = 0x00000001 // only valid with DIGCF_DEVICEINTERFACE
+	DIGCF_PRESENT         DIGCF = 0x00000002
+	DIGCF_ALLCLASSES      DIGCF = 0x00000004
+	DIGCF_PROFILE         DIGCF = 0x00000008
+	DIGCF_DEVICEINTERFACE DIGCF = 0x00000010
+)
+
+// DIREG specifies values for SetupDiCreateDevRegKey, SetupDiOpenDevRegKey, and SetupDiDeleteDevRegKey.
+type DIREG uint32
+
+const (
+	DIREG_DEV  DIREG = 0x00000001 // Open/Create/Delete device key
+	DIREG_DRV  DIREG = 0x00000002 // Open/Create/Delete driver key
+	DIREG_BOTH DIREG = 0x00000004 // Delete both driver and Device key
+)

@@ -20,53 +20,74 @@ func init() {
 	computerName, _ = windows.ComputerName()
 }
 
-func TestSetupDiClassNameFromGuidEx(t *testing.T) {
-	deviceClassNetName, err := SetupDiClassNameFromGuidEx(&deviceClassNetGUID, "")
-	if err != nil {
-		t.Errorf("Error calling SetupDiClassNameFromGuidEx: %s", err.Error())
-	} else if strings.ToLower(deviceClassNetName) != "net" {
-		t.Errorf("SetupDiClassNameFromGuidEx(%x) should return \"Net\"", deviceClassNetGUID)
-	}
-
-	deviceClassNetName, err = SetupDiClassNameFromGuidEx(&deviceClassNetGUID, computerName)
-	if err != nil {
-		t.Errorf("Error calling SetupDiClassNameFromGuidEx: %s", err.Error())
-	} else if strings.ToLower(deviceClassNetName) != "net" {
-		t.Errorf("SetupDiClassNameFromGuidEx(%x) should return \"Net\"", deviceClassNetGUID)
-	}
-
-	_, err = SetupDiClassNameFromGuidEx(nil, "")
+func TestSetupDiCreateDeviceInfoListEx(t *testing.T) {
+	devInfoList, err := SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, "")
 	if err == nil {
-		t.Errorf("SetupDiClassNameFromGuidEx(nil) should fail")
+		devInfoList.Close()
 	} else {
-		if errWin, ok := err.(syscall.Errno); !ok || errWin != 1784 /*ERROR_INVALID_USER_BUFFER*/ {
-			t.Errorf("SetupDiClassNameFromGuidEx(nil) should fail with ERROR_INVALID_USER_BUFFER")
-		}
+		t.Errorf("Error calling SetupDiCreateDeviceInfoListEx: %s", err.Error())
+	}
+
+	devInfoList, err = SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, computerName)
+	if err == nil {
+		devInfoList.Close()
+	} else {
+		t.Errorf("Error calling SetupDiCreateDeviceInfoListEx: %s", err.Error())
+	}
+
+	devInfoList, err = SetupDiCreateDeviceInfoListEx(nil, 0, "")
+	if err == nil {
+		devInfoList.Close()
+	} else {
+		t.Errorf("Error calling SetupDiCreateDeviceInfoListEx(nil): %s", err.Error())
 	}
 }
 
-func TestSetupDiClassGuidsFromNameEx(t *testing.T) {
-	ClassGUIDs, err := SetupDiClassGuidsFromNameEx("Net", "")
+func TestSetupDiGetDeviceInfoListDetail(t *testing.T) {
+	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, DIGCF_PRESENT, DevInfo(0), "")
 	if err != nil {
-		t.Errorf("Error calling SetupDiClassGuidsFromNameEx: %s", err.Error())
+		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
+	}
+	defer devInfoList.Close()
+
+	data, err := SetupDiGetDeviceInfoListDetail(devInfoList)
+	if err != nil {
+		t.Errorf("Error calling SetupDiGetDeviceInfoListDetail: %s", err.Error())
 	} else {
-		found := false
-		for i := range ClassGUIDs {
-			if ClassGUIDs[i] == deviceClassNetGUID {
-				found = true
-				break
-			}
+		if data.ClassGUID != deviceClassNetGUID {
+			t.Error("SetupDiGetDeviceInfoListDetail returned different class GUID")
 		}
-		if !found {
-			t.Errorf("SetupDiClassGuidsFromNameEx(\"Net\") should return %x", deviceClassNetGUID)
+
+		if data.RemoteMachineHandle != windows.Handle(0) {
+			t.Error("SetupDiGetDeviceInfoListDetail returned non-NULL remote machine handle")
+		}
+
+		if data.RemoteMachineName != "" {
+			t.Error("SetupDiGetDeviceInfoListDetail returned non-NULL remote machine name")
 		}
 	}
 
-	ClassGUIDs, err = SetupDiClassGuidsFromNameEx("foobar-34274a51-a6e6-45f0-80d6-c62be96dd5fe", computerName)
+	devInfoList, err = SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, DIGCF_PRESENT, DevInfo(0), computerName)
 	if err != nil {
-		t.Errorf("Error calling SetupDiClassGuidsFromNameEx: %s", err.Error())
-	} else if len(ClassGUIDs) != 0 {
-		t.Errorf("SetupDiClassGuidsFromNameEx(\"foobar-34274a51-a6e6-45f0-80d6-c62be96dd5fe\") should return an empty GUID set")
+		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
+	}
+	defer devInfoList.Close()
+
+	data, err = SetupDiGetDeviceInfoListDetail(devInfoList)
+	if err != nil {
+		t.Errorf("Error calling SetupDiGetDeviceInfoListDetail: %s", err.Error())
+	} else {
+		if data.ClassGUID != deviceClassNetGUID {
+			t.Error("SetupDiGetDeviceInfoListDetail returned different class GUID")
+		}
+
+		if data.RemoteMachineHandle == windows.Handle(0) {
+			t.Error("SetupDiGetDeviceInfoListDetail returned NULL remote machine handle")
+		}
+
+		if data.RemoteMachineName != computerName {
+			t.Error("SetupDiGetDeviceInfoListDetail returned different remote machine name")
+		}
 	}
 }
 
@@ -93,98 +114,6 @@ func TestSetupDiCreateDeviceInfo(t *testing.T) {
 	}
 }
 
-func TestSetupDiCreateDeviceInfoListEx(t *testing.T) {
-	devInfoList, err := SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, "")
-	if err == nil {
-		devInfoList.Close()
-	} else {
-		t.Errorf("Error calling SetupDiCreateDeviceInfoListEx: %s", err.Error())
-	}
-
-	devInfoList, err = SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, computerName)
-	if err == nil {
-		devInfoList.Close()
-	} else {
-		t.Errorf("Error calling SetupDiCreateDeviceInfoListEx: %s", err.Error())
-	}
-
-	devInfoList, err = SetupDiCreateDeviceInfoListEx(nil, 0, "")
-	if err == nil {
-		devInfoList.Close()
-	} else {
-		t.Errorf("Error calling SetupDiCreateDeviceInfoListEx(nil): %s", err.Error())
-	}
-}
-
-func TestSetupDiGetClassDevsEx(t *testing.T) {
-	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "PCI", 0, DIGCF_PRESENT, DevInfo(0), computerName)
-	if err == nil {
-		devInfoList.Close()
-	} else {
-		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
-	}
-
-	devInfoList, err = SetupDiGetClassDevsEx(nil, "", 0, DIGCF_PRESENT, DevInfo(0), "")
-	if err == nil {
-		devInfoList.Close()
-		t.Errorf("SetupDiGetClassDevsEx(nil, ...) should fail")
-	} else {
-		if errWin, ok := err.(syscall.Errno); !ok || errWin != 87 /*ERROR_INVALID_PARAMETER*/ {
-			t.Errorf("SetupDiGetClassDevsEx(nil, ...) should fail with ERROR_INVALID_PARAMETER")
-		}
-	}
-}
-
-func TestSetupDiGetDeviceInfoListDetailLocal(t *testing.T) {
-	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, DIGCF_PRESENT, DevInfo(0), "")
-	if err != nil {
-		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
-	}
-	defer devInfoList.Close()
-
-	data, err := SetupDiGetDeviceInfoListDetail(devInfoList)
-	if err != nil {
-		t.Errorf("Error calling SetupDiGetDeviceInfoListDetail: %s", err.Error())
-	} else {
-		if data.ClassGUID != deviceClassNetGUID {
-			t.Error("SetupDiGetDeviceInfoListDetail returned different class GUID")
-		}
-
-		if data.RemoteMachineHandle != windows.Handle(0) {
-			t.Error("SetupDiGetDeviceInfoListDetail returned non-NULL remote machine handle")
-		}
-
-		if data.RemoteMachineName != "" {
-			t.Error("SetupDiGetDeviceInfoListDetail returned non-NULL remote machine name")
-		}
-	}
-}
-
-func TestSetupDiGetDeviceInfoListDetailRemote(t *testing.T) {
-	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, DIGCF_PRESENT, DevInfo(0), computerName)
-	if err != nil {
-		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
-	}
-	defer devInfoList.Close()
-
-	data, err := SetupDiGetDeviceInfoListDetail(devInfoList)
-	if err != nil {
-		t.Errorf("Error calling SetupDiGetDeviceInfoListDetail: %s", err.Error())
-	} else {
-		if data.ClassGUID != deviceClassNetGUID {
-			t.Error("SetupDiGetDeviceInfoListDetail returned different class GUID")
-		}
-
-		if data.RemoteMachineHandle == windows.Handle(0) {
-			t.Error("SetupDiGetDeviceInfoListDetail returned NULL remote machine handle")
-		}
-
-		if data.RemoteMachineName != computerName {
-			t.Error("SetupDiGetDeviceInfoListDetail returned different remote machine name")
-		}
-	}
-}
-
 func TestSetupDiEnumDeviceInfo(t *testing.T) {
 	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, DIGCF_PRESENT, DevInfo(0), "")
 	if err != nil {
@@ -203,6 +132,25 @@ func TestSetupDiEnumDeviceInfo(t *testing.T) {
 
 		if data.ClassGUID != deviceClassNetGUID {
 			t.Error("SetupDiEnumDeviceInfo returned different class GUID")
+		}
+	}
+}
+
+func TestSetupDiGetClassDevsEx(t *testing.T) {
+	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "PCI", 0, DIGCF_PRESENT, DevInfo(0), computerName)
+	if err == nil {
+		devInfoList.Close()
+	} else {
+		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
+	}
+
+	devInfoList, err = SetupDiGetClassDevsEx(nil, "", 0, DIGCF_PRESENT, DevInfo(0), "")
+	if err == nil {
+		devInfoList.Close()
+		t.Errorf("SetupDiGetClassDevsEx(nil, ...) should fail")
+	} else {
+		if errWin, ok := err.(syscall.Errno); !ok || errWin != 87 /*ERROR_INVALID_PARAMETER*/ {
+			t.Errorf("SetupDiGetClassDevsEx(nil, ...) should fail with ERROR_INVALID_PARAMETER")
 		}
 	}
 }
@@ -251,5 +199,55 @@ func TestSetupDiGetDeviceInstallParams(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error calling SetupDiOpenDevRegKey: %s", err.Error())
 		}
+	}
+}
+
+func TestSetupDiClassNameFromGuidEx(t *testing.T) {
+	deviceClassNetName, err := SetupDiClassNameFromGuidEx(&deviceClassNetGUID, "")
+	if err != nil {
+		t.Errorf("Error calling SetupDiClassNameFromGuidEx: %s", err.Error())
+	} else if strings.ToLower(deviceClassNetName) != "net" {
+		t.Errorf("SetupDiClassNameFromGuidEx(%x) should return \"Net\"", deviceClassNetGUID)
+	}
+
+	deviceClassNetName, err = SetupDiClassNameFromGuidEx(&deviceClassNetGUID, computerName)
+	if err != nil {
+		t.Errorf("Error calling SetupDiClassNameFromGuidEx: %s", err.Error())
+	} else if strings.ToLower(deviceClassNetName) != "net" {
+		t.Errorf("SetupDiClassNameFromGuidEx(%x) should return \"Net\"", deviceClassNetGUID)
+	}
+
+	_, err = SetupDiClassNameFromGuidEx(nil, "")
+	if err == nil {
+		t.Errorf("SetupDiClassNameFromGuidEx(nil) should fail")
+	} else {
+		if errWin, ok := err.(syscall.Errno); !ok || errWin != 1784 /*ERROR_INVALID_USER_BUFFER*/ {
+			t.Errorf("SetupDiClassNameFromGuidEx(nil) should fail with ERROR_INVALID_USER_BUFFER")
+		}
+	}
+}
+
+func TestSetupDiClassGuidsFromNameEx(t *testing.T) {
+	ClassGUIDs, err := SetupDiClassGuidsFromNameEx("Net", "")
+	if err != nil {
+		t.Errorf("Error calling SetupDiClassGuidsFromNameEx: %s", err.Error())
+	} else {
+		found := false
+		for i := range ClassGUIDs {
+			if ClassGUIDs[i] == deviceClassNetGUID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("SetupDiClassGuidsFromNameEx(\"Net\") should return %x", deviceClassNetGUID)
+		}
+	}
+
+	ClassGUIDs, err = SetupDiClassGuidsFromNameEx("foobar-34274a51-a6e6-45f0-80d6-c62be96dd5fe", computerName)
+	if err != nil {
+		t.Errorf("Error calling SetupDiClassGuidsFromNameEx: %s", err.Error())
+	} else if len(ClassGUIDs) != 0 {
+		t.Errorf("SetupDiClassGuidsFromNameEx(\"foobar-34274a51-a6e6-45f0-80d6-c62be96dd5fe\") should return an empty GUID set")
 	}
 }
