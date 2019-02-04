@@ -25,11 +25,7 @@ type DevInfo windows.Handle
 
 // Close function deletes a device information set and frees all associated memory.
 func (h DevInfo) Close() error {
-	if h != DevInfo(windows.InvalidHandle) {
-		return SetupDiDestroyDeviceInfoList(h)
-	}
-
-	return nil
+	return SetupDiDestroyDeviceInfoList(h)
 }
 
 const (
