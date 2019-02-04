@@ -48,6 +48,7 @@ var (
 	procSetupDiSetDeviceInstallParamsW  = modsetupapi.NewProc("SetupDiSetDeviceInstallParamsW")
 	procSetupDiGetClassInstallParamsW   = modsetupapi.NewProc("SetupDiGetClassInstallParamsW")
 	procSetupDiSetClassInstallParamsW   = modsetupapi.NewProc("SetupDiSetClassInstallParamsW")
+	procSetupDiCallClassInstaller       = modsetupapi.NewProc("SetupDiCallClassInstaller")
 )
 
 func setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) {
@@ -150,6 +151,18 @@ func SetupDiGetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVI
 
 func SetupDiSetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32) (err error) {
 	r1, _, e1 := syscall.Syscall6(procSetupDiSetClassInstallParamsW.Addr(), 4, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(ClassInstallParams)), uintptr(ClassInstallParamsSize), 0, 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func SetupDiCallClassInstaller(InstallFunction DI_FUNCTION, DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiCallClassInstaller.Addr(), 3, uintptr(InstallFunction), uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
