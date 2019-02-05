@@ -111,7 +111,6 @@ func CreateBind(uport uint16, device *Device) (Bind, uint16, error) {
 
 	bind.ipv6, port, err = listenNet("udp6", port)
 	if err != nil && extractErrno(err) != syscall.EAFNOSUPPORT {
-		return nil, 0, err
 		bind.ipv4.Close()
 		bind.ipv4 = nil
 		return nil, 0, err
