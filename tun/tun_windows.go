@@ -53,7 +53,7 @@ type nativeTun struct {
 }
 
 func CreateTUN(ifname string) (TUNDevice, error) {
-	signalNameUTF16, err := windows.UTF16PtrFromString(fmt.Sprintf("Global\\TUN_EVENT_%s", ifname))
+	signalNameUTF16, err := windows.UTF16PtrFromString(fmt.Sprintf("Global\\WINTUN_EVENT_%s", ifname))
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 	// Create instance.
 	tun := &nativeTun{
 		ifname:     ifname,
-		tunName:    fmt.Sprintf("\\\\.\\Global\\TUN_%s_DEVICE", ifname),
+		tunName:    fmt.Sprintf("\\\\.\\Global\\WINTUN_DEVICE_%s", ifname),
 		signalName: signalNameUTF16,
 		events:     make(chan TUNEvent, 10),
 		errors:     make(chan error, 1),
@@ -90,7 +90,7 @@ func (tun *nativeTun) openTUN() error {
 			case windows.WAIT_TIMEOUT:
 				continue
 			default:
-				return fmt.Errorf("unexpected result from WaitForSingleObject:", e)
+				return errors.New("Unexpected result from WaitForSingleObject: " + e.Error())
 			}
 		}
 
@@ -98,7 +98,7 @@ func (tun *nativeTun) openTUN() error {
 		event, err := windows.OpenEvent(windows.SYNCHRONIZE, false, tun.signalName)
 		if err != nil {
 			file.Close()
-			return fmt.Errorf("opening interface data ready event failed:", err)
+			return errors.New("Opening interface data ready event failed: " + err.Error())
 		}
 
 		tun.tunFile = file
@@ -198,7 +198,7 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 				// Buffer was not full. Wait for the interface data or user close.
 				r, err := windows.WaitForMultipleObjects(tun.signals[:], false, windows.INFINITE)
 				if err != nil {
-					return 0, fmt.Errorf("waiting for data failed:", err)
+					return 0, errors.New("Waiting for data failed: " + err.Error())
 				}
 				switch r {
 				case windows.WAIT_OBJECT_0 + TUN_SIGNAL_DATA_AVAIL:
@@ -250,10 +250,10 @@ func (tun *nativeTun) flush() error {
 func (tun *nativeTun) putTunPacket(buff []byte) error {
 	size := len(buff)
 	if size == 0 {
-		return errors.New("empty packet")
+		return errors.New("Empty packet")
 	}
 	if size > TUN_MAX_PACKET_SIZE {
-		return errors.New("packet too big")
+		return errors.New("Packet too big")
 	}
 
 	if tun.wrBuff.numPackets >= TUN_MAX_PACKET_EXCHANGE {

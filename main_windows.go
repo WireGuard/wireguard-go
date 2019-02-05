@@ -7,9 +7,10 @@ package main
 
 import (
 	"fmt"
-	"git.zx2c4.com/wireguard-go/tun"
 	"os"
 	"os/signal"
+
+	"git.zx2c4.com/wireguard-go/tun"
 )
 
 const (
@@ -18,8 +19,7 @@ const (
 )
 
 func main() {
-
-	if len(os.Args) != 1 {
+	if len(os.Args) != 2 {
 		os.Exit(ExitSetupFailed)
 	}
 	//configFile := os.Args[1]
@@ -44,6 +44,7 @@ func main() {
 	}
 
 	device := NewDevice(tun, logger)
+	device.Up()
 	logger.Info.Println("Device started")
 
 	uapi, err := UAPIListen(interfaceName)
