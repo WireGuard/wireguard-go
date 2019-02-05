@@ -41,11 +41,7 @@ func SetupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo) (DeviceInfoSetDetailD
 		return
 	}
 
-	return &DevInfoListDetailData{
-		ClassGUID:           _data.ClassGUID,
-		RemoteMachineHandle: _data.RemoteMachineHandle,
-		RemoteMachineName:   windows.UTF16ToString(_data.RemoteMachineName[:]),
-	}, nil
+	return _data.toGo(), nil
 }
 
 // GetDeviceInfoListDetail method retrieves information associated with a device information set including the class GUID, remote computer handle, and remote computer name.
@@ -247,15 +243,7 @@ func SetupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEV
 		return
 	}
 
-	return &DevInstallParams{
-		Flags:                    _data.Flags,
-		FlagsEx:                  _data.FlagsEx,
-		hwndParent:               _data.hwndParent,
-		InstallMsgHandler:        _data.InstallMsgHandler,
-		InstallMsgHandlerContext: _data.InstallMsgHandlerContext,
-		FileQueue:                _data.FileQueue,
-		DriverPath:               windows.UTF16ToString(_data.DriverPath[:]),
-	}, nil
+	return _data.toGo(), nil
 }
 
 // GetDeviceInstallParams method retrieves device installation parameters for a device information set or a particular device information element.
@@ -275,23 +263,12 @@ func (DeviceInfoSet DevInfo) GetClassInstallParams(DeviceInfoData *SP_DEVINFO_DA
 
 // SetupDiSetDeviceInstallParams function sets device installation parameters for a device information set or a particular device information element.
 func SetupDiSetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *DevInstallParams) (err error) {
-	_data := _SP_DEVINSTALL_PARAMS{
-		Flags:                    DeviceInstallParams.Flags,
-		FlagsEx:                  DeviceInstallParams.FlagsEx,
-		hwndParent:               DeviceInstallParams.hwndParent,
-		InstallMsgHandler:        DeviceInstallParams.InstallMsgHandler,
-		InstallMsgHandlerContext: DeviceInstallParams.InstallMsgHandlerContext,
-		FileQueue:                DeviceInstallParams.FileQueue,
-	}
-	_data.Size = uint32(unsafe.Sizeof(_data))
-
-	driverPathUTF16, err := syscall.UTF16FromString(DeviceInstallParams.DriverPath)
+	_data, err := DeviceInstallParams.toWindows()
 	if err != nil {
 		return
 	}
-	copy(_data.DriverPath[:], driverPathUTF16)
 
-	return setupDiSetDeviceInstallParams(DeviceInfoSet, DeviceInfoData, &_data)
+	return setupDiSetDeviceInstallParams(DeviceInfoSet, DeviceInfoData, _data)
 }
 
 // SetDeviceInstallParams member sets device installation parameters for a device information set or a particular device information element.

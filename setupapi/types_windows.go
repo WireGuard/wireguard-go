@@ -6,6 +6,9 @@
 package setupapi
 
 import (
+	"syscall"
+	"unsafe"
+
 	"golang.org/x/sys/windows"
 )
 
@@ -44,6 +47,14 @@ type _SP_DEVINFO_LIST_DETAIL_DATA struct {
 	ClassGUID           windows.GUID
 	RemoteMachineHandle windows.Handle
 	RemoteMachineName   [SP_MAX_MACHINENAME_LENGTH]uint16
+}
+
+func (_data _SP_DEVINFO_LIST_DETAIL_DATA) toGo() *DevInfoListDetailData {
+	return &DevInfoListDetailData{
+		ClassGUID:           _data.ClassGUID,
+		RemoteMachineHandle: _data.RemoteMachineHandle,
+		RemoteMachineName:   windows.UTF16ToString(_data.RemoteMachineName[:]),
+	}
 }
 
 // DevInfoListDetailData is a structure for detailed information on a device information set (used for SetupDiGetDeviceInfoListDetail which supercedes the functionality of SetupDiGetDeviceInfoListClass).
@@ -111,6 +122,18 @@ type _SP_DEVINSTALL_PARAMS struct {
 	DriverPath               [windows.MAX_PATH]uint16
 }
 
+func (_data _SP_DEVINSTALL_PARAMS) toGo() *DevInstallParams {
+	return &DevInstallParams{
+		Flags:                    _data.Flags,
+		FlagsEx:                  _data.FlagsEx,
+		hwndParent:               _data.hwndParent,
+		InstallMsgHandler:        _data.InstallMsgHandler,
+		InstallMsgHandlerContext: _data.InstallMsgHandlerContext,
+		FileQueue:                _data.FileQueue,
+		DriverPath:               windows.UTF16ToString(_data.DriverPath[:]),
+	}
+}
+
 // DevInstallParams is device installation parameters structure (associated with a particular device information element, or globally with a device information set)
 type DevInstallParams struct {
 	Flags                    DI_FLAGS
@@ -120,6 +143,26 @@ type DevInstallParams struct {
 	InstallMsgHandlerContext uintptr
 	FileQueue                HSPFILEQ
 	DriverPath               string
+}
+
+func (DeviceInstallParams DevInstallParams) toWindows() (_data *_SP_DEVINSTALL_PARAMS, err error) {
+	_data = &_SP_DEVINSTALL_PARAMS{
+		Flags:                    DeviceInstallParams.Flags,
+		FlagsEx:                  DeviceInstallParams.FlagsEx,
+		hwndParent:               DeviceInstallParams.hwndParent,
+		InstallMsgHandler:        DeviceInstallParams.InstallMsgHandler,
+		InstallMsgHandlerContext: DeviceInstallParams.InstallMsgHandlerContext,
+		FileQueue:                DeviceInstallParams.FileQueue,
+	}
+	_data.Size = uint32(unsafe.Sizeof(*_data))
+
+	driverPathUTF16, err := syscall.UTF16FromString(DeviceInstallParams.DriverPath)
+	if err != nil {
+		return
+	}
+	copy(_data.DriverPath[:], driverPathUTF16)
+
+	return
 }
 
 // DI_FLAGS is SP_DEVINSTALL_PARAMS.Flags values
