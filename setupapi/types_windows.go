@@ -269,3 +269,54 @@ const (
 	DIREG_DRV  DIREG = 0x00000002 // Open/Create/Delete driver key
 	DIREG_BOTH DIREG = 0x00000004 // Delete both driver and Device key
 )
+
+//
+// SPDRP specifies device registry property codes
+// (Codes marked as read-only (R) may only be used for
+// SetupDiGetDeviceRegistryProperty)
+//
+// These values should cover the same set of registry properties
+// as defined by the CM_DRP codes in cfgmgr32.h.
+//
+// Note that SPDRP codes are zero based while CM_DRP codes are one based!
+//
+type SPDRP uint32
+
+const (
+	SPDRP_DEVICEDESC                  SPDRP = 0x00000000 // DeviceDesc (R/W)
+	SPDRP_HARDWAREID                  SPDRP = 0x00000001 // HardwareID (R/W)
+	SPDRP_COMPATIBLEIDS               SPDRP = 0x00000002 // CompatibleIDs (R/W)
+	SPDRP_SERVICE                     SPDRP = 0x00000004 // Service (R/W)
+	SPDRP_CLASS                       SPDRP = 0x00000007 // Class (R--tied to ClassGUID)
+	SPDRP_CLASSGUID                   SPDRP = 0x00000008 // ClassGUID (R/W)
+	SPDRP_DRIVER                      SPDRP = 0x00000009 // Driver (R/W)
+	SPDRP_CONFIGFLAGS                 SPDRP = 0x0000000A // ConfigFlags (R/W)
+	SPDRP_MFG                         SPDRP = 0x0000000B // Mfg (R/W)
+	SPDRP_FRIENDLYNAME                SPDRP = 0x0000000C // FriendlyName (R/W)
+	SPDRP_LOCATION_INFORMATION        SPDRP = 0x0000000D // LocationInformation (R/W)
+	SPDRP_PHYSICAL_DEVICE_OBJECT_NAME SPDRP = 0x0000000E // PhysicalDeviceObjectName (R)
+	SPDRP_CAPABILITIES                SPDRP = 0x0000000F // Capabilities (R)
+	SPDRP_UI_NUMBER                   SPDRP = 0x00000010 // UiNumber (R)
+	SPDRP_UPPERFILTERS                SPDRP = 0x00000011 // UpperFilters (R/W)
+	SPDRP_LOWERFILTERS                SPDRP = 0x00000012 // LowerFilters (R/W)
+	SPDRP_BUSTYPEGUID                 SPDRP = 0x00000013 // BusTypeGUID (R)
+	SPDRP_LEGACYBUSTYPE               SPDRP = 0x00000014 // LegacyBusType (R)
+	SPDRP_BUSNUMBER                   SPDRP = 0x00000015 // BusNumber (R)
+	SPDRP_ENUMERATOR_NAME             SPDRP = 0x00000016 // Enumerator Name (R)
+	SPDRP_SECURITY                    SPDRP = 0x00000017 // Security (R/W, binary form)
+	SPDRP_SECURITY_SDS                SPDRP = 0x00000018 // Security (W, SDS form)
+	SPDRP_DEVTYPE                     SPDRP = 0x00000019 // Device Type (R/W)
+	SPDRP_EXCLUSIVE                   SPDRP = 0x0000001A // Device is exclusive-access (R/W)
+	SPDRP_CHARACTERISTICS             SPDRP = 0x0000001B // Device Characteristics (R/W)
+	SPDRP_ADDRESS                     SPDRP = 0x0000001C // Device Address (R)
+	SPDRP_UI_NUMBER_DESC_FORMAT       SPDRP = 0x0000001D // UiNumberDescFormat (R/W)
+	SPDRP_DEVICE_POWER_DATA           SPDRP = 0x0000001E // Device Power Data (R)
+	SPDRP_REMOVAL_POLICY              SPDRP = 0x0000001F // Removal Policy (R)
+	SPDRP_REMOVAL_POLICY_HW_DEFAULT   SPDRP = 0x00000020 // Hardware Removal Policy (R)
+	SPDRP_REMOVAL_POLICY_OVERRIDE     SPDRP = 0x00000021 // Removal Policy Override (RW)
+	SPDRP_INSTALL_STATE               SPDRP = 0x00000022 // Device Install State (R)
+	SPDRP_LOCATION_PATHS              SPDRP = 0x00000023 // Device Location Paths (R)
+	SPDRP_BASE_CONTAINERID            SPDRP = 0x00000024 // Base ContainerID (R)
+
+	SPDRP_MAXIMUM_PROPERTY SPDRP = 0x00000025 // Upper bound on ordinals
+)

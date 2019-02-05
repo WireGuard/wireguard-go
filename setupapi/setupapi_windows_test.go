@@ -179,6 +179,56 @@ func TestSetupDiOpenDevRegKey(t *testing.T) {
 	}
 }
 
+func TestSetupDiGetDeviceRegistryProperty(t *testing.T) {
+	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, DIGCF_PRESENT, DevInfo(0), "")
+	if err != nil {
+		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
+	}
+	defer devInfoList.Close()
+
+	for i := 0; true; i++ {
+		data, err := devInfoList.EnumDeviceInfo(i)
+		if err != nil {
+			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+				break
+			}
+			continue
+		}
+
+		val, err := devInfoList.GetDeviceRegistryProperty(data, SPDRP_CLASS)
+		if err != nil {
+			t.Errorf("Error calling SetupDiGetDeviceRegistryProperty(SPDRP_CLASS): %s", err.Error())
+		} else if class, ok := val.(string); !ok || strings.ToLower(class) != "net" {
+			t.Errorf("SetupDiGetDeviceRegistryProperty(SPDRP_CLASS) should return \"Net\"")
+		}
+
+		val, err = devInfoList.GetDeviceRegistryProperty(data, SPDRP_CLASSGUID)
+		if err != nil {
+			t.Errorf("Error calling SetupDiGetDeviceRegistryProperty(SPDRP_CLASSGUID): %s", err.Error())
+		} /* TODO: Parse GUID string: else if classGUID, ok := val.(string); !ok || parseGUID(classGUID) != deviceClassNetGUID {
+			t.Errorf("SetupDiGetDeviceRegistryProperty(SPDRP_CLASSGUID) should return %x", deviceClassNetGUID)
+		}*/
+
+		val, err = devInfoList.GetDeviceRegistryProperty(data, SPDRP_COMPATIBLEIDS)
+		if err != nil {
+			// Some devices have no SPDRP_COMPATIBLEIDS.
+			if errWin, ok := err.(syscall.Errno); !ok || errWin != 13 /*windows.ERROR_INVALID_DATA*/ {
+				t.Errorf("Error calling SetupDiGetDeviceRegistryProperty(SPDRP_COMPATIBLEIDS): %s", err.Error())
+			}
+		}
+
+		val, err = devInfoList.GetDeviceRegistryProperty(data, SPDRP_CONFIGFLAGS)
+		if err != nil {
+			t.Errorf("Error calling SetupDiGetDeviceRegistryProperty(SPDRP_CONFIGFLAGS): %s", err.Error())
+		}
+
+		val, err = devInfoList.GetDeviceRegistryProperty(data, SPDRP_DEVICE_POWER_DATA)
+		if err != nil {
+			t.Errorf("Error calling SetupDiGetDeviceRegistryProperty(SPDRP_DEVICE_POWER_DATA): %s", err.Error())
+		}
+	}
+}
+
 func TestSetupDiGetDeviceInstallParams(t *testing.T) {
 	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, DIGCF_PRESENT, DevInfo(0), "")
 	if err != nil {

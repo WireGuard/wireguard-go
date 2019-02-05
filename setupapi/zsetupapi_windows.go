@@ -39,22 +39,24 @@ func errnoErr(e syscall.Errno) error {
 var (
 	modsetupapi = windows.NewLazySystemDLL("setupapi.dll")
 
-	procSetupDiCreateDeviceInfoListExW  = modsetupapi.NewProc("SetupDiCreateDeviceInfoListExW")
-	procSetupDiGetDeviceInfoListDetailW = modsetupapi.NewProc("SetupDiGetDeviceInfoListDetailW")
-	procSetupDiCreateDeviceInfoW        = modsetupapi.NewProc("SetupDiCreateDeviceInfoW")
-	procSetupDiEnumDeviceInfo           = modsetupapi.NewProc("SetupDiEnumDeviceInfo")
-	procSetupDiDestroyDeviceInfoList    = modsetupapi.NewProc("SetupDiDestroyDeviceInfoList")
-	procSetupDiGetClassDevsExW          = modsetupapi.NewProc("SetupDiGetClassDevsExW")
-	procSetupDiCallClassInstaller       = modsetupapi.NewProc("SetupDiCallClassInstaller")
-	procSetupDiOpenDevRegKey            = modsetupapi.NewProc("SetupDiOpenDevRegKey")
-	procSetupDiGetDeviceInstallParamsW  = modsetupapi.NewProc("SetupDiGetDeviceInstallParamsW")
-	procSetupDiGetClassInstallParamsW   = modsetupapi.NewProc("SetupDiGetClassInstallParamsW")
-	procSetupDiSetDeviceInstallParamsW  = modsetupapi.NewProc("SetupDiSetDeviceInstallParamsW")
-	procSetupDiSetClassInstallParamsW   = modsetupapi.NewProc("SetupDiSetClassInstallParamsW")
-	procSetupDiClassNameFromGuidExW     = modsetupapi.NewProc("SetupDiClassNameFromGuidExW")
-	procSetupDiClassGuidsFromNameExW    = modsetupapi.NewProc("SetupDiClassGuidsFromNameExW")
-	procSetupDiGetSelectedDevice        = modsetupapi.NewProc("SetupDiGetSelectedDevice")
-	procSetupDiSetSelectedDevice        = modsetupapi.NewProc("SetupDiSetSelectedDevice")
+	procSetupDiCreateDeviceInfoListExW    = modsetupapi.NewProc("SetupDiCreateDeviceInfoListExW")
+	procSetupDiGetDeviceInfoListDetailW   = modsetupapi.NewProc("SetupDiGetDeviceInfoListDetailW")
+	procSetupDiCreateDeviceInfoW          = modsetupapi.NewProc("SetupDiCreateDeviceInfoW")
+	procSetupDiEnumDeviceInfo             = modsetupapi.NewProc("SetupDiEnumDeviceInfo")
+	procSetupDiDestroyDeviceInfoList      = modsetupapi.NewProc("SetupDiDestroyDeviceInfoList")
+	procSetupDiGetClassDevsExW            = modsetupapi.NewProc("SetupDiGetClassDevsExW")
+	procSetupDiCallClassInstaller         = modsetupapi.NewProc("SetupDiCallClassInstaller")
+	procSetupDiOpenDevRegKey              = modsetupapi.NewProc("SetupDiOpenDevRegKey")
+	procSetupDiGetDeviceRegistryPropertyW = modsetupapi.NewProc("SetupDiGetDeviceRegistryPropertyW")
+	procSetupDiSetDeviceRegistryPropertyW = modsetupapi.NewProc("SetupDiSetDeviceRegistryPropertyW")
+	procSetupDiGetDeviceInstallParamsW    = modsetupapi.NewProc("SetupDiGetDeviceInstallParamsW")
+	procSetupDiGetClassInstallParamsW     = modsetupapi.NewProc("SetupDiGetClassInstallParamsW")
+	procSetupDiSetDeviceInstallParamsW    = modsetupapi.NewProc("SetupDiSetDeviceInstallParamsW")
+	procSetupDiSetClassInstallParamsW     = modsetupapi.NewProc("SetupDiSetClassInstallParamsW")
+	procSetupDiClassNameFromGuidExW       = modsetupapi.NewProc("SetupDiClassNameFromGuidExW")
+	procSetupDiClassGuidsFromNameExW      = modsetupapi.NewProc("SetupDiClassGuidsFromNameExW")
+	procSetupDiGetSelectedDevice          = modsetupapi.NewProc("SetupDiGetSelectedDevice")
+	procSetupDiSetSelectedDevice          = modsetupapi.NewProc("SetupDiSetSelectedDevice")
 )
 
 func setupDiCreateDeviceInfoListEx(ClassGUID *windows.GUID, hwndParent uintptr, MachineName *uint16, Reserved uintptr) (handle DevInfo, err error) {
@@ -147,6 +149,30 @@ func setupDiOpenDevRegKey(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA
 	r0, _, e1 := syscall.Syscall6(procSetupDiOpenDevRegKey.Addr(), 6, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(Scope), uintptr(HwProfile), uintptr(KeyType), uintptr(samDesired))
 	key = windows.Handle(r0)
 	if key == windows.InvalidHandle {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func setupDiGetDeviceRegistryProperty(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Property SPDRP, PropertyRegDataType *uint32, PropertyBuffer *byte, PropertyBufferSize uint32, RequiredSize *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall9(procSetupDiGetDeviceRegistryPropertyW.Addr(), 7, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(Property), uintptr(unsafe.Pointer(PropertyRegDataType)), uintptr(unsafe.Pointer(PropertyBuffer)), uintptr(PropertyBufferSize), uintptr(unsafe.Pointer(RequiredSize)), 0, 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func setupDiSetDeviceRegistryProperty(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Property SPDRP, PropertyBuffer *byte, PropertyBufferSize uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiSetDeviceRegistryPropertyW.Addr(), 5, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(Property), uintptr(unsafe.Pointer(PropertyBuffer)), uintptr(PropertyBufferSize), 0)
+	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
 		} else {

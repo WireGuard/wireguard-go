@@ -6,6 +6,8 @@
 package setupapi
 
 import (
+	"encoding/binary"
+	"fmt"
 	"syscall"
 	"unsafe"
 
@@ -144,6 +146,95 @@ func (DeviceInfoSet DevInfo) OpenDevRegKey(DeviceInfoData *SP_DEVINFO_DATA, Scop
 	return SetupDiOpenDevRegKey(DeviceInfoSet, DeviceInfoData, Scope, HwProfile, KeyType, samDesired)
 }
 
+//sys	setupDiGetDeviceRegistryProperty(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Property SPDRP, PropertyRegDataType *uint32, PropertyBuffer *byte, PropertyBufferSize uint32, RequiredSize *uint32) (err error) = setupapi.SetupDiGetDeviceRegistryPropertyW
+
+// SetupDiGetDeviceRegistryProperty function retrieves a specified Plug and Play device property.
+func SetupDiGetDeviceRegistryProperty(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Property SPDRP) (value interface{}, err error) {
+	buf := make([]byte, 0x100)
+	var dataType, bufLen uint32
+	err = setupDiGetDeviceRegistryProperty(DeviceInfoSet, DeviceInfoData, Property, &dataType, &buf[0], uint32(cap(buf)), &bufLen)
+	if err == nil {
+		// The buffer was sufficiently big.
+		return getRegistryValue(buf[:bufLen], dataType)
+	}
+
+	if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
+		// The buffer was too small. Now that we got the required size, create another one big enough and retry.
+		buf = make([]byte, bufLen)
+		err = setupDiGetDeviceRegistryProperty(DeviceInfoSet, DeviceInfoData, Property, &dataType, &buf[0], uint32(cap(buf)), &bufLen)
+		if err == nil {
+			return getRegistryValue(buf[:bufLen], dataType)
+		}
+	}
+
+	return
+}
+
+func getRegistryValue(buf []byte, dataType uint32) (interface{}, error) {
+	switch dataType {
+	case windows.REG_SZ:
+		return windows.UTF16ToString(toUTF16(buf)), nil
+	case windows.REG_EXPAND_SZ:
+		return registry.ExpandString(windows.UTF16ToString(toUTF16(buf)))
+	case windows.REG_BINARY:
+		return buf, nil
+	case windows.REG_DWORD_LITTLE_ENDIAN:
+		return binary.LittleEndian.Uint32(buf), nil
+	case windows.REG_DWORD_BIG_ENDIAN:
+		return binary.BigEndian.Uint32(buf), nil
+	case windows.REG_MULTI_SZ:
+		bufW := toUTF16(buf)
+		a := []string{}
+		for i := 0; i < len(bufW); {
+			j := i + wcslen(bufW[i:])
+			if i < j {
+				a = append(a, windows.UTF16ToString(bufW[i:j]))
+			}
+			i = j + 1
+		}
+		return a, nil
+	case windows.REG_QWORD_LITTLE_ENDIAN:
+		return binary.LittleEndian.Uint64(buf), nil
+	default:
+		return nil, fmt.Errorf("Unsupported registry value type: %v", dataType)
+	}
+}
+
+func toUTF16(buf []byte) []uint16 {
+	sl := struct {
+		addr *uint16
+		len  int
+		cap  int
+	}{(*uint16)(unsafe.Pointer(&buf[0])), len(buf) / 2, cap(buf) / 2}
+	return *(*[]uint16)(unsafe.Pointer(&sl))
+}
+
+func wcslen(str []uint16) int {
+	for i := 0; i < len(str); i++ {
+		if str[i] == 0 {
+			return i
+		}
+	}
+	return len(str)
+}
+
+// GetDeviceRegistryProperty method retrieves a specified Plug and Play device property.
+func (DeviceInfoSet DevInfo) GetDeviceRegistryProperty(DeviceInfoData *SP_DEVINFO_DATA, Property SPDRP) (value interface{}, err error) {
+	return SetupDiGetDeviceRegistryProperty(DeviceInfoSet, DeviceInfoData, Property)
+}
+
+//sys	setupDiSetDeviceRegistryProperty(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Property SPDRP, PropertyBuffer *byte, PropertyBufferSize uint32) (err error) = setupapi.SetupDiSetDeviceRegistryPropertyW
+
+// SetupDiSetDeviceRegistryProperty function sets a Plug and Play device property for a device.
+func SetupDiSetDeviceRegistryProperty(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Property SPDRP, PropertyBuffer []byte) (err error) {
+	return setupDiSetDeviceRegistryProperty(DeviceInfoSet, DeviceInfoData, Property, &PropertyBuffer[0], uint32(len(PropertyBuffer)))
+}
+
+// SetDeviceRegistryProperty function sets a Plug and Play device property for a device.
+func (DeviceInfoSet DevInfo) SetDeviceRegistryProperty(DeviceInfoData *SP_DEVINFO_DATA, Property SPDRP, PropertyBuffer []byte) (err error) {
+	return SetupDiSetDeviceRegistryProperty(DeviceInfoSet, DeviceInfoData, Property, PropertyBuffer)
+}
+
 //sys	setupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) = setupapi.SetupDiGetDeviceInstallParamsW
 
 // SetupDiGetDeviceInstallParams function retrieves device installation parameters for a device information set or a particular device information element.
@@ -248,9 +339,9 @@ func SetupDiClassGuidsFromNameEx(ClassName string, MachineName string) (ClassGui
 		return
 	}
 
-	const bufLen = 4
-	var buf [bufLen]windows.GUID
-	var bufCount uint32
+	const bufCapacity = 4
+	var buf [bufCapacity]windows.GUID
+	var bufLen uint32
 
 	var machineNameUTF16 *uint16
 	if MachineName != "" {
@@ -260,18 +351,18 @@ func SetupDiClassGuidsFromNameEx(ClassName string, MachineName string) (ClassGui
 		}
 	}
 
-	err = setupDiClassGuidsFromNameEx(classNameUTF16, &buf[0], bufLen, &bufCount, machineNameUTF16, 0)
+	err = setupDiClassGuidsFromNameEx(classNameUTF16, &buf[0], bufCapacity, &bufLen, machineNameUTF16, 0)
 	if err == nil {
 		// The GUID array was sufficiently big. Return its slice.
-		return buf[:bufCount], nil
+		return buf[:bufLen], nil
 	}
 
 	if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
 		// The GUID array was too small. Now that we got the required size, create another one big enough and retry.
-		buf := make([]windows.GUID, bufCount)
-		err = setupDiClassGuidsFromNameEx(classNameUTF16, &buf[0], bufCount, &bufCount, machineNameUTF16, 0)
+		buf := make([]windows.GUID, bufLen)
+		err = setupDiClassGuidsFromNameEx(classNameUTF16, &buf[0], bufLen, &bufLen, machineNameUTF16, 0)
 		if err == nil {
-			return buf[:bufCount], nil
+			return buf[:bufLen], nil
 		}
 	}
 
