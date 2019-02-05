@@ -31,11 +31,6 @@ type HSPFILEQ uintptr
 // DevInfo holds reference to device information set
 type DevInfo windows.Handle
 
-// Close function deletes a device information set and frees all associated memory.
-func (h DevInfo) Close() error {
-	return SetupDiDestroyDeviceInfoList(h)
-}
-
 // SP_DEVINFO_DATA is a device information structure (references a device instance that is a member of a device information set)
 type SP_DEVINFO_DATA struct {
 	Size      uint32

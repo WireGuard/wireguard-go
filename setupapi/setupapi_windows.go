@@ -16,7 +16,7 @@ import (
 //sys	setupDiCreateDeviceInfoListEx(ClassGUID *windows.GUID, hwndParent uintptr, MachineName *uint16, Reserved uintptr) (handle DevInfo, err error) [failretval==DevInfo(windows.InvalidHandle)] = setupapi.SetupDiCreateDeviceInfoListExW
 
 // SetupDiCreateDeviceInfoListEx function creates an empty device information set on a remote or a local computer and optionally associates the set with a device setup class.
-func SetupDiCreateDeviceInfoListEx(ClassGUID *windows.GUID, hwndParent uintptr, MachineName string) (handle DevInfo, err error) {
+func SetupDiCreateDeviceInfoListEx(ClassGUID *windows.GUID, hwndParent uintptr, MachineName string) (DeviceInfoSet DevInfo, err error) {
 	var machineNameUTF16 *uint16
 	if MachineName != "" {
 		machineNameUTF16, err = syscall.UTF16PtrFromString(MachineName)
@@ -46,6 +46,11 @@ func SetupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo) (DeviceInfoSetDetailD
 	}, nil
 }
 
+// GetDeviceInfoListDetail method retrieves information associated with a device information set including the class GUID, remote computer handle, and remote computer name.
+func (DeviceInfoSet DevInfo) GetDeviceInfoListDetail() (DeviceInfoSetDetailData *DevInfoListDetailData, err error) {
+	return SetupDiGetDeviceInfoListDetail(DeviceInfoSet)
+}
+
 //sys	setupDiCreateDeviceInfo(DeviceInfoSet DevInfo, DeviceName *uint16, ClassGUID *windows.GUID, DeviceDescription *uint16, hwndParent uintptr, CreationFlags DICD, DeviceInfoData *SP_DEVINFO_DATA) (err error) = setupapi.SetupDiCreateDeviceInfoW
 
 // SetupDiCreateDeviceInfo function creates a new device information element and adds it as a new member to the specified device information set.
@@ -69,6 +74,11 @@ func SetupDiCreateDeviceInfo(DeviceInfoSet DevInfo, DeviceName string, ClassGUID
 	return &data, setupDiCreateDeviceInfo(DeviceInfoSet, deviceNameUTF16, ClassGUID, deviceDescriptionUTF16, hwndParent, CreationFlags, &data)
 }
 
+// CreateDeviceInfo method creates a new device information element and adds it as a new member to the specified device information set.
+func (DeviceInfoSet DevInfo) CreateDeviceInfo(DeviceName string, ClassGUID *windows.GUID, DeviceDescription string, hwndParent uintptr, CreationFlags DICD) (DeviceInfoData *SP_DEVINFO_DATA, err error) {
+	return SetupDiCreateDeviceInfo(DeviceInfoSet, DeviceName, ClassGUID, DeviceDescription, hwndParent, CreationFlags)
+}
+
 //sys	setupDiEnumDeviceInfo(DeviceInfoSet DevInfo, MemberIndex uint32, DeviceInfoData *SP_DEVINFO_DATA) (err error) = setupapi.SetupDiEnumDeviceInfo
 
 // SetupDiEnumDeviceInfo function returns a SP_DEVINFO_DATA structure that specifies a device information element in a device information set.
@@ -79,8 +89,18 @@ func SetupDiEnumDeviceInfo(DeviceInfoSet DevInfo, MemberIndex int) (DeviceInfoDa
 	return &data, setupDiEnumDeviceInfo(DeviceInfoSet, uint32(MemberIndex), &data)
 }
 
+// EnumDeviceInfo method returns a SP_DEVINFO_DATA structure that specifies a device information element in a device information set.
+func (DeviceInfoSet DevInfo) EnumDeviceInfo(MemberIndex int) (DeviceInfoData *SP_DEVINFO_DATA, err error) {
+	return SetupDiEnumDeviceInfo(DeviceInfoSet, MemberIndex)
+}
+
 // SetupDiDestroyDeviceInfoList function deletes a device information set and frees all associated memory.
 //sys	SetupDiDestroyDeviceInfoList(DeviceInfoSet DevInfo) (err error) = setupapi.SetupDiDestroyDeviceInfoList
+
+// Close method deletes a device information set and frees all associated memory.
+func (DeviceInfoSet DevInfo) Close() error {
+	return SetupDiDestroyDeviceInfoList(DeviceInfoSet)
+}
 
 //sys	setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) [failretval==DevInfo(windows.InvalidHandle)] = setupapi.SetupDiGetClassDevsExW
 
@@ -106,12 +126,22 @@ func SetupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator string, hwndParen
 // SetupDiCallClassInstaller function calls the appropriate class installer, and any registered co-installers, with the specified installation request (DIF code).
 //sys	SetupDiCallClassInstaller(InstallFunction DI_FUNCTION, DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (err error) = setupapi.SetupDiCallClassInstaller
 
+// CallClassInstaller member calls the appropriate class installer, and any registered co-installers, with the specified installation request (DIF code).
+func (DeviceInfoSet DevInfo) CallClassInstaller(InstallFunction DI_FUNCTION, DeviceInfoData *SP_DEVINFO_DATA) (err error) {
+	return SetupDiCallClassInstaller(InstallFunction, DeviceInfoSet, DeviceInfoData)
+}
+
 //sys	setupDiOpenDevRegKey(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Scope DICS_FLAG, HwProfile uint32, KeyType DIREG, samDesired uint32) (key windows.Handle, err error) [failretval==windows.InvalidHandle] = setupapi.SetupDiOpenDevRegKey
 
 // SetupDiOpenDevRegKey function opens a registry key for device-specific configuration information.
 func SetupDiOpenDevRegKey(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Scope DICS_FLAG, HwProfile uint32, KeyType DIREG, samDesired uint32) (key registry.Key, err error) {
 	handle, err := setupDiOpenDevRegKey(DeviceInfoSet, DeviceInfoData, Scope, HwProfile, KeyType, samDesired)
 	return registry.Key(handle), err
+}
+
+// OpenDevRegKey method opens a registry key for device-specific configuration information.
+func (DeviceInfoSet DevInfo) OpenDevRegKey(DeviceInfoData *SP_DEVINFO_DATA, Scope DICS_FLAG, HwProfile uint32, KeyType DIREG, samDesired uint32) (key registry.Key, err error) {
+	return SetupDiOpenDevRegKey(DeviceInfoSet, DeviceInfoData, Scope, HwProfile, KeyType, samDesired)
 }
 
 //sys	setupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) = setupapi.SetupDiGetDeviceInstallParamsW
@@ -137,8 +167,18 @@ func SetupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEV
 	}, nil
 }
 
+// GetDeviceInstallParams method retrieves device installation parameters for a device information set or a particular device information element.
+func (DeviceInfoSet DevInfo) GetDeviceInstallParams(DeviceInfoData *SP_DEVINFO_DATA) (DeviceInstallParams *DevInstallParams, err error) {
+	return SetupDiGetDeviceInstallParams(DeviceInfoSet, DeviceInfoData)
+}
+
 // SetupDiGetClassInstallParams function retrieves class installation parameters for a device information set or a particular device information element.
 //sys	SetupDiGetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32, RequiredSize *uint32) (err error) = setupapi.SetupDiGetClassInstallParamsW
+
+// GetClassInstallParams method retrieves class installation parameters for a device information set or a particular device information element.
+func (DeviceInfoSet DevInfo) GetClassInstallParams(DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32, RequiredSize *uint32) (err error) {
+	return SetupDiGetClassInstallParams(DeviceInfoSet, DeviceInfoData, ClassInstallParams, ClassInstallParamsSize, RequiredSize)
+}
 
 //sys	setupDiSetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) = setupapi.SetupDiSetDeviceInstallParamsW
 
@@ -163,8 +203,18 @@ func SetupDiSetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEV
 	return setupDiSetDeviceInstallParams(DeviceInfoSet, DeviceInfoData, &_data)
 }
 
+// SetDeviceInstallParams member sets device installation parameters for a device information set or a particular device information element.
+func (DeviceInfoSet DevInfo) SetDeviceInstallParams(DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *DevInstallParams) (err error) {
+	return SetupDiSetDeviceInstallParams(DeviceInfoSet, DeviceInfoData, DeviceInstallParams)
+}
+
 // SetupDiSetClassInstallParams function sets or clears class install parameters for a device information set or a particular device information element.
 //sys	SetupDiSetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32) (err error) = setupapi.SetupDiSetClassInstallParamsW
+
+// SetClassInstallParams method sets or clears class install parameters for a device information set or a particular device information element.
+func (DeviceInfoSet DevInfo) SetClassInstallParams(DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32) (err error) {
+	return SetupDiSetClassInstallParams(DeviceInfoSet, DeviceInfoData, ClassInstallParams, ClassInstallParamsSize)
+}
 
 //sys	setupDiClassNameFromGuidEx(ClassGUID *windows.GUID, ClassName *uint16, ClassNameSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) = setupapi.SetupDiClassNameFromGuidExW
 
@@ -238,5 +288,15 @@ func SetupDiGetSelectedDevice(DeviceInfoSet DevInfo) (DeviceInfoData *SP_DEVINFO
 	return &data, setupDiGetSelectedDevice(DeviceInfoSet, &data)
 }
 
+// GetSelectedDevice method retrieves the selected device information element in a device information set.
+func (DeviceInfoSet DevInfo) GetSelectedDevice() (DeviceInfoData *SP_DEVINFO_DATA, err error) {
+	return SetupDiGetSelectedDevice(DeviceInfoSet)
+}
+
 // SetupDiSetSelectedDevice function sets a device information element as the selected member of a device information set. This function is typically used by an installation wizard.
 //sys	SetupDiSetSelectedDevice(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (err error) = setupapi.SetupDiSetSelectedDevice
+
+// SetSelectedDevice method sets a device information element as the selected member of a device information set. This function is typically used by an installation wizard.
+func (DeviceInfoSet DevInfo) SetSelectedDevice(DeviceInfoData *SP_DEVINFO_DATA) (err error) {
+	return SetupDiSetSelectedDevice(DeviceInfoSet, DeviceInfoData)
+}

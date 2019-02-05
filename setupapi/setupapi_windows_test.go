@@ -50,7 +50,7 @@ func TestSetupDiGetDeviceInfoListDetail(t *testing.T) {
 	}
 	defer devInfoList.Close()
 
-	data, err := SetupDiGetDeviceInfoListDetail(devInfoList)
+	data, err := devInfoList.GetDeviceInfoListDetail()
 	if err != nil {
 		t.Errorf("Error calling SetupDiGetDeviceInfoListDetail: %s", err.Error())
 	} else {
@@ -73,7 +73,7 @@ func TestSetupDiGetDeviceInfoListDetail(t *testing.T) {
 	}
 	defer devInfoList.Close()
 
-	data, err = SetupDiGetDeviceInfoListDetail(devInfoList)
+	data, err = devInfoList.GetDeviceInfoListDetail()
 	if err != nil {
 		t.Errorf("Error calling SetupDiGetDeviceInfoListDetail: %s", err.Error())
 	} else {
@@ -103,7 +103,7 @@ func TestSetupDiCreateDeviceInfo(t *testing.T) {
 		t.Errorf("Error calling SetupDiClassNameFromGuidEx: %s", err.Error())
 	}
 
-	devInfoData, err := SetupDiCreateDeviceInfo(devInfoList, deviceClassNetName, &deviceClassNetGUID, "This is a test device", 0, DICD_GENERATE_ID)
+	devInfoData, err := devInfoList.CreateDeviceInfo(deviceClassNetName, &deviceClassNetGUID, "This is a test device", 0, DICD_GENERATE_ID)
 	if err != nil {
 		// Access denied is expected, as the SetupDiCreateDeviceInfo() require elevation to succeed.
 		if errWin, ok := err.(syscall.Errno); !ok || errWin != windows.ERROR_ACCESS_DENIED {
@@ -122,7 +122,7 @@ func TestSetupDiEnumDeviceInfo(t *testing.T) {
 	defer devInfoList.Close()
 
 	for i := 0; true; i++ {
-		data, err := SetupDiEnumDeviceInfo(devInfoList, i)
+		data, err := devInfoList.EnumDeviceInfo(i)
 		if err != nil {
 			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
 				break
@@ -163,7 +163,7 @@ func TestSetupDiOpenDevRegKey(t *testing.T) {
 	defer devInfoList.Close()
 
 	for i := 0; true; i++ {
-		data, err := SetupDiEnumDeviceInfo(devInfoList, i)
+		data, err := devInfoList.EnumDeviceInfo(i)
 		if err != nil {
 			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
 				break
@@ -171,7 +171,7 @@ func TestSetupDiOpenDevRegKey(t *testing.T) {
 			continue
 		}
 
-		key, err := SetupDiOpenDevRegKey(devInfoList, data, DICS_FLAG_GLOBAL, 0, DIREG_DRV, windows.KEY_READ)
+		key, err := devInfoList.OpenDevRegKey(data, DICS_FLAG_GLOBAL, 0, DIREG_DRV, windows.KEY_READ)
 		if err != nil {
 			t.Errorf("Error calling SetupDiOpenDevRegKey: %s", err.Error())
 		}
@@ -187,7 +187,7 @@ func TestSetupDiGetDeviceInstallParams(t *testing.T) {
 	defer devInfoList.Close()
 
 	for i := 0; true; i++ {
-		data, err := SetupDiEnumDeviceInfo(devInfoList, i)
+		data, err := devInfoList.EnumDeviceInfo(i)
 		if err != nil {
 			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
 				break
@@ -195,9 +195,9 @@ func TestSetupDiGetDeviceInstallParams(t *testing.T) {
 			continue
 		}
 
-		_, err = SetupDiGetDeviceInstallParams(devInfoList, data)
+		_, err = devInfoList.GetDeviceInstallParams(data)
 		if err != nil {
-			t.Errorf("Error calling SetupDiOpenDevRegKey: %s", err.Error())
+			t.Errorf("Error calling SetupDiGetDeviceInstallParams: %s", err.Error())
 		}
 	}
 }
@@ -260,7 +260,7 @@ func TestSetupDiGetSelectedDevice(t *testing.T) {
 	defer devInfoList.Close()
 
 	for i := 0; true; i++ {
-		data, err := SetupDiEnumDeviceInfo(devInfoList, i)
+		data, err := devInfoList.EnumDeviceInfo(i)
 		if err != nil {
 			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
 				break
@@ -268,12 +268,12 @@ func TestSetupDiGetSelectedDevice(t *testing.T) {
 			continue
 		}
 
-		err = SetupDiSetSelectedDevice(devInfoList, data)
+		err = devInfoList.SetSelectedDevice(data)
 		if err != nil {
 			t.Errorf("Error calling SetupDiSetSelectedDevice: %s", err.Error())
 		}
 
-		data2, err := SetupDiGetSelectedDevice(devInfoList)
+		data2, err := devInfoList.GetSelectedDevice()
 		if err != nil {
 			t.Errorf("Error calling SetupDiGetSelectedDevice: %s", err.Error())
 		} else if *data != *data2 {
@@ -281,7 +281,7 @@ func TestSetupDiGetSelectedDevice(t *testing.T) {
 		}
 	}
 
-	err = SetupDiSetSelectedDevice(devInfoList, nil)
+	err = devInfoList.SetSelectedDevice(nil)
 	if err == nil {
 		t.Errorf("SetupDiSetSelectedDevice(nil) should fail")
 	} else {
