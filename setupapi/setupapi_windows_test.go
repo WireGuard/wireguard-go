@@ -136,6 +136,69 @@ func TestSetupDiEnumDeviceInfo(t *testing.T) {
 	}
 }
 
+func TestDevInfo_BuildDriverInfoList(t *testing.T) {
+	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, DIGCF_PRESENT, DevInfo(0), "")
+	if err != nil {
+		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
+	}
+	defer devInfoList.Close()
+
+	for i := 0; true; i++ {
+		deviceData, err := devInfoList.EnumDeviceInfo(i)
+		if err != nil {
+			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+				break
+			}
+			continue
+		}
+
+		const driverType SPDIT = SPDIT_COMPATDRIVER
+		err = devInfoList.BuildDriverInfoList(deviceData, driverType)
+		if err != nil {
+			t.Errorf("Error calling SetupDiBuildDriverInfoList: %s", err.Error())
+		}
+		defer devInfoList.DestroyDriverInfoList(deviceData, driverType)
+
+		var selectedDriverData *SP_DRVINFO_DATA
+		for j := 0; true; j++ {
+			driverData, err := devInfoList.EnumDriverInfo(deviceData, driverType, j)
+			if err != nil {
+				if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+					break
+				}
+				continue
+			}
+
+			if driverData2, err2 := driverData.ToGo().ToWindows(); err2 != nil || *driverData2 != *driverData {
+				t.Error("Error converting between SP_DRVINFO_DATA and DrvInfoData")
+			}
+
+			if driverData.DriverType == 0 {
+				continue
+			}
+
+			err = devInfoList.SetSelectedDriver(deviceData, driverData)
+			if err != nil {
+				t.Errorf("Error calling SetupDiSetSelectedDriver: %s", err.Error())
+			} else {
+				selectedDriverData = driverData
+			}
+
+			_, err = devInfoList.GetDriverInfoDetail(deviceData, driverData)
+			if err != nil {
+				t.Errorf("Error calling SetupDiGetDriverInfoDetail: %s", err.Error())
+			}
+		}
+
+		selectedDriverData2, err := devInfoList.GetSelectedDriver(deviceData)
+		if err != nil {
+			t.Errorf("Error calling SetupDiGetSelectedDriver: %s", err.Error())
+		} else if *selectedDriverData != *selectedDriverData2 {
+			t.Error("SetupDiGetSelectedDriver should return driver selected with SetupDiSetSelectedDriver")
+		}
+	}
+}
+
 func TestSetupDiGetClassDevsEx(t *testing.T) {
 	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "PCI", 0, DIGCF_PRESENT, DevInfo(0), computerName)
 	if err == nil {

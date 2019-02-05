@@ -44,6 +44,13 @@ var (
 	procSetupDiCreateDeviceInfoW          = modsetupapi.NewProc("SetupDiCreateDeviceInfoW")
 	procSetupDiEnumDeviceInfo             = modsetupapi.NewProc("SetupDiEnumDeviceInfo")
 	procSetupDiDestroyDeviceInfoList      = modsetupapi.NewProc("SetupDiDestroyDeviceInfoList")
+	procSetupDiBuildDriverInfoList        = modsetupapi.NewProc("SetupDiBuildDriverInfoList")
+	procSetupDiCancelDriverInfoSearch     = modsetupapi.NewProc("SetupDiCancelDriverInfoSearch")
+	procSetupDiEnumDriverInfoW            = modsetupapi.NewProc("SetupDiEnumDriverInfoW")
+	procSetupDiGetSelectedDriverW         = modsetupapi.NewProc("SetupDiGetSelectedDriverW")
+	procSetupDiSetSelectedDriverW         = modsetupapi.NewProc("SetupDiSetSelectedDriverW")
+	procSetupDiGetDriverInfoDetailW       = modsetupapi.NewProc("SetupDiGetDriverInfoDetailW")
+	procSetupDiDestroyDriverInfoList      = modsetupapi.NewProc("SetupDiDestroyDriverInfoList")
 	procSetupDiGetClassDevsExW            = modsetupapi.NewProc("SetupDiGetClassDevsExW")
 	procSetupDiCallClassInstaller         = modsetupapi.NewProc("SetupDiCallClassInstaller")
 	procSetupDiOpenDevRegKey              = modsetupapi.NewProc("SetupDiOpenDevRegKey")
@@ -110,6 +117,90 @@ func setupDiEnumDeviceInfo(DeviceInfoSet DevInfo, MemberIndex uint32, DeviceInfo
 
 func SetupDiDestroyDeviceInfoList(DeviceInfoSet DevInfo) (err error) {
 	r1, _, e1 := syscall.Syscall(procSetupDiDestroyDeviceInfoList.Addr(), 1, uintptr(DeviceInfoSet), 0, 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func SetupDiBuildDriverInfoList(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverType SPDIT) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiBuildDriverInfoList.Addr(), 3, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(DriverType))
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func SetupDiCancelDriverInfoSearch(DeviceInfoSet DevInfo) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiCancelDriverInfoSearch.Addr(), 1, uintptr(DeviceInfoSet), 0, 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func setupDiEnumDriverInfo(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverType SPDIT, MemberIndex uint32, DriverInfoData *SP_DRVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiEnumDriverInfoW.Addr(), 5, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(DriverType), uintptr(MemberIndex), uintptr(unsafe.Pointer(DriverInfoData)), 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func setupDiGetSelectedDriver(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverInfoData *SP_DRVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiGetSelectedDriverW.Addr(), 3, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(DriverInfoData)))
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func SetupDiSetSelectedDriver(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverInfoData *SP_DRVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiSetSelectedDriverW.Addr(), 3, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(DriverInfoData)))
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func setupDiGetDriverInfoDetail(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverInfoData *SP_DRVINFO_DATA, DriverInfoDetailData *_SP_DRVINFO_DETAIL_DATA, DriverInfoDetailDataSize uint32, RequiredSize *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiGetDriverInfoDetailW.Addr(), 6, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(DriverInfoData)), uintptr(unsafe.Pointer(DriverInfoDetailData)), uintptr(DriverInfoDetailDataSize), uintptr(unsafe.Pointer(RequiredSize)))
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func SetupDiDestroyDriverInfoList(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverType SPDIT) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiDestroyDriverInfoList.Addr(), 3, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(DriverType))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)

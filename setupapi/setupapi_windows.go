@@ -100,6 +100,101 @@ func (DeviceInfoSet DevInfo) Close() error {
 	return SetupDiDestroyDeviceInfoList(DeviceInfoSet)
 }
 
+//sys	SetupDiBuildDriverInfoList(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverType SPDIT) (err error) = setupapi.SetupDiBuildDriverInfoList
+
+// BuildDriverInfoList method builds a list of drivers that is associated with a specific device or with the global class driver list for a device information set.
+func (DeviceInfoSet DevInfo) BuildDriverInfoList(DeviceInfoData *SP_DEVINFO_DATA, DriverType SPDIT) (err error) {
+	return SetupDiBuildDriverInfoList(DeviceInfoSet, DeviceInfoData, DriverType)
+}
+
+//sys	SetupDiCancelDriverInfoSearch(DeviceInfoSet DevInfo) (err error) = setupapi.SetupDiCancelDriverInfoSearch
+
+// CancelDriverInfoSearch method cancels a driver list search that is currently in progress in a different thread.
+func (DeviceInfoSet DevInfo) CancelDriverInfoSearch() (err error) {
+	return SetupDiCancelDriverInfoSearch(DeviceInfoSet)
+}
+
+//sys	setupDiEnumDriverInfo(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverType SPDIT, MemberIndex uint32, DriverInfoData *SP_DRVINFO_DATA) (err error) = setupapi.SetupDiEnumDriverInfoW
+
+// SetupDiEnumDriverInfo function enumerates the members of a driver list.
+func SetupDiEnumDriverInfo(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverType SPDIT, MemberIndex int) (DriverInfoData *SP_DRVINFO_DATA, err error) {
+	data := &SP_DRVINFO_DATA{}
+	data.Size = uint32(unsafe.Sizeof(*data))
+
+	return data, setupDiEnumDriverInfo(DeviceInfoSet, DeviceInfoData, DriverType, uint32(MemberIndex), data)
+}
+
+// EnumDriverInfo method enumerates the members of a driver list.
+func (DeviceInfoSet DevInfo) EnumDriverInfo(DeviceInfoData *SP_DEVINFO_DATA, DriverType SPDIT, MemberIndex int) (DriverInfoData *SP_DRVINFO_DATA, err error) {
+	return SetupDiEnumDriverInfo(DeviceInfoSet, DeviceInfoData, DriverType, MemberIndex)
+}
+
+//sys	setupDiGetSelectedDriver(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverInfoData *SP_DRVINFO_DATA) (err error) = setupapi.SetupDiGetSelectedDriverW
+
+// SetupDiGetSelectedDriver function retrieves the selected driver for a device information set or a particular device information element.
+func SetupDiGetSelectedDriver(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (DriverInfoData *SP_DRVINFO_DATA, err error) {
+	data := &SP_DRVINFO_DATA{}
+	data.Size = uint32(unsafe.Sizeof(*data))
+
+	return data, setupDiGetSelectedDriver(DeviceInfoSet, DeviceInfoData, data)
+}
+
+// GetSelectedDriver method retrieves the selected driver for a device information set or a particular device information element.
+func (DeviceInfoSet DevInfo) GetSelectedDriver(DeviceInfoData *SP_DEVINFO_DATA) (DriverInfoData *SP_DRVINFO_DATA, err error) {
+	return SetupDiGetSelectedDriver(DeviceInfoSet, DeviceInfoData)
+}
+
+//sys	SetupDiSetSelectedDriver(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverInfoData *SP_DRVINFO_DATA) (err error) = setupapi.SetupDiSetSelectedDriverW
+
+// SetSelectedDriver method sets, or resets, the selected driver for a device information element or the selected class driver for a device information set.
+func (DeviceInfoSet DevInfo) SetSelectedDriver(DeviceInfoData *SP_DEVINFO_DATA, DriverInfoData *SP_DRVINFO_DATA) (err error) {
+	return SetupDiSetSelectedDriver(DeviceInfoSet, DeviceInfoData, DriverInfoData)
+}
+
+//sys	setupDiGetDriverInfoDetail(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverInfoData *SP_DRVINFO_DATA, DriverInfoDetailData *_SP_DRVINFO_DETAIL_DATA, DriverInfoDetailDataSize uint32, RequiredSize *uint32) (err error) = setupapi.SetupDiGetDriverInfoDetailW
+
+// SetupDiGetDriverInfoDetail function retrieves driver information detail for a device information set or a particular device information element in the device information set.
+func SetupDiGetDriverInfoDetail(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverInfoData *SP_DRVINFO_DATA) (DriverInfoDetailData *DrvInfoDetailData, err error) {
+	const bufCapacity = 0x800
+	buf := [bufCapacity]byte{}
+	var bufLen uint32
+
+	_data := (*_SP_DRVINFO_DETAIL_DATA)(unsafe.Pointer(&buf[0]))
+	_data.Size = uint32(unsafe.Sizeof(*_data))
+
+	err = setupDiGetDriverInfoDetail(DeviceInfoSet, DeviceInfoData, DriverInfoData, _data, bufCapacity, &bufLen)
+	if err == nil {
+		// The buffer was was sufficiently big.
+		return _data.toGo(bufLen), nil
+	}
+
+	if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
+		// The buffer was too small. Now that we got the required size, create another one big enough and retry.
+		buf := make([]byte, bufLen)
+		_data := (*_SP_DRVINFO_DETAIL_DATA)(unsafe.Pointer(&buf[0]))
+		_data.Size = uint32(unsafe.Sizeof(*_data))
+
+		err = setupDiGetDriverInfoDetail(DeviceInfoSet, DeviceInfoData, DriverInfoData, _data, bufLen, &bufLen)
+		if err == nil {
+			return _data.toGo(bufLen), nil
+		}
+	}
+
+	return
+}
+
+// GetDriverInfoDetail method retrieves driver information detail for a device information set or a particular device information element in the device information set.
+func (DeviceInfoSet DevInfo) GetDriverInfoDetail(DeviceInfoData *SP_DEVINFO_DATA, DriverInfoData *SP_DRVINFO_DATA) (DriverInfoDetailData *DrvInfoDetailData, err error) {
+	return SetupDiGetDriverInfoDetail(DeviceInfoSet, DeviceInfoData, DriverInfoData)
+}
+
+//sys	SetupDiDestroyDriverInfoList(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverType SPDIT) (err error) = setupapi.SetupDiDestroyDriverInfoList
+
+// DestroyDriverInfoList method deletes a driver list.
+func (DeviceInfoSet DevInfo) DestroyDriverInfoList(DeviceInfoData *SP_DEVINFO_DATA, DriverType SPDIT) (err error) {
+	return SetupDiDestroyDriverInfoList(DeviceInfoSet, DeviceInfoData, DriverType)
+}
+
 //sys	setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) [failretval==DevInfo(windows.InvalidHandle)] = setupapi.SetupDiGetClassDevsExW
 
 // SetupDiGetClassDevsEx function returns a handle to a device information set that contains requested device information elements for a local or a remote computer.

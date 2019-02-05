@@ -23,6 +23,20 @@ const (
 	CONFIGMG_VERSION    = 0x0400
 )
 
+//
+// Define maximum string length constants
+//
+const (
+	LINE_LEN                    = 256  // Windows 9x-compatible maximum for displayable strings coming from a device INF.
+	MAX_INF_STRING_LENGTH       = 4096 // Actual maximum size of an INF string (including string substitutions).
+	MAX_INF_SECTION_NAME_LENGTH = 255  // For Windows 9x compatibility, INF section names should be constrained to 32 characters.
+	MAX_TITLE_LEN               = 60
+	MAX_INSTRUCTION_LEN         = 256
+	MAX_LABEL_LEN               = 30
+	MAX_SERVICE_NAME_LEN        = 256
+	MAX_SUBTITLE_LEN            = 256
+)
+
 const (
 	// SP_MAX_MACHINENAME_LENGTH defines maximum length of a machine name in the format expected by ConfigMgr32 CM_Connect_Machine (i.e., "\\\\MachineName\0").
 	SP_MAX_MACHINENAME_LENGTH = windows.MAX_PATH + 3
@@ -285,12 +299,147 @@ const (
 	DICS_FLAG_CONFIGGENERAL  DICS_FLAG = 0x00000004 // 1 or more hardware profile-specific changes to follow
 )
 
+type SP_DRVINFO_DATA struct {
+	Size          uint32
+	DriverType    uint32
+	_             uintptr
+	Description   [LINE_LEN]uint16
+	MfgName       [LINE_LEN]uint16
+	ProviderName  [LINE_LEN]uint16
+	DriverDate    windows.Filetime
+	DriverVersion uint64
+}
+
+func (data SP_DRVINFO_DATA) ToGo() *DrvInfoData {
+	return &DrvInfoData{
+		DriverType:    data.DriverType,
+		Description:   windows.UTF16ToString(data.Description[:]),
+		MfgName:       windows.UTF16ToString(data.MfgName[:]),
+		ProviderName:  windows.UTF16ToString(data.ProviderName[:]),
+		DriverDate:    data.DriverDate,
+		DriverVersion: data.DriverVersion,
+	}
+}
+
+// DrvInfoData is driver information structure (member of a driver info list that may be associated with a particular device instance, or (globally) with a device information set)
+type DrvInfoData struct {
+	DriverType    uint32
+	Description   string
+	MfgName       string
+	ProviderName  string
+	DriverDate    windows.Filetime
+	DriverVersion uint64
+}
+
+func (DriverInfoData DrvInfoData) ToWindows() (data *SP_DRVINFO_DATA, err error) {
+	data = &SP_DRVINFO_DATA{
+		DriverType:    DriverInfoData.DriverType,
+		DriverDate:    DriverInfoData.DriverDate,
+		DriverVersion: DriverInfoData.DriverVersion,
+	}
+	data.Size = uint32(unsafe.Sizeof(*data))
+
+	DescriptionUTF16, err := syscall.UTF16FromString(DriverInfoData.Description)
+	if err != nil {
+		return
+	}
+	copy(data.Description[:], DescriptionUTF16)
+
+	MfgNameUTF16, err := syscall.UTF16FromString(DriverInfoData.MfgName)
+	if err != nil {
+		return
+	}
+	copy(data.MfgName[:], MfgNameUTF16)
+
+	ProviderNameUTF16, err := syscall.UTF16FromString(DriverInfoData.ProviderName)
+	if err != nil {
+		return
+	}
+	copy(data.ProviderName[:], ProviderNameUTF16)
+
+	return
+}
+
+type _SP_DRVINFO_DETAIL_DATA struct {
+	Size            uint32
+	InfDate         windows.Filetime
+	CompatIDsOffset uint32
+	CompatIDsLength uint32
+	_               uintptr
+	SectionName     [LINE_LEN]uint16
+	InfFileName     [windows.MAX_PATH]uint16
+	DrvDescription  [LINE_LEN]uint16
+	HardwareID      [1]uint16
+}
+
+func (_data _SP_DRVINFO_DETAIL_DATA) toGo(bufLen uint32) (DriverInfoDetailData *DrvInfoDetailData) {
+	DriverInfoDetailData = &DrvInfoDetailData{
+		InfDate:        _data.InfDate,
+		SectionName:    windows.UTF16ToString(_data.SectionName[:]),
+		InfFileName:    windows.UTF16ToString(_data.InfFileName[:]),
+		DrvDescription: windows.UTF16ToString(_data.DrvDescription[:]),
+		CompatIDs:      []string{},
+	}
+
+	bufW := _data.getBuf(bufLen)
+
+	if _data.CompatIDsOffset > 1 {
+		DriverInfoDetailData.HardwareID = windows.UTF16ToString(bufW[:wcslen(bufW)])
+	}
+
+	if _data.CompatIDsLength > 0 {
+		bufW = bufW[_data.CompatIDsOffset : _data.CompatIDsOffset+_data.CompatIDsLength]
+		for i := 0; i < len(bufW); {
+			j := i + wcslen(bufW[i:])
+			if i < j {
+				DriverInfoDetailData.CompatIDs = append(DriverInfoDetailData.CompatIDs, windows.UTF16ToString(bufW[i:j]))
+			}
+			i = j + 1
+		}
+	}
+
+	return
+}
+
+func (_data _SP_DRVINFO_DETAIL_DATA) getBuf(bufLen uint32) []uint16 {
+	len := (bufLen - uint32(unsafe.Offsetof(_data.HardwareID))) / 2
+	sl := struct {
+		addr *uint16
+		len  int
+		cap  int
+	}{&_data.HardwareID[0], int(len), int(len)}
+	return *(*[]uint16)(unsafe.Pointer(&sl))
+}
+
+// DrvInfoDetailData is driver information details structure (provides detailed information about a particular driver information structure)
+type DrvInfoDetailData struct {
+	InfDate        windows.Filetime
+	SectionName    string
+	InfFileName    string
+	DrvDescription string
+	HardwareID     string
+	CompatIDs      []string
+}
+
 // DICD flags control SetupDiCreateDeviceInfo
 type DICD uint32
 
 const (
 	DICD_GENERATE_ID       DICD = 0x00000001
 	DICD_INHERIT_CLASSDRVS DICD = 0x00000002
+)
+
+//
+// SPDIT flags to distinguish between class drivers and
+// device drivers.
+// (Passed in 'DriverType' parameter of driver information list APIs)
+//
+type SPDIT uint32
+
+const (
+	SPDIT_NODRIVER     SPDIT = 0x00000000
+	SPDIT_CLASSDRIVER  SPDIT = 0x00000001
+	SPDIT_COMPATDRIVER SPDIT = 0x00000002
 )
 
 // DIGCF flags control what is included in the device information set built by SetupDiGetClassDevs
