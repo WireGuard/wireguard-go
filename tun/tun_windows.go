@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	TUN_MIN_PACKET_SIZE      = 20
 	TUN_MAX_PACKET_SIZE      = 1600
 	TUN_MAX_PACKET_EXCHANGE  = 256 // Number of packets that can be exchanged at a time
 	TUN_EXCHANGE_BUFFER_SIZE = 410632
@@ -176,7 +175,7 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 				tunPacket := &tun.rdBuff.packets[tun.rdNextPacket]
 				tun.rdNextPacket++
 
-				if tunPacket.size < TUN_MIN_PACKET_SIZE || TUN_MAX_PACKET_SIZE < tunPacket.size {
+				if TUN_MAX_PACKET_SIZE < tunPacket.size {
 					// Invalid packet size.
 					continue
 				}
