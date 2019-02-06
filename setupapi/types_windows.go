@@ -300,6 +300,21 @@ const (
 	DICS_FLAG_CONFIGGENERAL  DICS_FLAG = 0x00000004 // 1 or more hardware profile-specific changes to follow
 )
 
+// DI_REMOVEDEVICE specifies the scope of the device removal
+type DI_REMOVEDEVICE uint32
+
+const (
+	DI_REMOVEDEVICE_GLOBAL         DI_REMOVEDEVICE = 0x00000001 // Make this change in all hardware profiles. Remove information about the device from the registry.
+	DI_REMOVEDEVICE_CONFIGSPECIFIC DI_REMOVEDEVICE = 0x00000002 // Make this change to only the hardware profile specified by HwProfile. this flag only applies to root-enumerated devices. When Windows removes the device from the last hardware profile in which it was configured, Windows performs a global removal.
+)
+
+// SP_REMOVEDEVICE_PARAMS is a structure corresponding to a DIF_REMOVE install function.
+type SP_REMOVEDEVICE_PARAMS struct {
+	ClassInstallHeader SP_CLASSINSTALL_HEADER
+	Scope              DI_REMOVEDEVICE
+	HwProfile          uint32
+}
+
 type SP_DRVINFO_DATA struct {
 	Size          uint32
 	DriverType    uint32
