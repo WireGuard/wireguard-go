@@ -264,9 +264,9 @@ func SetupDiGetDeviceRegistryProperty(DeviceInfoSet DevInfo, DeviceInfoData *SP_
 func getRegistryValue(buf []byte, dataType uint32) (interface{}, error) {
 	switch dataType {
 	case windows.REG_SZ:
-		return windows.UTF16ToString(toUTF16(buf)), nil
+		return windows.UTF16ToString(BufToUTF16(buf)), nil
 	case windows.REG_EXPAND_SZ:
-		return registry.ExpandString(windows.UTF16ToString(toUTF16(buf)))
+		return registry.ExpandString(windows.UTF16ToString(BufToUTF16(buf)))
 	case windows.REG_BINARY:
 		return buf, nil
 	case windows.REG_DWORD_LITTLE_ENDIAN:
@@ -274,7 +274,7 @@ func getRegistryValue(buf []byte, dataType uint32) (interface{}, error) {
 	case windows.REG_DWORD_BIG_ENDIAN:
 		return binary.BigEndian.Uint32(buf), nil
 	case windows.REG_MULTI_SZ:
-		bufW := toUTF16(buf)
+		bufW := BufToUTF16(buf)
 		a := []string{}
 		for i := 0; i < len(bufW); {
 			j := i + wcslen(bufW[i:])
@@ -291,13 +291,24 @@ func getRegistryValue(buf []byte, dataType uint32) (interface{}, error) {
 	}
 }
 
-func toUTF16(buf []byte) []uint16 {
+// BufToUTF16 function reinterprets []byte buffer as []uint16
+func BufToUTF16(buf []byte) []uint16 {
 	sl := struct {
 		addr *uint16
 		len  int
 		cap  int
 	}{(*uint16)(unsafe.Pointer(&buf[0])), len(buf) / 2, cap(buf) / 2}
 	return *(*[]uint16)(unsafe.Pointer(&sl))
+}
+
+// UTF16ToBuf function reinterprets []uint16 as []byte
+func UTF16ToBuf(buf []uint16) []byte {
+	sl := struct {
+		addr *byte
+		len  int
+		cap  int
+	}{(*byte)(unsafe.Pointer(&buf[0])), len(buf) * 2, cap(buf) * 2}
+	return *(*[]byte)(unsafe.Pointer(&sl))
 }
 
 func wcslen(str []uint16) int {

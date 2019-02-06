@@ -403,3 +403,16 @@ func TestSetupDiGetSelectedDevice(t *testing.T) {
 		}
 	}
 }
+
+func TestUTF16ToBuf(t *testing.T) {
+	buf := []uint16{0x0123, 0x4567, 0x89ab, 0xcdef}
+	buf2 := UTF16ToBuf(buf)
+	if len(buf)*2 != len(buf2) ||
+		cap(buf)*2 != cap(buf2) ||
+		buf2[0] != 0x23 || buf2[1] != 0x01 ||
+		buf2[2] != 0x67 || buf2[3] != 0x45 ||
+		buf2[4] != 0xab || buf2[5] != 0x89 ||
+		buf2[6] != 0xef || buf2[7] != 0xcd {
+		t.Errorf("SetupDiSetSelectedDevice(nil) should fail with ERROR_INVALID_USER_BUFFER")
+	}
+}
