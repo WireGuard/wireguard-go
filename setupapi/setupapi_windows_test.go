@@ -206,9 +206,21 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 				selectedDriverData = driverData
 			}
 
-			_, err = devInfoList.GetDriverInfoDetail(deviceData, driverData)
+			driverDetailData, err := devInfoList.GetDriverInfoDetail(deviceData, driverData)
 			if err != nil {
 				t.Errorf("Error calling SetupDiGetDriverInfoDetail: %s", err.Error())
+			}
+
+			if driverDetailData.IsCompatible("foobar-aab6e3a4-144e-4786-88d3-6cec361e1edd") {
+				t.Error("Invalid HWID compatibitlity reported")
+			}
+			if !driverDetailData.IsCompatible(strings.ToUpper(driverDetailData.HardwareID)) {
+				t.Error("HWID compatibitlity missed")
+			}
+			for k := range driverDetailData.CompatIDs {
+				if !driverDetailData.IsCompatible(strings.ToUpper(driverDetailData.CompatIDs[k])) {
+					t.Error("HWID compatibitlity missed")
+				}
 			}
 		}
 

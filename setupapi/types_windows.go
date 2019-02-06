@@ -6,6 +6,7 @@
 package setupapi
 
 import (
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -445,6 +446,21 @@ type DrvInfoDetailData struct {
 	DrvDescription string
 	HardwareID     string
 	CompatIDs      []string
+}
+
+// IsCompatible method tests if given hardware ID matches the driver or is listed on the compatible ID list.
+func (DriverInfoDetailData DrvInfoDetailData) IsCompatible(hwid string) bool {
+	hwidLC := strings.ToLower(hwid)
+	if strings.ToLower(DriverInfoDetailData.HardwareID) == hwidLC {
+		return true
+	}
+	for i := range DriverInfoDetailData.CompatIDs {
+		if strings.ToLower(DriverInfoDetailData.CompatIDs[i]) == hwidLC {
+			return true
+		}
+	}
+
+	return false
 }
 
 // DICD flags control SetupDiCreateDeviceInfo
