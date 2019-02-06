@@ -177,6 +177,28 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 				continue
 			}
 
+			if !driverData.IsNewer(windows.Filetime{}, 0) {
+				t.Error("Driver should have non-zero date and version")
+			}
+			if !driverData.IsNewer(windows.Filetime{HighDateTime: driverData.DriverDate.HighDateTime}, 0) {
+				t.Error("Driver should have non-zero date and version")
+			}
+			if driverData.IsNewer(windows.Filetime{HighDateTime: driverData.DriverDate.HighDateTime + 1}, 0) {
+				t.Error("Driver should report newer version on high-date-time")
+			}
+			if !driverData.IsNewer(windows.Filetime{HighDateTime: driverData.DriverDate.HighDateTime, LowDateTime: driverData.DriverDate.LowDateTime}, 0) {
+				t.Error("Driver should have non-zero version")
+			}
+			if driverData.IsNewer(windows.Filetime{HighDateTime: driverData.DriverDate.HighDateTime, LowDateTime: driverData.DriverDate.LowDateTime + 1}, 0) {
+				t.Error("Driver should report newer version on low-date-time")
+			}
+			if driverData.IsNewer(windows.Filetime{HighDateTime: driverData.DriverDate.HighDateTime, LowDateTime: driverData.DriverDate.LowDateTime}, driverData.DriverVersion) {
+				t.Error("Driver should not be newer than itself")
+			}
+			if driverData.IsNewer(windows.Filetime{HighDateTime: driverData.DriverDate.HighDateTime, LowDateTime: driverData.DriverDate.LowDateTime}, driverData.DriverVersion+1) {
+				t.Error("Driver should report newer version on version")
+			}
+
 			err = devInfoList.SetSelectedDriver(deviceData, driverData)
 			if err != nil {
 				t.Errorf("Error calling SetupDiSetSelectedDriver: %s", err.Error())

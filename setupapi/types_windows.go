@@ -321,6 +321,32 @@ func (data SP_DRVINFO_DATA) ToGo() *DrvInfoData {
 	}
 }
 
+// IsNewer method returns true if SP_DRVINFO_DATA date and version is newer than supplied parameters.
+func (data SP_DRVINFO_DATA) IsNewer(DriverDate windows.Filetime, DriverVersion uint64) bool {
+	if data.DriverDate.HighDateTime > DriverDate.HighDateTime {
+		return true
+	}
+	if data.DriverDate.HighDateTime < DriverDate.HighDateTime {
+		return false
+	}
+
+	if data.DriverDate.LowDateTime > DriverDate.LowDateTime {
+		return true
+	}
+	if data.DriverDate.LowDateTime < DriverDate.LowDateTime {
+		return false
+	}
+
+	if data.DriverVersion > DriverVersion {
+		return true
+	}
+	if data.DriverVersion < DriverVersion {
+		return false
+	}
+
+	return false
+}
+
 // DrvInfoData is driver information structure (member of a driver info list that may be associated with a particular device instance, or (globally) with a device information set)
 type DrvInfoData struct {
 	DriverType    uint32
