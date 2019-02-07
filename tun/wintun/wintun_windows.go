@@ -52,7 +52,11 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 		return nil, err
 	}
 
-	// TODO: If we're certain we want case-insensitive name comparison, please document the rationale.
+	// Windows requires each interface to have a different name. When
+	// enforcing this, Windows treats interface names case-insensitive. If an
+	// interface "FooBar" exists and this function reports there is no
+	// interface "foobar", an attempt to create a new interface and name it
+	// "foobar" would cause conflict with "FooBar".
 	ifname = strings.ToLower(ifname)
 
 	// Iterate.
