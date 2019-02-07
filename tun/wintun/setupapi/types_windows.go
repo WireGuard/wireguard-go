@@ -57,26 +57,25 @@ type DevInfoData struct {
 	_         uintptr
 }
 
-type _SP_DEVINFO_LIST_DETAIL_DATA struct {
-	Size                uint32
-	ClassGUID           windows.GUID
-	RemoteMachineHandle windows.Handle
-	RemoteMachineName   [SP_MAX_MACHINENAME_LENGTH]uint16
-}
-
-func (_data *_SP_DEVINFO_LIST_DETAIL_DATA) toGo() *DevInfoListDetailData {
-	return &DevInfoListDetailData{
-		ClassGUID:           _data.ClassGUID,
-		RemoteMachineHandle: _data.RemoteMachineHandle,
-		RemoteMachineName:   windows.UTF16ToString(_data.RemoteMachineName[:]),
-	}
-}
-
 // DevInfoListDetailData is a structure for detailed information on a device information set (used for SetupDiGetDeviceInfoListDetail which supercedes the functionality of SetupDiGetDeviceInfoListClass).
 type DevInfoListDetailData struct {
+	size                uint32
 	ClassGUID           windows.GUID
 	RemoteMachineHandle windows.Handle
-	RemoteMachineName   string
+	remoteMachineName   [SP_MAX_MACHINENAME_LENGTH]uint16
+}
+
+func (data *DevInfoListDetailData) GetRemoteMachineName() string {
+	return windows.UTF16ToString(data.remoteMachineName[:])
+}
+
+func (data *DevInfoListDetailData) SetRemoteMachineName(remoteMachineName string) error {
+	str, err := syscall.UTF16FromString(remoteMachineName)
+	if err != nil {
+		return err
+	}
+	copy(data.remoteMachineName[:], str)
+	return nil
 }
 
 // DI_FUNCTION is function type for device installer

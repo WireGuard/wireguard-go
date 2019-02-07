@@ -29,19 +29,14 @@ func SetupDiCreateDeviceInfoListEx(classGUID *windows.GUID, hwndParent uintptr, 
 	return setupDiCreateDeviceInfoListEx(classGUID, hwndParent, machineNameUTF16, 0)
 }
 
-//sys	setupDiGetDeviceInfoListDetail(deviceInfoSet DevInfo, deviceInfoSetDetailData *_SP_DEVINFO_LIST_DETAIL_DATA) (err error) = setupapi.SetupDiGetDeviceInfoListDetailW
+//sys	setupDiGetDeviceInfoListDetail(deviceInfoSet DevInfo, deviceInfoSetDetailData *DevInfoListDetailData) (err error) = setupapi.SetupDiGetDeviceInfoListDetailW
 
 // SetupDiGetDeviceInfoListDetail function retrieves information associated with a device information set including the class GUID, remote computer handle, and remote computer name.
 func SetupDiGetDeviceInfoListDetail(deviceInfoSet DevInfo) (deviceInfoSetDetailData *DevInfoListDetailData, err error) {
-	var _data _SP_DEVINFO_LIST_DETAIL_DATA
-	_data.Size = uint32(unsafe.Sizeof(_data))
+	data := &DevInfoListDetailData{}
+	data.size = uint32(unsafe.Sizeof(*data))
 
-	err = setupDiGetDeviceInfoListDetail(deviceInfoSet, &_data)
-	if err != nil {
-		return
-	}
-
-	return _data.toGo(), nil
+	return data, setupDiGetDeviceInfoListDetail(deviceInfoSet, data)
 }
 
 // GetDeviceInfoListDetail method retrieves information associated with a device information set including the class GUID, remote computer handle, and remote computer name.

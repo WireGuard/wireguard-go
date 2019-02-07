@@ -79,7 +79,7 @@ func setupDiCreateDeviceInfoListEx(classGUID *windows.GUID, hwndParent uintptr, 
 	return
 }
 
-func setupDiGetDeviceInfoListDetail(deviceInfoSet DevInfo, deviceInfoSetDetailData *_SP_DEVINFO_LIST_DETAIL_DATA) (err error) {
+func setupDiGetDeviceInfoListDetail(deviceInfoSet DevInfo, deviceInfoSetDetailData *DevInfoListDetailData) (err error) {
 	r1, _, e1 := syscall.Syscall(procSetupDiGetDeviceInfoListDetailW.Addr(), 2, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoSetDetailData)), 0)
 	if r1 == 0 {
 		if e1 != 0 {

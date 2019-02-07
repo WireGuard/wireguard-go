@@ -63,7 +63,7 @@ func TestSetupDiGetDeviceInfoListDetail(t *testing.T) {
 			t.Error("SetupDiGetDeviceInfoListDetail returned non-NULL remote machine handle")
 		}
 
-		if data.RemoteMachineName != "" {
+		if data.GetRemoteMachineName() != "" {
 			t.Error("SetupDiGetDeviceInfoListDetail returned non-NULL remote machine name")
 		}
 	}
@@ -86,9 +86,15 @@ func TestSetupDiGetDeviceInfoListDetail(t *testing.T) {
 			t.Error("SetupDiGetDeviceInfoListDetail returned NULL remote machine handle")
 		}
 
-		if data.RemoteMachineName != computerName {
+		if data.GetRemoteMachineName() != computerName {
 			t.Error("SetupDiGetDeviceInfoListDetail returned different remote machine name")
 		}
+	}
+
+	data = &DevInfoListDetailData{}
+	data.SetRemoteMachineName("foobar")
+	if data.GetRemoteMachineName() != "foobar" {
+		t.Error("DevInfoListDetailData.(Get|Set)RemoteMachineName() differ")
 	}
 }
 
