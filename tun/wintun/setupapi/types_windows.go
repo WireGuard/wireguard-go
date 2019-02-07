@@ -123,8 +123,9 @@ const (
 	DIF_FINISHINSTALL_ACTION           DI_FUNCTION = 0x0000002A
 )
 
-type _SP_DEVINSTALL_PARAMS struct {
-	Size                     uint32
+// DevInstallParams is device installation parameters structure (associated with a particular device information element, or globally with a device information set)
+type DevInstallParams struct {
+	size                     uint32
 	Flags                    DI_FLAGS
 	FlagsEx                  DI_FLAGSEX
 	hwndParent               uintptr
@@ -133,50 +134,20 @@ type _SP_DEVINSTALL_PARAMS struct {
 	FileQueue                HSPFILEQ
 	_                        uintptr
 	_                        uint32
-	DriverPath               [windows.MAX_PATH]uint16
+	driverPath               [windows.MAX_PATH]uint16
 }
 
-func (_data *_SP_DEVINSTALL_PARAMS) toGo() *DevInstallParams {
-	return &DevInstallParams{
-		Flags:                    _data.Flags,
-		FlagsEx:                  _data.FlagsEx,
-		hwndParent:               _data.hwndParent,
-		InstallMsgHandler:        _data.InstallMsgHandler,
-		InstallMsgHandlerContext: _data.InstallMsgHandlerContext,
-		FileQueue:                _data.FileQueue,
-		DriverPath:               windows.UTF16ToString(_data.DriverPath[:]),
-	}
+func (params *DevInstallParams) GetDriverPath() string {
+	return windows.UTF16ToString(params.driverPath[:])
 }
 
-// DevInstallParams is device installation parameters structure (associated with a particular device information element, or globally with a device information set)
-type DevInstallParams struct {
-	Flags                    DI_FLAGS
-	FlagsEx                  DI_FLAGSEX
-	hwndParent               uintptr
-	InstallMsgHandler        uintptr
-	InstallMsgHandlerContext uintptr
-	FileQueue                HSPFILEQ
-	DriverPath               string
-}
-
-func (DeviceInstallParams *DevInstallParams) toWindows() (_data *_SP_DEVINSTALL_PARAMS, err error) {
-	_data = &_SP_DEVINSTALL_PARAMS{
-		Flags:                    DeviceInstallParams.Flags,
-		FlagsEx:                  DeviceInstallParams.FlagsEx,
-		hwndParent:               DeviceInstallParams.hwndParent,
-		InstallMsgHandler:        DeviceInstallParams.InstallMsgHandler,
-		InstallMsgHandlerContext: DeviceInstallParams.InstallMsgHandlerContext,
-		FileQueue:                DeviceInstallParams.FileQueue,
-	}
-	_data.Size = uint32(unsafe.Sizeof(*_data))
-
-	driverPathUTF16, err := syscall.UTF16FromString(DeviceInstallParams.DriverPath)
+func (params *DevInstallParams) SetDriverPath(driverPath string) error {
+	str, err := syscall.UTF16FromString(driverPath)
 	if err != nil {
-		return
+		return err
 	}
-	copy(_data.DriverPath[:], driverPathUTF16)
-
-	return
+	copy(params.driverPath[:], str)
+	return nil
 }
 
 // DI_FLAGS is SP_DEVINSTALL_PARAMS.Flags values

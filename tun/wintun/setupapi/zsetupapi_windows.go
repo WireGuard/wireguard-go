@@ -273,7 +273,7 @@ func setupDiSetDeviceRegistryProperty(deviceInfoSet DevInfo, deviceInfoData *Dev
 	return
 }
 
-func setupDiGetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, deviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) {
+func setupDiGetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, deviceInstallParams *DevInstallParams) (err error) {
 	r1, _, e1 := syscall.Syscall(procSetupDiGetDeviceInstallParamsW.Addr(), 3, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(deviceInstallParams)))
 	if r1 == 0 {
 		if e1 != 0 {
@@ -297,7 +297,7 @@ func SetupDiGetClassInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfo
 	return
 }
 
-func setupDiSetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, deviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) {
+func SetupDiSetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, deviceInstallParams *DevInstallParams) (err error) {
 	r1, _, e1 := syscall.Syscall(procSetupDiSetDeviceInstallParamsW.Addr(), 3, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(deviceInstallParams)))
 	if r1 == 0 {
 		if e1 != 0 {

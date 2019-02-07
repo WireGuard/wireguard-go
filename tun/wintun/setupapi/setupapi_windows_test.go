@@ -361,6 +361,12 @@ func TestSetupDiGetDeviceInstallParams(t *testing.T) {
 			t.Errorf("Error calling SetupDiGetDeviceInstallParams: %s", err.Error())
 		}
 	}
+
+	params := &DevInstallParams{}
+	params.SetDriverPath("foobar")
+	if params.GetDriverPath() != "foobar" {
+		t.Error("DevInstallParams.(Get|Set)DriverPath() differ")
+	}
 }
 
 func TestSetupDiClassNameFromGuidEx(t *testing.T) {

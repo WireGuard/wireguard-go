@@ -332,19 +332,14 @@ func (deviceInfoSet DevInfo) SetDeviceRegistryProperty(deviceInfoData *DevInfoDa
 	return SetupDiSetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, propertyBuffers)
 }
 
-//sys	setupDiGetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, deviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) = setupapi.SetupDiGetDeviceInstallParamsW
+//sys	setupDiGetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, deviceInstallParams *DevInstallParams) (err error) = setupapi.SetupDiGetDeviceInstallParamsW
 
 // SetupDiGetDeviceInstallParams function retrieves device installation parameters for a device information set or a particular device information element.
-func SetupDiGetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData) (deviceInstallParams *DevInstallParams, err error) {
-	var _data _SP_DEVINSTALL_PARAMS
-	_data.Size = uint32(unsafe.Sizeof(_data))
+func SetupDiGetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData) (*DevInstallParams, error) {
+	params := &DevInstallParams{}
+	params.size = uint32(unsafe.Sizeof(*params))
 
-	err = setupDiGetDeviceInstallParams(deviceInfoSet, deviceInfoData, &_data)
-	if err != nil {
-		return
-	}
-
-	return _data.toGo(), nil
+	return params, setupDiGetDeviceInstallParams(deviceInfoSet, deviceInfoData, params)
 }
 
 // GetDeviceInstallParams method retrieves device installation parameters for a device information set or a particular device information element.
@@ -360,17 +355,7 @@ func (deviceInfoSet DevInfo) GetClassInstallParams(deviceInfoData *DevInfoData, 
 	return SetupDiGetClassInstallParams(deviceInfoSet, deviceInfoData, classInstallParams, classInstallParamsSize, requiredSize)
 }
 
-//sys	setupDiSetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, deviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) = setupapi.SetupDiSetDeviceInstallParamsW
-
-// SetupDiSetDeviceInstallParams function sets device installation parameters for a device information set or a particular device information element.
-func SetupDiSetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, deviceInstallParams *DevInstallParams) (err error) {
-	_data, err := deviceInstallParams.toWindows()
-	if err != nil {
-		return
-	}
-
-	return setupDiSetDeviceInstallParams(deviceInfoSet, deviceInfoData, _data)
-}
+//sys	SetupDiSetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, deviceInstallParams *DevInstallParams) (err error) = setupapi.SetupDiSetDeviceInstallParamsW
 
 // SetDeviceInstallParams member sets device installation parameters for a device information set or a particular device information element.
 func (deviceInfoSet DevInfo) SetDeviceInstallParams(deviceInfoData *DevInfoData, deviceInstallParams *DevInstallParams) error {
