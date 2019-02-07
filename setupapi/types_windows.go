@@ -326,7 +326,7 @@ type SP_DRVINFO_DATA struct {
 	DriverVersion uint64
 }
 
-func (data *SP_DRVINFO_DATA) ToGo() *DrvInfoData {
+func (data *SP_DRVINFO_DATA) toGo() *DrvInfoData {
 	return &DrvInfoData{
 		DriverType:    data.DriverType,
 		Description:   windows.UTF16ToString(data.Description[:]),
@@ -373,7 +373,7 @@ type DrvInfoData struct {
 	DriverVersion uint64
 }
 
-func (DriverInfoData *DrvInfoData) ToWindows() (data *SP_DRVINFO_DATA, err error) {
+func (DriverInfoData *DrvInfoData) toWindows() (data *SP_DRVINFO_DATA, err error) {
 	data = &SP_DRVINFO_DATA{
 		DriverType:    DriverInfoData.DriverType,
 		DriverDate:    DriverInfoData.DriverDate,

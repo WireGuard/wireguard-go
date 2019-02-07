@@ -169,7 +169,7 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 				continue
 			}
 
-			if driverData2, err2 := driverData.ToGo().ToWindows(); err2 != nil || *driverData2 != *driverData {
+			if driverData2, err2 := driverData.toGo().toWindows(); err2 != nil || *driverData2 != *driverData {
 				t.Error("Error converting between SP_DRVINFO_DATA and DrvInfoData")
 			}
 
