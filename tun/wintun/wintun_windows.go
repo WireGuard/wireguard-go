@@ -35,7 +35,8 @@ const TUN_HWID = "Wintun"
 // hwndParent to 0.
 //
 // Function returns interface ID when the interface was found, or nil
-// otherwise.
+// otherwise. If the interface is found but not Wintun-class, the function
+// returns interface ID with an error.
 //
 func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 	// Create a list of network devices.
@@ -79,8 +80,40 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 		}
 
 		if ifname == strings.ToLower(ifname2) {
-			// Interface name found.
-			return (*Wintun)(ifid), nil
+			// Interface name found. Check its driver.
+			const driverType = setupapi.SPDIT_COMPATDRIVER
+			err = devInfoList.BuildDriverInfoList(deviceData, driverType)
+			if err != nil {
+				return nil, err
+			}
+			defer devInfoList.DestroyDriverInfoList(deviceData, driverType)
+
+			for index := 0; ; index++ {
+				// Get a driver from the list.
+				driverData, err := devInfoList.EnumDriverInfo(deviceData, driverType, index)
+				if err != nil {
+					if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+						break
+					}
+					// Something is wrong with this driver. Skip it.
+					continue
+				}
+
+				// Get driver info details.
+				driverDetailData, err := devInfoList.GetDriverInfoDetail(deviceData, driverData)
+				if err != nil {
+					// Something is wrong with this driver. Skip it.
+					continue
+				}
+
+				if driverDetailData.IsCompatible(TUN_HWID) {
+					// Matching hardware ID found.
+					return (*Wintun)(ifid), nil
+				}
+			}
+
+			// This interface is not using Wintun driver.
+			return (*Wintun)(ifid), errors.New("Foreign network interface with the same name exists")
 		}
 	}
 

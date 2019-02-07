@@ -55,16 +55,26 @@ type nativeTun struct {
 func CreateTUN(ifname string) (TUNDevice, error) {
 	// Does an interface with this name already exist?
 	wt, err := wintun.GetInterface(ifname, 0)
-	if wt == nil || err != nil {
+	if wt == nil {
 		// Interface does not exist or an error occured. Create one.
 		wt, _, err = wintun.CreateInterface("WireGuard Tunnel Adapter", 0)
 		if err != nil {
 			return nil, err
 		}
-
-		// Set interface name. (Ignore errors.)
-		wt.SetInterfaceName(ifname)
+	} else if err != nil {
+		// Foreign interface with the same name found.
+		// We could create a Wintun interface under a temporary name. But, should our
+		// proces die without deleting this interface first, the interface would remain
+		// orphaned.
+		return nil, err
 	}
+
+	err = wt.SetInterfaceName(ifname)
+	if err != nil {
+		wt.DeleteInterface(0)
+		return nil, err
+	}
+
 	err = wt.FlushInterface()
 	if err != nil {
 		wt.DeleteInterface(0)
