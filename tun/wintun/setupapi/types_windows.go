@@ -49,9 +49,9 @@ type HSPFILEQ uintptr
 // DevInfo holds reference to device information set
 type DevInfo windows.Handle
 
-// SP_DEVINFO_DATA is a device information structure (references a device instance that is a member of a device information set)
-type SP_DEVINFO_DATA struct {
-	Size      uint32
+// DevInfoData is a device information structure (references a device instance that is a member of a device information set)
+type DevInfoData struct {
+	size      uint32
 	ClassGUID windows.GUID
 	DevInst   uint32 // DEVINST handle
 	_         uintptr

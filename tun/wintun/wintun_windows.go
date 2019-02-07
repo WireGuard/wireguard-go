@@ -357,7 +357,7 @@ func (wintun *Wintun) FlushInterface() error {
 //
 // checkReboot checks device install parameters if a system reboot is required.
 //
-func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.SP_DEVINFO_DATA) (bool, error) {
+func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) (bool, error) {
 	devInstallParams, err := deviceInfoSet.GetDeviceInstallParams(deviceInfoData)
 	if err != nil {
 		return false, err
@@ -379,7 +379,7 @@ func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.SP_DEV
 //
 // Function returns the network interface ID.
 //
-func getInterfaceId(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.SP_DEVINFO_DATA, numAttempts int) (*windows.GUID, error) {
+func getInterfaceId(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData, numAttempts int) (*windows.GUID, error) {
 	if numAttempts < 1 {
 		return nil, fmt.Errorf("Invalid numAttempts (expected: >=1, provided: %v)", numAttempts)
 	}
