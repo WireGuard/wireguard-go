@@ -36,7 +36,7 @@ type tunPacket struct {
 type tunRWQueue struct {
 	numPackets uint32
 	packets    [TUN_MAX_PACKET_EXCHANGE]tunPacket
-	left       uint32
+	left       bool
 }
 
 type nativeTun struct {
@@ -229,7 +229,7 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 				}
 			}
 
-			if tun.rdBuff.numPackets < TUN_MAX_PACKET_EXCHANGE || tun.rdBuff.left == 0 {
+			if tun.rdBuff.numPackets < TUN_MAX_PACKET_EXCHANGE || !tun.rdBuff.left {
 				// Buffer was not full. Wait for the interface data or user close.
 				r, err := windows.WaitForMultipleObjects(tun.signals[:], false, windows.INFINITE)
 				if err != nil {
