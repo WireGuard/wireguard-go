@@ -368,75 +368,77 @@ func (data *DrvInfoData) IsNewer(driverDate windows.Filetime, driverVersion uint
 	return false
 }
 
-type _SP_DRVINFO_DETAIL_DATA struct {
-	Size            uint32
+// DrvInfoDetailData is driver information details structure (provides detailed information about a particular driver information structure)
+type DrvInfoDetailData struct {
+	size            uint32 // On input, this must be exactly the sizeof(DrvInfoDetailData). On output, we set this member to the actual size of structure data.
 	InfDate         windows.Filetime
-	CompatIDsOffset uint32
-	CompatIDsLength uint32
+	compatIDsOffset uint32
+	compatIDsLength uint32
 	_               uintptr
-	SectionName     [LINE_LEN]uint16
-	InfFileName     [windows.MAX_PATH]uint16
-	DrvDescription  [LINE_LEN]uint16
-	HardwareID      [1]uint16
+	sectionName     [LINE_LEN]uint16
+	infFileName     [windows.MAX_PATH]uint16
+	drvDescription  [LINE_LEN]uint16
+	hardwareID      [1]uint16
 }
 
-func (_data *_SP_DRVINFO_DETAIL_DATA) toGo(bufLen uint32) (DriverInfoDetailData *DrvInfoDetailData) {
-	DriverInfoDetailData = &DrvInfoDetailData{
-		InfDate:        _data.InfDate,
-		SectionName:    windows.UTF16ToString(_data.SectionName[:]),
-		InfFileName:    windows.UTF16ToString(_data.InfFileName[:]),
-		DrvDescription: windows.UTF16ToString(_data.DrvDescription[:]),
-		CompatIDs:      []string{},
+func (data *DrvInfoDetailData) GetSectionName() string {
+	return windows.UTF16ToString(data.sectionName[:])
+}
+
+func (data *DrvInfoDetailData) GetInfFileName() string {
+	return windows.UTF16ToString(data.infFileName[:])
+}
+
+func (data *DrvInfoDetailData) GetDrvDescription() string {
+	return windows.UTF16ToString(data.drvDescription[:])
+}
+
+func (data *DrvInfoDetailData) GetHardwareID() string {
+	if data.compatIDsOffset > 1 {
+		bufW := data.getBuf()
+		return windows.UTF16ToString(bufW[:wcslen(bufW)])
 	}
 
-	bufW := _data.getBuf(bufLen)
+	return ""
+}
 
-	if _data.CompatIDsOffset > 1 {
-		DriverInfoDetailData.HardwareID = windows.UTF16ToString(bufW[:wcslen(bufW)])
-	}
+func (data *DrvInfoDetailData) GetCompatIDs() []string {
+	a := make([]string, 0)
 
-	if _data.CompatIDsLength > 0 {
-		bufW = bufW[_data.CompatIDsOffset : _data.CompatIDsOffset+_data.CompatIDsLength]
+	if data.compatIDsLength > 0 {
+		bufW := data.getBuf()
+		bufW = bufW[data.compatIDsOffset : data.compatIDsOffset+data.compatIDsLength]
 		for i := 0; i < len(bufW); {
 			j := i + wcslen(bufW[i:])
 			if i < j {
-				DriverInfoDetailData.CompatIDs = append(DriverInfoDetailData.CompatIDs, windows.UTF16ToString(bufW[i:j]))
+				a = append(a, windows.UTF16ToString(bufW[i:j]))
 			}
 			i = j + 1
 		}
 	}
 
-	return
+	return a
 }
 
-func (_data *_SP_DRVINFO_DETAIL_DATA) getBuf(bufLen uint32) []uint16 {
-	len := (bufLen - uint32(unsafe.Offsetof(_data.HardwareID))) / 2
+func (data *DrvInfoDetailData) getBuf() []uint16 {
+	len := (data.size - uint32(unsafe.Offsetof(data.hardwareID))) / 2
 	sl := struct {
 		addr *uint16
 		len  int
 		cap  int
-	}{&_data.HardwareID[0], int(len), int(len)}
+	}{&data.hardwareID[0], int(len), int(len)}
 	return *(*[]uint16)(unsafe.Pointer(&sl))
 }
 
-// DrvInfoDetailData is driver information details structure (provides detailed information about a particular driver information structure)
-type DrvInfoDetailData struct {
-	InfDate        windows.Filetime
-	SectionName    string
-	InfFileName    string
-	DrvDescription string
-	HardwareID     string
-	CompatIDs      []string
-}
-
 // IsCompatible method tests if given hardware ID matches the driver or is listed on the compatible ID list.
-func (driverInfoDetailData *DrvInfoDetailData) IsCompatible(hwid string) bool {
+func (data *DrvInfoDetailData) IsCompatible(hwid string) bool {
 	hwidLC := strings.ToLower(hwid)
-	if strings.ToLower(driverInfoDetailData.HardwareID) == hwidLC {
+	if strings.ToLower(data.GetHardwareID()) == hwidLC {
 		return true
 	}
-	for i := range driverInfoDetailData.CompatIDs {
-		if strings.ToLower(driverInfoDetailData.CompatIDs[i]) == hwidLC {
+	a := data.GetCompatIDs()
+	for i := range a {
+		if strings.ToLower(a[i]) == hwidLC {
 			return true
 		}
 	}

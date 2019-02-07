@@ -146,36 +146,38 @@ func (deviceInfoSet DevInfo) SetSelectedDriver(deviceInfoData *DevInfoData, driv
 	return SetupDiSetSelectedDriver(deviceInfoSet, deviceInfoData, driverInfoData)
 }
 
-//sys	setupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *DrvInfoData, driverInfoDetailData *_SP_DRVINFO_DETAIL_DATA, driverInfoDetailDataSize uint32, requiredSize *uint32) (err error) = setupapi.SetupDiGetDriverInfoDetailW
+//sys	setupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *DrvInfoData, driverInfoDetailData *DrvInfoDetailData, driverInfoDetailDataSize uint32, requiredSize *uint32) (err error) = setupapi.SetupDiGetDriverInfoDetailW
 
 // SetupDiGetDriverInfoDetail function retrieves driver information detail for a device information set or a particular device information element in the device information set.
-func SetupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *DrvInfoData) (driverInfoDetailData *DrvInfoDetailData, err error) {
+func SetupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *DrvInfoData) (*DrvInfoDetailData, error) {
 	const bufCapacity = 0x800
 	buf := [bufCapacity]byte{}
 	var bufLen uint32
 
-	_data := (*_SP_DRVINFO_DETAIL_DATA)(unsafe.Pointer(&buf[0]))
-	_data.Size = uint32(unsafe.Sizeof(*_data))
+	data := (*DrvInfoDetailData)(unsafe.Pointer(&buf[0]))
+	data.size = uint32(unsafe.Sizeof(*data))
 
-	err = setupDiGetDriverInfoDetail(deviceInfoSet, deviceInfoData, driverInfoData, _data, bufCapacity, &bufLen)
+	err := setupDiGetDriverInfoDetail(deviceInfoSet, deviceInfoData, driverInfoData, data, bufCapacity, &bufLen)
 	if err == nil {
 		// The buffer was was sufficiently big.
-		return _data.toGo(bufLen), nil
+		data.size = bufLen
+		return data, nil
 	}
 
 	if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
 		// The buffer was too small. Now that we got the required size, create another one big enough and retry.
 		buf := make([]byte, bufLen)
-		_data := (*_SP_DRVINFO_DETAIL_DATA)(unsafe.Pointer(&buf[0]))
-		_data.Size = uint32(unsafe.Sizeof(*_data))
+		data := (*DrvInfoDetailData)(unsafe.Pointer(&buf[0]))
+		data.size = uint32(unsafe.Sizeof(*data))
 
-		err = setupDiGetDriverInfoDetail(deviceInfoSet, deviceInfoData, driverInfoData, _data, bufLen, &bufLen)
+		err = setupDiGetDriverInfoDetail(deviceInfoSet, deviceInfoData, driverInfoData, data, bufLen, &bufLen)
 		if err == nil {
-			return _data.toGo(bufLen), nil
+			data.size = bufLen
+			return data, nil
 		}
 	}
 
-	return
+	return nil, err
 }
 
 // GetDriverInfoDetail method retrieves driver information detail for a device information set or a particular device information element in the device information set.

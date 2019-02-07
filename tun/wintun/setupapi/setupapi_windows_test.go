@@ -217,11 +217,12 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 			if driverDetailData.IsCompatible("foobar-aab6e3a4-144e-4786-88d3-6cec361e1edd") {
 				t.Error("Invalid HWID compatibitlity reported")
 			}
-			if !driverDetailData.IsCompatible(strings.ToUpper(driverDetailData.HardwareID)) {
+			if !driverDetailData.IsCompatible(strings.ToUpper(driverDetailData.GetHardwareID())) {
 				t.Error("HWID compatibitlity missed")
 			}
-			for k := range driverDetailData.CompatIDs {
-				if !driverDetailData.IsCompatible(strings.ToUpper(driverDetailData.CompatIDs[k])) {
+			a := driverDetailData.GetCompatIDs()
+			for k := range a {
+				if !driverDetailData.IsCompatible(strings.ToUpper(a[k])) {
 					t.Error("HWID compatibitlity missed")
 				}
 			}
