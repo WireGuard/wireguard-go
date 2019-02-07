@@ -64,7 +64,7 @@ type _SP_DEVINFO_LIST_DETAIL_DATA struct {
 	RemoteMachineName   [SP_MAX_MACHINENAME_LENGTH]uint16
 }
 
-func (_data _SP_DEVINFO_LIST_DETAIL_DATA) toGo() *DevInfoListDetailData {
+func (_data *_SP_DEVINFO_LIST_DETAIL_DATA) toGo() *DevInfoListDetailData {
 	return &DevInfoListDetailData{
 		ClassGUID:           _data.ClassGUID,
 		RemoteMachineHandle: _data.RemoteMachineHandle,
@@ -137,7 +137,7 @@ type _SP_DEVINSTALL_PARAMS struct {
 	DriverPath               [windows.MAX_PATH]uint16
 }
 
-func (_data _SP_DEVINSTALL_PARAMS) toGo() *DevInstallParams {
+func (_data *_SP_DEVINSTALL_PARAMS) toGo() *DevInstallParams {
 	return &DevInstallParams{
 		Flags:                    _data.Flags,
 		FlagsEx:                  _data.FlagsEx,
@@ -160,7 +160,7 @@ type DevInstallParams struct {
 	DriverPath               string
 }
 
-func (DeviceInstallParams DevInstallParams) toWindows() (_data *_SP_DEVINSTALL_PARAMS, err error) {
+func (DeviceInstallParams *DevInstallParams) toWindows() (_data *_SP_DEVINSTALL_PARAMS, err error) {
 	_data = &_SP_DEVINSTALL_PARAMS{
 		Flags:                    DeviceInstallParams.Flags,
 		FlagsEx:                  DeviceInstallParams.FlagsEx,
@@ -326,7 +326,7 @@ type SP_DRVINFO_DATA struct {
 	DriverVersion uint64
 }
 
-func (data SP_DRVINFO_DATA) ToGo() *DrvInfoData {
+func (data *SP_DRVINFO_DATA) ToGo() *DrvInfoData {
 	return &DrvInfoData{
 		DriverType:    data.DriverType,
 		Description:   windows.UTF16ToString(data.Description[:]),
@@ -338,7 +338,7 @@ func (data SP_DRVINFO_DATA) ToGo() *DrvInfoData {
 }
 
 // IsNewer method returns true if SP_DRVINFO_DATA date and version is newer than supplied parameters.
-func (data SP_DRVINFO_DATA) IsNewer(DriverDate windows.Filetime, DriverVersion uint64) bool {
+func (data *SP_DRVINFO_DATA) IsNewer(DriverDate windows.Filetime, DriverVersion uint64) bool {
 	if data.DriverDate.HighDateTime > DriverDate.HighDateTime {
 		return true
 	}
@@ -373,7 +373,7 @@ type DrvInfoData struct {
 	DriverVersion uint64
 }
 
-func (DriverInfoData DrvInfoData) ToWindows() (data *SP_DRVINFO_DATA, err error) {
+func (DriverInfoData *DrvInfoData) ToWindows() (data *SP_DRVINFO_DATA, err error) {
 	data = &SP_DRVINFO_DATA{
 		DriverType:    DriverInfoData.DriverType,
 		DriverDate:    DriverInfoData.DriverDate,
@@ -414,7 +414,7 @@ type _SP_DRVINFO_DETAIL_DATA struct {
 	HardwareID      [1]uint16
 }
 
-func (_data _SP_DRVINFO_DETAIL_DATA) toGo(bufLen uint32) (DriverInfoDetailData *DrvInfoDetailData) {
+func (_data *_SP_DRVINFO_DETAIL_DATA) toGo(bufLen uint32) (DriverInfoDetailData *DrvInfoDetailData) {
 	DriverInfoDetailData = &DrvInfoDetailData{
 		InfDate:        _data.InfDate,
 		SectionName:    windows.UTF16ToString(_data.SectionName[:]),
@@ -443,7 +443,7 @@ func (_data _SP_DRVINFO_DETAIL_DATA) toGo(bufLen uint32) (DriverInfoDetailData *
 	return
 }
 
-func (_data _SP_DRVINFO_DETAIL_DATA) getBuf(bufLen uint32) []uint16 {
+func (_data *_SP_DRVINFO_DETAIL_DATA) getBuf(bufLen uint32) []uint16 {
 	len := (bufLen - uint32(unsafe.Offsetof(_data.HardwareID))) / 2
 	sl := struct {
 		addr *uint16
@@ -464,7 +464,7 @@ type DrvInfoDetailData struct {
 }
 
 // IsCompatible method tests if given hardware ID matches the driver or is listed on the compatible ID list.
-func (DriverInfoDetailData DrvInfoDetailData) IsCompatible(hwid string) bool {
+func (DriverInfoDetailData *DrvInfoDetailData) IsCompatible(hwid string) bool {
 	hwidLC := strings.ToLower(hwid)
 	if strings.ToLower(DriverInfoDetailData.HardwareID) == hwidLC {
 		return true
