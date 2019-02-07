@@ -65,6 +65,11 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 		// Set interface name. (Ignore errors.)
 		wt.SetInterfaceName(ifname)
 	}
+	err = wt.FlushInterface()
+	if err != nil {
+		wt.DeleteInterface(0)
+		return nil, err
+	}
 
 	signalNameUTF16, err := windows.UTF16PtrFromString(wt.SignalEventName())
 	if err != nil {
