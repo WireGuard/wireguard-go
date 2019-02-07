@@ -109,47 +109,47 @@ func (deviceInfoSet DevInfo) CancelDriverInfoSearch() error {
 	return SetupDiCancelDriverInfoSearch(deviceInfoSet)
 }
 
-//sys	setupDiEnumDriverInfo(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverType SPDIT, memberIndex uint32, driverInfoData *SP_DRVINFO_DATA) (err error) = setupapi.SetupDiEnumDriverInfoW
+//sys	setupDiEnumDriverInfo(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverType SPDIT, memberIndex uint32, driverInfoData *DrvInfoData) (err error) = setupapi.SetupDiEnumDriverInfoW
 
 // SetupDiEnumDriverInfo function enumerates the members of a driver list.
-func SetupDiEnumDriverInfo(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverType SPDIT, memberIndex int) (*SP_DRVINFO_DATA, error) {
-	data := &SP_DRVINFO_DATA{}
-	data.Size = uint32(unsafe.Sizeof(*data))
+func SetupDiEnumDriverInfo(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverType SPDIT, memberIndex int) (*DrvInfoData, error) {
+	data := &DrvInfoData{}
+	data.size = uint32(unsafe.Sizeof(*data))
 
 	return data, setupDiEnumDriverInfo(deviceInfoSet, deviceInfoData, driverType, uint32(memberIndex), data)
 }
 
 // EnumDriverInfo method enumerates the members of a driver list.
-func (deviceInfoSet DevInfo) EnumDriverInfo(deviceInfoData *DevInfoData, driverType SPDIT, memberIndex int) (*SP_DRVINFO_DATA, error) {
+func (deviceInfoSet DevInfo) EnumDriverInfo(deviceInfoData *DevInfoData, driverType SPDIT, memberIndex int) (*DrvInfoData, error) {
 	return SetupDiEnumDriverInfo(deviceInfoSet, deviceInfoData, driverType, memberIndex)
 }
 
-//sys	setupDiGetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *SP_DRVINFO_DATA) (err error) = setupapi.SetupDiGetSelectedDriverW
+//sys	setupDiGetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *DrvInfoData) (err error) = setupapi.SetupDiGetSelectedDriverW
 
 // SetupDiGetSelectedDriver function retrieves the selected driver for a device information set or a particular device information element.
-func SetupDiGetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *DevInfoData) (*SP_DRVINFO_DATA, error) {
-	data := &SP_DRVINFO_DATA{}
-	data.Size = uint32(unsafe.Sizeof(*data))
+func SetupDiGetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *DevInfoData) (*DrvInfoData, error) {
+	data := &DrvInfoData{}
+	data.size = uint32(unsafe.Sizeof(*data))
 
 	return data, setupDiGetSelectedDriver(deviceInfoSet, deviceInfoData, data)
 }
 
 // GetSelectedDriver method retrieves the selected driver for a device information set or a particular device information element.
-func (deviceInfoSet DevInfo) GetSelectedDriver(deviceInfoData *DevInfoData) (*SP_DRVINFO_DATA, error) {
+func (deviceInfoSet DevInfo) GetSelectedDriver(deviceInfoData *DevInfoData) (*DrvInfoData, error) {
 	return SetupDiGetSelectedDriver(deviceInfoSet, deviceInfoData)
 }
 
-//sys	SetupDiSetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *SP_DRVINFO_DATA) (err error) = setupapi.SetupDiSetSelectedDriverW
+//sys	SetupDiSetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *DrvInfoData) (err error) = setupapi.SetupDiSetSelectedDriverW
 
 // SetSelectedDriver method sets, or resets, the selected driver for a device information element or the selected class driver for a device information set.
-func (deviceInfoSet DevInfo) SetSelectedDriver(deviceInfoData *DevInfoData, driverInfoData *SP_DRVINFO_DATA) error {
+func (deviceInfoSet DevInfo) SetSelectedDriver(deviceInfoData *DevInfoData, driverInfoData *DrvInfoData) error {
 	return SetupDiSetSelectedDriver(deviceInfoSet, deviceInfoData, driverInfoData)
 }
 
-//sys	setupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *SP_DRVINFO_DATA, driverInfoDetailData *_SP_DRVINFO_DETAIL_DATA, driverInfoDetailDataSize uint32, requiredSize *uint32) (err error) = setupapi.SetupDiGetDriverInfoDetailW
+//sys	setupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *DrvInfoData, driverInfoDetailData *_SP_DRVINFO_DETAIL_DATA, driverInfoDetailDataSize uint32, requiredSize *uint32) (err error) = setupapi.SetupDiGetDriverInfoDetailW
 
 // SetupDiGetDriverInfoDetail function retrieves driver information detail for a device information set or a particular device information element in the device information set.
-func SetupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *SP_DRVINFO_DATA) (driverInfoDetailData *DrvInfoDetailData, err error) {
+func SetupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *DrvInfoData) (driverInfoDetailData *DrvInfoDetailData, err error) {
 	const bufCapacity = 0x800
 	buf := [bufCapacity]byte{}
 	var bufLen uint32
@@ -179,7 +179,7 @@ func SetupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoDa
 }
 
 // GetDriverInfoDetail method retrieves driver information detail for a device information set or a particular device information element in the device information set.
-func (deviceInfoSet DevInfo) GetDriverInfoDetail(deviceInfoData *DevInfoData, driverInfoData *SP_DRVINFO_DATA) (*DrvInfoDetailData, error) {
+func (deviceInfoSet DevInfo) GetDriverInfoDetail(deviceInfoData *DevInfoData, driverInfoData *DrvInfoData) (*DrvInfoDetailData, error) {
 	return SetupDiGetDriverInfoDetail(deviceInfoSet, deviceInfoData, driverInfoData)
 }
 

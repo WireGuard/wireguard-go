@@ -291,30 +291,59 @@ type RemoveDeviceParams struct {
 	HwProfile          uint32
 }
 
-type SP_DRVINFO_DATA struct {
-	Size          uint32
+// DrvInfoData is driver information structure (member of a driver info list that may be associated with a particular device instance, or (globally) with a device information set)
+type DrvInfoData struct {
+	size          uint32
 	DriverType    uint32
 	_             uintptr
-	Description   [LINE_LEN]uint16
-	MfgName       [LINE_LEN]uint16
-	ProviderName  [LINE_LEN]uint16
+	description   [LINE_LEN]uint16
+	mfgName       [LINE_LEN]uint16
+	providerName  [LINE_LEN]uint16
 	DriverDate    windows.Filetime
 	DriverVersion uint64
 }
 
-func (data *SP_DRVINFO_DATA) toGo() *DrvInfoData {
-	return &DrvInfoData{
-		DriverType:    data.DriverType,
-		Description:   windows.UTF16ToString(data.Description[:]),
-		MfgName:       windows.UTF16ToString(data.MfgName[:]),
-		ProviderName:  windows.UTF16ToString(data.ProviderName[:]),
-		DriverDate:    data.DriverDate,
-		DriverVersion: data.DriverVersion,
-	}
+func (data *DrvInfoData) GetDescription() string {
+	return windows.UTF16ToString(data.description[:])
 }
 
-// IsNewer method returns true if SP_DRVINFO_DATA date and version is newer than supplied parameters.
-func (data *SP_DRVINFO_DATA) IsNewer(driverDate windows.Filetime, driverVersion uint64) bool {
+func (data *DrvInfoData) SetDescription(description string) error {
+	str, err := syscall.UTF16FromString(description)
+	if err != nil {
+		return err
+	}
+	copy(data.description[:], str)
+	return nil
+}
+
+func (data *DrvInfoData) GetMfgName() string {
+	return windows.UTF16ToString(data.mfgName[:])
+}
+
+func (data *DrvInfoData) SetMfgName(mfgName string) error {
+	str, err := syscall.UTF16FromString(mfgName)
+	if err != nil {
+		return err
+	}
+	copy(data.mfgName[:], str)
+	return nil
+}
+
+func (data *DrvInfoData) GetProviderName() string {
+	return windows.UTF16ToString(data.providerName[:])
+}
+
+func (data *DrvInfoData) SetProviderName(providerName string) error {
+	str, err := syscall.UTF16FromString(providerName)
+	if err != nil {
+		return err
+	}
+	copy(data.providerName[:], str)
+	return nil
+}
+
+// IsNewer method returns true if DrvInfoData date and version is newer than supplied parameters.
+func (data *DrvInfoData) IsNewer(driverDate windows.Filetime, driverVersion uint64) bool {
 	if data.DriverDate.HighDateTime > driverDate.HighDateTime {
 		return true
 	}
@@ -337,45 +366,6 @@ func (data *SP_DRVINFO_DATA) IsNewer(driverDate windows.Filetime, driverVersion 
 	}
 
 	return false
-}
-
-// DrvInfoData is driver information structure (member of a driver info list that may be associated with a particular device instance, or (globally) with a device information set)
-type DrvInfoData struct {
-	DriverType    uint32
-	Description   string
-	MfgName       string
-	ProviderName  string
-	DriverDate    windows.Filetime
-	DriverVersion uint64
-}
-
-func (driverInfoData *DrvInfoData) toWindows() (data *SP_DRVINFO_DATA, err error) {
-	data = &SP_DRVINFO_DATA{
-		DriverType:    driverInfoData.DriverType,
-		DriverDate:    driverInfoData.DriverDate,
-		DriverVersion: driverInfoData.DriverVersion,
-	}
-	data.Size = uint32(unsafe.Sizeof(*data))
-
-	DescriptionUTF16, err := syscall.UTF16FromString(driverInfoData.Description)
-	if err != nil {
-		return
-	}
-	copy(data.Description[:], DescriptionUTF16)
-
-	MfgNameUTF16, err := syscall.UTF16FromString(driverInfoData.MfgName)
-	if err != nil {
-		return
-	}
-	copy(data.MfgName[:], MfgNameUTF16)
-
-	ProviderNameUTF16, err := syscall.UTF16FromString(driverInfoData.ProviderName)
-	if err != nil {
-		return
-	}
-	copy(data.ProviderName[:], ProviderNameUTF16)
-
-	return
 }
 
 type _SP_DRVINFO_DETAIL_DATA struct {

@@ -151,7 +151,7 @@ func SetupDiCancelDriverInfoSearch(deviceInfoSet DevInfo) (err error) {
 	return
 }
 
-func setupDiEnumDriverInfo(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverType SPDIT, memberIndex uint32, driverInfoData *SP_DRVINFO_DATA) (err error) {
+func setupDiEnumDriverInfo(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverType SPDIT, memberIndex uint32, driverInfoData *DrvInfoData) (err error) {
 	r1, _, e1 := syscall.Syscall6(procSetupDiEnumDriverInfoW.Addr(), 5, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(driverType), uintptr(memberIndex), uintptr(unsafe.Pointer(driverInfoData)), 0)
 	if r1 == 0 {
 		if e1 != 0 {
@@ -163,7 +163,7 @@ func setupDiEnumDriverInfo(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, d
 	return
 }
 
-func setupDiGetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *SP_DRVINFO_DATA) (err error) {
+func setupDiGetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *DrvInfoData) (err error) {
 	r1, _, e1 := syscall.Syscall(procSetupDiGetSelectedDriverW.Addr(), 3, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(driverInfoData)))
 	if r1 == 0 {
 		if e1 != 0 {
@@ -175,7 +175,7 @@ func setupDiGetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *DevInfoData
 	return
 }
 
-func SetupDiSetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *SP_DRVINFO_DATA) (err error) {
+func SetupDiSetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *DrvInfoData) (err error) {
 	r1, _, e1 := syscall.Syscall(procSetupDiSetSelectedDriverW.Addr(), 3, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(driverInfoData)))
 	if r1 == 0 {
 		if e1 != 0 {
@@ -187,7 +187,7 @@ func SetupDiSetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *DevInfoData
 	return
 }
 
-func setupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *SP_DRVINFO_DATA, driverInfoDetailData *_SP_DRVINFO_DETAIL_DATA, driverInfoDetailDataSize uint32, requiredSize *uint32) (err error) {
+func setupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *DrvInfoData, driverInfoDetailData *_SP_DRVINFO_DETAIL_DATA, driverInfoDetailDataSize uint32, requiredSize *uint32) (err error) {
 	r1, _, e1 := syscall.Syscall6(procSetupDiGetDriverInfoDetailW.Addr(), 6, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(driverInfoData)), uintptr(unsafe.Pointer(driverInfoDetailData)), uintptr(driverInfoDetailDataSize), uintptr(unsafe.Pointer(requiredSize)))
 	if r1 == 0 {
 		if e1 != 0 {

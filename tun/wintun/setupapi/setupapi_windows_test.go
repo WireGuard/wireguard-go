@@ -166,7 +166,7 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 		}
 		defer devInfoList.DestroyDriverInfoList(deviceData, driverType)
 
-		var selectedDriverData *SP_DRVINFO_DATA
+		var selectedDriverData *DrvInfoData
 		for j := 0; true; j++ {
 			driverData, err := devInfoList.EnumDriverInfo(deviceData, driverType, j)
 			if err != nil {
@@ -174,10 +174,6 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 					break
 				}
 				continue
-			}
-
-			if driverData2, err2 := driverData.toGo().toWindows(); err2 != nil || *driverData2 != *driverData {
-				t.Error("Error converting between SP_DRVINFO_DATA and DrvInfoData")
 			}
 
 			if driverData.DriverType == 0 {
@@ -237,6 +233,20 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 		} else if *selectedDriverData != *selectedDriverData2 {
 			t.Error("SetupDiGetSelectedDriver should return driver selected with SetupDiSetSelectedDriver")
 		}
+	}
+
+	data := &DrvInfoData{}
+	data.SetDescription("foobar")
+	if data.GetDescription() != "foobar" {
+		t.Error("DrvInfoData.(Get|Set)Description() differ")
+	}
+	data.SetMfgName("foobar")
+	if data.GetMfgName() != "foobar" {
+		t.Error("DrvInfoData.(Get|Set)MfgName() differ")
+	}
+	data.SetProviderName("foobar")
+	if data.GetProviderName() != "foobar" {
+		t.Error("DrvInfoData.(Get|Set)ProviderName() differ")
 	}
 }
 
