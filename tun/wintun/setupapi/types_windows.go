@@ -284,8 +284,8 @@ const (
 	DI_REMOVEDEVICE_CONFIGSPECIFIC DI_REMOVEDEVICE = 0x00000002 // Make this change to only the hardware profile specified by HwProfile. this flag only applies to root-enumerated devices. When Windows removes the device from the last hardware profile in which it was configured, Windows performs a global removal.
 )
 
-// SP_REMOVEDEVICE_PARAMS is a structure corresponding to a DIF_REMOVE install function.
-type SP_REMOVEDEVICE_PARAMS struct {
+// RemoveDeviceParams is a structure corresponding to a DIF_REMOVE install function.
+type RemoveDeviceParams struct {
 	ClassInstallHeader ClassInstallHeader
 	Scope              DI_REMOVEDEVICE
 	HwProfile          uint32

@@ -249,7 +249,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 	}
 
 	// The interface failed to install, or the interface ID was unobtainable. Clean-up.
-	removeDeviceParams := setupapi.SP_REMOVEDEVICE_PARAMS{
+	removeDeviceParams := setupapi.RemoveDeviceParams{
 		ClassInstallHeader: *setupapi.MakeClassInstallHeader(setupapi.DIF_REMOVE),
 		Scope:              setupapi.DI_REMOVEDEVICE_GLOBAL,
 	}
@@ -310,7 +310,7 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 
 		if *ifid == *ifid2 {
 			// Remove the device.
-			removeDeviceParams := setupapi.SP_REMOVEDEVICE_PARAMS{
+			removeDeviceParams := setupapi.RemoveDeviceParams{
 				ClassInstallHeader: *setupapi.MakeClassInstallHeader(setupapi.DIF_REMOVE),
 				Scope:              setupapi.DI_REMOVEDEVICE_GLOBAL,
 			}
