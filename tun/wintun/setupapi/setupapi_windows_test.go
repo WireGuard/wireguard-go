@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"testing"
 
+	"git.zx2c4.com/wireguard-go/tun/wintun/guid"
 	"golang.org/x/sys/windows"
 )
 
@@ -302,9 +303,16 @@ func TestSetupDiGetDeviceRegistryProperty(t *testing.T) {
 		val, err = devInfoList.GetDeviceRegistryProperty(data, SPDRP_CLASSGUID)
 		if err != nil {
 			t.Errorf("Error calling SetupDiGetDeviceRegistryProperty(SPDRP_CLASSGUID): %s", err.Error())
-		} /* TODO: Parse GUID string: else if classGUID, ok := val.(string); !ok || parseGUID(classGUID) != deviceClassNetGUID {
-			t.Errorf("SetupDiGetDeviceRegistryProperty(SPDRP_CLASSGUID) should return %x", deviceClassNetGUID)
-		}*/
+		} else if valStr, ok := val.(string); !ok {
+			t.Errorf("SetupDiGetDeviceRegistryProperty(SPDRP_CLASSGUID) should return string")
+		} else {
+			classGUID, err := guid.FromString(valStr)
+			if err != nil {
+				t.Errorf("Error parsing GUID returned by SetupDiGetDeviceRegistryProperty(SPDRP_CLASSGUID): %s", err.Error())
+			} else if *classGUID != deviceClassNetGUID {
+				t.Errorf("SetupDiGetDeviceRegistryProperty(SPDRP_CLASSGUID) should return %x", deviceClassNetGUID)
+			}
+		}
 
 		val, err = devInfoList.GetDeviceRegistryProperty(data, SPDRP_COMPATIBLEIDS)
 		if err != nil {
