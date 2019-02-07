@@ -45,13 +45,6 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 	}
 	defer devInfoList.Close()
 
-	// Retrieve information associated with a device information set.
-	// TODO: Is this really necessary?
-	_, err = devInfoList.GetDeviceInfoListDetail()
-	if err != nil {
-		return nil, err
-	}
-
 	// Windows requires each interface to have a different name. When
 	// enforcing this, Windows treats interface names case-insensitive. If an
 	// interface "FooBar" exists and this function reports there is no
@@ -265,13 +258,6 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 		return false, false, err
 	}
 	defer devInfoList.Close()
-
-	// Retrieve information associated with a device information set.
-	// TODO: Is this really necessary?
-	_, err = devInfoList.GetDeviceInfoListDetail()
-	if err != nil {
-		return false, false, err
-	}
 
 	// Iterate.
 	for index := 0; ; index++ {
