@@ -285,7 +285,7 @@ func setupDiGetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInf
 	return
 }
 
-func SetupDiGetClassInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, classInstallParams *SP_CLASSINSTALL_HEADER, classInstallParamsSize uint32, requiredSize *uint32) (err error) {
+func SetupDiGetClassInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, classInstallParams *ClassInstallHeader, classInstallParamsSize uint32, requiredSize *uint32) (err error) {
 	r1, _, e1 := syscall.Syscall6(procSetupDiGetClassInstallParamsW.Addr(), 5, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(classInstallParams)), uintptr(classInstallParamsSize), uintptr(unsafe.Pointer(requiredSize)), 0)
 	if r1 == 0 {
 		if e1 != 0 {
@@ -309,7 +309,7 @@ func SetupDiSetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInf
 	return
 }
 
-func SetupDiSetClassInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, classInstallParams *SP_CLASSINSTALL_HEADER, classInstallParamsSize uint32) (err error) {
+func SetupDiSetClassInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, classInstallParams *ClassInstallHeader, classInstallParamsSize uint32) (err error) {
 	r1, _, e1 := syscall.Syscall6(procSetupDiSetClassInstallParamsW.Addr(), 4, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(classInstallParams)), uintptr(classInstallParamsSize), 0, 0)
 	if r1 == 0 {
 		if e1 != 0 {

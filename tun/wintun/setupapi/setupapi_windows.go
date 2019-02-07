@@ -348,10 +348,10 @@ func (deviceInfoSet DevInfo) GetDeviceInstallParams(deviceInfoData *DevInfoData)
 }
 
 // SetupDiGetClassInstallParams function retrieves class installation parameters for a device information set or a particular device information element.
-//sys	SetupDiGetClassInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, classInstallParams *SP_CLASSINSTALL_HEADER, classInstallParamsSize uint32, requiredSize *uint32) (err error) = setupapi.SetupDiGetClassInstallParamsW
+//sys	SetupDiGetClassInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, classInstallParams *ClassInstallHeader, classInstallParamsSize uint32, requiredSize *uint32) (err error) = setupapi.SetupDiGetClassInstallParamsW
 
 // GetClassInstallParams method retrieves class installation parameters for a device information set or a particular device information element.
-func (deviceInfoSet DevInfo) GetClassInstallParams(deviceInfoData *DevInfoData, classInstallParams *SP_CLASSINSTALL_HEADER, classInstallParamsSize uint32, requiredSize *uint32) error {
+func (deviceInfoSet DevInfo) GetClassInstallParams(deviceInfoData *DevInfoData, classInstallParams *ClassInstallHeader, classInstallParamsSize uint32, requiredSize *uint32) error {
 	return SetupDiGetClassInstallParams(deviceInfoSet, deviceInfoData, classInstallParams, classInstallParamsSize, requiredSize)
 }
 
@@ -363,10 +363,10 @@ func (deviceInfoSet DevInfo) SetDeviceInstallParams(deviceInfoData *DevInfoData,
 }
 
 // SetupDiSetClassInstallParams function sets or clears class install parameters for a device information set or a particular device information element.
-//sys	SetupDiSetClassInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, classInstallParams *SP_CLASSINSTALL_HEADER, classInstallParamsSize uint32) (err error) = setupapi.SetupDiSetClassInstallParamsW
+//sys	SetupDiSetClassInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, classInstallParams *ClassInstallHeader, classInstallParamsSize uint32) (err error) = setupapi.SetupDiSetClassInstallParamsW
 
 // SetClassInstallParams method sets or clears class install parameters for a device information set or a particular device information element.
-func (deviceInfoSet DevInfo) SetClassInstallParams(deviceInfoData *DevInfoData, classInstallParams *SP_CLASSINSTALL_HEADER, classInstallParamsSize uint32) error {
+func (deviceInfoSet DevInfo) SetClassInstallParams(deviceInfoData *DevInfoData, classInstallParams *ClassInstallHeader, classInstallParamsSize uint32) error {
 	return SetupDiSetClassInstallParams(deviceInfoSet, deviceInfoData, classInstallParams, classInstallParamsSize)
 }
 

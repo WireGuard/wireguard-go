@@ -255,10 +255,16 @@ const (
 	DI_FLAGSEX_SEARCH_PUBLISHED_INFS    DI_FLAGSEX = 0x80000000 // Tell SetupDiBuildDriverInfoList to do a "published INF" search
 )
 
-// SP_CLASSINSTALL_HEADER is the first member of any class install parameters structure. It contains the device installation request code that defines the format of the rest of the install parameters structure.
-type SP_CLASSINSTALL_HEADER struct {
-	Size            uint32
+// ClassInstallHeader is the first member of any class install parameters structure. It contains the device installation request code that defines the format of the rest of the install parameters structure.
+type ClassInstallHeader struct {
+	size            uint32
 	InstallFunction DI_FUNCTION
+}
+
+func MakeClassInstallHeader(installFunction DI_FUNCTION) *ClassInstallHeader {
+	hdr := &ClassInstallHeader{InstallFunction: installFunction}
+	hdr.size = uint32(unsafe.Sizeof(*hdr))
+	return hdr
 }
 
 // DICS_FLAG specifies the scope of a device property change
@@ -280,7 +286,7 @@ const (
 
 // SP_REMOVEDEVICE_PARAMS is a structure corresponding to a DIF_REMOVE install function.
 type SP_REMOVEDEVICE_PARAMS struct {
-	ClassInstallHeader SP_CLASSINSTALL_HEADER
+	ClassInstallHeader ClassInstallHeader
 	Scope              DI_REMOVEDEVICE
 	HwProfile          uint32
 }

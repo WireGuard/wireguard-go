@@ -250,12 +250,9 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 
 	// The interface failed to install, or the interface ID was unobtainable. Clean-up.
 	removeDeviceParams := setupapi.SP_REMOVEDEVICE_PARAMS{
-		ClassInstallHeader: setupapi.SP_CLASSINSTALL_HEADER{
-			InstallFunction: setupapi.DIF_REMOVE,
-		},
-		Scope: setupapi.DI_REMOVEDEVICE_GLOBAL,
+		ClassInstallHeader: *setupapi.MakeClassInstallHeader(setupapi.DIF_REMOVE),
+		Scope:              setupapi.DI_REMOVEDEVICE_GLOBAL,
 	}
-	removeDeviceParams.ClassInstallHeader.Size = uint32(unsafe.Sizeof(removeDeviceParams.ClassInstallHeader))
 
 	// Set class installer parameters for DIF_REMOVE.
 	if devInfoList.SetClassInstallParams(deviceData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams))) == nil {
@@ -314,12 +311,9 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 		if *ifid == *ifid2 {
 			// Remove the device.
 			removeDeviceParams := setupapi.SP_REMOVEDEVICE_PARAMS{
-				ClassInstallHeader: setupapi.SP_CLASSINSTALL_HEADER{
-					InstallFunction: setupapi.DIF_REMOVE,
-				},
-				Scope: setupapi.DI_REMOVEDEVICE_GLOBAL,
+				ClassInstallHeader: *setupapi.MakeClassInstallHeader(setupapi.DIF_REMOVE),
+				Scope:              setupapi.DI_REMOVEDEVICE_GLOBAL,
 			}
-			removeDeviceParams.ClassInstallHeader.Size = uint32(unsafe.Sizeof(removeDeviceParams.ClassInstallHeader))
 
 			// Set class installer parameters for DIF_REMOVE.
 			err = devInfoList.SetClassInstallParams(deviceData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams)))
