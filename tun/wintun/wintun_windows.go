@@ -288,7 +288,7 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 			continue
 		}
 
-		if ifid == ifid2 {
+		if *ifid == *ifid2 {
 			// Remove the device.
 			removeDeviceParams := setupapi.SP_REMOVEDEVICE_PARAMS{
 				ClassInstallHeader: setupapi.SP_CLASSINSTALL_HEADER{
