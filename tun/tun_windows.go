@@ -38,14 +38,14 @@ var deviceClassNetGUID = windows.GUID{0x4d36e972, 0xe325, 0x11ce, [8]byte{0xbf, 
 
 const TUN_HWID = "Wintun"
 
-type TunPacket struct {
+type tunPacket struct {
 	size uint32
 	data [TUN_MAX_PACKET_SIZE]byte
 }
 
-type TunRWQueue struct {
+type tunRWQueue struct {
 	numPackets uint32
-	packets    [TUN_MAX_PACKET_EXCHANGE]TunPacket
+	packets    [TUN_MAX_PACKET_EXCHANGE]tunPacket
 	left       uint32
 }
 
@@ -54,8 +54,8 @@ type nativeTun struct {
 	tunName      string
 	signalName   *uint16
 	tunFile      *os.File
-	wrBuff       TunRWQueue
-	rdBuff       TunRWQueue
+	wrBuff       tunRWQueue
+	rdBuff       tunRWQueue
 	signals      [TUN_SIGNAL_MAX]windows.Handle
 	rdNextPacket uint32
 	events       chan TUNEvent
@@ -67,7 +67,7 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 	ifid, err := getInterface(ifname, 0)
 	if ifid == nil || err != nil {
 		// Interface does not exist or an error occured. Create one.
-		ifid, _, err = createInterface("", 0)
+		ifid, _, err = createInterface("WireGuard Tunnel Adapter", 0)
 		if err != nil {
 			return nil, err
 		}
@@ -264,6 +264,8 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 	}
 }
 
+// Note: flush() and putTunPacket() assume the caller comes only from a single thread; there's no locking.
+
 func (tun *nativeTun) flush() error {
 	// Flush write buffer.
 	data := (*[TUN_EXCHANGE_BUFFER_SIZE]byte)(unsafe.Pointer(&tun.wrBuff))
@@ -307,7 +309,6 @@ func (tun *nativeTun) putTunPacket(buff []byte) error {
 }
 
 func (tun *nativeTun) Write(buff []byte, offset int) (int, error) {
-
 	err := tun.putTunPacket(buff[offset:])
 	if err != nil {
 		return 0, err
@@ -344,6 +345,7 @@ func getInterface(ifname string, hwndParent uintptr) (*windows.GUID, error) {
 		return nil, err
 	}
 
+	// TODO: If we're certain we want case-insensitive name comparison, please document the rationale.
 	ifname = strings.ToLower(ifname)
 
 	// Iterate.
@@ -615,8 +617,8 @@ func deleteInterface(ifid *windows.GUID, hwndParent uintptr) (bool, bool, error)
 ///
 /// checkReboot checks device install parameters if a system reboot is required.
 ///
-func checkReboot(DeviceInfoSet setupapi.DevInfo, DeviceInfoData *setupapi.SP_DEVINFO_DATA) (bool, error) {
-	devInstallParams, err := DeviceInfoSet.GetDeviceInstallParams(DeviceInfoData)
+func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.SP_DEVINFO_DATA) (bool, error) {
+	devInstallParams, err := deviceInfoSet.GetDeviceInstallParams(deviceInfoData)
 	if err != nil {
 		return false, err
 	}
@@ -637,13 +639,13 @@ func checkReboot(DeviceInfoSet setupapi.DevInfo, DeviceInfoData *setupapi.SP_DEV
 //
 // Function returns the network interface ID.
 //
-func getInterfaceId(DeviceInfoSet setupapi.DevInfo, DeviceInfoData *setupapi.SP_DEVINFO_DATA, numAttempts int) (*windows.GUID, error) {
+func getInterfaceId(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.SP_DEVINFO_DATA, numAttempts int) (*windows.GUID, error) {
 	if numAttempts < 1 {
 		return nil, fmt.Errorf("Invalid numAttempts (expected: >=1, provided: %v)", numAttempts)
 	}
 
 	// Open HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\<class>\<id> registry key.
-	key, err := DeviceInfoSet.OpenDevRegKey(DeviceInfoData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.READ)
+	key, err := deviceInfoSet.OpenDevRegKey(deviceInfoData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.READ)
 	if err != nil {
 		return nil, errors.New("Device-specific registry key open failed: " + err.Error())
 	}
