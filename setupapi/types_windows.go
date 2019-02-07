@@ -338,25 +338,25 @@ func (data *SP_DRVINFO_DATA) toGo() *DrvInfoData {
 }
 
 // IsNewer method returns true if SP_DRVINFO_DATA date and version is newer than supplied parameters.
-func (data *SP_DRVINFO_DATA) IsNewer(DriverDate windows.Filetime, DriverVersion uint64) bool {
-	if data.DriverDate.HighDateTime > DriverDate.HighDateTime {
+func (data *SP_DRVINFO_DATA) IsNewer(driverDate windows.Filetime, driverVersion uint64) bool {
+	if data.DriverDate.HighDateTime > driverDate.HighDateTime {
 		return true
 	}
-	if data.DriverDate.HighDateTime < DriverDate.HighDateTime {
+	if data.DriverDate.HighDateTime < driverDate.HighDateTime {
 		return false
 	}
 
-	if data.DriverDate.LowDateTime > DriverDate.LowDateTime {
+	if data.DriverDate.LowDateTime > driverDate.LowDateTime {
 		return true
 	}
-	if data.DriverDate.LowDateTime < DriverDate.LowDateTime {
+	if data.DriverDate.LowDateTime < driverDate.LowDateTime {
 		return false
 	}
 
-	if data.DriverVersion > DriverVersion {
+	if data.DriverVersion > driverVersion {
 		return true
 	}
-	if data.DriverVersion < DriverVersion {
+	if data.DriverVersion < driverVersion {
 		return false
 	}
 
@@ -373,27 +373,27 @@ type DrvInfoData struct {
 	DriverVersion uint64
 }
 
-func (DriverInfoData *DrvInfoData) toWindows() (data *SP_DRVINFO_DATA, err error) {
+func (driverInfoData *DrvInfoData) toWindows() (data *SP_DRVINFO_DATA, err error) {
 	data = &SP_DRVINFO_DATA{
-		DriverType:    DriverInfoData.DriverType,
-		DriverDate:    DriverInfoData.DriverDate,
-		DriverVersion: DriverInfoData.DriverVersion,
+		DriverType:    driverInfoData.DriverType,
+		DriverDate:    driverInfoData.DriverDate,
+		DriverVersion: driverInfoData.DriverVersion,
 	}
 	data.Size = uint32(unsafe.Sizeof(*data))
 
-	DescriptionUTF16, err := syscall.UTF16FromString(DriverInfoData.Description)
+	DescriptionUTF16, err := syscall.UTF16FromString(driverInfoData.Description)
 	if err != nil {
 		return
 	}
 	copy(data.Description[:], DescriptionUTF16)
 
-	MfgNameUTF16, err := syscall.UTF16FromString(DriverInfoData.MfgName)
+	MfgNameUTF16, err := syscall.UTF16FromString(driverInfoData.MfgName)
 	if err != nil {
 		return
 	}
 	copy(data.MfgName[:], MfgNameUTF16)
 
-	ProviderNameUTF16, err := syscall.UTF16FromString(DriverInfoData.ProviderName)
+	ProviderNameUTF16, err := syscall.UTF16FromString(driverInfoData.ProviderName)
 	if err != nil {
 		return
 	}
@@ -464,13 +464,13 @@ type DrvInfoDetailData struct {
 }
 
 // IsCompatible method tests if given hardware ID matches the driver or is listed on the compatible ID list.
-func (DriverInfoDetailData *DrvInfoDetailData) IsCompatible(hwid string) bool {
+func (driverInfoDetailData *DrvInfoDetailData) IsCompatible(hwid string) bool {
 	hwidLC := strings.ToLower(hwid)
-	if strings.ToLower(DriverInfoDetailData.HardwareID) == hwidLC {
+	if strings.ToLower(driverInfoDetailData.HardwareID) == hwidLC {
 		return true
 	}
-	for i := range DriverInfoDetailData.CompatIDs {
-		if strings.ToLower(DriverInfoDetailData.CompatIDs[i]) == hwidLC {
+	for i := range driverInfoDetailData.CompatIDs {
+		if strings.ToLower(driverInfoDetailData.CompatIDs[i]) == hwidLC {
 			return true
 		}
 	}

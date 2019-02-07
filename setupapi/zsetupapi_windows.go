@@ -66,8 +66,8 @@ var (
 	procSetupDiSetSelectedDevice          = modsetupapi.NewProc("SetupDiSetSelectedDevice")
 )
 
-func setupDiCreateDeviceInfoListEx(ClassGUID *windows.GUID, hwndParent uintptr, MachineName *uint16, Reserved uintptr) (handle DevInfo, err error) {
-	r0, _, e1 := syscall.Syscall6(procSetupDiCreateDeviceInfoListExW.Addr(), 4, uintptr(unsafe.Pointer(ClassGUID)), uintptr(hwndParent), uintptr(unsafe.Pointer(MachineName)), uintptr(Reserved), 0, 0)
+func setupDiCreateDeviceInfoListEx(classGUID *windows.GUID, hwndParent uintptr, machineName *uint16, reserved uintptr) (handle DevInfo, err error) {
+	r0, _, e1 := syscall.Syscall6(procSetupDiCreateDeviceInfoListExW.Addr(), 4, uintptr(unsafe.Pointer(classGUID)), uintptr(hwndParent), uintptr(unsafe.Pointer(machineName)), uintptr(reserved), 0, 0)
 	handle = DevInfo(r0)
 	if handle == DevInfo(windows.InvalidHandle) {
 		if e1 != 0 {
@@ -79,8 +79,8 @@ func setupDiCreateDeviceInfoListEx(ClassGUID *windows.GUID, hwndParent uintptr, 
 	return
 }
 
-func setupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo, DeviceInfoSetDetailData *_SP_DEVINFO_LIST_DETAIL_DATA) (err error) {
-	r1, _, e1 := syscall.Syscall(procSetupDiGetDeviceInfoListDetailW.Addr(), 2, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoSetDetailData)), 0)
+func setupDiGetDeviceInfoListDetail(deviceInfoSet DevInfo, deviceInfoSetDetailData *_SP_DEVINFO_LIST_DETAIL_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiGetDeviceInfoListDetailW.Addr(), 2, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoSetDetailData)), 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -91,8 +91,8 @@ func setupDiGetDeviceInfoListDetail(DeviceInfoSet DevInfo, DeviceInfoSetDetailDa
 	return
 }
 
-func setupDiCreateDeviceInfo(DeviceInfoSet DevInfo, DeviceName *uint16, ClassGUID *windows.GUID, DeviceDescription *uint16, hwndParent uintptr, CreationFlags DICD, DeviceInfoData *SP_DEVINFO_DATA) (err error) {
-	r1, _, e1 := syscall.Syscall9(procSetupDiCreateDeviceInfoW.Addr(), 7, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceName)), uintptr(unsafe.Pointer(ClassGUID)), uintptr(unsafe.Pointer(DeviceDescription)), uintptr(hwndParent), uintptr(CreationFlags), uintptr(unsafe.Pointer(DeviceInfoData)), 0, 0)
+func setupDiCreateDeviceInfo(deviceInfoSet DevInfo, DeviceName *uint16, classGUID *windows.GUID, DeviceDescription *uint16, hwndParent uintptr, CreationFlags DICD, deviceInfoData *SP_DEVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall9(procSetupDiCreateDeviceInfoW.Addr(), 7, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(DeviceName)), uintptr(unsafe.Pointer(classGUID)), uintptr(unsafe.Pointer(DeviceDescription)), uintptr(hwndParent), uintptr(CreationFlags), uintptr(unsafe.Pointer(deviceInfoData)), 0, 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -103,8 +103,8 @@ func setupDiCreateDeviceInfo(DeviceInfoSet DevInfo, DeviceName *uint16, ClassGUI
 	return
 }
 
-func setupDiEnumDeviceInfo(DeviceInfoSet DevInfo, MemberIndex uint32, DeviceInfoData *SP_DEVINFO_DATA) (err error) {
-	r1, _, e1 := syscall.Syscall(procSetupDiEnumDeviceInfo.Addr(), 3, uintptr(DeviceInfoSet), uintptr(MemberIndex), uintptr(unsafe.Pointer(DeviceInfoData)))
+func setupDiEnumDeviceInfo(deviceInfoSet DevInfo, memberIndex uint32, deviceInfoData *SP_DEVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiEnumDeviceInfo.Addr(), 3, uintptr(deviceInfoSet), uintptr(memberIndex), uintptr(unsafe.Pointer(deviceInfoData)))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -115,8 +115,8 @@ func setupDiEnumDeviceInfo(DeviceInfoSet DevInfo, MemberIndex uint32, DeviceInfo
 	return
 }
 
-func SetupDiDestroyDeviceInfoList(DeviceInfoSet DevInfo) (err error) {
-	r1, _, e1 := syscall.Syscall(procSetupDiDestroyDeviceInfoList.Addr(), 1, uintptr(DeviceInfoSet), 0, 0)
+func SetupDiDestroyDeviceInfoList(deviceInfoSet DevInfo) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiDestroyDeviceInfoList.Addr(), 1, uintptr(deviceInfoSet), 0, 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -127,8 +127,8 @@ func SetupDiDestroyDeviceInfoList(DeviceInfoSet DevInfo) (err error) {
 	return
 }
 
-func SetupDiBuildDriverInfoList(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverType SPDIT) (err error) {
-	r1, _, e1 := syscall.Syscall(procSetupDiBuildDriverInfoList.Addr(), 3, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(DriverType))
+func SetupDiBuildDriverInfoList(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA, driverType SPDIT) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiBuildDriverInfoList.Addr(), 3, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(driverType))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -139,8 +139,8 @@ func SetupDiBuildDriverInfoList(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINF
 	return
 }
 
-func SetupDiCancelDriverInfoSearch(DeviceInfoSet DevInfo) (err error) {
-	r1, _, e1 := syscall.Syscall(procSetupDiCancelDriverInfoSearch.Addr(), 1, uintptr(DeviceInfoSet), 0, 0)
+func SetupDiCancelDriverInfoSearch(deviceInfoSet DevInfo) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiCancelDriverInfoSearch.Addr(), 1, uintptr(deviceInfoSet), 0, 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -151,8 +151,8 @@ func SetupDiCancelDriverInfoSearch(DeviceInfoSet DevInfo) (err error) {
 	return
 }
 
-func setupDiEnumDriverInfo(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverType SPDIT, MemberIndex uint32, DriverInfoData *SP_DRVINFO_DATA) (err error) {
-	r1, _, e1 := syscall.Syscall6(procSetupDiEnumDriverInfoW.Addr(), 5, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(DriverType), uintptr(MemberIndex), uintptr(unsafe.Pointer(DriverInfoData)), 0)
+func setupDiEnumDriverInfo(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA, driverType SPDIT, memberIndex uint32, driverInfoData *SP_DRVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiEnumDriverInfoW.Addr(), 5, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(driverType), uintptr(memberIndex), uintptr(unsafe.Pointer(driverInfoData)), 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -163,8 +163,8 @@ func setupDiEnumDriverInfo(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DAT
 	return
 }
 
-func setupDiGetSelectedDriver(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverInfoData *SP_DRVINFO_DATA) (err error) {
-	r1, _, e1 := syscall.Syscall(procSetupDiGetSelectedDriverW.Addr(), 3, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(DriverInfoData)))
+func setupDiGetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA, driverInfoData *SP_DRVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiGetSelectedDriverW.Addr(), 3, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(driverInfoData)))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -175,8 +175,8 @@ func setupDiGetSelectedDriver(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_
 	return
 }
 
-func SetupDiSetSelectedDriver(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverInfoData *SP_DRVINFO_DATA) (err error) {
-	r1, _, e1 := syscall.Syscall(procSetupDiSetSelectedDriverW.Addr(), 3, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(DriverInfoData)))
+func SetupDiSetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA, driverInfoData *SP_DRVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiSetSelectedDriverW.Addr(), 3, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(driverInfoData)))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -187,8 +187,8 @@ func SetupDiSetSelectedDriver(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_
 	return
 }
 
-func setupDiGetDriverInfoDetail(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverInfoData *SP_DRVINFO_DATA, DriverInfoDetailData *_SP_DRVINFO_DETAIL_DATA, DriverInfoDetailDataSize uint32, RequiredSize *uint32) (err error) {
-	r1, _, e1 := syscall.Syscall6(procSetupDiGetDriverInfoDetailW.Addr(), 6, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(DriverInfoData)), uintptr(unsafe.Pointer(DriverInfoDetailData)), uintptr(DriverInfoDetailDataSize), uintptr(unsafe.Pointer(RequiredSize)))
+func setupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA, driverInfoData *SP_DRVINFO_DATA, driverInfoDetailData *_SP_DRVINFO_DETAIL_DATA, driverInfoDetailDataSize uint32, requiredSize *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiGetDriverInfoDetailW.Addr(), 6, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(driverInfoData)), uintptr(unsafe.Pointer(driverInfoDetailData)), uintptr(driverInfoDetailDataSize), uintptr(unsafe.Pointer(requiredSize)))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -199,8 +199,8 @@ func setupDiGetDriverInfoDetail(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINF
 	return
 }
 
-func SetupDiDestroyDriverInfoList(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DriverType SPDIT) (err error) {
-	r1, _, e1 := syscall.Syscall(procSetupDiDestroyDriverInfoList.Addr(), 3, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(DriverType))
+func SetupDiDestroyDriverInfoList(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA, driverType SPDIT) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiDestroyDriverInfoList.Addr(), 3, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(driverType))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -211,8 +211,8 @@ func SetupDiDestroyDriverInfoList(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVI
 	return
 }
 
-func setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, DeviceInfoSet DevInfo, MachineName *uint16, reserved uintptr) (handle DevInfo, err error) {
-	r0, _, e1 := syscall.Syscall9(procSetupDiGetClassDevsExW.Addr(), 7, uintptr(unsafe.Pointer(ClassGUID)), uintptr(unsafe.Pointer(Enumerator)), uintptr(hwndParent), uintptr(Flags), uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(MachineName)), uintptr(reserved), 0, 0)
+func setupDiGetClassDevsEx(classGUID *windows.GUID, Enumerator *uint16, hwndParent uintptr, Flags DIGCF, deviceInfoSet DevInfo, machineName *uint16, reserved uintptr) (handle DevInfo, err error) {
+	r0, _, e1 := syscall.Syscall9(procSetupDiGetClassDevsExW.Addr(), 7, uintptr(unsafe.Pointer(classGUID)), uintptr(unsafe.Pointer(Enumerator)), uintptr(hwndParent), uintptr(Flags), uintptr(deviceInfoSet), uintptr(unsafe.Pointer(machineName)), uintptr(reserved), 0, 0)
 	handle = DevInfo(r0)
 	if handle == DevInfo(windows.InvalidHandle) {
 		if e1 != 0 {
@@ -224,8 +224,8 @@ func setupDiGetClassDevsEx(ClassGUID *windows.GUID, Enumerator *uint16, hwndPare
 	return
 }
 
-func SetupDiCallClassInstaller(InstallFunction DI_FUNCTION, DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (err error) {
-	r1, _, e1 := syscall.Syscall(procSetupDiCallClassInstaller.Addr(), 3, uintptr(InstallFunction), uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)))
+func SetupDiCallClassInstaller(installFunction DI_FUNCTION, deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiCallClassInstaller.Addr(), 3, uintptr(installFunction), uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -236,8 +236,8 @@ func SetupDiCallClassInstaller(InstallFunction DI_FUNCTION, DeviceInfoSet DevInf
 	return
 }
 
-func setupDiOpenDevRegKey(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Scope DICS_FLAG, HwProfile uint32, KeyType DIREG, samDesired uint32) (key windows.Handle, err error) {
-	r0, _, e1 := syscall.Syscall6(procSetupDiOpenDevRegKey.Addr(), 6, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(Scope), uintptr(HwProfile), uintptr(KeyType), uintptr(samDesired))
+func setupDiOpenDevRegKey(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA, Scope DICS_FLAG, HwProfile uint32, KeyType DIREG, samDesired uint32) (key windows.Handle, err error) {
+	r0, _, e1 := syscall.Syscall6(procSetupDiOpenDevRegKey.Addr(), 6, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(Scope), uintptr(HwProfile), uintptr(KeyType), uintptr(samDesired))
 	key = windows.Handle(r0)
 	if key == windows.InvalidHandle {
 		if e1 != 0 {
@@ -249,8 +249,8 @@ func setupDiOpenDevRegKey(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA
 	return
 }
 
-func setupDiGetDeviceRegistryProperty(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Property SPDRP, PropertyRegDataType *uint32, PropertyBuffer *byte, PropertyBufferSize uint32, RequiredSize *uint32) (err error) {
-	r1, _, e1 := syscall.Syscall9(procSetupDiGetDeviceRegistryPropertyW.Addr(), 7, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(Property), uintptr(unsafe.Pointer(PropertyRegDataType)), uintptr(unsafe.Pointer(PropertyBuffer)), uintptr(PropertyBufferSize), uintptr(unsafe.Pointer(RequiredSize)), 0, 0)
+func setupDiGetDeviceRegistryProperty(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA, property SPDRP, propertyRegDataType *uint32, propertyBuffer *byte, propertyBufferSize uint32, requiredSize *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall9(procSetupDiGetDeviceRegistryPropertyW.Addr(), 7, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(property), uintptr(unsafe.Pointer(propertyRegDataType)), uintptr(unsafe.Pointer(propertyBuffer)), uintptr(propertyBufferSize), uintptr(unsafe.Pointer(requiredSize)), 0, 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -261,8 +261,8 @@ func setupDiGetDeviceRegistryProperty(DeviceInfoSet DevInfo, DeviceInfoData *SP_
 	return
 }
 
-func setupDiSetDeviceRegistryProperty(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, Property SPDRP, PropertyBuffer *byte, PropertyBufferSize uint32) (err error) {
-	r1, _, e1 := syscall.Syscall6(procSetupDiSetDeviceRegistryPropertyW.Addr(), 5, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(Property), uintptr(unsafe.Pointer(PropertyBuffer)), uintptr(PropertyBufferSize), 0)
+func setupDiSetDeviceRegistryProperty(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA, property SPDRP, propertyBuffer *byte, propertyBufferSize uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiSetDeviceRegistryPropertyW.Addr(), 5, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(property), uintptr(unsafe.Pointer(propertyBuffer)), uintptr(propertyBufferSize), 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -273,8 +273,8 @@ func setupDiSetDeviceRegistryProperty(DeviceInfoSet DevInfo, DeviceInfoData *SP_
 	return
 }
 
-func setupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) {
-	r1, _, e1 := syscall.Syscall(procSetupDiGetDeviceInstallParamsW.Addr(), 3, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(DeviceInstallParams)))
+func setupDiGetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA, deviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiGetDeviceInstallParamsW.Addr(), 3, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(deviceInstallParams)))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -285,8 +285,8 @@ func setupDiGetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEV
 	return
 }
 
-func SetupDiGetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32, RequiredSize *uint32) (err error) {
-	r1, _, e1 := syscall.Syscall6(procSetupDiGetClassInstallParamsW.Addr(), 5, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(ClassInstallParams)), uintptr(ClassInstallParamsSize), uintptr(unsafe.Pointer(RequiredSize)), 0)
+func SetupDiGetClassInstallParams(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA, classInstallParams *SP_CLASSINSTALL_HEADER, classInstallParamsSize uint32, requiredSize *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiGetClassInstallParamsW.Addr(), 5, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(classInstallParams)), uintptr(classInstallParamsSize), uintptr(unsafe.Pointer(requiredSize)), 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -297,8 +297,8 @@ func SetupDiGetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVI
 	return
 }
 
-func setupDiSetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, DeviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) {
-	r1, _, e1 := syscall.Syscall(procSetupDiSetDeviceInstallParamsW.Addr(), 3, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(DeviceInstallParams)))
+func setupDiSetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA, deviceInstallParams *_SP_DEVINSTALL_PARAMS) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiSetDeviceInstallParamsW.Addr(), 3, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(deviceInstallParams)))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -309,8 +309,8 @@ func setupDiSetDeviceInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEV
 	return
 }
 
-func SetupDiSetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA, ClassInstallParams *SP_CLASSINSTALL_HEADER, ClassInstallParamsSize uint32) (err error) {
-	r1, _, e1 := syscall.Syscall6(procSetupDiSetClassInstallParamsW.Addr(), 4, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), uintptr(unsafe.Pointer(ClassInstallParams)), uintptr(ClassInstallParamsSize), 0, 0)
+func SetupDiSetClassInstallParams(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA, classInstallParams *SP_CLASSINSTALL_HEADER, classInstallParamsSize uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiSetClassInstallParamsW.Addr(), 4, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), uintptr(unsafe.Pointer(classInstallParams)), uintptr(classInstallParamsSize), 0, 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -321,8 +321,8 @@ func SetupDiSetClassInstallParams(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVI
 	return
 }
 
-func setupDiClassNameFromGuidEx(ClassGUID *windows.GUID, ClassName *uint16, ClassNameSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) {
-	r1, _, e1 := syscall.Syscall6(procSetupDiClassNameFromGuidExW.Addr(), 6, uintptr(unsafe.Pointer(ClassGUID)), uintptr(unsafe.Pointer(ClassName)), uintptr(ClassNameSize), uintptr(unsafe.Pointer(RequiredSize)), uintptr(unsafe.Pointer(MachineName)), uintptr(Reserved))
+func setupDiClassNameFromGuidEx(classGUID *windows.GUID, className *uint16, classNameSize uint32, requiredSize *uint32, machineName *uint16, reserved uintptr) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiClassNameFromGuidExW.Addr(), 6, uintptr(unsafe.Pointer(classGUID)), uintptr(unsafe.Pointer(className)), uintptr(classNameSize), uintptr(unsafe.Pointer(requiredSize)), uintptr(unsafe.Pointer(machineName)), uintptr(reserved))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -333,8 +333,8 @@ func setupDiClassNameFromGuidEx(ClassGUID *windows.GUID, ClassName *uint16, Clas
 	return
 }
 
-func setupDiClassGuidsFromNameEx(ClassName *uint16, ClassGuidList *windows.GUID, ClassGuidListSize uint32, RequiredSize *uint32, MachineName *uint16, Reserved uintptr) (err error) {
-	r1, _, e1 := syscall.Syscall6(procSetupDiClassGuidsFromNameExW.Addr(), 6, uintptr(unsafe.Pointer(ClassName)), uintptr(unsafe.Pointer(ClassGuidList)), uintptr(ClassGuidListSize), uintptr(unsafe.Pointer(RequiredSize)), uintptr(unsafe.Pointer(MachineName)), uintptr(Reserved))
+func setupDiClassGuidsFromNameEx(className *uint16, classGuidList *windows.GUID, classGuidListSize uint32, requiredSize *uint32, machineName *uint16, reserved uintptr) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetupDiClassGuidsFromNameExW.Addr(), 6, uintptr(unsafe.Pointer(className)), uintptr(unsafe.Pointer(classGuidList)), uintptr(classGuidListSize), uintptr(unsafe.Pointer(requiredSize)), uintptr(unsafe.Pointer(machineName)), uintptr(reserved))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -345,8 +345,8 @@ func setupDiClassGuidsFromNameEx(ClassName *uint16, ClassGuidList *windows.GUID,
 	return
 }
 
-func setupDiGetSelectedDevice(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (err error) {
-	r1, _, e1 := syscall.Syscall(procSetupDiGetSelectedDevice.Addr(), 2, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), 0)
+func setupDiGetSelectedDevice(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiGetSelectedDevice.Addr(), 2, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -357,8 +357,8 @@ func setupDiGetSelectedDevice(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_
 	return
 }
 
-func SetupDiSetSelectedDevice(DeviceInfoSet DevInfo, DeviceInfoData *SP_DEVINFO_DATA) (err error) {
-	r1, _, e1 := syscall.Syscall(procSetupDiSetSelectedDevice.Addr(), 2, uintptr(DeviceInfoSet), uintptr(unsafe.Pointer(DeviceInfoData)), 0)
+func SetupDiSetSelectedDevice(deviceInfoSet DevInfo, deviceInfoData *SP_DEVINFO_DATA) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetupDiSetSelectedDevice.Addr(), 2, uintptr(deviceInfoSet), uintptr(unsafe.Pointer(deviceInfoData)), 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
