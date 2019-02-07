@@ -23,8 +23,7 @@ func main() {
 	if len(os.Args) != 2 {
 		os.Exit(ExitSetupFailed)
 	}
-	//configFile := os.Args[1]
-	interfaceName := "TODO"
+	interfaceName := os.Args[1]
 
 	logger := NewLogger(
 		LogLevelDebug,
