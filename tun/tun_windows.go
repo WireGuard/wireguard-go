@@ -18,7 +18,6 @@ import (
 const (
 	packetSizeMax      = 1600
 	packetExchangeMax  = 256 // Number of packets that can be exchanged at a time
-	exchangeBufferSize = 410632
 )
 
 const (
@@ -252,10 +251,10 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 		}
 
 		// Fill queue.
-		data := (*[exchangeBufferSize]byte)(unsafe.Pointer(&tun.rdBuff))
-		n, err := tun.tunFile.Read(data[:])
+		const bufSize = int(unsafe.Sizeof(tun.rdBuff))
+		n, err := tun.tunFile.Read((*[bufSize]byte)(unsafe.Pointer(&tun.rdBuff))[:])
 		tun.rdNextPacket = 0
-		if n != exchangeBufferSize || err != nil {
+		if n != bufSize || err != nil {
 			// TUN interface stopped, returned incomplete data, etc.
 			// Retry.
 			tun.rdBuff.numPackets = 0
@@ -269,14 +268,14 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 
 func (tun *nativeTun) flush() error {
 	// Flush write buffer.
-	data := (*[exchangeBufferSize]byte)(unsafe.Pointer(&tun.wrBuff))
-	n, err := tun.tunFile.Write(data[:])
+	const bufSize = int(unsafe.Sizeof(tun.wrBuff))
+	n, err := tun.tunFile.Write((*[bufSize]byte)(unsafe.Pointer(&tun.wrBuff))[:])
 	tun.wrBuff.numPackets = 0
 	if err != nil {
 		return err
 	}
-	if n != exchangeBufferSize {
-		return fmt.Errorf("%d byte(s) written, %d byte(s) expected", n, exchangeBufferSize)
+	if n != bufSize {
+		return fmt.Errorf("%d byte(s) written, %d byte(s) expected", n, bufSize)
 	}
 
 	return nil
