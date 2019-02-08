@@ -16,26 +16,26 @@ import (
 )
 
 const (
-	TUN_MAX_PACKET_SIZE      = 1600
-	TUN_MAX_PACKET_EXCHANGE  = 256 // Number of packets that can be exchanged at a time
-	TUN_EXCHANGE_BUFFER_SIZE = 410632
+	packetSizeMax      = 1600
+	packetExchangeMax  = 256 // Number of packets that can be exchanged at a time
+	exchangeBufferSize = 410632
 )
 
 const (
-	TUN_SIGNAL_CLOSE = iota
-	TUN_SIGNAL_DATA_AVAIL
+	signalClose = iota
+	signalDataAvail
 
-	TUN_SIGNAL_MAX
+	signalMax
 )
 
 type tunPacket struct {
 	size uint32
-	data [TUN_MAX_PACKET_SIZE]byte
+	data [packetSizeMax]byte
 }
 
 type tunRWQueue struct {
 	numPackets uint32
-	packets    [TUN_MAX_PACKET_EXCHANGE]tunPacket
+	packets    [packetExchangeMax]tunPacket
 	left       bool
 }
 
@@ -46,7 +46,7 @@ type nativeTun struct {
 	tunFile      *os.File
 	wrBuff       tunRWQueue
 	rdBuff       tunRWQueue
-	signals      [TUN_SIGNAL_MAX]windows.Handle
+	signals      [signalMax]windows.Handle
 	rdNextPacket uint32
 	events       chan TUNEvent
 	errors       chan error
@@ -97,7 +97,7 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 	}
 
 	// Create close event.
-	tun.signals[TUN_SIGNAL_CLOSE], err = windows.CreateEvent(nil, 1 /*TRUE*/, 0 /*FALSE*/, nil)
+	tun.signals[signalClose], err = windows.CreateEvent(nil, 1 /*TRUE*/, 0 /*FALSE*/, nil)
 	if err != nil {
 		wt.DeleteInterface(0)
 		return nil, err
@@ -114,7 +114,7 @@ func (tun *nativeTun) openTUN() error {
 		if err != nil {
 			// After examining possible error conditions, many arose that were only temporary: windows.ERROR_FILE_NOT_FOUND, "read <filename> closed", etc.
 			// To simplify, we will enter a retry-loop on _any_ error until session is closed by user.
-			switch evt, e := windows.WaitForSingleObject(tun.signals[TUN_SIGNAL_CLOSE], 1000); evt {
+			switch evt, e := windows.WaitForSingleObject(tun.signals[signalClose], 1000); evt {
 			case windows.WAIT_OBJECT_0, windows.WAIT_ABANDONED:
 				return errors.New("TUN closed")
 			case windows.WAIT_TIMEOUT:
@@ -132,21 +132,21 @@ func (tun *nativeTun) openTUN() error {
 		}
 
 		tun.tunFile = file
-		tun.signals[TUN_SIGNAL_DATA_AVAIL] = event
+		tun.signals[signalDataAvail] = event
 
 		return nil
 	}
 }
 
 func (tun *nativeTun) closeTUN() (err error) {
-	if tun.signals[TUN_SIGNAL_DATA_AVAIL] != 0 {
+	if tun.signals[signalDataAvail] != 0 {
 		// Close interface data ready event.
-		e := windows.CloseHandle(tun.signals[TUN_SIGNAL_DATA_AVAIL])
+		e := windows.CloseHandle(tun.signals[signalDataAvail])
 		if err != nil {
 			err = e
 		}
 
-		tun.signals[TUN_SIGNAL_DATA_AVAIL] = 0
+		tun.signals[signalDataAvail] = 0
 	}
 
 	if tun.tunFile != nil {
@@ -175,8 +175,8 @@ func (tun *nativeTun) Events() chan TUNEvent {
 }
 
 func (tun *nativeTun) Close() error {
-	windows.SetEvent(tun.signals[TUN_SIGNAL_CLOSE])
-	err := windows.CloseHandle(tun.signals[TUN_SIGNAL_CLOSE])
+	windows.SetEvent(tun.signals[signalClose])
+	err := windows.CloseHandle(tun.signals[signalClose])
 
 	e := tun.closeTUN()
 	if err == nil {
@@ -211,7 +211,7 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 				tunPacket := &tun.rdBuff.packets[tun.rdNextPacket]
 				tun.rdNextPacket++
 
-				if TUN_MAX_PACKET_SIZE < tunPacket.size {
+				if packetSizeMax < tunPacket.size {
 					// Invalid packet size.
 					continue
 				}
@@ -221,7 +221,7 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 				return int(tunPacket.size), nil
 			}
 
-			if tun.signals[TUN_SIGNAL_DATA_AVAIL] == 0 {
+			if tun.signals[signalDataAvail] == 0 {
 				// Data pipe and interface data available event are not open (yet).
 				err := tun.openTUN()
 				if err != nil {
@@ -235,11 +235,11 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 				return 0, errors.New("Waiting for data failed: " + err.Error())
 			}
 			switch r {
-			case windows.WAIT_OBJECT_0 + TUN_SIGNAL_CLOSE, windows.WAIT_ABANDONED + TUN_SIGNAL_CLOSE:
+			case windows.WAIT_OBJECT_0 + signalClose, windows.WAIT_ABANDONED + signalClose:
 				return 0, errors.New("TUN closed")
-			case windows.WAIT_OBJECT_0 + TUN_SIGNAL_DATA_AVAIL:
+			case windows.WAIT_OBJECT_0 + signalDataAvail:
 				// Data is available.
-			case windows.WAIT_ABANDONED + TUN_SIGNAL_DATA_AVAIL:
+			case windows.WAIT_ABANDONED + signalDataAvail:
 				// TUN stopped. Reopen it.
 				tun.closeTUN()
 				continue
@@ -251,10 +251,10 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 			}
 
 			// Fill queue.
-			data := (*[TUN_EXCHANGE_BUFFER_SIZE]byte)(unsafe.Pointer(&tun.rdBuff))
+			data := (*[exchangeBufferSize]byte)(unsafe.Pointer(&tun.rdBuff))
 			n, err := tun.tunFile.Read(data[:])
 			tun.rdNextPacket = 0
-			if n != TUN_EXCHANGE_BUFFER_SIZE || err != nil {
+			if n != exchangeBufferSize || err != nil {
 				// TUN interface stopped, returned incomplete data, etc.
 				// Retry.
 				tun.rdBuff.numPackets = 0
@@ -269,14 +269,14 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 
 func (tun *nativeTun) flush() error {
 	// Flush write buffer.
-	data := (*[TUN_EXCHANGE_BUFFER_SIZE]byte)(unsafe.Pointer(&tun.wrBuff))
+	data := (*[exchangeBufferSize]byte)(unsafe.Pointer(&tun.wrBuff))
 	n, err := tun.tunFile.Write(data[:])
 	tun.wrBuff.numPackets = 0
 	if err != nil {
 		return err
 	}
-	if n != TUN_EXCHANGE_BUFFER_SIZE {
-		return fmt.Errorf("%d byte(s) written, %d byte(s) expected", n, TUN_EXCHANGE_BUFFER_SIZE)
+	if n != exchangeBufferSize {
+		return fmt.Errorf("%d byte(s) written, %d byte(s) expected", n, exchangeBufferSize)
 	}
 
 	return nil
@@ -287,11 +287,11 @@ func (tun *nativeTun) putTunPacket(buff []byte) error {
 	if size == 0 {
 		return errors.New("Empty packet")
 	}
-	if size > TUN_MAX_PACKET_SIZE {
+	if size > packetSizeMax {
 		return errors.New("Packet too big")
 	}
 
-	if tun.wrBuff.numPackets >= TUN_MAX_PACKET_EXCHANGE {
+	if tun.wrBuff.numPackets >= packetExchangeMax {
 		// Queue is full -> flush first.
 		err := tun.flush()
 		if err != nil {
