@@ -203,64 +203,64 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 	select {
 	case err := <-tun.errors:
 		return 0, err
-
 	default:
-		for {
-			if tun.rdNextPacket < tun.rdBuff.numPackets {
-				// Get packet from the queue.
-				tunPacket := &tun.rdBuff.packets[tun.rdNextPacket]
-				tun.rdNextPacket++
+	}
 
-				if packetSizeMax < tunPacket.size {
-					// Invalid packet size.
-					continue
-				}
+	for {
+		if tun.rdNextPacket < tun.rdBuff.numPackets {
+			// Get packet from the queue.
+			tunPacket := &tun.rdBuff.packets[tun.rdNextPacket]
+			tun.rdNextPacket++
 
-				// Copy data.
-				copy(buff[offset:], tunPacket.data[:tunPacket.size])
-				return int(tunPacket.size), nil
+			if packetSizeMax < tunPacket.size {
+				// Invalid packet size.
+				continue
 			}
 
-			if tun.signals[signalDataAvail] == 0 {
-				// Data pipe and interface data available event are not open (yet).
-				err := tun.openTUN()
-				if err != nil {
-					return 0, err
-				}
-			}
+			// Copy data.
+			copy(buff[offset:], tunPacket.data[:tunPacket.size])
+			return int(tunPacket.size), nil
+		}
 
-			// Wait for user close or interface data.
-			r, err := windows.WaitForMultipleObjects(tun.signals[:], false, windows.INFINITE)
+		if tun.signals[signalDataAvail] == 0 {
+			// Data pipe and interface data available event are not open (yet).
+			err := tun.openTUN()
 			if err != nil {
-				return 0, errors.New("Waiting for data failed: " + err.Error())
+				return 0, err
 			}
-			switch r {
-			case windows.WAIT_OBJECT_0 + signalClose, windows.WAIT_ABANDONED + signalClose:
-				return 0, errors.New("TUN closed")
-			case windows.WAIT_OBJECT_0 + signalDataAvail:
-				// Data is available.
-			case windows.WAIT_ABANDONED + signalDataAvail:
-				// TUN stopped. Reopen it.
-				tun.closeTUN()
-				continue
-			case windows.WAIT_TIMEOUT:
-				// Congratulations, we reached infinity. Let's do it again! :)
-				continue
-			default:
-				return 0, errors.New("unexpected result from WaitForMultipleObjects")
-			}
+		}
 
-			// Fill queue.
-			data := (*[exchangeBufferSize]byte)(unsafe.Pointer(&tun.rdBuff))
-			n, err := tun.tunFile.Read(data[:])
-			tun.rdNextPacket = 0
-			if n != exchangeBufferSize || err != nil {
-				// TUN interface stopped, returned incomplete data, etc.
-				// Retry.
-				tun.rdBuff.numPackets = 0
-				tun.closeTUN()
-				continue
-			}
+		// Wait for user close or interface data.
+		r, err := windows.WaitForMultipleObjects(tun.signals[:], false, windows.INFINITE)
+		if err != nil {
+			return 0, errors.New("Waiting for data failed: " + err.Error())
+		}
+		switch r {
+		case windows.WAIT_OBJECT_0 + signalClose, windows.WAIT_ABANDONED + signalClose:
+			return 0, errors.New("TUN closed")
+		case windows.WAIT_OBJECT_0 + signalDataAvail:
+			// Data is available.
+		case windows.WAIT_ABANDONED + signalDataAvail:
+			// TUN stopped. Reopen it.
+			tun.closeTUN()
+			continue
+		case windows.WAIT_TIMEOUT:
+			// Congratulations, we reached infinity. Let's do it again! :)
+			continue
+		default:
+			return 0, errors.New("unexpected result from WaitForMultipleObjects")
+		}
+
+		// Fill queue.
+		data := (*[exchangeBufferSize]byte)(unsafe.Pointer(&tun.rdBuff))
+		n, err := tun.tunFile.Read(data[:])
+		tun.rdNextPacket = 0
+		if n != exchangeBufferSize || err != nil {
+			// TUN interface stopped, returned incomplete data, etc.
+			// Retry.
+			tun.rdBuff.numPackets = 0
+			tun.closeTUN()
+			continue
 		}
 	}
 }
