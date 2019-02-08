@@ -22,10 +22,10 @@ const (
 )
 
 const (
-	TUN_SIGNAL_DATA_AVAIL = 0
-	TUN_SIGNAL_CLOSE      = 1
+	TUN_SIGNAL_CLOSE = iota
+	TUN_SIGNAL_DATA_AVAIL
 
-	TUN_SIGNAL_MAX = 2
+	TUN_SIGNAL_MAX
 )
 
 type tunPacket struct {
@@ -229,27 +229,25 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 				}
 			}
 
-			if tun.rdBuff.numPackets < TUN_MAX_PACKET_EXCHANGE || !tun.rdBuff.left {
-				// Buffer was not full. Wait for the interface data or user close.
-				r, err := windows.WaitForMultipleObjects(tun.signals[:], false, windows.INFINITE)
-				if err != nil {
-					return 0, errors.New("Waiting for data failed: " + err.Error())
-				}
-				switch r {
-				case windows.WAIT_OBJECT_0 + TUN_SIGNAL_DATA_AVAIL:
-					// Data is available.
-				case windows.WAIT_ABANDONED + TUN_SIGNAL_DATA_AVAIL:
-					// TUN stopped. Reopen it.
-					tun.closeTUN()
-					continue
-				case windows.WAIT_OBJECT_0 + TUN_SIGNAL_CLOSE, windows.WAIT_ABANDONED + TUN_SIGNAL_CLOSE:
-					return 0, errors.New("TUN closed")
-				case windows.WAIT_TIMEOUT:
-					// Congratulations, we reached infinity. Let's do it again! :)
-					continue
-				default:
-					return 0, errors.New("unexpected result from WaitForMultipleObjects")
-				}
+			// Wait for user close or interface data.
+			r, err := windows.WaitForMultipleObjects(tun.signals[:], false, windows.INFINITE)
+			if err != nil {
+				return 0, errors.New("Waiting for data failed: " + err.Error())
+			}
+			switch r {
+			case windows.WAIT_OBJECT_0 + TUN_SIGNAL_CLOSE, windows.WAIT_ABANDONED + TUN_SIGNAL_CLOSE:
+				return 0, errors.New("TUN closed")
+			case windows.WAIT_OBJECT_0 + TUN_SIGNAL_DATA_AVAIL:
+				// Data is available.
+			case windows.WAIT_ABANDONED + TUN_SIGNAL_DATA_AVAIL:
+				// TUN stopped. Reopen it.
+				tun.closeTUN()
+				continue
+			case windows.WAIT_TIMEOUT:
+				// Congratulations, we reached infinity. Let's do it again! :)
+				continue
+			default:
+				return 0, errors.New("unexpected result from WaitForMultipleObjects")
 			}
 
 			// Fill queue.
