@@ -8,7 +8,7 @@ package main
 import (
 	"bytes"
 	"errors"
-	"git.zx2c4.com/wireguard-go/tun"
+	"golang.zx2c4.com/wireguard/tun"
 	"os"
 	"testing"
 )

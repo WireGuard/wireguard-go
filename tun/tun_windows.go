@@ -11,7 +11,7 @@ import (
 	"os"
 	"unsafe"
 
-	"git.zx2c4.com/wireguard-go/tun/wintun"
+	"golang.zx2c4.com/wireguard/tun/wintun"
 	"golang.org/x/sys/windows"
 )
 

@@ -11,7 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"git.zx2c4.com/wireguard-go/tun"
+	"golang.zx2c4.com/wireguard/tun"
 )
 
 const (

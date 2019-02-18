@@ -13,8 +13,8 @@ import (
 	"time"
 	"unsafe"
 
-	"git.zx2c4.com/wireguard-go/tun/wintun/guid"
-	"git.zx2c4.com/wireguard-go/tun/wintun/setupapi"
+	"golang.zx2c4.com/wireguard/tun/wintun/guid"
+	"golang.zx2c4.com/wireguard/tun/wintun/setupapi"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )

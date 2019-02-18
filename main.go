@@ -9,7 +9,7 @@ package main
 
 import (
 	"fmt"
-	"git.zx2c4.com/wireguard-go/tun"
+	"golang.zx2c4.com/wireguard/tun"
 	"os"
 	"os/signal"
 	"runtime"

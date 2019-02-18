@@ -9,7 +9,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"git.zx2c4.com/wireguard-go/rwcancel"
+	"golang.zx2c4.com/wireguard/rwcancel"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
 	"net"

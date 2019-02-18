@@ -1,4 +1,4 @@
-module git.zx2c4.com/wireguard-go
+module golang.zx2c4.com/wireguard
 
 require (
 	github.com/Microsoft/go-winio v0.4.11

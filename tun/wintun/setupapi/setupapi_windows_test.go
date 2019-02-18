@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"testing"
 
-	"git.zx2c4.com/wireguard-go/tun/wintun/guid"
+	"golang.zx2c4.com/wireguard/tun/wintun/guid"
 	"golang.org/x/sys/windows"
 )
 
