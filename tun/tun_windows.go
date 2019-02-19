@@ -7,17 +7,18 @@ package tun
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"unsafe"
 
-	"golang.zx2c4.com/wireguard/tun/wintun"
 	"golang.org/x/sys/windows"
+	"golang.zx2c4.com/wireguard/tun/wintun"
 )
 
 const (
-	packetSizeMax      = 1600
-	packetExchangeMax  = 256 // Number of packets that can be exchanged at a time
+	packetSizeMax           uint32 = 0xeffc   // Maximum packet size: 4 + packetSizeMax == 0xf000
+	packetExchangeMax       uint32 = 256      // Number of packets that may be written at a time
+	packetExchangeAlignment uint32 = 16       // Number of bytes packets are aligned to in exchange buffers
+	packetExchangeSize      uint32 = 0x100000 // Exchange buffer size (defaults to 1MiB)
 )
 
 const (
@@ -27,28 +28,24 @@ const (
 	signalMax
 )
 
-type tunPacket struct {
-	size uint32
-	data [packetSizeMax]byte
-}
-
-type tunRWQueue struct {
-	numPackets uint32
-	packets    [packetExchangeMax]tunPacket
-	left       bool
-}
-
 type nativeTun struct {
-	wt           *wintun.Wintun
-	tunName      string
-	signalName   *uint16
-	tunFile      *os.File
-	wrBuff       tunRWQueue
-	rdBuff       tunRWQueue
-	signals      [signalMax]windows.Handle
-	rdNextPacket uint32
-	events       chan TUNEvent
-	errors       chan error
+	wt          *wintun.Wintun
+	tunName     string
+	signalName  *uint16
+	tunFile     *os.File
+	wrBuff      [packetExchangeSize]byte
+	rdBuff      [packetExchangeSize]byte
+	signals     [signalMax]windows.Handle
+	wrOffset    uint32
+	wrPacketNum uint32
+	rdOffset    uint32
+	rdAvailabe  uint32
+	events      chan TUNEvent
+	errors      chan error
+}
+
+func packetAlign(size uint32) uint32 {
+	return (size + (packetExchangeAlignment - 1)) &^ (packetExchangeAlignment - 1)
 }
 
 func CreateTUN(ifname string) (TUNDevice, error) {
@@ -206,19 +203,20 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 	}
 
 	for {
-		if tun.rdNextPacket < tun.rdBuff.numPackets {
+		if tun.rdOffset+4 <= tun.rdAvailabe {
 			// Get packet from the queue.
-			tunPacket := &tun.rdBuff.packets[tun.rdNextPacket]
-			tun.rdNextPacket++
-
-			if packetSizeMax < tunPacket.size {
+			size := *(*uint32)(unsafe.Pointer(&tun.rdBuff[tun.rdOffset]))
+			pSize := packetAlign(4 + size)
+			if packetSizeMax < size || tun.rdAvailabe < tun.rdOffset+pSize {
 				// Invalid packet size.
+				tun.rdAvailabe = 0
 				continue
 			}
 
 			// Copy data.
-			copy(buff[offset:], tunPacket.data[:tunPacket.size])
-			return int(tunPacket.size), nil
+			copy(buff[offset:], (*(*[packetSizeMax]byte)(unsafe.Pointer(&tun.rdBuff[tun.rdOffset+4])))[:size])
+			tun.rdOffset += pSize
+			return int(size), nil
 		}
 
 		if tun.signals[signalDataAvail] == 0 {
@@ -251,16 +249,16 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 		}
 
 		// Fill queue.
-		const bufSize = int(unsafe.Sizeof(tun.rdBuff))
-		n, err := tun.tunFile.Read((*[bufSize]byte)(unsafe.Pointer(&tun.rdBuff))[:])
-		tun.rdNextPacket = 0
-		if n != bufSize || err != nil {
+		n, err := tun.tunFile.Read(tun.rdBuff[:])
+		if err != nil {
 			// TUN interface stopped, returned incomplete data, etc.
 			// Retry.
-			tun.rdBuff.numPackets = 0
+			tun.rdAvailabe = 0
 			tun.closeTUN()
 			continue
 		}
+		tun.rdOffset = 0
+		tun.rdAvailabe = uint32(n)
 	}
 }
 
@@ -268,42 +266,40 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 
 func (tun *nativeTun) flush() error {
 	// Flush write buffer.
-	const bufSize = int(unsafe.Sizeof(tun.wrBuff))
-	n, err := tun.tunFile.Write((*[bufSize]byte)(unsafe.Pointer(&tun.wrBuff))[:])
-	tun.wrBuff.numPackets = 0
+	_, err := tun.tunFile.Write(tun.wrBuff[:tun.wrOffset])
+	tun.wrPacketNum = 0
+	tun.wrOffset = 0
 	if err != nil {
 		return err
-	}
-	if n != bufSize {
-		return fmt.Errorf("%d byte(s) written, %d byte(s) expected", n, bufSize)
 	}
 
 	return nil
 }
 
 func (tun *nativeTun) putTunPacket(buff []byte) error {
-	size := len(buff)
+	size := uint32(len(buff))
 	if size == 0 {
 		return errors.New("Empty packet")
 	}
 	if size > packetSizeMax {
 		return errors.New("Packet too big")
 	}
+	pSize := packetAlign(4 + size)
 
-	if tun.wrBuff.numPackets >= packetExchangeMax {
-		// Queue is full -> flush first.
+	if tun.wrPacketNum >= packetExchangeMax || tun.wrOffset+pSize >= packetExchangeSize {
+		// Exchange buffer is full -> flush first.
 		err := tun.flush()
 		if err != nil {
 			return err
 		}
 	}
 
-	// Push packet to the buffer.
-	tunPacket := &tun.wrBuff.packets[tun.wrBuff.numPackets]
-	tunPacket.size = uint32(size)
-	copy(tunPacket.data[:size], buff)
+	// Write packet to the exchange buffer.
+	*(*uint32)(unsafe.Pointer(&tun.wrBuff[tun.wrOffset])) = size
+	copy((*(*[packetSizeMax]byte)(unsafe.Pointer(&tun.wrBuff[tun.wrOffset+4])))[:size], buff)
 
-	tun.wrBuff.numPackets++
+	tun.wrPacketNum++
+	tun.wrOffset += pSize
 
 	return nil
 }
