@@ -8,6 +8,7 @@ package tun
 import (
 	"errors"
 	"os"
+	"sync"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -20,13 +21,6 @@ const (
 	packetExchangeAlignment uint32 = 16       // Number of bytes packets are aligned to in exchange buffers
 	packetExchangeSizeRead  uint32 = 0x100000 // Read exchange buffer size (defaults to 1MiB)
 	packetExchangeSizeWrite uint32 = 0x10000  // Write exchange buffer size (defaults to 64kiB)
-)
-
-const (
-	signalClose = iota
-	signalDataAvail
-
-	signalMax
 )
 
 type exchgBufRead struct {
@@ -42,15 +36,17 @@ type exchgBufWrite struct {
 }
 
 type nativeTun struct {
-	wt         *wintun.Wintun
-	tunName    string
-	signalName *uint16
-	tunFile    *os.File
-	rdBuff     *exchgBufRead
-	wrBuff     *exchgBufWrite
-	signals    [signalMax]windows.Handle
-	events     chan TUNEvent
-	errors     chan error
+	wt           *wintun.Wintun
+	tunName      string
+	signalName   *uint16
+	tunFile      *os.File
+	tunLock      sync.Mutex
+	rdBuff       *exchgBufRead
+	wrBuff       *exchgBufWrite
+	tunDataAvail windows.Handle
+	userClose    windows.Handle
+	events       chan TUNEvent
+	errors       chan error
 }
 
 func packetAlign(size uint32) uint32 {
@@ -104,7 +100,7 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 	}
 
 	// Create close event.
-	tun.signals[signalClose], err = windows.CreateEvent(nil, 1 /*TRUE*/, 0 /*FALSE*/, nil)
+	tun.userClose, err = windows.CreateEvent(nil, 1 /*TRUE*/, 0 /*FALSE*/, nil)
 	if err != nil {
 		wt.DeleteInterface(0)
 		return nil, err
@@ -121,7 +117,7 @@ func (tun *nativeTun) openTUN() error {
 		if err != nil {
 			// After examining possible error conditions, many arose that were only temporary: windows.ERROR_FILE_NOT_FOUND, "read <filename> closed", etc.
 			// To simplify, we will enter a retry-loop on _any_ error until session is closed by user.
-			switch evt, e := windows.WaitForSingleObject(tun.signals[signalClose], 1000); evt {
+			switch evt, e := windows.WaitForSingleObject(tun.userClose, 1000); evt {
 			case windows.WAIT_OBJECT_0, windows.WAIT_ABANDONED:
 				return errors.New("TUN closed")
 			case windows.WAIT_TIMEOUT:
@@ -139,21 +135,24 @@ func (tun *nativeTun) openTUN() error {
 		}
 
 		tun.tunFile = file
-		tun.signals[signalDataAvail] = event
+		tun.tunDataAvail = event
 
 		return nil
 	}
 }
 
 func (tun *nativeTun) closeTUN() (err error) {
-	if tun.signals[signalDataAvail] != 0 {
+	tun.tunLock.Lock()
+	defer tun.tunLock.Unlock()
+
+	if tun.tunDataAvail != 0 {
 		// Close interface data ready event.
-		e := windows.CloseHandle(tun.signals[signalDataAvail])
+		e := windows.CloseHandle(tun.tunDataAvail)
 		if err != nil {
 			err = e
 		}
 
-		tun.signals[signalDataAvail] = 0
+		tun.tunDataAvail = 0
 	}
 
 	if tun.tunFile != nil {
@@ -169,6 +168,21 @@ func (tun *nativeTun) closeTUN() (err error) {
 	return
 }
 
+func (tun *nativeTun) getTUN() (*os.File, windows.Handle, error) {
+	tun.tunLock.Lock()
+	defer tun.tunLock.Unlock()
+
+	if tun.tunFile == nil || tun.tunDataAvail == 0 {
+		// TUN device is not open (yet).
+		err := tun.openTUN()
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	return tun.tunFile, tun.tunDataAvail, nil
+}
+
 func (tun *nativeTun) Name() (string, error) {
 	return tun.wt.GetInterfaceName()
 }
@@ -182,8 +196,8 @@ func (tun *nativeTun) Events() chan TUNEvent {
 }
 
 func (tun *nativeTun) Close() error {
-	windows.SetEvent(tun.signals[signalClose])
-	err := windows.CloseHandle(tun.signals[signalClose])
+	windows.SetEvent(tun.userClose)
+	err := windows.CloseHandle(tun.userClose)
 
 	e := tun.closeTUN()
 	if err == nil {
@@ -230,28 +244,25 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 			return int(size), nil
 		}
 
-		if tun.signals[signalDataAvail] == 0 {
-			// Data pipe and interface data available event are not open (yet).
-			err := tun.openTUN()
-			if err != nil {
-				return 0, err
-			}
+		// Get TUN data ready event.
+		_, tunDataAvail, err := tun.getTUN()
+		if err != nil {
+			return 0, err
 		}
 
 		// Wait for user close or interface data.
-		r, err := windows.WaitForMultipleObjects(tun.signals[:], false, windows.INFINITE)
+		r, err := windows.WaitForMultipleObjects([]windows.Handle{tun.userClose, tunDataAvail}, false, windows.INFINITE)
 		if err != nil {
 			return 0, errors.New("Waiting for data failed: " + err.Error())
 		}
 		switch r {
-		case windows.WAIT_OBJECT_0 + signalClose, windows.WAIT_ABANDONED + signalClose:
+		case windows.WAIT_OBJECT_0 + 0, windows.WAIT_ABANDONED + 0:
 			return 0, errors.New("TUN closed")
-		case windows.WAIT_OBJECT_0 + signalDataAvail:
+		case windows.WAIT_OBJECT_0 + 1:
 			// Data is available.
-		case windows.WAIT_ABANDONED + signalDataAvail:
-			// TUN stopped. Reopen it.
+		case windows.WAIT_ABANDONED + 1:
+			// TUN stopped.
 			tun.closeTUN()
-			continue
 		case windows.WAIT_TIMEOUT:
 			// Congratulations, we reached infinity. Let's do it again! :)
 			continue
@@ -259,11 +270,16 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 			return 0, errors.New("unexpected result from WaitForMultipleObjects")
 		}
 
-		// Fill queue.
-		n, err := tun.tunFile.Read(tun.rdBuff.data[:])
+		// Get TUN data pipe.
+		file, _, err := tun.getTUN()
 		if err != nil {
-			// TUN interface stopped, returned incomplete data, etc.
-			// Retry.
+			return 0, err
+		}
+
+		// Fill queue.
+		n, err := file.Read(tun.rdBuff.data[:])
+		if err != nil {
+			// TUN interface stopped, failed, etc. Retry.
 			tun.rdBuff.avail = 0
 			tun.closeTUN()
 			continue
@@ -276,11 +292,19 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 // Note: flush() and putTunPacket() assume the caller comes only from a single thread; there's no locking.
 
 func (tun *nativeTun) flush() error {
+	// Get TUN data pipe.
+	file, _, err := tun.getTUN()
+	if err != nil {
+		return err
+	}
+
 	// Flush write buffer.
-	_, err := tun.tunFile.Write(tun.wrBuff.data[:tun.wrBuff.offset])
+	_, err = file.Write(tun.wrBuff.data[:tun.wrBuff.offset])
 	tun.wrBuff.packetNum = 0
 	tun.wrBuff.offset = 0
 	if err != nil {
+		// TUN interface stopped, failed, etc. Drop.
+		tun.closeTUN()
 		return err
 	}
 
