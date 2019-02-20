@@ -239,7 +239,7 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 			}
 
 			// Copy data.
-			copy(buff[offset:], (*(*[packetSizeMax]byte)(unsafe.Pointer(&tun.rdBuff.data[tun.rdBuff.offset+4])))[:size])
+			copy(buff[offset:], tun.rdBuff.data[tun.rdBuff.offset+4:][:size])
 			tun.rdBuff.offset += pSize
 			return int(size), nil
 		}
@@ -331,7 +331,7 @@ func (tun *nativeTun) putTunPacket(buff []byte) error {
 
 	// Write packet to the exchange buffer.
 	*(*uint32)(unsafe.Pointer(&tun.wrBuff.data[tun.wrBuff.offset])) = size
-	copy((*(*[packetSizeMax]byte)(unsafe.Pointer(&tun.wrBuff.data[tun.wrBuff.offset+4])))[:size], buff)
+	copy(tun.wrBuff.data[tun.wrBuff.offset+4:][:size], buff)
 
 	tun.wrBuff.packetNum++
 	tun.wrBuff.offset += pSize
