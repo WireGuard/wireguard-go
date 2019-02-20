@@ -6,10 +6,10 @@
 package tun
 
 import (
+	"encoding/binary"
 	"errors"
 	"os"
 	"sync"
-	"unsafe"
 
 	"golang.org/x/sys/windows"
 	"golang.zx2c4.com/wireguard/tun/wintun"
@@ -230,16 +230,18 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 	for {
 		if tun.rdBuff.offset+packetExchangeAlignment <= tun.rdBuff.avail {
 			// Get packet from the exchange buffer.
-			size := *(*uint32)(unsafe.Pointer(&tun.rdBuff.data[tun.rdBuff.offset]))
+			packet := tun.rdBuff.data[tun.rdBuff.offset:]
+			size := binary.LittleEndian.Uint32(packet[:4])
 			pSize := packetAlign(packetExchangeAlignment + size)
 			if packetSizeMax < size || tun.rdBuff.avail < tun.rdBuff.offset+pSize {
 				// Invalid packet size.
 				tun.rdBuff.avail = 0
 				continue
 			}
+			packet = packet[:pSize]
 
 			// Copy data.
-			copy(buff[offset:], tun.rdBuff.data[tun.rdBuff.offset+packetExchangeAlignment:][:size])
+			copy(buff[offset:], packet[packetExchangeAlignment:][:size])
 			tun.rdBuff.offset += pSize
 			return int(size), nil
 		}
@@ -330,8 +332,9 @@ func (tun *nativeTun) putTunPacket(buff []byte) error {
 	}
 
 	// Write packet to the exchange buffer.
-	*(*uint32)(unsafe.Pointer(&tun.wrBuff.data[tun.wrBuff.offset])) = size
-	copy(tun.wrBuff.data[tun.wrBuff.offset+packetExchangeAlignment:][:size], buff)
+	packet := tun.wrBuff.data[tun.wrBuff.offset:][:pSize]
+	binary.LittleEndian.PutUint32(packet[:4], size)
+	copy(packet[packetExchangeAlignment:][:size], buff)
 
 	tun.wrBuff.packetNum++
 	tun.wrBuff.offset += pSize
