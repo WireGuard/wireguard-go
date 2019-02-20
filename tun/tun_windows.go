@@ -18,7 +18,8 @@ const (
 	packetSizeMax           uint32 = 0xeffc   // Maximum packet size: 4 + packetSizeMax == 0xf000
 	packetExchangeMax       uint32 = 256      // Number of packets that may be written at a time
 	packetExchangeAlignment uint32 = 16       // Number of bytes packets are aligned to in exchange buffers
-	packetExchangeSize      uint32 = 0x100000 // Exchange buffer size (defaults to 1MiB)
+	packetExchangeSizeRead  uint32 = 0x100000 // Read exchange buffer size (defaults to 1MiB)
+	packetExchangeSizeWrite uint32 = 0x10000  // Write exchange buffer size (defaults to 64kiB)
 )
 
 const (
@@ -28,20 +29,28 @@ const (
 	signalMax
 )
 
+type exchgBufRead struct {
+	data   [packetExchangeSizeRead]byte
+	offset uint32
+	avail  uint32
+}
+
+type exchgBufWrite struct {
+	data      [packetExchangeSizeWrite]byte
+	offset    uint32
+	packetNum uint32
+}
+
 type nativeTun struct {
-	wt          *wintun.Wintun
-	tunName     string
-	signalName  *uint16
-	tunFile     *os.File
-	wrBuff      [packetExchangeSize]byte
-	rdBuff      [packetExchangeSize]byte
-	signals     [signalMax]windows.Handle
-	wrOffset    uint32
-	wrPacketNum uint32
-	rdOffset    uint32
-	rdAvailabe  uint32
-	events      chan TUNEvent
-	errors      chan error
+	wt         *wintun.Wintun
+	tunName    string
+	signalName *uint16
+	tunFile    *os.File
+	rdBuff     *exchgBufRead
+	wrBuff     *exchgBufWrite
+	signals    [signalMax]windows.Handle
+	events     chan TUNEvent
+	errors     chan error
 }
 
 func packetAlign(size uint32) uint32 {
@@ -88,6 +97,8 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 		wt:         wt,
 		tunName:    wt.DataFileName(),
 		signalName: signalNameUTF16,
+		rdBuff:     &exchgBufRead{},
+		wrBuff:     &exchgBufWrite{},
 		events:     make(chan TUNEvent, 10),
 		errors:     make(chan error, 1),
 	}
@@ -203,19 +214,19 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 	}
 
 	for {
-		if tun.rdOffset+4 <= tun.rdAvailabe {
-			// Get packet from the queue.
-			size := *(*uint32)(unsafe.Pointer(&tun.rdBuff[tun.rdOffset]))
+		if tun.rdBuff.offset+4 <= tun.rdBuff.avail {
+			// Get packet from the exchange buffer.
+			size := *(*uint32)(unsafe.Pointer(&tun.rdBuff.data[tun.rdBuff.offset]))
 			pSize := packetAlign(4 + size)
-			if packetSizeMax < size || tun.rdAvailabe < tun.rdOffset+pSize {
+			if packetSizeMax < size || tun.rdBuff.avail < tun.rdBuff.offset+pSize {
 				// Invalid packet size.
-				tun.rdAvailabe = 0
+				tun.rdBuff.avail = 0
 				continue
 			}
 
 			// Copy data.
-			copy(buff[offset:], (*(*[packetSizeMax]byte)(unsafe.Pointer(&tun.rdBuff[tun.rdOffset+4])))[:size])
-			tun.rdOffset += pSize
+			copy(buff[offset:], (*(*[packetSizeMax]byte)(unsafe.Pointer(&tun.rdBuff.data[tun.rdBuff.offset+4])))[:size])
+			tun.rdBuff.offset += pSize
 			return int(size), nil
 		}
 
@@ -249,16 +260,16 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 		}
 
 		// Fill queue.
-		n, err := tun.tunFile.Read(tun.rdBuff[:])
+		n, err := tun.tunFile.Read(tun.rdBuff.data[:])
 		if err != nil {
 			// TUN interface stopped, returned incomplete data, etc.
 			// Retry.
-			tun.rdAvailabe = 0
+			tun.rdBuff.avail = 0
 			tun.closeTUN()
 			continue
 		}
-		tun.rdOffset = 0
-		tun.rdAvailabe = uint32(n)
+		tun.rdBuff.offset = 0
+		tun.rdBuff.avail = uint32(n)
 	}
 }
 
@@ -266,9 +277,9 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 
 func (tun *nativeTun) flush() error {
 	// Flush write buffer.
-	_, err := tun.tunFile.Write(tun.wrBuff[:tun.wrOffset])
-	tun.wrPacketNum = 0
-	tun.wrOffset = 0
+	_, err := tun.tunFile.Write(tun.wrBuff.data[:tun.wrBuff.offset])
+	tun.wrBuff.packetNum = 0
+	tun.wrBuff.offset = 0
 	if err != nil {
 		return err
 	}
@@ -286,7 +297,7 @@ func (tun *nativeTun) putTunPacket(buff []byte) error {
 	}
 	pSize := packetAlign(4 + size)
 
-	if tun.wrPacketNum >= packetExchangeMax || tun.wrOffset+pSize >= packetExchangeSize {
+	if tun.wrBuff.packetNum >= packetExchangeMax || tun.wrBuff.offset+pSize >= packetExchangeSizeWrite {
 		// Exchange buffer is full -> flush first.
 		err := tun.flush()
 		if err != nil {
@@ -295,11 +306,11 @@ func (tun *nativeTun) putTunPacket(buff []byte) error {
 	}
 
 	// Write packet to the exchange buffer.
-	*(*uint32)(unsafe.Pointer(&tun.wrBuff[tun.wrOffset])) = size
-	copy((*(*[packetSizeMax]byte)(unsafe.Pointer(&tun.wrBuff[tun.wrOffset+4])))[:size], buff)
+	*(*uint32)(unsafe.Pointer(&tun.wrBuff.data[tun.wrBuff.offset])) = size
+	copy((*(*[packetSizeMax]byte)(unsafe.Pointer(&tun.wrBuff.data[tun.wrBuff.offset+4])))[:size], buff)
 
-	tun.wrPacketNum++
-	tun.wrOffset += pSize
+	tun.wrBuff.packetNum++
+	tun.wrBuff.offset += pSize
 
 	return nil
 }
