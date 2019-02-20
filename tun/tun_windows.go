@@ -19,18 +19,17 @@ const (
 	packetExchangeMax       uint32 = 256                              // Number of packets that may be written at a time
 	packetExchangeAlignment uint32 = 16                               // Number of bytes packets are aligned to in exchange buffers
 	packetSizeMax           uint32 = 0xf000 - packetExchangeAlignment // Maximum packet size
-	packetExchangeSizeRead  uint32 = 0x100000                         // Read exchange buffer size (defaults to 1MiB)
-	packetExchangeSizeWrite uint32 = 0x10000                          // Write exchange buffer size (defaults to 64kiB)
+	packetExchangeSize      uint32 = 0x100000                         // Exchange buffer size (defaults to 1MiB)
 )
 
 type exchgBufRead struct {
-	data   [packetExchangeSizeRead]byte
+	data   [packetExchangeSize]byte
 	offset uint32
 	avail  uint32
 }
 
 type exchgBufWrite struct {
-	data      [packetExchangeSizeWrite]byte
+	data      [packetExchangeSize]byte
 	offset    uint32
 	packetNum uint32
 }
@@ -323,7 +322,7 @@ func (tun *nativeTun) putTunPacket(buff []byte) error {
 	}
 	pSize := packetAlign(packetExchangeAlignment + size)
 
-	if tun.wrBuff.packetNum >= packetExchangeMax || tun.wrBuff.offset+pSize >= packetExchangeSizeWrite {
+	if tun.wrBuff.packetNum >= packetExchangeMax || tun.wrBuff.offset+pSize >= packetExchangeSize {
 		// Exchange buffer is full -> flush first.
 		err := tun.flush()
 		if err != nil {
