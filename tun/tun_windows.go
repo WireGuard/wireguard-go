@@ -240,7 +240,7 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 			packet = packet[:pSize]
 
 			// Copy data.
-			copy(buff[offset:], packet[packetExchangeAlignment:][:size])
+			copy(buff[offset:], packet[packetExchangeAlignment:packetExchangeAlignment+size])
 			tun.rdBuff.offset += pSize
 			return int(size), nil
 		}
@@ -331,9 +331,9 @@ func (tun *nativeTun) putTunPacket(buff []byte) error {
 	}
 
 	// Write packet to the exchange buffer.
-	packet := tun.wrBuff.data[tun.wrBuff.offset:][:pSize]
+	packet := tun.wrBuff.data[tun.wrBuff.offset : tun.wrBuff.offset+pSize]
 	binary.LittleEndian.PutUint32(packet[:4], size)
-	copy(packet[packetExchangeAlignment:][:size], buff)
+	copy(packet[packetExchangeAlignment:packetExchangeAlignment+size], buff)
 
 	tun.wrBuff.packetNum++
 	tun.wrBuff.offset += pSize
