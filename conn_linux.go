@@ -18,8 +18,8 @@ package main
 
 import (
 	"errors"
-	"golang.zx2c4.com/wireguard/rwcancel"
 	"golang.org/x/sys/unix"
+	"golang.zx2c4.com/wireguard/rwcancel"
 	"net"
 	"strconv"
 	"sync"
