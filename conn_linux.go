@@ -258,18 +258,18 @@ func (bind *NativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
 	return n, &end, err
 }
 
-func (bind *NativeBind) Send(buff []byte, end Endpoint) error {
+func (bind *NativeBind) Send(buff []byte, end Endpoint, tos byte) error {
 	nend := end.(*NativeEndpoint)
 	if !nend.isV6 {
 		if bind.sock4 == -1 {
 			return syscall.EAFNOSUPPORT
 		}
-		return send4(bind.sock4, nend, buff)
+		return send4(bind.sock4, nend, buff, tos)
 	} else {
 		if bind.sock6 == -1 {
 			return syscall.EAFNOSUPPORT
 		}
-		return send6(bind.sock6, nend, buff)
+		return send6(bind.sock6, nend, buff, tos)
 	}
 }
 
@@ -452,13 +452,18 @@ func create6(port uint16) (int, uint16, error) {
 	return fd, uint16(addr.Port), err
 }
 
-func send4(sock int, end *NativeEndpoint, buff []byte) error {
+func send4(sock int, end *NativeEndpoint, buff []byte, tos byte) error {
 
 	// construct message header
+	type ipTos struct {
+		tos byte
+	}
 
 	cmsg := struct {
 		cmsghdr unix.Cmsghdr
 		pktinfo unix.Inet4Pktinfo
+		cmsghdr2 unix.Cmsghdr
+		iptos   ipTos
 	}{
 		unix.Cmsghdr{
 			Level: unix.IPPROTO_IP,
@@ -469,6 +474,15 @@ func send4(sock int, end *NativeEndpoint, buff []byte) error {
 			Spec_dst: end.src4().src,
 			Ifindex:  end.src4().ifindex,
 		},
+		unix.Cmsghdr{
+			Level: unix.IPPROTO_IP,
+			Type:  unix.IP_TOS,
+			Len:   1 + unix.SizeofCmsghdr,
+		},
+		ipTos{
+			tos: tos,
+		},
+
 	}
 
 	_, err := unix.SendmsgN(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], end.dst4(), 0)
@@ -488,13 +502,18 @@ func send4(sock int, end *NativeEndpoint, buff []byte) error {
 	return err
 }
 
-func send6(sock int, end *NativeEndpoint, buff []byte) error {
+func send6(sock int, end *NativeEndpoint, buff []byte, tos byte) error {
 
 	// construct message header
+	type ipTos struct {
+		tos byte
+	}
 
 	cmsg := struct {
 		cmsghdr unix.Cmsghdr
 		pktinfo unix.Inet6Pktinfo
+		cmsghdr2 unix.Cmsghdr
+		tclass   ipTos
 	}{
 		unix.Cmsghdr{
 			Level: unix.IPPROTO_IPV6,
@@ -504,6 +523,14 @@ func send6(sock int, end *NativeEndpoint, buff []byte) error {
 		unix.Inet6Pktinfo{
 			Addr:    end.src6().src,
 			Ifindex: end.dst6().ZoneId,
+		},
+		unix.Cmsghdr{
+			Level: unix.IPPROTO_IPV6,
+			Type:  unix.IPV6_TCLASS,
+			Len:   1 + unix.SizeofCmsghdr,
+		},
+		ipTos{
+			tos: tos,
 		},
 	}
 

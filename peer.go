@@ -125,7 +125,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	return peer, nil
 }
 
-func (peer *Peer) SendBuffer(buffer []byte) error {
+func (peer *Peer) SendBuffer(buffer []byte, tos byte) error {
 	peer.device.net.RLock()
 	defer peer.device.net.RUnlock()
 
@@ -140,7 +140,7 @@ func (peer *Peer) SendBuffer(buffer []byte) error {
 		return errors.New("no known endpoint for peer")
 	}
 
-	return peer.device.net.bind.Send(buffer, peer.endpoint)
+	return peer.device.net.bind.Send(buffer, peer.endpoint, tos)
 }
 
 func (peer *Peer) String() string {

@@ -41,6 +41,10 @@ import (
  * (to allow the construction of transport messages in-place)
  */
 
+const (
+	HandshakeDSCP = 0x88 // AF41, plus 00 ECN
+)
+
 type QueueOutboundElement struct {
 	dropped int32
 	sync.Mutex
@@ -49,6 +53,7 @@ type QueueOutboundElement struct {
 	nonce   uint64                // nonce for encryption
 	keypair *Keypair              // keypair for encryption
 	peer    *Peer                 // related peer
+	tos     byte                  // Type of Service (DSCP + ECN bits)
 }
 
 func (device *Device) NewOutboundElement() *QueueOutboundElement {
@@ -159,7 +164,7 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	peer.timersAnyAuthenticatedPacketTraversal()
 	peer.timersAnyAuthenticatedPacketSent()
 
-	err = peer.SendBuffer(packet)
+	err = peer.SendBuffer(packet, HandshakeDSCP)
 	if err != nil {
 		peer.device.log.Error.Println(peer, "- Failed to send handshake initiation", err)
 	}
@@ -197,7 +202,7 @@ func (peer *Peer) SendHandshakeResponse() error {
 	peer.timersAnyAuthenticatedPacketTraversal()
 	peer.timersAnyAuthenticatedPacketSent()
 
-	err = peer.SendBuffer(packet)
+	err = peer.SendBuffer(packet, HandshakeDSCP)
 	if err != nil {
 		peer.device.log.Error.Println(peer, "- Failed to send handshake response", err)
 	}
@@ -218,7 +223,7 @@ func (device *Device) SendHandshakeCookie(initiatingElem *QueueHandshakeElement)
 	var buff [MessageCookieReplySize]byte
 	writer := bytes.NewBuffer(buff[:0])
 	binary.Write(writer, binary.LittleEndian, reply)
-	device.net.bind.Send(writer.Bytes(), initiatingElem.endpoint)
+	device.net.bind.Send(writer.Bytes(), initiatingElem.endpoint, HandshakeDSCP)
 	if err != nil {
 		device.log.Error.Println("Failed to send cookie reply:", err)
 	}
@@ -294,14 +299,14 @@ func (device *Device) RoutineReadFromTUN() {
 			}
 			dst := elem.packet[IPv4offsetDst : IPv4offsetDst+net.IPv4len]
 			peer = device.allowedips.LookupIPv4(dst)
-
+			elem.tos = elem.packet[1];
 		case ipv6.Version:
 			if len(elem.packet) < ipv6.HeaderLen {
 				continue
 			}
 			dst := elem.packet[IPv6offsetDst : IPv6offsetDst+net.IPv6len]
 			peer = device.allowedips.LookupIPv6(dst)
-
+			elem.tos = elem.packet[1];
 		default:
 			logDebug.Println("Received packet with unknown IP version")
 		}
@@ -600,7 +605,7 @@ func (peer *Peer) RoutineSequentialSender() {
 			// send message and return buffer to pool
 
 			length := uint64(len(elem.packet))
-			err := peer.SendBuffer(elem.packet)
+			err := peer.SendBuffer(elem.packet, elem.tos)
 			device.PutMessageBuffer(elem.buffer)
 			device.PutOutboundElement(elem)
 			if err != nil {
