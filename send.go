@@ -41,10 +41,6 @@ import (
  * (to allow the construction of transport messages in-place)
  */
 
-const (
-	HandshakeDSCP = 0x88 // AF41, plus 00 ECN
-)
-
 type QueueOutboundElement struct {
 	dropped int32
 	sync.Mutex
@@ -299,14 +295,20 @@ func (device *Device) RoutineReadFromTUN() {
 			}
 			dst := elem.packet[IPv4offsetDst : IPv4offsetDst+net.IPv4len]
 			peer = device.allowedips.LookupIPv4(dst)
-			elem.tos = elem.packet[1];
+			if peer == nil {
+				continue
+			}
+			elem.tos = ecn_rfc6040_ingress(elem.packet[1], peer.isECNConfirmed.Get())
 		case ipv6.Version:
 			if len(elem.packet) < ipv6.HeaderLen {
 				continue
 			}
 			dst := elem.packet[IPv6offsetDst : IPv6offsetDst+net.IPv6len]
 			peer = device.allowedips.LookupIPv6(dst)
-			elem.tos = elem.packet[1];
+			if peer == nil {
+				continue
+			}
+			elem.tos = ecn_rfc6040_ingress(elem.packet[1], peer.isECNConfirmed.Get())
 		default:
 			logDebug.Println("Received packet with unknown IP version")
 		}

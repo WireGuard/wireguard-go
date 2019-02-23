@@ -15,6 +15,14 @@ import (
 
 const (
 	PeerRoutineNumber = 3
+
+	DiffServAF41          = 0x88 // AF41
+	NotECNTransport       = 0x00 // Not-ECT (Not ECN-Capable Transport)
+	ECNTransport1         = 0x01 // ECT(1) (ECN-Capable Transport(1))
+	ECNTransport0         = 0x02 // ECT(0) (ECN-Capable Transport(0))
+	CongestionExperienced = 0x03 // CE (Congestion Experienced)
+
+	HandshakeDSCP = DiffServAF41 | ECNTransport0 // AF41, plus 10 ECN
 )
 
 type Peer struct {
@@ -25,6 +33,7 @@ type Peer struct {
 	device                      *Device
 	endpoint                    Endpoint
 	persistentKeepaliveInterval uint16
+	isECNConfirmed              AtomicBool
 
 	// This must be 64-bit aligned, so make sure the above members come out to even alignment and pad accordingly
 	stats struct {

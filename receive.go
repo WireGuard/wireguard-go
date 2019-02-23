@@ -23,6 +23,7 @@ type QueueHandshakeElement struct {
 	packet   []byte
 	endpoint Endpoint
 	buffer   *[MaxMessageSize]byte
+	isECNCompatible bool
 }
 
 type QueueInboundElement struct {
@@ -33,6 +34,7 @@ type QueueInboundElement struct {
 	counter  uint64
 	keypair  *Keypair
 	endpoint Endpoint
+	tos      byte
 }
 
 func (elem *QueueInboundElement) Drop() {
@@ -108,6 +110,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 		err      error
 		size     int
 		endpoint Endpoint
+		outerTOS byte
 	)
 
 	for {
@@ -116,9 +119,9 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 
 		switch IP {
 		case ipv4.Version:
-			size, endpoint, err = bind.ReceiveIPv4(buffer[:])
+			size, endpoint, outerTOS, err = bind.ReceiveIPv4(buffer[:])
 		case ipv6.Version:
-			size, endpoint, err = bind.ReceiveIPv6(buffer[:])
+			size, endpoint, outerTOS, err = bind.ReceiveIPv6(buffer[:])
 		default:
 			panic("invalid IP version")
 		}
@@ -178,6 +181,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 			elem.endpoint = endpoint
 			elem.counter = 0
 			elem.Mutex = sync.Mutex{}
+			elem.tos = outerTOS
 			elem.Lock()
 
 			// add to decryption queues
@@ -213,6 +217,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 					buffer:   buffer,
 					packet:   packet,
 					endpoint: endpoint,
+					isECNCompatible: ecn_rfc6040_enabled(outerTOS),
 				},
 			)) {
 				buffer = device.GetMessageBuffer()
@@ -426,7 +431,7 @@ func (device *Device) RoutineHandshake() {
 			peer.SetEndpointFromPacket(elem.endpoint)
 
 			logDebug.Println(peer, "- Received handshake initiation")
-
+			peer.isECNConfirmed.Set(elem.isECNCompatible)
 			peer.SendHandshakeResponse()
 
 		case MessageResponseType:
@@ -473,6 +478,7 @@ func (device *Device) RoutineHandshake() {
 
 			peer.timersSessionDerived()
 			peer.timersHandshakeComplete()
+			peer.isECNConfirmed.Set(elem.isECNCompatible)
 			peer.SendKeepalive()
 			select {
 			case peer.signals.newKeypairArrived <- struct{}{}:
@@ -565,6 +571,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			}
 			peer.timersDataReceived()
 
+			var shouldDrop bool
 			// verify source and strip padding
 
 			switch elem.packet[0] >> 4 {
@@ -595,6 +602,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 					continue
 				}
 
+				elem.tos, shouldDrop = ecn_rfc6040_egress(elem.packet[1], elem.tos)
 			case ipv6.Version:
 
 				// strip padding
@@ -623,8 +631,13 @@ func (peer *Peer) RoutineSequentialReceiver() {
 					continue
 				}
 
+				elem.tos, shouldDrop = ecn_rfc6040_egress(elem.packet[1], elem.tos);
 			default:
 				logInfo.Println("Packet with invalid IP version from", peer)
+				continue
+			}
+			if shouldDrop {
+				logInfo.Println("ECN/Congestion detected, dropping packet from", peer)
 				continue
 			}
 

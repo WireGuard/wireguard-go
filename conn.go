@@ -20,8 +20,8 @@ const (
  */
 type Bind interface {
 	SetMark(value uint32) error
-	ReceiveIPv6(buff []byte) (int, Endpoint, error)
-	ReceiveIPv4(buff []byte) (int, Endpoint, error)
+	ReceiveIPv6(buff []byte) (int, Endpoint, byte, error)
+	ReceiveIPv4(buff []byte) (int, Endpoint, byte, error)
 	Send(buff []byte, end Endpoint, tos byte) error
 	Close() error
 }

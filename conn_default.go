@@ -133,26 +133,29 @@ func (bind *NativeBind) Close() error {
 	return err2
 }
 
-func (bind *NativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
+// TODO: implement TOS
+func (bind *NativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, byte, error) {
 	if bind.ipv4 == nil {
-		return 0, nil, syscall.EAFNOSUPPORT
+		return 0, nil, 0, syscall.EAFNOSUPPORT
 	}
 	n, endpoint, err := bind.ipv4.ReadFromUDP(buff)
 	if endpoint != nil {
 		endpoint.IP = endpoint.IP.To4()
 	}
-	return n, (*NativeEndpoint)(endpoint), err
+	return n, (*NativeEndpoint)(endpoint), 0, err
 }
 
-func (bind *NativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
+// TODO: implement TOS
+func (bind *NativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, byte, error) {
 	if bind.ipv6 == nil {
-		return 0, nil, syscall.EAFNOSUPPORT
+		return 0, nil, 0, syscall.EAFNOSUPPORT
 	}
 	n, endpoint, err := bind.ipv6.ReadFromUDP(buff)
-	return n, (*NativeEndpoint)(endpoint), err
+	return n, (*NativeEndpoint)(endpoint), 0, err
 }
 
-func (bind *NativeBind) Send(buff []byte, endpoint Endpoint) error {
+// TODO: implement TOS
+func (bind *NativeBind) Send(buff []byte, endpoint Endpoint, tos byte) error {
 	var err error
 	nend := endpoint.(*NativeEndpoint)
 	if nend.IP.To4() != nil {
