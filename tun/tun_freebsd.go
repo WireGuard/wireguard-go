@@ -9,9 +9,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"golang.zx2c4.com/wireguard/rwcancel"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
+	"golang.zx2c4.com/wireguard/rwcancel"
 	"net"
 	"os"
 	"syscall"
@@ -52,7 +52,6 @@ type ifstat struct {
 type nativeTun struct {
 	name        string
 	tunFile     *os.File
-	fd          uintptr
 	rwcancel    *rwcancel.RWCancel
 	events      chan TUNEvent
 	errors      chan error
@@ -239,12 +238,15 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 	}
 
 	tunFile, err := os.OpenFile("/dev/tun", unix.O_RDWR, 0)
-
 	if err != nil {
 		return nil, err
 	}
-	tunfd := tunFile.Fd()
-	assignedName, err := tunName(tunfd)
+
+	tun := nativeTun{tunFile: tunFile}
+	var assignedName string
+	tun.operateOnFd(func(fd uintptr) {
+		assignedName, err = tunName(fd)
+	})
 	if err != nil {
 		tunFile.Close()
 		return nil, err
@@ -252,12 +254,15 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 
 	// Enable ifhead mode, otherwise tun will complain if it gets a non-AF_INET packet
 	ifheadmode := 1
-	_, _, errno := unix.Syscall(
-		unix.SYS_IOCTL,
-		uintptr(tunfd),
-		uintptr(_TUNSIFHEAD),
-		uintptr(unsafe.Pointer(&ifheadmode)),
-	)
+	var errno syscall.Errno
+	tun.operateOnFd(func(fd uintptr) {
+		_, _, errno = unix.Syscall(
+			unix.SYS_IOCTL,
+			fd,
+			uintptr(_TUNSIFHEAD),
+			uintptr(unsafe.Pointer(&ifheadmode)),
+		)
+	})
 
 	if errno != 0 {
 		return nil, fmt.Errorf("error %s", errno.Error())
@@ -306,7 +311,6 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 
 	tun := &nativeTun{
 		tunFile: file,
-		fd:      file.Fd(),
 		events:  make(chan TUNEvent, 10),
 		errors:  make(chan error, 1),
 	}
@@ -329,7 +333,9 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 		return nil, err
 	}
 
-	tun.rwcancel, err = rwcancel.NewRWCancel(int(tun.fd))
+	tun.operateOnFd(func(fd uintptr) {
+		tun.rwcancel, err = rwcancel.NewRWCancel(int(fd))
+	})
 	if err != nil {
 		tun.tunFile.Close()
 		return nil, err
@@ -353,7 +359,11 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 }
 
 func (tun *nativeTun) Name() (string, error) {
-	name, err := tunName(tun.fd)
+	var name string
+	var err error
+	tun.operateOnFd(func(fd uintptr) {
+		name, err = tunName(fd)
+	})
 	if err != nil {
 		return "", err
 	}

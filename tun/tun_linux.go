@@ -12,13 +12,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"golang.zx2c4.com/wireguard/rwcancel"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
+	"golang.zx2c4.com/wireguard/rwcancel"
 	"net"
 	"os"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 	"unsafe"
 )
@@ -30,7 +31,6 @@ const (
 
 type nativeTun struct {
 	tunFile                 *os.File
-	fd                      uintptr
 	fdCancel                *rwcancel.RWCancel
 	index                   int32         // if index
 	name                    string        // name of interface
@@ -52,9 +52,11 @@ func (tun *nativeTun) routineHackListener() {
 	/* This is needed for the detection to work across network namespaces
 	 * If you are reading this and know a better method, please get in touch.
 	 */
-	fd := int(tun.fd)
 	for {
-		_, err := unix.Write(fd, nil)
+		var err error
+		tun.operateOnFd(func(fd uintptr) {
+			_, err = unix.Write(int(fd), nil)
+		})
 		switch err {
 		case unix.EINVAL:
 			tun.events <- TUNEventUp
@@ -162,16 +164,12 @@ func (tun *nativeTun) isUp() (bool, error) {
 	return inter.Flags&net.FlagUp != 0, err
 }
 
-func getDummySock() (int, error) {
-	return unix.Socket(
+func getIFIndex(name string) (int32, error) {
+	fd, err := unix.Socket(
 		unix.AF_INET,
 		unix.SOCK_DGRAM,
 		0,
 	)
-}
-
-func getIFIndex(name string) (int32, error) {
-	fd, err := getDummySock()
 	if err != nil {
 		return 0, err
 	}
@@ -195,9 +193,7 @@ func getIFIndex(name string) (int32, error) {
 }
 
 func (tun *nativeTun) setMTU(n int) error {
-
 	// open datagram socket
-
 	fd, err := unix.Socket(
 		unix.AF_INET,
 		unix.SOCK_DGRAM,
@@ -230,9 +226,7 @@ func (tun *nativeTun) setMTU(n int) error {
 }
 
 func (tun *nativeTun) MTU() (int, error) {
-
 	// open datagram socket
-
 	fd, err := unix.Socket(
 		unix.AF_INET,
 		unix.SOCK_DGRAM,
@@ -263,14 +257,16 @@ func (tun *nativeTun) MTU() (int, error) {
 }
 
 func (tun *nativeTun) Name() (string, error) {
-
 	var ifr [ifReqSize]byte
-	_, _, errno := unix.Syscall(
-		unix.SYS_IOCTL,
-		tun.fd,
-		uintptr(unix.TUNGETIFF),
-		uintptr(unsafe.Pointer(&ifr[0])),
-	)
+	var errno syscall.Errno
+	tun.operateOnFd(func(fd uintptr) {
+		_, _, errno = unix.Syscall(
+			unix.SYS_IOCTL,
+			fd,
+			uintptr(unix.TUNGETIFF),
+			uintptr(unsafe.Pointer(&ifr[0])),
+		)
+	})
 	if errno != 0 {
 		return "", errors.New("failed to get name of TUN device: " + strconv.FormatInt(int64(errno), 10))
 	}
@@ -391,7 +387,7 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
-		fd.Fd(),
+		nfd,
 		uintptr(unix.TUNSETIFF),
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)
@@ -405,7 +401,6 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 	tun := &nativeTun{
 		tunFile:                 file,
-		fd:                      file.Fd(),
 		events:                  make(chan TUNEvent, 5),
 		errors:                  make(chan error, 5),
 		statusListenersShutdown: make(chan struct{}),
@@ -413,7 +408,9 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 	}
 	var err error
 
-	tun.fdCancel, err = rwcancel.NewRWCancel(int(tun.fd))
+	tun.operateOnFd(func(fd uintptr) {
+		tun.fdCancel, err = rwcancel.NewRWCancel(int(fd))
+	})
 	if err != nil {
 		tun.tunFile.Close()
 		return nil, err

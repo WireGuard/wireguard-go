@@ -8,9 +8,9 @@ package tun
 import (
 	"errors"
 	"fmt"
-	"golang.zx2c4.com/wireguard/rwcancel"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
+	"golang.zx2c4.com/wireguard/rwcancel"
 	"io/ioutil"
 	"net"
 	"os"
@@ -167,7 +167,9 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 		return nil, err
 	}
 
-	tun.rwcancel, err = rwcancel.NewRWCancel(int(file.Fd()))
+	tun.operateOnFd(func(fd uintptr) {
+		tun.rwcancel, err = rwcancel.NewRWCancel(int(fd))
+	})
 	if err != nil {
 		tun.tunFile.Close()
 		return nil, err

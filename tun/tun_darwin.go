@@ -8,9 +8,9 @@ package tun
 import (
 	"errors"
 	"fmt"
-	"golang.zx2c4.com/wireguard/rwcancel"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
+	"golang.zx2c4.com/wireguard/rwcancel"
 	"io/ioutil"
 	"net"
 	"os"
@@ -36,7 +36,6 @@ type sockaddrCtl struct {
 type nativeTun struct {
 	name        string
 	tunFile     *os.File
-	fd          uintptr
 	rwcancel    *rwcancel.RWCancel
 	events      chan TUNEvent
 	errors      chan error
@@ -168,10 +167,8 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 }
 
 func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
-
 	tun := &nativeTun{
 		tunFile: file,
-		fd:      file.Fd(),
 		events:  make(chan TUNEvent, 10),
 		errors:  make(chan error, 1),
 	}
@@ -194,7 +191,9 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 		return nil, err
 	}
 
-	tun.rwcancel, err = rwcancel.NewRWCancel(int(tun.fd))
+	tun.operateOnFd(func (fd uintptr) {
+		tun.rwcancel, err = rwcancel.NewRWCancel(int(fd))
+	})
 	if err != nil {
 		tun.tunFile.Close()
 		return nil, err
@@ -218,19 +217,21 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 }
 
 func (tun *nativeTun) Name() (string, error) {
-
 	var ifName struct {
 		name [16]byte
 	}
 	ifNameSize := uintptr(16)
 
-	_, _, errno := unix.Syscall6(
-		unix.SYS_GETSOCKOPT,
-		uintptr(tun.fd),
-		2, /* #define SYSPROTO_CONTROL 2 */
-		2, /* #define UTUN_OPT_IFNAME 2 */
-		uintptr(unsafe.Pointer(&ifName)),
-		uintptr(unsafe.Pointer(&ifNameSize)), 0)
+	var errno syscall.Errno
+	tun.operateOnFd(func(fd uintptr) {
+		_, _, errno = unix.Syscall6(
+			unix.SYS_GETSOCKOPT,
+			fd,
+			2, /* #define SYSPROTO_CONTROL 2 */
+			2, /* #define UTUN_OPT_IFNAME 2 */
+			uintptr(unsafe.Pointer(&ifName)),
+			uintptr(unsafe.Pointer(&ifNameSize)), 0)
+	})
 
 	if errno != 0 {
 		return "", fmt.Errorf("SYS_GETSOCKOPT: %v", errno)
