@@ -390,7 +390,6 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 
 	_, err = tun.Name()
 	if err != nil {
-		tun.tunFile.Close()
 		return nil, err
 	}
 
@@ -403,12 +402,11 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 
 	tun.netlinkSock, err = createNetlinkSocket()
 	if err != nil {
-		tun.tunFile.Close()
 		return nil, err
 	}
 	tun.netlinkCancel, err = rwcancel.NewRWCancel(tun.netlinkSock)
 	if err != nil {
-		tun.tunFile.Close()
+		unix.Close(tun.netlinkSock)
 		return nil, err
 	}
 
@@ -418,7 +416,7 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 
 	err = tun.setMTU(mtu)
 	if err != nil {
-		tun.Close()
+		unix.Close(tun.netlinkSock)
 		return nil, err
 	}
 
