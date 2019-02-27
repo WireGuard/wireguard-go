@@ -145,6 +145,11 @@ func main() {
 			return nil, err
 		}
 
+		err = syscall.SetNonblock(int(fd), true)
+		if err != nil {
+			return nil, err
+		}
+
 		file := os.NewFile(uintptr(fd), "")
 		return tun.CreateTUNFromFile(file, DefaultMTU)
 	}()

@@ -6,11 +6,9 @@
 package tun
 
 import (
-	"errors"
 	"fmt"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
-	"golang.zx2c4.com/wireguard/rwcancel"
 	"io/ioutil"
 	"net"
 	"os"
@@ -30,7 +28,6 @@ const _TUNSIFMODE = 0x8004745d
 type nativeTun struct {
 	name        string
 	tunFile     *os.File
-	rwcancel    *rwcancel.RWCancel
 	events      chan TUNEvent
 	errors      chan error
 	routeSocket int
@@ -167,14 +164,6 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 		return nil, err
 	}
 
-	tun.operateOnFd(func(fd uintptr) {
-		tun.rwcancel, err = rwcancel.NewRWCancel(int(fd))
-	})
-	if err != nil {
-		tun.tunFile.Close()
-		return nil, err
-	}
-
 	tun.routeSocket, err = unix.Socket(unix.AF_ROUTE, unix.SOCK_RAW, unix.AF_UNSPEC)
 	if err != nil {
 		tun.tunFile.Close()
@@ -211,7 +200,7 @@ func (tun *nativeTun) Events() chan TUNEvent {
 	return tun.events
 }
 
-func (tun *nativeTun) doRead(buff []byte, offset int) (int, error) {
+func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 	select {
 	case err := <-tun.errors:
 		return 0, err
@@ -222,18 +211,6 @@ func (tun *nativeTun) doRead(buff []byte, offset int) (int, error) {
 			return 0, err
 		}
 		return n - 4, err
-	}
-}
-
-func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
-	for {
-		n, err := tun.doRead(buff, offset)
-		if err == nil || !rwcancel.RetryAfterError(err) {
-			return n, err
-		}
-		if !tun.rwcancel.ReadyRead() {
-			return 0, errors.New("tun device closed")
-		}
 	}
 }
 
@@ -261,12 +238,11 @@ func (tun *nativeTun) Write(buff []byte, offset int) (int, error) {
 }
 
 func (tun *nativeTun) Close() error {
-	var err3 error
-	err1 := tun.rwcancel.Cancel()
-	err2 := tun.tunFile.Close()
+	var err2 error
+	err1 := tun.tunFile.Close()
 	if tun.routeSocket != -1 {
 		unix.Shutdown(tun.routeSocket, unix.SHUT_RDWR)
-		err3 = unix.Close(tun.routeSocket)
+		err2 = unix.Close(tun.routeSocket)
 		tun.routeSocket = -1
 	} else if tun.events != nil {
 		close(tun.events)
@@ -274,10 +250,7 @@ func (tun *nativeTun) Close() error {
 	if err1 != nil {
 		return err1
 	}
-	if err2 != nil {
-		return err2
-	}
-	return err3
+	return err2
 }
 
 func (tun *nativeTun) setMTU(n int) error {
