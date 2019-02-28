@@ -350,3 +350,7 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 	// Flush write buffer.
 	return len(buff) - offset, tun.flush()
 }
+
+func (tun *NativeTun) GUID() windows.GUID {
+	return *(*windows.GUID)(tun.wt)
+}
