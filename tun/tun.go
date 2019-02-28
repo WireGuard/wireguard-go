@@ -28,7 +28,7 @@ type TUNDevice interface {
 	Close() error                   // stops the device and closes the event channel
 }
 
-func (tun *nativeTun) operateOnFd(fn func(fd uintptr)) {
+func (tun *NativeTun) operateOnFd(fn func(fd uintptr)) {
 	sysconn, err := tun.tunFile.SyscallConn()
 	if err != nil {
 		tun.errors <- fmt.Errorf("unable to find sysconn for tunfile: %s", err.Error())

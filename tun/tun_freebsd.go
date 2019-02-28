@@ -48,7 +48,7 @@ type ifstat struct {
 	Ascii   [_IFSTATMAX]byte
 }
 
-type nativeTun struct {
+type NativeTun struct {
 	name        string
 	tunFile     *os.File
 	events      chan TUNEvent
@@ -56,7 +56,7 @@ type nativeTun struct {
 	routeSocket int
 }
 
-func (tun *nativeTun) routineRouteListener(tunIfindex int) {
+func (tun *NativeTun) routineRouteListener(tunIfindex int) {
 	var (
 		statusUp  bool
 		statusMTU int
@@ -240,7 +240,7 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 		return nil, err
 	}
 
-	tun := nativeTun{tunFile: tunFile}
+	tun := NativeTun{tunFile: tunFile}
 	var assignedName string
 	tun.operateOnFd(func(fd uintptr) {
 		assignedName, err = tunName(fd)
@@ -307,7 +307,7 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 
 func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 
-	tun := &nativeTun{
+	tun := &NativeTun{
 		tunFile: file,
 		events:  make(chan TUNEvent, 10),
 		errors:  make(chan error, 1),
@@ -348,7 +348,7 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 	return tun, nil
 }
 
-func (tun *nativeTun) Name() (string, error) {
+func (tun *NativeTun) Name() (string, error) {
 	var name string
 	var err error
 	tun.operateOnFd(func(fd uintptr) {
@@ -361,15 +361,15 @@ func (tun *nativeTun) Name() (string, error) {
 	return name, nil
 }
 
-func (tun *nativeTun) File() *os.File {
+func (tun *NativeTun) File() *os.File {
 	return tun.tunFile
 }
 
-func (tun *nativeTun) Events() chan TUNEvent {
+func (tun *NativeTun) Events() chan TUNEvent {
 	return tun.events
 }
 
-func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
+func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	select {
 	case err := <-tun.errors:
 		return 0, err
@@ -383,7 +383,7 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 	}
 }
 
-func (tun *nativeTun) Write(buff []byte, offset int) (int, error) {
+func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 
 	// reserve space for header
 
@@ -406,7 +406,7 @@ func (tun *nativeTun) Write(buff []byte, offset int) (int, error) {
 	return tun.tunFile.Write(buff)
 }
 
-func (tun *nativeTun) Close() error {
+func (tun *NativeTun) Close() error {
 	var err3 error
 	err1 := tun.tunFile.Close()
 	err2 := tunDestroy(tun.name)
@@ -426,7 +426,7 @@ func (tun *nativeTun) Close() error {
 	return err3
 }
 
-func (tun *nativeTun) setMTU(n int) error {
+func (tun *NativeTun) setMTU(n int) error {
 	// open datagram socket
 
 	var fd int
@@ -463,7 +463,7 @@ func (tun *nativeTun) setMTU(n int) error {
 	return nil
 }
 
-func (tun *nativeTun) MTU() (int, error) {
+func (tun *NativeTun) MTU() (int, error) {
 	// open datagram socket
 
 	fd, err := unix.Socket(

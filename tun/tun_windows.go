@@ -34,7 +34,7 @@ type exchgBufWrite struct {
 	packetNum uint32
 }
 
-type nativeTun struct {
+type NativeTun struct {
 	wt           *wintun.Wintun
 	tunName      string
 	signalName   *uint16
@@ -88,7 +88,7 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 	}
 
 	// Create instance.
-	tun := &nativeTun{
+	tun := &NativeTun{
 		wt:         wt,
 		tunName:    wt.DataFileName(),
 		signalName: signalNameUTF16,
@@ -108,7 +108,7 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 	return tun, nil
 }
 
-func (tun *nativeTun) openTUN() error {
+func (tun *NativeTun) openTUN() error {
 	for {
 		// Open interface data pipe.
 		// Data pipe must be opened first, as the interface data available event is created when somebody actually connects to the data pipe.
@@ -140,7 +140,7 @@ func (tun *nativeTun) openTUN() error {
 	}
 }
 
-func (tun *nativeTun) closeTUN() (err error) {
+func (tun *NativeTun) closeTUN() (err error) {
 	tun.tunLock.Lock()
 	defer tun.tunLock.Unlock()
 
@@ -167,7 +167,7 @@ func (tun *nativeTun) closeTUN() (err error) {
 	return
 }
 
-func (tun *nativeTun) getTUN() (*os.File, windows.Handle, error) {
+func (tun *NativeTun) getTUN() (*os.File, windows.Handle, error) {
 	tun.tunLock.Lock()
 	defer tun.tunLock.Unlock()
 
@@ -182,19 +182,19 @@ func (tun *nativeTun) getTUN() (*os.File, windows.Handle, error) {
 	return tun.tunFile, tun.tunDataAvail, nil
 }
 
-func (tun *nativeTun) Name() (string, error) {
+func (tun *NativeTun) Name() (string, error) {
 	return tun.wt.GetInterfaceName()
 }
 
-func (tun *nativeTun) File() *os.File {
+func (tun *NativeTun) File() *os.File {
 	return nil
 }
 
-func (tun *nativeTun) Events() chan TUNEvent {
+func (tun *NativeTun) Events() chan TUNEvent {
 	return tun.events
 }
 
-func (tun *nativeTun) Close() error {
+func (tun *NativeTun) Close() error {
 	windows.SetEvent(tun.userClose)
 	err := windows.CloseHandle(tun.userClose)
 
@@ -215,11 +215,11 @@ func (tun *nativeTun) Close() error {
 	return err
 }
 
-func (tun *nativeTun) MTU() (int, error) {
+func (tun *NativeTun) MTU() (int, error) {
 	return 1500, nil
 }
 
-func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
+func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	select {
 	case err := <-tun.errors:
 		return 0, err
@@ -292,7 +292,7 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 
 // Note: flush() and putTunPacket() assume the caller comes only from a single thread; there's no locking.
 
-func (tun *nativeTun) flush() error {
+func (tun *NativeTun) flush() error {
 	// Get TUN data pipe.
 	file, _, err := tun.getTUN()
 	if err != nil {
@@ -312,7 +312,7 @@ func (tun *nativeTun) flush() error {
 	return nil
 }
 
-func (tun *nativeTun) putTunPacket(buff []byte) error {
+func (tun *NativeTun) putTunPacket(buff []byte) error {
 	size := uint32(len(buff))
 	if size == 0 {
 		return errors.New("Empty packet")
@@ -341,7 +341,7 @@ func (tun *nativeTun) putTunPacket(buff []byte) error {
 	return nil
 }
 
-func (tun *nativeTun) Write(buff []byte, offset int) (int, error) {
+func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 	err := tun.putTunPacket(buff[offset:])
 	if err != nil {
 		return 0, err

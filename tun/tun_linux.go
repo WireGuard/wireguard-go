@@ -28,7 +28,7 @@ const (
 	ifReqSize       = unix.IFNAMSIZ + 64
 )
 
-type nativeTun struct {
+type NativeTun struct {
 	tunFile                 *os.File
 	fd                      uintptr
 	fdCancel                *rwcancel.RWCancel
@@ -43,11 +43,11 @@ type nativeTun struct {
 	statusListenersShutdown chan struct{}
 }
 
-func (tun *nativeTun) File() *os.File {
+func (tun *NativeTun) File() *os.File {
 	return tun.tunFile
 }
 
-func (tun *nativeTun) routineHackListener() {
+func (tun *NativeTun) routineHackListener() {
 	defer tun.hackListenerClosed.Unlock()
 	/* This is needed for the detection to work across network namespaces
 	 * If you are reading this and know a better method, please get in touch.
@@ -87,7 +87,7 @@ func createNetlinkSocket() (int, error) {
 	return sock, nil
 }
 
-func (tun *nativeTun) routineNetlinkListener() {
+func (tun *NativeTun) routineNetlinkListener() {
 	defer func() {
 		unix.Close(tun.netlinkSock)
 		tun.hackListenerClosed.Lock()
@@ -157,7 +157,7 @@ func (tun *nativeTun) routineNetlinkListener() {
 	}
 }
 
-func (tun *nativeTun) isUp() (bool, error) {
+func (tun *NativeTun) isUp() (bool, error) {
 	inter, err := net.InterfaceByName(tun.name)
 	return inter.Flags&net.FlagUp != 0, err
 }
@@ -190,7 +190,7 @@ func getIFIndex(name string) (int32, error) {
 	return *(*int32)(unsafe.Pointer(&ifr[unix.IFNAMSIZ])), nil
 }
 
-func (tun *nativeTun) setMTU(n int) error {
+func (tun *NativeTun) setMTU(n int) error {
 	// open datagram socket
 	fd, err := unix.Socket(
 		unix.AF_INET,
@@ -223,7 +223,7 @@ func (tun *nativeTun) setMTU(n int) error {
 	return nil
 }
 
-func (tun *nativeTun) MTU() (int, error) {
+func (tun *NativeTun) MTU() (int, error) {
 	// open datagram socket
 	fd, err := unix.Socket(
 		unix.AF_INET,
@@ -254,7 +254,7 @@ func (tun *nativeTun) MTU() (int, error) {
 	return int(*(*int32)(unsafe.Pointer(&ifr[unix.IFNAMSIZ]))), nil
 }
 
-func (tun *nativeTun) Name() (string, error) {
+func (tun *NativeTun) Name() (string, error) {
 	var ifr [ifReqSize]byte
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
@@ -274,7 +274,7 @@ func (tun *nativeTun) Name() (string, error) {
 	return tun.name, nil
 }
 
-func (tun *nativeTun) Write(buff []byte, offset int) (int, error) {
+func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 
 	if tun.nopi {
 		buff = buff[offset:]
@@ -302,7 +302,7 @@ func (tun *nativeTun) Write(buff []byte, offset int) (int, error) {
 	return tun.tunFile.Write(buff)
 }
 
-func (tun *nativeTun) doRead(buff []byte, offset int) (int, error) {
+func (tun *NativeTun) doRead(buff []byte, offset int) (int, error) {
 	select {
 	case err := <-tun.errors:
 		return 0, err
@@ -320,7 +320,7 @@ func (tun *nativeTun) doRead(buff []byte, offset int) (int, error) {
 	}
 }
 
-func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
+func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	for {
 		n, err := tun.doRead(buff, offset)
 		if err == nil || !rwcancel.RetryAfterError(err) {
@@ -332,11 +332,11 @@ func (tun *nativeTun) Read(buff []byte, offset int) (int, error) {
 	}
 }
 
-func (tun *nativeTun) Events() chan TUNEvent {
+func (tun *NativeTun) Events() chan TUNEvent {
 	return tun.events
 }
 
-func (tun *nativeTun) Close() error {
+func (tun *NativeTun) Close() error {
 	var err1 error
 	if tun.statusListenersShutdown != nil {
 		close(tun.statusListenersShutdown)
@@ -394,7 +394,7 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 }
 
 func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
-	tun := &nativeTun{
+	tun := &NativeTun{
 		tunFile:                 file,
 		fd:                      file.Fd(),
 		events:                  make(chan TUNEvent, 5),
