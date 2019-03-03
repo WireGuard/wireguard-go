@@ -171,7 +171,7 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 	tun := &NativeTun{
 		tunFile: file,
 		events:  make(chan TUNEvent, 10),
-		errors:  make(chan error, 1),
+		errors:  make(chan error, 5),
 	}
 
 	name, err := tun.Name()
@@ -200,10 +200,12 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 
 	go tun.routineRouteListener(tunIfindex)
 
-	err = tun.setMTU(mtu)
-	if err != nil {
-		tun.Close()
-		return nil, err
+	if mtu > 0 {
+		err = tun.setMTU(mtu)
+		if err != nil {
+			tun.Close()
+			return nil, err
+		}
 	}
 
 	return tun, nil

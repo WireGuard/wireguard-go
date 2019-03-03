@@ -443,3 +443,25 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 
 	return tun, nil
 }
+
+func CreateUnmonitoredTUNFromFD(tunFd int) (TUNDevice, string, error) {
+	file := os.NewFile(uintptr(tunFd), "/dev/tun")
+	tun := &NativeTun{
+		tunFile: file,
+		fd:      file.Fd(),
+		events:  make(chan TUNEvent, 5),
+		errors:  make(chan error, 5),
+		nopi:    true,
+	}
+	var err error
+	tun.fdCancel, err = rwcancel.NewRWCancel(int(tun.fd))
+	if err != nil {
+		return nil, "", err
+	}
+	name, err := tun.Name()
+	if err != nil {
+		tun.fdCancel.Cancel()
+		return nil, "", err
+	}
+	return tun, name, nil
+}
