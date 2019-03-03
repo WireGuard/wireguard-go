@@ -20,14 +20,14 @@ import (
  * See conn_linux.go for an implementation on the linux platform.
  */
 
-type NativeBind struct {
+type nativeBind struct {
 	ipv4 *net.UDPConn
 	ipv6 *net.UDPConn
 }
 
 type NativeEndpoint net.UDPAddr
 
-var _ Bind = (*NativeBind)(nil)
+var _ Bind = (*nativeBind)(nil)
 var _ Endpoint = (*NativeEndpoint)(nil)
 
 func CreateEndpoint(s string) (Endpoint, error) {
@@ -100,7 +100,7 @@ func extractErrno(err error) error {
 
 func CreateBind(uport uint16, device *Device) (Bind, uint16, error) {
 	var err error
-	var bind NativeBind
+	var bind nativeBind
 
 	port := int(uport)
 
@@ -119,7 +119,7 @@ func CreateBind(uport uint16, device *Device) (Bind, uint16, error) {
 	return &bind, uint16(port), nil
 }
 
-func (bind *NativeBind) Close() error {
+func (bind *nativeBind) Close() error {
 	var err1, err2 error
 	if bind.ipv4 != nil {
 		err1 = bind.ipv4.Close()
@@ -133,7 +133,7 @@ func (bind *NativeBind) Close() error {
 	return err2
 }
 
-func (bind *NativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
+func (bind *nativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
 	if bind.ipv4 == nil {
 		return 0, nil, syscall.EAFNOSUPPORT
 	}
@@ -144,7 +144,7 @@ func (bind *NativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
 	return n, (*NativeEndpoint)(endpoint), err
 }
 
-func (bind *NativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
+func (bind *nativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
 	if bind.ipv6 == nil {
 		return 0, nil, syscall.EAFNOSUPPORT
 	}
@@ -152,7 +152,7 @@ func (bind *NativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
 	return n, (*NativeEndpoint)(endpoint), err
 }
 
-func (bind *NativeBind) Send(buff []byte, endpoint Endpoint) error {
+func (bind *nativeBind) Send(buff []byte, endpoint Endpoint) error {
 	var err error
 	nend := endpoint.(*NativeEndpoint)
 	if nend.IP.To4() != nil {

@@ -258,10 +258,10 @@ func (peer *Peer) Stop() {
 	peer.ZeroAndFlushAll()
 }
 
-var roamingDisabled bool
+var RoamingDisabled bool
 
 func (peer *Peer) SetEndpointFromPacket(endpoint Endpoint) {
-	if roamingDisabled {
+	if RoamingDisabled {
 		return
 	}
 	peer.Lock()

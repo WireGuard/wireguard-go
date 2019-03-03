@@ -7,6 +7,6 @@
 
 package device
 
-func (bind *NativeBind) SetMark(mark uint32) error {
+func (bind *nativeBind) SetMark(mark uint32) error {
 	return nil
 }
