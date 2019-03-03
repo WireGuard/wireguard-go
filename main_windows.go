@@ -7,6 +7,8 @@ package main
 
 import (
 	"fmt"
+	"golang.zx2c4.com/wireguard/device"
+	"golang.zx2c4.com/wireguard/ipc"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,8 +27,8 @@ func main() {
 	}
 	interfaceName := os.Args[1]
 
-	logger := NewLogger(
-		LogLevelDebug,
+	logger := device.NewLogger(
+		device.LogLevelDebug,
 		fmt.Sprintf("(%s) ", interfaceName),
 	)
 	logger.Info.Println("Starting wireguard-go version", WireGuardGoVersion)
@@ -43,11 +45,11 @@ func main() {
 		os.Exit(ExitSetupFailed)
 	}
 
-	device := NewDevice(tun, logger)
+	device := device.NewDevice(tun, logger)
 	device.Up()
 	logger.Info.Println("Device started")
 
-	uapi, err := UAPIListen(interfaceName)
+	uapi, err := ipc.UAPIListen(interfaceName)
 	if err != nil {
 		logger.Error.Println("Failed to listen on uapi socket:", err)
 		os.Exit(ExitSetupFailed)
@@ -63,7 +65,7 @@ func main() {
 				errs <- err
 				return
 			}
-			go ipcHandle(device, conn)
+			go device.IpcHandle(conn)
 		}
 	}()
 	logger.Info.Println("UAPI listener started")
