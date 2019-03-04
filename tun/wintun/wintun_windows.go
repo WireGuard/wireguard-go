@@ -13,10 +13,10 @@ import (
 	"time"
 	"unsafe"
 
-	"golang.zx2c4.com/wireguard/tun/wintun/guid"
-	"golang.zx2c4.com/wireguard/tun/wintun/setupapi"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
+	"golang.zx2c4.com/wireguard/tun/wintun/guid"
+	"golang.zx2c4.com/wireguard/tun/wintun/setupapi"
 )
 
 type Wintun windows.GUID
@@ -422,11 +422,9 @@ func getInterfaceId(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.Dev
 // GetInterfaceName returns network interface name.
 //
 func (wintun *Wintun) GetInterfaceName() (string, error) {
-	ifid := (*windows.GUID)(wintun)
-	// Open network interface registry key.
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Network\\%v\\%v\\Connection", guid.ToString(&deviceClassNetGUID), guid.ToString(ifid)), registry.QUERY_VALUE)
+	key, err := wintun.openNetRegKey(registry.QUERY_VALUE)
 	if err != nil {
-		return "", errors.New("Network-specific registry key open failed: " + err.Error())
+		return "", err
 	}
 	defer key.Close()
 
@@ -438,16 +436,27 @@ func (wintun *Wintun) GetInterfaceName() (string, error) {
 // SetInterfaceName sets network interface name.
 //
 func (wintun *Wintun) SetInterfaceName(ifname string) error {
-	ifid := (*windows.GUID)(wintun)
-	// Open network interface registry key.
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Network\\%v\\%v\\Connection", guid.ToString(&deviceClassNetGUID), guid.ToString(ifid)), registry.SET_VALUE)
+	key, err := wintun.openNetRegKey(registry.SET_VALUE)
 	if err != nil {
-		return errors.New("Network-specific registry key open failed: " + err.Error())
+		return err
 	}
 	defer key.Close()
 
 	// Set the interface name.
 	return key.SetStringValue("Name", ifname)
+}
+
+//
+// openNetRegKey opens interface-specific network registry key.
+//
+func (wintun *Wintun) openNetRegKey(access uint32) (registry.Key, error) {
+	ifid := (*windows.GUID)(wintun)
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Network\\%v\\%v\\Connection", guid.ToString(&deviceClassNetGUID), guid.ToString(ifid)), access)
+	if err != nil {
+		return 0, errors.New("Network-specific registry key open failed: " + err.Error())
+	}
+
+	return key, nil
 }
 
 //
