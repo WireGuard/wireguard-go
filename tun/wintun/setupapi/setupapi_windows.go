@@ -398,10 +398,10 @@ func SetupDiClassNameFromGuidEx(classGUID *windows.GUID, machineName string) (cl
 //sys	setupDiClassGuidsFromNameEx(className *uint16, classGuidList *windows.GUID, classGuidListSize uint32, requiredSize *uint32, machineName *uint16, reserved uintptr) (err error) = setupapi.SetupDiClassGuidsFromNameExW
 
 // SetupDiClassGuidsFromNameEx function retrieves the GUIDs associated with the specified class name. This resulting list contains the classes currently installed on a local or remote computer.
-func SetupDiClassGuidsFromNameEx(className string, machineName string) (classGuidLists []windows.GUID, err error) {
+func SetupDiClassGuidsFromNameEx(className string, machineName string) ([]windows.GUID, error) {
 	classNameUTF16, err := syscall.UTF16PtrFromString(className)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	const bufCapacity = 4
@@ -412,7 +412,7 @@ func SetupDiClassGuidsFromNameEx(className string, machineName string) (classGui
 	if machineName != "" {
 		machineNameUTF16, err = syscall.UTF16PtrFromString(machineName)
 		if err != nil {
-			return
+			return nil, err
 		}
 	}
 
@@ -431,7 +431,7 @@ func SetupDiClassGuidsFromNameEx(className string, machineName string) (classGui
 		}
 	}
 
-	return
+	return nil, err
 }
 
 //sys	setupDiGetSelectedDevice(deviceInfoSet DevInfo, deviceInfoData *DevInfoData) (err error) = setupapi.SetupDiGetSelectedDevice

@@ -19,11 +19,14 @@ import (
 	"golang.zx2c4.com/wireguard/tun/wintun/setupapi"
 )
 
+//
+// Wintun is a handle of a Wintun adapter
+//
 type Wintun windows.GUID
 
-var deviceClassNetGUID = windows.GUID{0x4d36e972, 0xe325, 0x11ce, [8]byte{0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}}
+var deviceClassNetGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0x11ce, Data4: [8]byte{0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}}
 
-const TUN_HWID = "Wintun"
+const hardwareID = "Wintun"
 
 //
 // GetInterface finds interface ID by name.
@@ -66,7 +69,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 		}
 
 		// Get interface ID.
-		ifid, err := getInterfaceId(devInfoList, deviceData, 1)
+		ifid, err := getInterfaceID(devInfoList, deviceData, 1)
 		if err != nil {
 			// Something is wrong with this device. Skip it.
 			continue
@@ -106,7 +109,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 					continue
 				}
 
-				if driverDetailData.IsCompatible(TUN_HWID) {
+				if driverDetailData.IsCompatible(hardwareID) {
 					// Matching hardware ID found.
 					return (*Wintun)(ifid), nil
 				}
@@ -160,7 +163,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 	}
 
 	// Set Plug&Play device hardware ID property.
-	hwid, err := syscall.UTF16FromString(TUN_HWID)
+	hwid, err := syscall.UTF16FromString(hardwareID)
 	if err != nil {
 		return nil, false, err
 	}
@@ -199,7 +202,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 				continue
 			}
 
-			if driverDetailData.IsCompatible(TUN_HWID) {
+			if driverDetailData.IsCompatible(hardwareID) {
 				// Matching hardware ID found. Select the driver.
 				err := devInfoList.SetSelectedDriver(deviceData, driverData)
 				if err != nil {
@@ -214,7 +217,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 	}
 
 	if driverVersion == 0 {
-		return nil, false, fmt.Errorf("No driver for device \"%v\" installed", TUN_HWID)
+		return nil, false, fmt.Errorf("No driver for device \"%v\" installed", hardwareID)
 	}
 
 	// Call appropriate class installer.
@@ -241,7 +244,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 		}
 
 		// Get network interface ID from registry. Retry for max 30sec.
-		ifid, err = getInterfaceId(devInfoList, deviceData, 30)
+		ifid, err = getInterfaceID(devInfoList, deviceData, 30)
 	}
 
 	if err == nil {
@@ -302,7 +305,7 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 		}
 
 		// Get interface ID.
-		ifid2, err := getInterfaceId(devInfoList, deviceData, 1)
+		ifid2, err := getInterfaceID(devInfoList, deviceData, 1)
 		if err != nil {
 			// Something is wrong with this device. Skip it.
 			continue
@@ -364,7 +367,7 @@ func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInf
 	return false, nil
 }
 
-// getInterfaceId returns network interface ID.
+// getInterfaceID returns network interface ID.
 //
 // After the device is created, it might take some time before the registry
 // key is populated. numAttempts parameter specifies the number of attempts
@@ -373,7 +376,7 @@ func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInf
 //
 // Function returns the network interface ID.
 //
-func getInterfaceId(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData, numAttempts int) (*windows.GUID, error) {
+func getInterfaceID(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData, numAttempts int) (*windows.GUID, error) {
 	if numAttempts < 1 {
 		return nil, fmt.Errorf("Invalid numAttempts (expected: >=1, provided: %v)", numAttempts)
 	}
@@ -481,10 +484,16 @@ func getRegStringValue(key registry.Key, name string) (string, error) {
 	return valueExp, nil
 }
 
+//
+// SignalEventName returns Wintun device data-ready event name.
+//
 func (wintun *Wintun) SignalEventName() string {
 	return fmt.Sprintf("Global\\WINTUN_EVENT_%s", guid.ToString((*windows.GUID)(wintun)))
 }
 
+//
+// DataFileName returns Wintun device data pipe name.
+//
 func (wintun *Wintun) DataFileName() string {
 	return fmt.Sprintf("\\\\.\\Global\\WINTUN_DEVICE_%s", guid.ToString((*windows.GUID)(wintun)))
 }

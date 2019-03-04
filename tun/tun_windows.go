@@ -52,6 +52,10 @@ func packetAlign(size uint32) uint32 {
 	return (size + (packetExchangeAlignment - 1)) &^ (packetExchangeAlignment - 1)
 }
 
+//
+// CreateTUN creates a Wintun adapter with the given name. Should a Wintun
+// adapter with the same name exist, it is reused.
+//
 func CreateTUN(ifname string) (TUNDevice, error) {
 	// Does an interface with this name already exist?
 	wt, err := wintun.GetInterface(ifname, 0)
@@ -351,6 +355,9 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 	return len(buff) - offset, tun.flush()
 }
 
+//
+// GUID returns Windows adapter instance ID.
+//
 func (tun *NativeTun) GUID() windows.GUID {
 	return *(*windows.GUID)(tun.wt)
 }
