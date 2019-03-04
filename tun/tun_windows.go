@@ -59,7 +59,7 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 		// Interface does not exist or an error occured. Create one.
 		wt, _, err = wintun.CreateInterface("WireGuard Tunnel Adapter", 0)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("Creating Wintun adapter failed: " + err.Error())
 		}
 	} else if err != nil {
 		// Foreign interface with the same name found.
@@ -72,13 +72,13 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 	err = wt.SetInterfaceName(ifname)
 	if err != nil {
 		wt.DeleteInterface(0)
-		return nil, err
+		return nil, errors.New("Setting interface name failed: " + err.Error())
 	}
 
 	err = wt.FlushInterface()
 	if err != nil {
 		wt.DeleteInterface(0)
-		return nil, err
+		return nil, errors.New("Flushing interface failed: " + err.Error())
 	}
 
 	signalNameUTF16, err := windows.UTF16PtrFromString(wt.SignalEventName())
