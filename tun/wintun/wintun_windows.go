@@ -386,8 +386,8 @@ func getInterfaceId(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.Dev
 	defer key.Close()
 
 	for {
-		// Query the NetCfgInstanceId value. Using get_reg_string() right on might clutter the output with error messages while the registry is still being populated.
-		_, _, err = key.GetValue("NetCfgInstanceId", nil)
+		// Read the NetCfgInstanceId value.
+		value, err := getRegStringValue(key, "NetCfgInstanceId")
 		if err != nil {
 			if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_FILE_NOT_FOUND {
 				numAttempts--
@@ -399,12 +399,6 @@ func getInterfaceId(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.Dev
 				}
 			}
 
-			return nil, errors.New("RegQueryValueEx(\"NetCfgInstanceId\") failed: " + err.Error())
-		}
-
-		// Read the NetCfgInstanceId value now.
-		value, err := getRegStringValue(key, "NetCfgInstanceId")
-		if err != nil {
 			return nil, errors.New("RegQueryStringValue(\"NetCfgInstanceId\") failed: " + err.Error())
 		}
 
