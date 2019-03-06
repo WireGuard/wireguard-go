@@ -46,9 +46,20 @@ func (l *UAPIListener) Addr() net.Addr {
 	return l.listener.Addr()
 }
 
+func GetSystemSecurityDescriptor() string {
+	//
+	// SDDL encoded.
+	//
+	// (system = SECURITY_NT_AUTHORITY | SECURITY_LOCAL_SYSTEM_RID)
+	// owner: system
+	// grant: GENERIC_ALL to system
+	//
+	return "O:SYD:(A;;GA;;;SY)"
+}
+
 func UAPIListen(name string) (net.Listener, error) {
 	config := winio.PipeConfig{
-		SecurityDescriptor: "O:SYD:P(A;;GA;;;SY)", /* Local System only, not inheritable */
+		SecurityDescriptor: GetSystemSecurityDescriptor(),
 	}
 	listener, err := winio.ListenPipe("\\\\.\\pipe\\WireGuard\\"+name, &config)
 	if err != nil {
