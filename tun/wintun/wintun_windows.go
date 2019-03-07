@@ -302,7 +302,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 			if err != nil {
 				if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_FILE_NOT_FOUND {
 					// Wait and retry. TODO: Wait for a cancellable event instead.
-					time.Sleep(1000 * time.Millisecond)
+					time.Sleep(time.Second)
 					continue
 				}
 			}
