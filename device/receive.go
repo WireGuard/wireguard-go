@@ -633,7 +633,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			offset := MessageTransportOffsetContent
 			atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
 			_, err := device.tun.device.Write(elem.buffer[:offset+len(elem.packet)], offset)
-			if err != nil {
+			if err != nil && !device.isClosed.Get() {
 				logError.Println("Failed to write packet to TUN device:", err)
 			}
 		}
