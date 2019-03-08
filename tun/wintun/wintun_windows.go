@@ -47,7 +47,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 	// Create a list of network devices.
 	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, enumerator, hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), machineName)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(fmt.Sprintf("SetupDiGetClassDevsEx(%v) failed: ", guid.ToString(&deviceClassNetGUID)) + err.Error())
 	}
 	defer devInfoList.Close()
 
@@ -86,7 +86,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 			const driverType = setupapi.SPDIT_COMPATDRIVER
 			err = devInfoList.BuildDriverInfoList(deviceData, driverType)
 			if err != nil {
-				return nil, err
+				return nil, errors.New("SetupDiBuildDriverInfoList failed: " + err.Error())
 			}
 			defer devInfoList.DestroyDriverInfoList(deviceData, driverType)
 
@@ -140,42 +140,42 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 	// Create an empty device info set for network adapter device class.
 	devInfoList, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, hwndParent, machineName)
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.New(fmt.Sprintf("SetupDiCreateDeviceInfoListEx(%v) failed: ", guid.ToString(&deviceClassNetGUID)) + err.Error())
 	}
 
 	// Get the device class name from GUID.
 	className, err := setupapi.SetupDiClassNameFromGuidEx(&deviceClassNetGUID, machineName)
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.New(fmt.Sprintf("SetupDiClassNameFromGuidEx(%v) failed: ", guid.ToString(&deviceClassNetGUID)) + err.Error())
 	}
 
 	// Create a new device info element and add it to the device info set.
 	deviceData, err := devInfoList.CreateDeviceInfo(className, &deviceClassNetGUID, description, hwndParent, setupapi.DICD_GENERATE_ID)
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.New("SetupDiCreateDeviceInfo failed: " + err.Error())
 	}
 
 	// Set a device information element as the selected member of a device information set.
 	err = devInfoList.SetSelectedDevice(deviceData)
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.New("SetupDiSetSelectedDevice failed: " + err.Error())
 	}
 
 	// Set Plug&Play device hardware ID property.
 	hwid, err := syscall.UTF16FromString(hardwareID)
 	if err != nil {
-		return nil, false, err
+		return nil, false, err // syscall.UTF16FromString(hardwareID) should never fail: hardwareID is const string without NUL chars.
 	}
 	err = devInfoList.SetDeviceRegistryProperty(deviceData, setupapi.SPDRP_HARDWAREID, setupapi.UTF16ToBuf(append(hwid, 0)))
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.New("SetupDiSetDeviceRegistryProperty(SPDRP_HARDWAREID) failed: " + err.Error())
 	}
 
 	// Search for the driver.
 	const driverType = setupapi.SPDIT_CLASSDRIVER
 	err = devInfoList.BuildDriverInfoList(deviceData, driverType)
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.New("SetupDiBuildDriverInfoList failed: " + err.Error())
 	}
 	defer devInfoList.DestroyDriverInfoList(deviceData, driverType)
 
@@ -222,13 +222,13 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 	// Call appropriate class installer.
 	err = devInfoList.CallClassInstaller(setupapi.DIF_REGISTERDEVICE, deviceData)
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.New("SetupDiCallClassInstaller(DIF_REGISTERDEVICE) failed: " + err.Error())
 	}
 
-	// Register device co-installers if any.
+	// Register device co-installers if any. (Ignore errors)
 	devInfoList.CallClassInstaller(setupapi.DIF_REGISTER_COINSTALLERS, deviceData)
 
-	// Install interfaces if any.
+	// Install interfaces if any. (Ignore errors)
 	devInfoList.CallClassInstaller(setupapi.DIF_INSTALLINTERFACES, deviceData)
 
 	var wintun *Wintun
@@ -236,6 +236,10 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 
 	// Install the device.
 	err = devInfoList.CallClassInstaller(setupapi.DIF_INSTALLDEVICE, deviceData)
+	if err != nil {
+		err = errors.New("SetupDiCallClassInstaller(DIF_INSTALLDEVICE) failed: " + err.Error())
+	}
+
 	if err == nil {
 		// Check if a system reboot is required. (Ignore errors)
 		if ret, _ := checkReboot(devInfoList, deviceData); ret {
@@ -304,6 +308,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 			if err != nil {
 				if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_FILE_NOT_FOUND {
 					// Wait and retry. TODO: Wait for a cancellable event instead.
+					err = errors.New("Time-out waiting for adapter to get ready")
 					time.Sleep(time.Second)
 					continue
 				}
@@ -355,7 +360,7 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 	// Create a list of network devices.
 	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, enumerator, hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), machineName)
 	if err != nil {
-		return false, false, err
+		return false, false, errors.New(fmt.Sprintf("SetupDiGetClassDevsEx(%v) failed: ", guid.ToString(&deviceClassNetGUID)) + err.Error())
 	}
 	defer devInfoList.Close()
 
@@ -386,13 +391,13 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 			// Set class installer parameters for DIF_REMOVE.
 			err = devInfoList.SetClassInstallParams(deviceData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams)))
 			if err != nil {
-				return false, false, err
+				return false, false, errors.New("SetupDiSetClassInstallParams failed: " + err.Error())
 			}
 
 			// Call appropriate class installer.
 			err = devInfoList.CallClassInstaller(setupapi.DIF_REMOVE, deviceData)
 			if err != nil {
-				return false, false, err
+				return false, false, errors.New("SetupDiCallClassInstaller failed: " + err.Error())
 			}
 
 			// Check if a system reboot is required. (Ignore errors)
