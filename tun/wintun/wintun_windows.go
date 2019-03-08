@@ -216,7 +216,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 	}
 
 	if driverVersion == 0 {
-		return nil, false, fmt.Errorf("No driver for device \"%v\" installed", hardwareID)
+		return nil, false, fmt.Errorf("No driver for device %q installed", hardwareID)
 	}
 
 	// Call appropriate class installer.
@@ -266,7 +266,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 			// Convert to windows.GUID.
 			ifid, err := guid.FromString(value)
 			if err != nil {
-				return nil, fmt.Errorf("NetCfgInstanceId registry value is not a GUID (expected: \"{...}\", provided: \"%v\")", value)
+				return nil, fmt.Errorf("NetCfgInstanceId registry value is not a GUID (expected: \"{...}\", provided: %q)", value)
 			}
 
 			wintun := (*Wintun)(ifid)
@@ -277,7 +277,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 					return nil, err
 				}
 
-				return nil, errors.New(fmt.Sprintf("RegOpenKeyEx(\"%v\") failed: ", keyNetName) + err.Error())
+				return nil, errors.New(fmt.Sprintf("RegOpenKeyEx(%q) failed: ", keyNetName) + err.Error())
 			}
 			defer keyNet.Close()
 

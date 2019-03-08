@@ -257,7 +257,7 @@ func (deviceInfoSet DevInfo) GetInterfaceID(deviceInfoData *DevInfoData) (*windo
 	// Convert to windows.GUID.
 	ifid, err := guid.FromString(value)
 	if err != nil {
-		return nil, fmt.Errorf("NetCfgInstanceId registry value is not a GUID (expected: \"{...}\", provided: \"%v\")", value)
+		return nil, fmt.Errorf("NetCfgInstanceId registry value is not a GUID (expected: \"{...}\", provided: %q)", value)
 	}
 
 	return ifid, nil
