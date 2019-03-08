@@ -334,7 +334,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 		}
 	}
 
-	return nil, false, err
+	return nil, rebootRequired, err
 }
 
 //
