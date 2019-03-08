@@ -48,9 +48,9 @@ func (l *UAPIListener) Addr() net.Addr {
 
 func UAPIListen(name string) (net.Listener, error) {
 	config := winio.PipeConfig{
-		SecurityDescriptor: "", //TODO: we want this to be a very locked down pipe.
+		SecurityDescriptor: "O:SYD:P(A;;GA;;;SY)", /* Local System only, not inheritable */
 	}
-	listener, err := winio.ListenPipe("\\\\.\\pipe\\wireguard\\"+name, &config) //TODO: choose sane name.
+	listener, err := winio.ListenPipe("\\\\.\\pipe\\WireGuard\\"+name, &config)
 	if err != nil {
 		return nil, err
 	}
