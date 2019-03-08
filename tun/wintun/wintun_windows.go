@@ -27,6 +27,8 @@ type Wintun windows.GUID
 var deviceClassNetGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0x11ce, Data4: [8]byte{0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}}
 
 const hardwareID = "Wintun"
+const enumerator = ""
+const machineName = ""
 
 //
 // GetInterface finds interface ID by name.
@@ -43,7 +45,7 @@ const hardwareID = "Wintun"
 //
 func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 	// Create a list of network devices.
-	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
+	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, enumerator, hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), machineName)
 	if err != nil {
 		return nil, err
 	}
@@ -136,13 +138,13 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 //
 func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, error) {
 	// Create an empty device info set for network adapter device class.
-	devInfoList, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, hwndParent, "")
+	devInfoList, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, hwndParent, machineName)
 	if err != nil {
 		return nil, false, err
 	}
 
 	// Get the device class name from GUID.
-	className, err := setupapi.SetupDiClassNameFromGuidEx(&deviceClassNetGUID, "")
+	className, err := setupapi.SetupDiClassNameFromGuidEx(&deviceClassNetGUID, machineName)
 	if err != nil {
 		return nil, false, err
 	}
@@ -349,8 +351,9 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 //
 func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 	ifid := (*windows.GUID)(wintun)
+
 	// Create a list of network devices.
-	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
+	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, enumerator, hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), machineName)
 	if err != nil {
 		return false, false, err
 	}
