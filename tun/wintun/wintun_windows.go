@@ -309,7 +309,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 				if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_FILE_NOT_FOUND {
 					// Wait and retry. TODO: Wait for a cancellable event instead.
 					err = errors.New("Time-out waiting for adapter to get ready")
-					time.Sleep(time.Second)
+					time.Sleep(time.Second / 4)
 					continue
 				}
 			}
