@@ -21,11 +21,11 @@ type IPCError struct {
 	int64
 }
 
-func (s *IPCError) Error() string {
+func (s IPCError) Error() string {
 	return fmt.Sprintf("IPC error: %d", s.int64)
 }
 
-func (s *IPCError) ErrorCode() int64 {
+func (s IPCError) ErrorCode() int64 {
 	return s.int64
 }
 
