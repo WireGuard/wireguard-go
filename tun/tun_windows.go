@@ -46,6 +46,7 @@ type NativeTun struct {
 	userClose    windows.Handle
 	events       chan TUNEvent
 	errors       chan error
+	forcedMtu    int
 }
 
 func packetAlign(size uint32) uint32 {
@@ -100,6 +101,7 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 		wrBuff:     &exchgBufWrite{},
 		events:     make(chan TUNEvent, 10),
 		errors:     make(chan error, 1),
+		forcedMtu:  1500,
 	}
 
 	// Create close event.
@@ -220,7 +222,12 @@ func (tun *NativeTun) Close() error {
 }
 
 func (tun *NativeTun) MTU() (int, error) {
-	return 1500, nil
+	return tun.forcedMtu, nil
+}
+
+//TODO: This is a temporary hack. We really need to be monitoring the interface in real time and adapting to MTU changes.
+func (tun *NativeTun) ForceMtu(mtu int) {
+	tun.forcedMtu = mtu
 }
 
 func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
