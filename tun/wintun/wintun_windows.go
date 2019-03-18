@@ -502,13 +502,6 @@ func getRegStringValue(key registry.Key, name string) (string, error) {
 }
 
 //
-// SignalEventName returns Wintun device data-ready event name.
-//
-func (wintun *Wintun) SignalEventName() string {
-	return fmt.Sprintf("Global\\WINTUN_EVENT_%s", guid.ToString((*windows.GUID)(wintun)))
-}
-
-//
 // DataFileName returns Wintun device data pipe name.
 //
 func (wintun *Wintun) DataFileName() string {

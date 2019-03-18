@@ -35,18 +35,15 @@ type exchgBufWrite struct {
 }
 
 type NativeTun struct {
-	wt           *wintun.Wintun
-	tunName      string
-	signalName   *uint16
-	tunFile      *os.File
-	tunLock      sync.Mutex
-	rdBuff       *exchgBufRead
-	wrBuff       *exchgBufWrite
-	tunDataAvail windows.Handle
-	userClose    windows.Handle
-	events       chan TUNEvent
-	errors       chan error
-	forcedMtu    int
+	wt        *wintun.Wintun
+	tunName   string
+	tunFile   *os.File
+	tunLock   sync.Mutex
+	rdBuff    *exchgBufRead
+	wrBuff    *exchgBufWrite
+	events    chan TUNEvent
+	errors    chan error
+	forcedMtu int
 }
 
 func packetAlign(size uint32) uint32 {
@@ -86,106 +83,51 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 		return nil, errors.New("Flushing interface failed: " + err.Error())
 	}
 
-	signalNameUTF16, err := windows.UTF16PtrFromString(wt.SignalEventName())
-	if err != nil {
-		wt.DeleteInterface(0)
-		return nil, err
-	}
-
-	// Create instance.
-	tun := &NativeTun{
-		wt:         wt,
-		tunName:    wt.DataFileName(),
-		signalName: signalNameUTF16,
-		rdBuff:     &exchgBufRead{},
-		wrBuff:     &exchgBufWrite{},
-		events:     make(chan TUNEvent, 10),
-		errors:     make(chan error, 1),
-		forcedMtu:  1500,
-	}
-
-	// Create close event.
-	tun.userClose, err = windows.CreateEvent(nil, 1 /*TRUE*/, 0 /*FALSE*/, nil)
-	if err != nil {
-		wt.DeleteInterface(0)
-		return nil, err
-	}
-
-	return tun, nil
+	return &NativeTun{
+		wt:        wt,
+		tunName:   wt.DataFileName(),
+		rdBuff:    &exchgBufRead{},
+		wrBuff:    &exchgBufWrite{},
+		events:    make(chan TUNEvent, 10),
+		errors:    make(chan error, 1),
+		forcedMtu: 1500,
+	}, nil
 }
 
-func (tun *NativeTun) openTUN() error {
+func (tun *NativeTun) openTUN() {
 	for {
-		// Open interface data pipe.
-		// Data pipe must be opened first, as the interface data available event is created when somebody actually connects to the data pipe.
-		file, err := os.OpenFile(tun.tunName, os.O_RDWR|os.O_SYNC, 0600)
+		file, err := os.OpenFile(tun.tunName, os.O_RDWR, 0)
 		if err != nil {
-			// After examining possible error conditions, many arose that were only temporary: windows.ERROR_FILE_NOT_FOUND, "read <filename> closed", etc.
-			// To simplify, we will enter a retry-loop on _any_ error until session is closed by user.
-			switch evt, e := windows.WaitForSingleObject(tun.userClose, 1000); evt {
-			case windows.WAIT_OBJECT_0, windows.WAIT_ABANDONED:
-				return errors.New("TUN closed")
-			case windows.WAIT_TIMEOUT:
-				continue
-			default:
-				return errors.New("Unexpected result from WaitForSingleObject: " + e.Error())
-			}
+			continue
 		}
-
-		// Open interface data available event.
-		event, err := windows.OpenEvent(windows.SYNCHRONIZE, false, tun.signalName)
-		if err != nil {
-			file.Close()
-			return errors.New("Opening interface data ready event failed: " + err.Error())
-		}
-
 		tun.tunFile = file
-		tun.tunDataAvail = event
-
-		return nil
 	}
 }
 
 func (tun *NativeTun) closeTUN() (err error) {
-	tun.tunLock.Lock()
-	defer tun.tunLock.Unlock()
-
-	if tun.tunDataAvail != 0 {
-		// Close interface data ready event.
-		e := windows.CloseHandle(tun.tunDataAvail)
-		if err != nil {
-			err = e
-		}
-
-		tun.tunDataAvail = 0
-	}
-
 	if tun.tunFile != nil {
-		// Close interface data pipe.
-		e := tun.tunFile.Close()
-		if err != nil {
-			err = e
+		tun.tunLock.Lock()
+		defer tun.tunLock.Unlock()
+		if tun.tunFile == nil {
+			return
 		}
-
+		t := tun.tunFile
 		tun.tunFile = nil
+		err = t.Close()
 	}
-
 	return
 }
 
-func (tun *NativeTun) getTUN() (*os.File, windows.Handle, error) {
-	tun.tunLock.Lock()
-	defer tun.tunLock.Unlock()
-
-	if tun.tunFile == nil || tun.tunDataAvail == 0 {
-		// TUN device is not open (yet).
-		err := tun.openTUN()
-		if err != nil {
-			return nil, 0, err
+func (tun *NativeTun) getTUN() (*os.File, error) {
+	if tun.tunFile == nil {
+		tun.tunLock.Lock()
+		defer tun.tunLock.Unlock()
+		if tun.tunFile != nil {
+			return tun.tunFile, nil
 		}
+		tun.openTUN()
 	}
-
-	return tun.tunFile, tun.tunDataAvail, nil
+	return tun.tunFile, nil
 }
 
 func (tun *NativeTun) Name() (string, error) {
@@ -201,24 +143,18 @@ func (tun *NativeTun) Events() chan TUNEvent {
 }
 
 func (tun *NativeTun) Close() error {
-	windows.SetEvent(tun.userClose)
-	err := windows.CloseHandle(tun.userClose)
-
-	e := tun.closeTUN()
-	if err == nil {
-		err = e
-	}
+	err1 := tun.closeTUN()
 
 	if tun.events != nil {
 		close(tun.events)
 	}
 
-	_, _, e = tun.wt.DeleteInterface(0)
-	if err == nil {
-		err = e
+	_, _, err2 := tun.wt.DeleteInterface(0)
+	if err1 == nil {
+		err1 = err2
 	}
 
-	return err
+	return err1
 }
 
 func (tun *NativeTun) MTU() (int, error) {
@@ -248,42 +184,16 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 				tun.rdBuff.avail = 0
 				continue
 			}
-			packet = packet[:pSize]
+			packet = packet[packetExchangeAlignment : packetExchangeAlignment+size]
 
 			// Copy data.
-			copy(buff[offset:], packet[packetExchangeAlignment:packetExchangeAlignment+size])
+			copy(buff[offset:], packet)
 			tun.rdBuff.offset += pSize
 			return int(size), nil
 		}
 
-		// Get TUN data ready event.
-		_, tunDataAvail, err := tun.getTUN()
-		if err != nil {
-			return 0, err
-		}
-
-		// Wait for user close or interface data.
-		r, err := windows.WaitForMultipleObjects([]windows.Handle{tun.userClose, tunDataAvail}, false, windows.INFINITE)
-		if err != nil {
-			return 0, errors.New("Waiting for data failed: " + err.Error())
-		}
-		switch r {
-		case windows.WAIT_OBJECT_0 + 0, windows.WAIT_ABANDONED + 0:
-			return 0, errors.New("TUN closed")
-		case windows.WAIT_OBJECT_0 + 1:
-			// Data is available.
-		case windows.WAIT_ABANDONED + 1:
-			// TUN stopped.
-			tun.closeTUN()
-		case windows.WAIT_TIMEOUT:
-			// Congratulations, we reached infinity. Let's do it again! :)
-			continue
-		default:
-			return 0, errors.New("unexpected result from WaitForMultipleObjects")
-		}
-
 		// Get TUN data pipe.
-		file, _, err := tun.getTUN()
+		file, err := tun.getTUN()
 		if err != nil {
 			return 0, err
 		}
@@ -291,6 +201,9 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 		// Fill queue.
 		n, err := file.Read(tun.rdBuff.data[:])
 		if err != nil {
+			if pe, ok := err.(*os.PathError); ok && pe.Err == os.ErrClosed {
+				return 0, err
+			}
 			// TUN interface stopped, failed, etc. Retry.
 			tun.rdBuff.avail = 0
 			tun.closeTUN()
@@ -305,7 +218,7 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 
 func (tun *NativeTun) flush() error {
 	// Get TUN data pipe.
-	file, _, err := tun.getTUN()
+	file, err := tun.getTUN()
 	if err != nil {
 		return err
 	}
@@ -344,7 +257,8 @@ func (tun *NativeTun) putTunPacket(buff []byte) error {
 	// Write packet to the exchange buffer.
 	packet := tun.wrBuff.data[tun.wrBuff.offset : tun.wrBuff.offset+pSize]
 	*(*uint32)(unsafe.Pointer(&packet[0])) = size
-	copy(packet[packetExchangeAlignment:packetExchangeAlignment+size], buff)
+	packet = packet[packetExchangeAlignment : packetExchangeAlignment+size]
+	copy(packet, buff)
 
 	tun.wrBuff.packetNum++
 	tun.wrBuff.offset += pSize
