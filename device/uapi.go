@@ -298,7 +298,7 @@ func (device *Device) IpcSetOperation(socket *bufio.Reader) *IPCError {
 				}()
 
 				if err != nil {
-					logError.Println("Failed to set endpoint:", value)
+					logError.Println("Failed to set endpoint:", err, ":", value)
 					return &IPCError{ipc.IpcErrorInvalid}
 				}
 
