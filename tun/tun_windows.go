@@ -9,6 +9,8 @@ import (
 	"errors"
 	"os"
 	"sync"
+	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -20,6 +22,8 @@ const (
 	packetExchangeAlignment uint32 = 16                               // Number of bytes packets are aligned to in exchange buffers
 	packetSizeMax           uint32 = 0xf000 - packetExchangeAlignment // Maximum packet size
 	packetExchangeSize      uint32 = 0x100000                         // Exchange buffer size (defaults to 1MiB)
+	retryRate                      = 4                                // Number of retries per second to reopen device pipe
+	retryTimeout                   = 5                                // Number of seconds to tolerate adapter unavailable
 )
 
 type exchgBufRead struct {
@@ -36,15 +40,18 @@ type exchgBufWrite struct {
 
 type NativeTun struct {
 	wt        *wintun.Wintun
-	tunName   string
-	tunFile   *os.File
+	tunName   *uint16
+	tunFile   windows.Handle
 	tunLock   sync.Mutex
+	close     bool
 	rdBuff    *exchgBufRead
 	wrBuff    *exchgBufWrite
 	events    chan TUNEvent
 	errors    chan error
 	forcedMtu int
 }
+
+//sys	getOverlappedResult(handle windows.Handle, overlapped *windows.Overlapped, done *uint32, wait bool) (err error) = kernel32.GetOverlappedResult
 
 func packetAlign(size uint32) uint32 {
 	return (size + (packetExchangeAlignment - 1)) &^ (packetExchangeAlignment - 1)
@@ -83,9 +90,16 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 		return nil, errors.New("Flushing interface failed: " + err.Error())
 	}
 
+	tunNameUTF16, err := windows.UTF16PtrFromString(wt.DataFileName())
+	if err != nil {
+		wt.DeleteInterface(0)
+		return nil, err
+	}
+
 	return &NativeTun{
 		wt:        wt,
-		tunName:   wt.DataFileName(),
+		tunName:   tunNameUTF16,
+		tunFile:   windows.InvalidHandle,
 		rdBuff:    &exchgBufRead{},
 		wrBuff:    &exchgBufWrite{},
 		events:    make(chan TUNEvent, 10),
@@ -94,40 +108,65 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 	}, nil
 }
 
-func (tun *NativeTun) openTUN() {
+func (tun *NativeTun) openTUN() error {
+	retries := retryTimeout * retryRate
 	for {
-		file, err := os.OpenFile(tun.tunName, os.O_RDWR, 0)
-		if err != nil {
-			continue
+		if tun.close {
+			return errors.New("Cancelled")
 		}
+
+		file, err := windows.CreateFile(tun.tunName, windows.GENERIC_READ|windows.GENERIC_WRITE, 0, nil, windows.OPEN_EXISTING, windows.FILE_ATTRIBUTE_NORMAL|windows.FILE_FLAG_OVERLAPPED|0x20000000 /*windows.FILE_FLAG_NO_BUFFERING*/, 0)
+		if err != nil {
+			if retries > 0 {
+				time.Sleep(time.Second / retryRate)
+				retries--
+				continue
+			}
+			return err
+		}
+
 		tun.tunFile = file
+		return nil
 	}
 }
 
 func (tun *NativeTun) closeTUN() (err error) {
-	if tun.tunFile != nil {
+	if tun.tunFile != windows.InvalidHandle {
 		tun.tunLock.Lock()
 		defer tun.tunLock.Unlock()
-		if tun.tunFile == nil {
+		if tun.tunFile == windows.InvalidHandle {
 			return
 		}
 		t := tun.tunFile
-		tun.tunFile = nil
-		err = t.Close()
+		tun.tunFile = windows.InvalidHandle
+		err = windows.CloseHandle(t)
 	}
 	return
 }
 
-func (tun *NativeTun) getTUN() (*os.File, error) {
-	if tun.tunFile == nil {
+func (tun *NativeTun) getTUN() (windows.Handle, error) {
+	if tun.tunFile == windows.InvalidHandle {
 		tun.tunLock.Lock()
 		defer tun.tunLock.Unlock()
-		if tun.tunFile != nil {
+		if tun.tunFile != windows.InvalidHandle {
 			return tun.tunFile, nil
 		}
-		tun.openTUN()
+		err := tun.openTUN()
+		if err != nil {
+			return windows.InvalidHandle, err
+		}
 	}
 	return tun.tunFile, nil
+}
+
+func (tun *NativeTun) isIOCancelled(err error) bool {
+	// Read&WriteFile() return the same ERROR_OPERATION_ABORTED if we close the handle
+	// or the TUN device is put down. We need a "close" flag to distinguish.
+	en, ok := err.(syscall.Errno)
+	if tun.close && ok && en == windows.ERROR_OPERATION_ABORTED {
+		return true
+	}
+	return false
 }
 
 func (tun *NativeTun) Name() (string, error) {
@@ -143,6 +182,7 @@ func (tun *NativeTun) Events() chan TUNEvent {
 }
 
 func (tun *NativeTun) Close() error {
+	tun.close = true
 	err1 := tun.closeTUN()
 
 	if tun.events != nil {
@@ -199,15 +239,21 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 		}
 
 		// Fill queue.
-		n, err := file.Read(tun.rdBuff.data[:])
+		var n uint32
+		overlapped := &windows.Overlapped{}
+		err = windows.ReadFile(file, tun.rdBuff.data[:], &n, overlapped)
 		if err != nil {
-			if pe, ok := err.(*os.PathError); ok && pe.Err == os.ErrClosed {
-				return 0, err
+			if en, ok := err.(syscall.Errno); ok && en == windows.ERROR_IO_PENDING {
+				err = getOverlappedResult(file, overlapped, &n, true)
 			}
-			// TUN interface stopped, failed, etc. Retry.
-			tun.rdBuff.avail = 0
-			tun.closeTUN()
-			continue
+			if err != nil {
+				tun.rdBuff.avail = 0
+				if tun.isIOCancelled(err) {
+					return 0, err
+				}
+				tun.closeTUN()
+				continue
+			}
 		}
 		tun.rdBuff.offset = 0
 		tun.rdBuff.avail = uint32(n)
@@ -224,13 +270,22 @@ func (tun *NativeTun) flush() error {
 	}
 
 	// Flush write buffer.
-	_, err = file.Write(tun.wrBuff.data[:tun.wrBuff.offset])
+	var n uint32
+	overlapped := &windows.Overlapped{}
+	err = windows.WriteFile(file, tun.wrBuff.data[:tun.wrBuff.offset], &n, overlapped)
 	tun.wrBuff.packetNum = 0
 	tun.wrBuff.offset = 0
 	if err != nil {
-		// TUN interface stopped, failed, etc. Drop.
-		tun.closeTUN()
-		return err
+		if en, ok := err.(syscall.Errno); ok && en == windows.ERROR_IO_PENDING {
+			err = getOverlappedResult(file, overlapped, &n, true)
+		}
+		if err != nil {
+			if tun.isIOCancelled(err) {
+				return err
+			}
+			tun.closeTUN()
+			return nil
+		}
 	}
 
 	return nil
