@@ -482,6 +482,33 @@ func (device *Device) RoutineHandshake() {
 	}
 }
 
+func (peer *Peer) elementStopOrFlush(shouldFlush *bool) (stop bool, elemOk bool, elem *QueueInboundElement) {
+	if !*shouldFlush {
+		select {
+		case <-peer.routines.stop:
+			stop = true
+			return
+		case elem, elemOk = <-peer.queue.inbound:
+			return
+		}
+	} else {
+		select {
+		case <-peer.routines.stop:
+			stop = true
+			return
+		case elem, elemOk = <-peer.queue.inbound:
+			return
+		default:
+			*shouldFlush = false
+			err := peer.device.tun.device.Flush()
+			if err != nil {
+				peer.device.log.Error.Printf("Unable to flush packets: %v", err)
+			}
+			return peer.elementStopOrFlush(shouldFlush)
+		}
+	}
+}
+
 func (peer *Peer) RoutineSequentialReceiver() {
 
 	device := peer.device
@@ -491,6 +518,9 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 	var elem *QueueInboundElement
 	var ok bool
+	var stop bool
+
+	shouldFlush := false
 
 	defer func() {
 		logDebug.Println(peer, "- Routine: sequential receiver - stopped")
@@ -516,126 +546,122 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			elem = nil
 		}
 
-		select {
-
-		case <-peer.routines.stop:
+		stop, ok, elem = peer.elementStopOrFlush(&shouldFlush)
+		if stop || !ok {
 			return
+		}
 
-		case elem, ok = <-peer.queue.inbound:
+		// wait for decryption
 
-			if !ok {
-				return
-			}
+		elem.Lock()
 
-			// wait for decryption
+		if elem.IsDropped() {
+			continue
+		}
 
-			elem.Lock()
+		// check for replay
 
-			if elem.IsDropped() {
-				continue
-			}
+		if !elem.keypair.replayFilter.ValidateCounter(elem.counter, RejectAfterMessages) {
+			continue
+		}
 
-			// check for replay
+		// update endpoint
+		peer.SetEndpointFromPacket(elem.endpoint)
 
-			if !elem.keypair.replayFilter.ValidateCounter(elem.counter, RejectAfterMessages) {
-				continue
-			}
-
-			// update endpoint
-			peer.SetEndpointFromPacket(elem.endpoint)
-
-			// check if using new keypair
-			if peer.ReceivedWithKeypair(elem.keypair) {
-				peer.timersHandshakeComplete()
-				select {
-				case peer.signals.newKeypairArrived <- struct{}{}:
-				default:
-				}
-			}
-
-			peer.keepKeyFreshReceiving()
-			peer.timersAnyAuthenticatedPacketTraversal()
-			peer.timersAnyAuthenticatedPacketReceived()
-
-			// check for keepalive
-
-			if len(elem.packet) == 0 {
-				logDebug.Println(peer, "- Receiving keepalive packet")
-				continue
-			}
-			peer.timersDataReceived()
-
-			// verify source and strip padding
-
-			switch elem.packet[0] >> 4 {
-			case ipv4.Version:
-
-				// strip padding
-
-				if len(elem.packet) < ipv4.HeaderLen {
-					continue
-				}
-
-				field := elem.packet[IPv4offsetTotalLength : IPv4offsetTotalLength+2]
-				length := binary.BigEndian.Uint16(field)
-				if int(length) > len(elem.packet) || int(length) < ipv4.HeaderLen {
-					continue
-				}
-
-				elem.packet = elem.packet[:length]
-
-				// verify IPv4 source
-
-				src := elem.packet[IPv4offsetSrc : IPv4offsetSrc+net.IPv4len]
-				if device.allowedips.LookupIPv4(src) != peer {
-					logInfo.Println(
-						"IPv4 packet with disallowed source address from",
-						peer,
-					)
-					continue
-				}
-
-			case ipv6.Version:
-
-				// strip padding
-
-				if len(elem.packet) < ipv6.HeaderLen {
-					continue
-				}
-
-				field := elem.packet[IPv6offsetPayloadLength : IPv6offsetPayloadLength+2]
-				length := binary.BigEndian.Uint16(field)
-				length += ipv6.HeaderLen
-				if int(length) > len(elem.packet) {
-					continue
-				}
-
-				elem.packet = elem.packet[:length]
-
-				// verify IPv6 source
-
-				src := elem.packet[IPv6offsetSrc : IPv6offsetSrc+net.IPv6len]
-				if device.allowedips.LookupIPv6(src) != peer {
-					logInfo.Println(
-						peer,
-						"sent packet with disallowed IPv6 source",
-					)
-					continue
-				}
-
+		// check if using new keypair
+		if peer.ReceivedWithKeypair(elem.keypair) {
+			peer.timersHandshakeComplete()
+			select {
+			case peer.signals.newKeypairArrived <- struct{}{}:
 			default:
-				logInfo.Println("Packet with invalid IP version from", peer)
+			}
+		}
+
+		peer.keepKeyFreshReceiving()
+		peer.timersAnyAuthenticatedPacketTraversal()
+		peer.timersAnyAuthenticatedPacketReceived()
+
+		// check for keepalive
+
+		if len(elem.packet) == 0 {
+			logDebug.Println(peer, "- Receiving keepalive packet")
+			continue
+		}
+		peer.timersDataReceived()
+
+		// verify source and strip padding
+
+		switch elem.packet[0] >> 4 {
+		case ipv4.Version:
+
+			// strip padding
+
+			if len(elem.packet) < ipv4.HeaderLen {
 				continue
 			}
 
-			// write to tun device
-
-			offset := MessageTransportOffsetContent
-			atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
-			_, err := device.tun.device.Write(elem.buffer[:offset+len(elem.packet)], offset)
-			if err != nil && !device.isClosed.Get() {
-				logError.Println("Failed to write packet to TUN device:", err)
+			field := elem.packet[IPv4offsetTotalLength : IPv4offsetTotalLength+2]
+			length := binary.BigEndian.Uint16(field)
+			if int(length) > len(elem.packet) || int(length) < ipv4.HeaderLen {
+				continue
 			}
+
+			elem.packet = elem.packet[:length]
+
+			// verify IPv4 source
+
+			src := elem.packet[IPv4offsetSrc : IPv4offsetSrc+net.IPv4len]
+			if device.allowedips.LookupIPv4(src) != peer {
+				logInfo.Println(
+					"IPv4 packet with disallowed source address from",
+					peer,
+				)
+				continue
+			}
+
+		case ipv6.Version:
+
+			// strip padding
+
+			if len(elem.packet) < ipv6.HeaderLen {
+				continue
+			}
+
+			field := elem.packet[IPv6offsetPayloadLength : IPv6offsetPayloadLength+2]
+			length := binary.BigEndian.Uint16(field)
+			length += ipv6.HeaderLen
+			if int(length) > len(elem.packet) {
+				continue
+			}
+
+			elem.packet = elem.packet[:length]
+
+			// verify IPv6 source
+
+			src := elem.packet[IPv6offsetSrc : IPv6offsetSrc+net.IPv6len]
+			if device.allowedips.LookupIPv6(src) != peer {
+				logInfo.Println(
+					peer,
+					"sent packet with disallowed IPv6 source",
+				)
+				continue
+			}
+
+		default:
+			logInfo.Println("Packet with invalid IP version from", peer)
+			continue
+		}
+
+		// write to tun device
+
+		offset := MessageTransportOffsetContent
+		atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
+		_, err := device.tun.device.Write(elem.buffer[:offset+len(elem.packet)], offset)
+		if err == nil {
+			shouldFlush = true
+		}
+		if err != nil && !device.isClosed.Get() {
+			logError.Println("Failed to write packet to TUN device:", err)
 		}
 	}
 }

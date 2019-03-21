@@ -318,6 +318,11 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 	return tun.tunFile.Write(buff)
 }
 
+func (tun *NativeTun) Flush() error {
+	//TODO: can flushing be implemented by buffering and using sendmmsg?
+	return nil
+}
+
 func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	select {
 	case err := <-tun.errors:

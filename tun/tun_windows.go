@@ -281,7 +281,11 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 
 // Note: flush() and putTunPacket() assume the caller comes only from a single thread; there's no locking.
 
-func (tun *NativeTun) flush() error {
+func (tun *NativeTun) Flush() error {
+	if tun.wrBuff.offset == 0 {
+		return nil
+	}
+
 	// Get TUN data pipe.
 	file, err := tun.getTUN()
 	if err != nil {
@@ -322,7 +326,7 @@ func (tun *NativeTun) putTunPacket(buff []byte) error {
 
 	if tun.wrBuff.packetNum >= packetExchangeMax || tun.wrBuff.offset+pSize >= packetExchangeSize {
 		// Exchange buffer is full -> flush first.
-		err := tun.flush()
+		err := tun.Flush()
 		if err != nil {
 			return err
 		}
@@ -345,9 +349,7 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-
-	// Flush write buffer.
-	return len(buff) - offset, tun.flush()
+	return len(buff) - offset, nil
 }
 
 //
