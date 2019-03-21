@@ -115,7 +115,7 @@ func (tun *NativeTun) openTUN() error {
 			return errors.New("Cancelled")
 		}
 
-		file, err := windows.CreateFile(tun.tunName, windows.GENERIC_READ|windows.GENERIC_WRITE, 0, nil, windows.OPEN_EXISTING, windows.FILE_ATTRIBUTE_NORMAL|windows.FILE_FLAG_OVERLAPPED|0x20000000 /*windows.FILE_FLAG_NO_BUFFERING*/, 0)
+		file, err := windows.CreateFile(tun.tunName, windows.GENERIC_READ|windows.GENERIC_WRITE, 0, nil, windows.OPEN_EXISTING, windows.FILE_ATTRIBUTE_NORMAL|windows.FILE_FLAG_OVERLAPPED|windows.FILE_FLAG_NO_BUFFERING, 0)
 		if err != nil {
 			if retries > 0 {
 				time.Sleep(time.Second / retryRate)
