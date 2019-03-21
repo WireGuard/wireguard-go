@@ -30,11 +30,6 @@ func (s IPCError) ErrorCode() int64 {
 }
 
 func (device *Device) IpcGetOperation(socket *bufio.Writer) *IPCError {
-
-	device.log.Debug.Println("UAPI: Processing get operation")
-
-	// create lines
-
 	lines := make([]string, 0, 100)
 	send := func(line string) {
 		lines = append(lines, line)
@@ -403,11 +398,9 @@ func (device *Device) IpcHandle(socket net.Conn) {
 
 	switch op {
 	case "set=1\n":
-		device.log.Debug.Println("UAPI: Set operation")
 		status = device.IpcSetOperation(buffered.Reader)
 
 	case "get=1\n":
-		device.log.Debug.Println("UAPI: Get operation")
 		status = device.IpcGetOperation(buffered.Writer)
 
 	default:
