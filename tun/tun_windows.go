@@ -46,6 +46,8 @@ type NativeTun struct {
 	close     bool
 	rdBuff    *exchgBufRead
 	wrBuff    *exchgBufWrite
+	rdEvent   windows.Handle
+	wrEvent   windows.Handle
 	events    chan TUNEvent
 	errors    chan error
 	forcedMtu int
@@ -96,12 +98,26 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 		return nil, err
 	}
 
+	rde, err := windows.CreateEvent(nil, 1 /*TRUE*/, 0 /*FALSE*/, nil)
+	if err != nil {
+		wt.DeleteInterface(0)
+		return nil, err
+	}
+	wre, err := windows.CreateEvent(nil, 1 /*TRUE*/, 0 /*FALSE*/, nil)
+	if err != nil {
+		windows.CloseHandle(rde)
+		wt.DeleteInterface(0)
+		return nil, err
+	}
+
 	return &NativeTun{
 		wt:        wt,
 		tunName:   tunNameUTF16,
 		tunFile:   windows.InvalidHandle,
 		rdBuff:    &exchgBufRead{},
 		wrBuff:    &exchgBufWrite{},
+		rdEvent:   rde,
+		wrEvent:   wre,
 		events:    make(chan TUNEvent, 10),
 		errors:    make(chan error, 1),
 		forcedMtu: 1500,
@@ -194,6 +210,9 @@ func (tun *NativeTun) Close() error {
 		err1 = err2
 	}
 
+	windows.CloseHandle(tun.rdEvent)
+	windows.CloseHandle(tun.wrEvent)
+
 	return err1
 }
 
@@ -240,7 +259,7 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 
 		// Fill queue.
 		var n uint32
-		overlapped := &windows.Overlapped{}
+		overlapped := &windows.Overlapped{HEvent: tun.rdEvent}
 		err = windows.ReadFile(file, tun.rdBuff.data[:], &n, overlapped)
 		if err != nil {
 			if en, ok := err.(syscall.Errno); ok && en == windows.ERROR_IO_PENDING {
@@ -271,7 +290,7 @@ func (tun *NativeTun) flush() error {
 
 	// Flush write buffer.
 	var n uint32
-	overlapped := &windows.Overlapped{}
+	overlapped := &windows.Overlapped{HEvent: tun.wrEvent}
 	err = windows.WriteFile(file, tun.wrBuff.data[:tun.wrBuff.offset], &n, overlapped)
 	tun.wrBuff.packetNum = 0
 	tun.wrBuff.offset = 0
