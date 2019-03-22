@@ -291,11 +291,6 @@ func TestSetupDiOpenDevRegKey(t *testing.T) {
 			t.Errorf("Error calling SetupDiOpenDevRegKey: %s", err.Error())
 		}
 		defer key.Close()
-
-		_, err = devInfoList.GetInterfaceID(data)
-		if err != nil {
-			t.Errorf("Error calling GetInterfaceID: %s", err.Error())
-		}
 	}
 }
 

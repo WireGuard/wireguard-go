@@ -348,5 +348,5 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 // GUID returns Windows adapter instance ID.
 //
 func (tun *NativeTun) GUID() windows.GUID {
-	return *(*windows.GUID)(tun.wt)
+	return tun.wt.CfgInstanceID
 }

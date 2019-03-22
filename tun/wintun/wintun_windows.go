@@ -22,7 +22,11 @@ import (
 //
 // Wintun is a handle of a Wintun adapter
 //
-type Wintun windows.GUID
+type Wintun struct {
+	CfgInstanceID windows.GUID
+	LUIDIndex     uint32
+	IfType        uint32
+}
 
 var deviceClassNetGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0x11ce, Data4: [8]byte{0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}}
 
@@ -31,7 +35,52 @@ const enumerator = ""
 const machineName = ""
 
 //
-// GetInterface finds interface ID by name.
+// MakeWintun creates interface handle and populates it from device registry key
+//
+func MakeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) (*Wintun, error) {
+	// Open HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\<class>\<id> registry key.
+	key, err := deviceInfoSet.OpenDevRegKey(deviceInfoData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.READ)
+	if err != nil {
+		return nil, errors.New("Device-specific registry key open failed: " + err.Error())
+	}
+	defer key.Close()
+
+	// Read the NetCfgInstanceId value.
+	valueStr, valueType, err := key.GetStringValue("NetCfgInstanceId")
+	if err != nil {
+		return nil, errors.New("RegQueryStringValue(\"NetCfgInstanceId\") failed: " + err.Error())
+	}
+	if valueType != registry.SZ {
+		return nil, fmt.Errorf("NetCfgInstanceId registry value is not REG_SZ (expected: %v, provided: %v)", registry.SZ, valueType)
+	}
+
+	// Convert to windows.GUID.
+	ifid, err := guid.FromString(valueStr)
+	if err != nil {
+		return nil, fmt.Errorf("NetCfgInstanceId registry value is not a GUID (expected: \"{...}\", provided: %q)", valueStr)
+	}
+
+	// Read the NetLuidIndex value.
+	luidIdx, valueType, err := key.GetIntegerValue("NetLuidIndex")
+	if err != nil {
+		return nil, errors.New("RegQueryValue(\"NetLuidIndex\") failed: " + err.Error())
+	}
+
+	// Read the NetLuidIndex value.
+	ifType, valueType, err := key.GetIntegerValue("*IfType")
+	if err != nil {
+		return nil, errors.New("RegQueryValue(\"*IfType\") failed: " + err.Error())
+	}
+
+	return &Wintun{
+		CfgInstanceID: *ifid,
+		LUIDIndex:     uint32(luidIdx),
+		IfType:        uint32(ifType),
+	}, nil
+}
+
+//
+// GetInterface finds interface by name.
 //
 // hwndParent is a handle to the top-level window to use for any user
 // interface that is related to non-device-specific actions (such as a select-
@@ -39,9 +88,8 @@ const machineName = ""
 // optional and can be 0. If a specific top-level window is not required, set
 // hwndParent to 0.
 //
-// Function returns interface ID when the interface was found, or nil
-// otherwise. If the interface is found but not Wintun-class, the function
-// returns interface ID with an error.
+// Function returns interface if found, or nil otherwise. If the interface is
+// found but not Wintun-class, the function returns interface and an error.
 //
 func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 	// Create a list of network devices.
@@ -70,13 +118,13 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 		}
 
 		// Get interface ID.
-		ifid, err := devInfoList.GetInterfaceID(deviceData)
+		wintun, err := MakeWintun(devInfoList, deviceData)
 		if err != nil {
 			continue
 		}
 
 		// Get interface name.
-		ifname2, err := ((*Wintun)(ifid)).GetInterfaceName()
+		ifname2, err := wintun.GetInterfaceName()
 		if err != nil {
 			continue
 		}
@@ -110,12 +158,12 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 
 				if driverDetailData.IsCompatible(hardwareID) {
 					// Matching hardware ID found.
-					return (*Wintun)(ifid), nil
+					return wintun, nil
 				}
 			}
 
 			// This interface is not using Wintun driver.
-			return (*Wintun)(ifid), errors.New("Foreign network interface with the same name exists")
+			return wintun, errors.New("Foreign network interface with the same name exists")
 		}
 	}
 
@@ -273,7 +321,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 				return nil, fmt.Errorf("NetCfgInstanceId registry value is not a GUID (expected: \"{...}\", provided: %q)", value)
 			}
 
-			wintun := (*Wintun)(ifid)
+			wintun := &Wintun{CfgInstanceID: *ifid}
 			keyNetName := wintun.GetNetRegKeyName()
 			keyNet, err := registry.OpenKey(registry.LOCAL_MACHINE, keyNetName, registry.QUERY_VALUE)
 			if err != nil {
@@ -355,8 +403,6 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 // reboot is required.
 //
 func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
-	ifid := (*windows.GUID)(wintun)
-
 	// Create a list of network devices.
 	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, enumerator, hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), machineName)
 	if err != nil {
@@ -376,12 +422,12 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 		}
 
 		// Get interface ID.
-		ifid2, err := devInfoList.GetInterfaceID(deviceData)
+		wintun2, err := MakeWintun(devInfoList, deviceData)
 		if err != nil {
 			continue
 		}
 
-		if *ifid == *ifid2 {
+		if wintun.CfgInstanceID == wintun2.CfgInstanceID {
 			// Remove the device.
 			removeDeviceParams := setupapi.RemoveDeviceParams{
 				ClassInstallHeader: *setupapi.MakeClassInstallHeader(setupapi.DIF_REMOVE),
@@ -469,8 +515,7 @@ func (wintun *Wintun) SetInterfaceName(ifname string) error {
 // GetNetRegKeyName returns interface-specific network registry key name.
 //
 func (wintun *Wintun) GetNetRegKeyName() string {
-	ifid := (*windows.GUID)(wintun)
-	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Network\\%v\\%v\\Connection", guid.ToString(&deviceClassNetGUID), guid.ToString(ifid))
+	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Network\\%v\\%v\\Connection", guid.ToString(&deviceClassNetGUID), guid.ToString(&wintun.CfgInstanceID))
 }
 
 //
@@ -505,5 +550,5 @@ func getRegStringValue(key registry.Key, name string) (string, error) {
 // DataFileName returns Wintun device data pipe name.
 //
 func (wintun *Wintun) DataFileName() string {
-	return fmt.Sprintf("\\\\.\\Global\\WINTUN_DEVICE_%s", guid.ToString((*windows.GUID)(wintun)))
+	return fmt.Sprintf("\\\\.\\Global\\WINTUN%d", wintun.LUIDIndex)
 }
