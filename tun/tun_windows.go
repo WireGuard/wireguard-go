@@ -284,24 +284,26 @@ func (tun *NativeTun) Flush() error {
 		return nil
 	}
 
-	// Get TUN data pipe.
-	_, file, err := tun.getTUN()
-	if err != nil {
-		return err
-	}
-
-	// Flush write buffer.
-	_, err = file.Write(tun.wrBuff.data[:tun.wrBuff.offset])
-	tun.wrBuff.packetNum = 0
-	tun.wrBuff.offset = 0
-	if err != nil {
-		if tun.shouldReopenHandle(err) {
-			tun.closeTUN()
-			return nil
+	for {
+		// Get TUN data pipe.
+		_, file, err := tun.getTUN()
+		if err != nil {
+			return err
 		}
-		return err
+
+		// Flush write buffer.
+		_, err = file.Write(tun.wrBuff.data[:tun.wrBuff.offset])
+		tun.wrBuff.packetNum = 0
+		tun.wrBuff.offset = 0
+		if err != nil {
+			if tun.shouldReopenHandle(err) {
+				tun.closeTUN()
+				continue
+			}
+			return err
+		}
+		return nil
 	}
-	return nil
 }
 
 func (tun *NativeTun) putTunPacket(buff []byte) error {
