@@ -45,13 +45,24 @@ func MakeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 	}
 	defer key.Close()
 
-	// Read the NetCfgInstanceId value.
-	valueStr, valueType, err := key.GetStringValue("NetCfgInstanceId")
+	var valueStr string
+	var valueType uint32
+
+	//TODO: Figure out a way to not need to loop like this.
+	for i := 0; i < 30; i++ {
+		// Read the NetCfgInstanceId value.
+		valueStr, valueType, err = key.GetStringValue("NetCfgInstanceId")
+		if err != nil {
+			time.Sleep(time.Millisecond * 100)
+			continue
+		}
+		if valueType != registry.SZ {
+			return nil, fmt.Errorf("NetCfgInstanceId registry value is not REG_SZ (expected: %v, provided: %v)", registry.SZ, valueType)
+		}
+		break
+	}
 	if err != nil {
 		return nil, errors.New("RegQueryStringValue(\"NetCfgInstanceId\") failed: " + err.Error())
-	}
-	if valueType != registry.SZ {
-		return nil, fmt.Errorf("NetCfgInstanceId registry value is not REG_SZ (expected: %v, provided: %v)", registry.SZ, valueType)
 	}
 
 	// Convert to windows.GUID.
