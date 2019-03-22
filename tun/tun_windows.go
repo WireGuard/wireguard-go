@@ -22,7 +22,7 @@ const (
 	packetSizeMax           uint32 = 0xf000 - packetExchangeAlignment // Maximum packet size
 	packetExchangeSize      uint32 = 0x100000                         // Exchange buffer size (defaults to 1MiB)
 	retryRate                      = 4                                // Number of retries per second to reopen device pipe
-	retryTimeout                   = 5                                // Number of seconds to tolerate adapter unavailable
+	retryTimeout                   = 30                               // Number of seconds to tolerate adapter unavailable
 )
 
 type exchgBufRead struct {
