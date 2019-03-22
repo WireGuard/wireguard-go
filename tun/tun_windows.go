@@ -187,7 +187,7 @@ func (tun *NativeTun) getTUN() (read *os.File, write *os.File, err error) {
 }
 
 func (tun *NativeTun) shouldReopenHandle(err error) bool {
-	if pe, ok := err.(*os.PathError); ok && pe.Err == os.ErrClosed {
+	if pe, ok := err.(*os.PathError); ok && pe.Err == windows.ERROR_OPERATION_ABORTED {
 		return !tun.close
 	}
 	return false
