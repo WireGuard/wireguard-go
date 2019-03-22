@@ -75,11 +75,18 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 		return nil, err
 	}
 
-	err = wt.SetInterfaceName(ifname)
-	if err != nil {
-		wt.DeleteInterface(0)
-		return nil, errors.New("Setting interface name failed: " + err.Error())
-	}
+	go func() {
+		retries := retryTimeout * retryRate
+		for {
+			err := wt.SetInterfaceName(ifname)
+			if err != nil && retries > 0 {
+				time.Sleep(time.Second / retryRate)
+				retries--
+				continue
+			}
+			return
+		}
+	}()
 
 	err = wt.FlushInterface()
 	if err != nil {

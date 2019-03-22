@@ -297,62 +297,8 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 		// Get network interface. DIF_INSTALLDEVICE returns almost immediately, while the device
 		// installation continues in the background. It might take a while, before all registry
 		// keys and values are populated.
-		getInterface := func() (*Wintun, error) {
-			// Open HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\<class>\<id> registry key.
-			keyDev, err := devInfoList.OpenDevRegKey(deviceData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.READ)
-			if err != nil {
-				return nil, errors.New("Device-specific registry key open failed: " + err.Error())
-			}
-			defer keyDev.Close()
-
-			// Read the NetCfgInstanceId value.
-			value, err := getRegStringValue(keyDev, "NetCfgInstanceId")
-			if err != nil {
-				if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_FILE_NOT_FOUND {
-					return nil, err
-				}
-
-				return nil, errors.New("RegQueryStringValue(\"NetCfgInstanceId\") failed: " + err.Error())
-			}
-
-			// Convert to windows.GUID.
-			ifid, err := guid.FromString(value)
-			if err != nil {
-				return nil, fmt.Errorf("NetCfgInstanceId registry value is not a GUID (expected: \"{...}\", provided: %q)", value)
-			}
-
-			wintun := &Wintun{CfgInstanceID: *ifid}
-			keyNetName := wintun.GetNetRegKeyName()
-			keyNet, err := registry.OpenKey(registry.LOCAL_MACHINE, keyNetName, registry.QUERY_VALUE)
-			if err != nil {
-				if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_FILE_NOT_FOUND {
-					return nil, err
-				}
-
-				return nil, errors.New(fmt.Sprintf("RegOpenKeyEx(%q) failed: ", keyNetName) + err.Error())
-			}
-			defer keyNet.Close()
-
-			// Query the interface name.
-			_, valueType, err := keyNet.GetValue("Name", nil)
-			if err != nil {
-				if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_FILE_NOT_FOUND {
-					return nil, err
-				}
-
-				return nil, errors.New("RegQueryValueEx(\"Name\") failed: " + err.Error())
-			}
-			switch valueType {
-			case registry.SZ, registry.EXPAND_SZ:
-			default:
-				return nil, fmt.Errorf("Interface name registry value is not REG_SZ or REG_EXPAND_SZ (expected: %v or %v, provided: %v)", registry.SZ, registry.EXPAND_SZ, valueType)
-			}
-
-			// TUN interface is ready. (As much as we need it.)
-			return wintun, nil
-		}
 		for numAttempts := 0; numAttempts < 30; numAttempts++ {
-			wintun, err = getInterface()
+			wintun, err = MakeWintun(devInfoList, deviceData)
 			if err != nil {
 				if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_FILE_NOT_FOUND {
 					// Wait and retry. TODO: Wait for a cancellable event instead.
