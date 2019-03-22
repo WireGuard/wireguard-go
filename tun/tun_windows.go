@@ -214,18 +214,13 @@ func (tun *NativeTun) Events() chan TUNEvent {
 
 func (tun *NativeTun) Close() error {
 	tun.close = true
-	err1 := tun.closeTUN()
-
 	if tun.events != nil {
 		close(tun.events)
 	}
-
-	_, _, err2 := tun.wt.DeleteInterface(0)
-	if err1 == nil {
-		err1 = err2
-	}
-
-	return err1
+	/* We delete it first, before closing, so that the close operations don't hang with the concurrent read operation. */
+	_, _, err := tun.wt.DeleteInterface(0)
+	tun.closeTUN()
+	return err
 }
 
 func (tun *NativeTun) MTU() (int, error) {
