@@ -146,6 +146,7 @@ func (tun *NativeTun) closeTUN() (err error) {
 		}
 		t := tun.tunFileRead
 		tun.tunFileRead = nil
+		windows.CancelIoEx(windows.Handle(t.Fd()), nil)
 		err = t.Close()
 		tun.tunLock.Unlock()
 		break
@@ -158,6 +159,7 @@ func (tun *NativeTun) closeTUN() (err error) {
 		}
 		t := tun.tunFileWrite
 		tun.tunFileWrite = nil
+		windows.CancelIoEx(windows.Handle(t.Fd()), nil)
 		err2 := t.Close()
 		tun.tunLock.Unlock()
 		if err == nil {
@@ -214,13 +216,18 @@ func (tun *NativeTun) Events() chan TUNEvent {
 
 func (tun *NativeTun) Close() error {
 	tun.close = true
+	err1 := tun.closeTUN()
+
 	if tun.events != nil {
 		close(tun.events)
 	}
-	/* We delete it first, before closing, so that the close operations don't hang with the concurrent read operation. */
-	_, _, err := tun.wt.DeleteInterface(0)
-	tun.closeTUN()
-	return err
+
+	_, _, err2 := tun.wt.DeleteInterface(0)
+	if err1 == nil {
+		err1 = err2
+	}
+
+	return err1
 }
 
 func (tun *NativeTun) MTU() (int, error) {
