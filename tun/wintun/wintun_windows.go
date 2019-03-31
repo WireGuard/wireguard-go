@@ -48,21 +48,13 @@ func MakeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 	var valueStr string
 	var valueType uint32
 
-	//TODO: Figure out a way to not need to loop like this.
-	for i := 0; i < 30; i++ {
-		// Read the NetCfgInstanceId value.
-		valueStr, valueType, err = key.GetStringValue("NetCfgInstanceId")
-		if err != nil {
-			time.Sleep(time.Millisecond * 100)
-			continue
-		}
-		if valueType != registry.SZ {
-			return nil, fmt.Errorf("NetCfgInstanceId registry value is not REG_SZ (expected: %v, provided: %v)", registry.SZ, valueType)
-		}
-		break
-	}
+	// Read the NetCfgInstanceId value.
+	valueStr, valueType, err = keyGetStringValueRetry(key, "NetCfgInstanceId")
 	if err != nil {
 		return nil, errors.New("RegQueryStringValue(\"NetCfgInstanceId\") failed: " + err.Error())
+	}
+	if valueType != registry.SZ {
+		return nil, fmt.Errorf("NetCfgInstanceId registry value is not REG_SZ (expected: %v, provided: %v)", registry.SZ, valueType)
 	}
 
 	// Convert to windows.GUID.
@@ -117,7 +109,6 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 	// "foobar" would cause conflict with "FooBar".
 	ifname = strings.ToLower(ifname)
 
-	// Iterate.
 	for index := 0; ; index++ {
 		// Get the device from the list. Should anything be wrong with this device, continue with next.
 		deviceData, err := devInfoList.EnumDeviceInfo(index)
@@ -174,7 +165,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 			}
 
 			// This interface is not using Wintun driver.
-			return wintun, errors.New("Foreign network interface with the same name exists")
+			return nil, errors.New("Foreign network interface with the same name exists")
 		}
 	}
 
@@ -444,7 +435,7 @@ func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInf
 // GetInterfaceName returns network interface name.
 //
 func (wintun *Wintun) GetInterfaceName() (string, error) {
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.QUERY_VALUE)
+	key, err := registryOpenKeyRetry(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.QUERY_VALUE)
 	if err != nil {
 		return "", errors.New("Network-specific registry key open failed: " + err.Error())
 	}
@@ -458,7 +449,7 @@ func (wintun *Wintun) GetInterfaceName() (string, error) {
 // SetInterfaceName sets network interface name.
 //
 func (wintun *Wintun) SetInterfaceName(ifname string) error {
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.SET_VALUE)
+	key, err := registryOpenKeyRetry(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.SET_VALUE)
 	if err != nil {
 		return errors.New("Network-specific registry key open failed: " + err.Error())
 	}
@@ -483,7 +474,7 @@ func (wintun *Wintun) GetNetRegKeyName() string {
 //
 func getRegStringValue(key registry.Key, name string) (string, error) {
 	// Read string value.
-	value, valueType, err := key.GetStringValue(name)
+	value, valueType, err := keyGetStringValueRetry(key, name)
 	if err != nil {
 		return "", err
 	}
