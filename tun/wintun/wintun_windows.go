@@ -8,6 +8,7 @@ package wintun
 import (
 	"errors"
 	"fmt"
+	"golang.zx2c4.com/wireguard/tun/wintun/netshell"
 	"strings"
 	"syscall"
 	"time"
@@ -449,13 +450,20 @@ func (wintun *Wintun) GetInterfaceName() (string, error) {
 // SetInterfaceName sets network interface name.
 //
 func (wintun *Wintun) SetInterfaceName(ifname string) error {
+	// We open the registry key before calling HrRename, because the registry open will wait until the key exists.
 	key, err := registryOpenKeyRetry(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.SET_VALUE)
 	if err != nil {
 		return errors.New("Network-specific registry key open failed: " + err.Error())
 	}
 	defer key.Close()
 
-	// Set the interface name.
+	// We have to tell the various runtime COM services about the new name too. We ignore the
+	// error because netshell isn't available on servercore.
+	// TODO: netsh.exe falls back to NciSetConnection in this case. If somebody complains, maybe
+	// we should do the same.
+	_ = netshell.HrRenameConnection(&wintun.CfgInstanceID, windows.StringToUTF16Ptr(ifname))
+
+	// Set the interface name. The above line should have done this too, but in case it failed, we force it.
 	return key.SetStringValue("Name", ifname)
 }
 
