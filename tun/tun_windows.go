@@ -188,13 +188,6 @@ func (tun *NativeTun) getTUN() (read *os.File, write *os.File, err error) {
 	return
 }
 
-func (tun *NativeTun) shouldReopenHandle(err error) bool {
-	if pe, ok := err.(*os.PathError); ok && pe.Err == windows.ERROR_OPERATION_ABORTED {
-		return !tun.close
-	}
-	return false
-}
-
 func (tun *NativeTun) Name() (string, error) {
 	return tun.wt.GetInterfaceName()
 }
@@ -267,12 +260,13 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 		// Fill queue.
 		n, err := file.Read(tun.rdBuff.data[:])
 		if err != nil {
+			tun.rdBuff.offset = 0
 			tun.rdBuff.avail = 0
-			if tun.shouldReopenHandle(err) {
-				tun.closeTUN()
-				continue
+			if tun.close {
+				return 0, err
 			}
-			return 0, err
+			tun.closeTUN()
+			continue
 		}
 		tun.rdBuff.offset = 0
 		tun.rdBuff.avail = uint32(n)
@@ -298,11 +292,11 @@ func (tun *NativeTun) Flush() error {
 		tun.wrBuff.packetNum = 0
 		tun.wrBuff.offset = 0
 		if err != nil {
-			if tun.shouldReopenHandle(err) {
-				tun.closeTUN()
-				continue
+			if tun.close {
+				return err
 			}
-			return err
+			tun.closeTUN()
+			continue
 		}
 		return nil
 	}
