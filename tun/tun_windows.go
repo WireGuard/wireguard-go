@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"sync"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -119,7 +120,7 @@ func (tun *NativeTun) openTUN() error {
 	for tun.tunFileWrite == nil {
 		tun.tunFileWrite, err = os.OpenFile(name, os.O_WRONLY, 0)
 		if err != nil {
-			if retries > 0 {
+			if retries > 0 && !tun.close {
 				time.Sleep(time.Second / retryRate)
 				retries--
 				continue
@@ -258,18 +259,31 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 		}
 
 		// Fill queue.
-		n, err := file.Read(tun.rdBuff.data[:])
-		if err != nil {
-			tun.rdBuff.offset = 0
-			tun.rdBuff.avail = 0
-			if tun.close {
+		retries := retryTimeout * retryRate
+		for {
+			n, err := file.Read(tun.rdBuff.data[:])
+			if err != nil {
+				tun.rdBuff.offset = 0
+				tun.rdBuff.avail = 0
+				pe, ok := err.(*os.PathError)
+				if tun.close {
+					return 0, os.ErrClosed
+				}
+				if retries > 0 && ok && pe.Err == windows.ERROR_OPERATION_ABORTED {
+					time.Sleep(time.Second / retryRate)
+					retries--
+					continue
+				}
+				if ok && pe.Err == syscall.Errno(6) /*windows.ERROR_INVALID_HANDLE*/ {
+					tun.closeTUN()
+					break
+				}
 				return 0, err
 			}
-			tun.closeTUN()
-			continue
+			tun.rdBuff.offset = 0
+			tun.rdBuff.avail = uint32(n)
+			break
 		}
-		tun.rdBuff.offset = 0
-		tun.rdBuff.avail = uint32(n)
 	}
 }
 
@@ -288,17 +302,29 @@ func (tun *NativeTun) Flush() error {
 		}
 
 		// Flush write buffer.
-		_, err = file.Write(tun.wrBuff.data[:tun.wrBuff.offset])
-		tun.wrBuff.packetNum = 0
-		tun.wrBuff.offset = 0
-		if err != nil {
-			if tun.close {
+		retries := retryTimeout * retryRate
+		for {
+			_, err = file.Write(tun.wrBuff.data[:tun.wrBuff.offset])
+			tun.wrBuff.packetNum = 0
+			tun.wrBuff.offset = 0
+			if err != nil {
+				pe, ok := err.(*os.PathError)
+				if tun.close {
+					return os.ErrClosed
+				}
+				if retries > 0 && ok && pe.Err == windows.ERROR_OPERATION_ABORTED {
+					time.Sleep(time.Second / retryRate)
+					retries--
+					continue
+				}
+				if ok && pe.Err == syscall.Errno(6) /*windows.ERROR_INVALID_HANDLE*/ {
+					tun.closeTUN()
+					break
+				}
 				return err
 			}
-			tun.closeTUN()
-			continue
+			return nil
 		}
-		return nil
 	}
 }
 
