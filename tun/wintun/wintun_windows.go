@@ -131,6 +131,15 @@ func (pool Pool) GetInterface(ifname string) (*Interface, error) {
 			continue
 		}
 
+		// Check the Hardware ID to make sure it's a real Wintun device first. This avoids doing slow operations on non-Wintun devices.
+		property, err := devInfoList.DeviceRegistryProperty(deviceData, setupapi.SPDRP_HARDWAREID)
+		if err != nil {
+			continue
+		}
+		if hwids, ok := property.([]string); ok && len(hwids) > 0 && hwids[0] != hardwareID {
+			continue
+		}
+
 		wintun, err := makeWintun(devInfoList, deviceData, pool)
 		if err != nil {
 			continue
@@ -491,6 +500,15 @@ func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Interface) bool) 
 			if err == windows.ERROR_NO_MORE_ITEMS {
 				break
 			}
+			continue
+		}
+
+		// Check the Hardware ID to make sure it's a real Wintun device first. This avoids doing slow operations on non-Wintun devices.
+		property, err := devInfoList.DeviceRegistryProperty(deviceData, setupapi.SPDRP_HARDWAREID)
+		if err != nil {
+			continue
+		}
+		if hwids, ok := property.([]string); ok && len(hwids) > 0 && hwids[0] != hardwareID {
 			continue
 		}
 
