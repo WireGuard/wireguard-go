@@ -259,7 +259,7 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 		}
 
 		// Fill queue.
-		retries := retryTimeout * retryRate
+		retries := 1000
 		for {
 			n, err := file.Read(tun.rdBuff.data[:])
 			if err != nil {
@@ -270,7 +270,6 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 					return 0, os.ErrClosed
 				}
 				if retries > 0 && ok && pe.Err == windows.ERROR_OPERATION_ABORTED {
-					time.Sleep(time.Second / retryRate)
 					retries--
 					continue
 				}
