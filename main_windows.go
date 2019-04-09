@@ -31,7 +31,7 @@ func main() {
 		device.LogLevelDebug,
 		fmt.Sprintf("(%s) ", interfaceName),
 	)
-	logger.Info.Println("Starting wireguard-go version", WireGuardGoVersion)
+	logger.Info.Println("Starting wireguard-go version", device.WireGuardGoVersion)
 	logger.Debug.Println("Debug log enabled")
 
 	tun, err := tun.CreateTUN(interfaceName)
