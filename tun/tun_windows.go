@@ -301,7 +301,7 @@ func (tun *NativeTun) Flush() error {
 		}
 
 		// Flush write buffer.
-		retries := retryTimeout * retryRate
+		retries := 1000
 		for {
 			_, err = file.Write(tun.wrBuff.data[:tun.wrBuff.offset])
 			tun.wrBuff.packetNum = 0
@@ -312,7 +312,6 @@ func (tun *NativeTun) Flush() error {
 					return os.ErrClosed
 				}
 				if retries > 0 && ok && pe.Err == windows.ERROR_OPERATION_ABORTED {
-					time.Sleep(time.Second / retryRate)
 					retries--
 					continue
 				}
