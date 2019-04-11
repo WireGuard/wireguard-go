@@ -9,7 +9,6 @@ import (
 	"errors"
 	"os"
 	"sync"
-	"syscall"
 	"time"
 	"unsafe"
 
@@ -273,7 +272,7 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 					retries--
 					continue
 				}
-				if ok && pe.Err == syscall.Errno(6) /*windows.ERROR_INVALID_HANDLE*/ {
+				if ok && pe.Err == windows.ERROR_HANDLE_EOF {
 					tun.closeTUN()
 					break
 				}
@@ -315,7 +314,7 @@ func (tun *NativeTun) Flush() error {
 					retries--
 					continue
 				}
-				if ok && pe.Err == syscall.Errno(6) /*windows.ERROR_INVALID_HANDLE*/ {
+				if ok && pe.Err == windows.ERROR_HANDLE_EOF {
 					tun.closeTUN()
 					break
 				}
