@@ -131,7 +131,7 @@ func TestSetupDiEnumDeviceInfo(t *testing.T) {
 	for i := 0; true; i++ {
 		data, err := devInfoList.EnumDeviceInfo(i)
 		if err != nil {
-			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+			if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
 				break
 			}
 			continue
@@ -153,7 +153,7 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 	for i := 0; true; i++ {
 		deviceData, err := devInfoList.EnumDeviceInfo(i)
 		if err != nil {
-			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+			if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
 				break
 			}
 			continue
@@ -170,7 +170,7 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 		for j := 0; true; j++ {
 			driverData, err := devInfoList.EnumDriverInfo(deviceData, driverType, j)
 			if err != nil {
-				if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+				if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
 					break
 				}
 				continue
@@ -264,7 +264,7 @@ func TestSetupDiGetClassDevsEx(t *testing.T) {
 		devInfoList.Close()
 		t.Errorf("SetupDiGetClassDevsEx(nil, ...) should fail")
 	} else {
-		if errWin, ok := err.(syscall.Errno); !ok || errWin != 87 /*ERROR_INVALID_PARAMETER*/ {
+		if errWin, ok := err.(syscall.Errno); !ok || errWin != windows.ERROR_INVALID_PARAMETER {
 			t.Errorf("SetupDiGetClassDevsEx(nil, ...) should fail with ERROR_INVALID_PARAMETER")
 		}
 	}
@@ -280,7 +280,7 @@ func TestSetupDiOpenDevRegKey(t *testing.T) {
 	for i := 0; true; i++ {
 		data, err := devInfoList.EnumDeviceInfo(i)
 		if err != nil {
-			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+			if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
 				break
 			}
 			continue
@@ -304,7 +304,7 @@ func TestSetupDiGetDeviceRegistryProperty(t *testing.T) {
 	for i := 0; true; i++ {
 		data, err := devInfoList.EnumDeviceInfo(i)
 		if err != nil {
-			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+			if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
 				break
 			}
 			continue
@@ -334,7 +334,7 @@ func TestSetupDiGetDeviceRegistryProperty(t *testing.T) {
 		val, err = devInfoList.GetDeviceRegistryProperty(data, SPDRP_COMPATIBLEIDS)
 		if err != nil {
 			// Some devices have no SPDRP_COMPATIBLEIDS.
-			if errWin, ok := err.(syscall.Errno); !ok || errWin != 13 /*windows.ERROR_INVALID_DATA*/ {
+			if errWin, ok := err.(syscall.Errno); !ok || errWin != windows.ERROR_INVALID_DATA {
 				t.Errorf("Error calling SetupDiGetDeviceRegistryProperty(SPDRP_COMPATIBLEIDS): %s", err.Error())
 			}
 		}
@@ -361,7 +361,7 @@ func TestSetupDiGetDeviceInstallParams(t *testing.T) {
 	for i := 0; true; i++ {
 		data, err := devInfoList.EnumDeviceInfo(i)
 		if err != nil {
-			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+			if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
 				break
 			}
 			continue
@@ -399,7 +399,7 @@ func TestSetupDiClassNameFromGuidEx(t *testing.T) {
 	if err == nil {
 		t.Errorf("SetupDiClassNameFromGuidEx(nil) should fail")
 	} else {
-		if errWin, ok := err.(syscall.Errno); !ok || errWin != 1784 /*ERROR_INVALID_USER_BUFFER*/ {
+		if errWin, ok := err.(syscall.Errno); !ok || errWin != windows.ERROR_INVALID_USER_BUFFER {
 			t.Errorf("SetupDiClassNameFromGuidEx(nil) should fail with ERROR_INVALID_USER_BUFFER")
 		}
 	}
@@ -440,7 +440,7 @@ func TestSetupDiGetSelectedDevice(t *testing.T) {
 	for i := 0; true; i++ {
 		data, err := devInfoList.EnumDeviceInfo(i)
 		if err != nil {
-			if errWin, ok := err.(syscall.Errno); ok && errWin == 259 /*ERROR_NO_MORE_ITEMS*/ {
+			if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
 				break
 			}
 			continue
@@ -463,7 +463,7 @@ func TestSetupDiGetSelectedDevice(t *testing.T) {
 	if err == nil {
 		t.Errorf("SetupDiSetSelectedDevice(nil) should fail")
 	} else {
-		if errWin, ok := err.(syscall.Errno); !ok || errWin != 87 /*ERROR_INVALID_PARAMETER*/ {
+		if errWin, ok := err.(syscall.Errno); !ok || errWin != windows.ERROR_INVALID_PARAMETER {
 			t.Errorf("SetupDiSetSelectedDevice(nil) should fail with ERROR_INVALID_USER_BUFFER")
 		}
 	}

@@ -14,7 +14,7 @@ import (
 
 func TestSetupDiDestroyDeviceInfoList(t *testing.T) {
 	err := SetupDiDestroyDeviceInfoList(DevInfo(windows.InvalidHandle))
-	if errWin, ok := err.(syscall.Errno); !ok || errWin != 6 /*ERROR_INVALID_HANDLE*/ {
+	if errWin, ok := err.(syscall.Errno); !ok || errWin != windows.ERROR_INVALID_HANDLE {
 		t.Errorf("SetupDiDestroyDeviceInfoList(nil, ...) should fail with ERROR_INVALID_HANDLE")
 	}
 }
