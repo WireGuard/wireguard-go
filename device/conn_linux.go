@@ -719,7 +719,7 @@ func (bind *nativeBind) routineRouteListener(device *Device) {
 							peer.endpoint.(*NativeEndpoint).src4().src,
 							unix.RtAttr{
 								Len:  8,
-								Type: 0x10, //unix.RTA_MARK  TODO: add this to x/sys/unix
+								Type: unix.RTA_MARK,
 							},
 							uint32(bind.lastMark),
 						}
