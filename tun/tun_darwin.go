@@ -47,7 +47,10 @@ func (tun *NativeTun) routineRouteListener(tunIfindex int) {
 		statusMTU int
 	)
 
-	defer close(tun.events)
+	defer func() {
+		close(tun.events)
+		tun.routeSocket = -1
+	}()
 
 	data := make([]byte, os.Getpagesize())
 	for {
@@ -292,7 +295,6 @@ func (tun *NativeTun) Close() error {
 	if tun.routeSocket != -1 {
 		unix.Shutdown(tun.routeSocket, unix.SHUT_RDWR)
 		err2 = unix.Close(tun.routeSocket)
-		tun.routeSocket = -1
 	} else if tun.events != nil {
 		close(tun.events)
 	}
