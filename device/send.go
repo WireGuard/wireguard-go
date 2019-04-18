@@ -601,6 +601,9 @@ func (peer *Peer) RoutineSequentialSender() {
 
 			length := uint64(len(elem.packet))
 			err := peer.SendBuffer(elem.packet)
+			if len(elem.packet) != MessageKeepaliveSize {
+				peer.timersDataSent()
+			}
 			device.PutMessageBuffer(elem.buffer)
 			device.PutOutboundElement(elem)
 			if err != nil {
@@ -609,9 +612,6 @@ func (peer *Peer) RoutineSequentialSender() {
 			}
 			atomic.AddUint64(&peer.stats.txBytes, length)
 
-			if len(elem.packet) != MessageKeepaliveSize {
-				peer.timersDataSent()
-			}
 			peer.keepKeyFreshSending()
 		}
 	}
