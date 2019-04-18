@@ -155,7 +155,10 @@ func SetupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoDa
 	var bufLen uint32
 
 	data := (*DrvInfoDetailData)(unsafe.Pointer(&buf[0]))
-	data.size = uint32(unsafe.Sizeof(*data))
+
+	// unsafe.Sizeof(data) >= sizeof(SP_DRVINFO_DETAIL_DATA) due to Go trailing padding. SetupAPI expects exactly sizeof(SP_DRVINFO_DETAIL_DATA).
+	sizeAPI := unsafe.Offsetof(data.hardwareID) + unsafe.Sizeof(data.hardwareID)
+	data.size = uint32(sizeAPI)
 
 	err := setupDiGetDriverInfoDetail(deviceInfoSet, deviceInfoData, driverInfoData, data, bufCapacity, &bufLen)
 	if err == nil {
@@ -168,7 +171,7 @@ func SetupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoDa
 		// The buffer was too small. Now that we got the required size, create another one big enough and retry.
 		buf := make([]byte, bufLen)
 		data := (*DrvInfoDetailData)(unsafe.Pointer(&buf[0]))
-		data.size = uint32(unsafe.Sizeof(*data))
+		data.size = uint32(sizeAPI)
 
 		err = setupDiGetDriverInfoDetail(deviceInfoSet, deviceInfoData, driverInfoData, data, bufLen, &bufLen)
 		if err == nil {

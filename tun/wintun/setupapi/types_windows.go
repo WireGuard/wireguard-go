@@ -28,6 +28,7 @@ const (
 // Define maximum string length constants
 //
 const (
+	ANYSIZE_ARRAY               = 1
 	LINE_LEN                    = 256  // Windows 9x-compatible maximum for displayable strings coming from a device INF.
 	MAX_INF_STRING_LENGTH       = 4096 // Actual maximum size of an INF string (including string substitutions).
 	MAX_INF_SECTION_NAME_LENGTH = 255  // For Windows 9x compatibility, INF section names should be constrained to 32 characters.
@@ -378,7 +379,7 @@ type DrvInfoDetailData struct {
 	sectionName     [LINE_LEN]uint16
 	infFileName     [windows.MAX_PATH]uint16
 	drvDescription  [LINE_LEN]uint16
-	hardwareID      [1]uint16
+	hardwareID      [ANYSIZE_ARRAY]uint16
 }
 
 func (data *DrvInfoDetailData) GetSectionName() string {
