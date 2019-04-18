@@ -36,37 +36,27 @@ func printUsage() {
 }
 
 func warning() {
-	if os.Getenv(ENV_WG_PROCESS_FOREGROUND) == "1" {
+	if runtime.GOOS != "linux" || os.Getenv(ENV_WG_PROCESS_FOREGROUND) == "1" {
 		return
 	}
-
-	shouldQuit := false
+	shouldQuit := os.Getenv("WG_I_PREFER_BUGGY_USERSPACE_TO_POLISHED_KMOD") != "1"
 
 	fmt.Fprintln(os.Stderr, "WARNING WARNING WARNING WARNING WARNING WARNING WARNING")
 	fmt.Fprintln(os.Stderr, "W                                                     G")
-	fmt.Fprintln(os.Stderr, "W   This is alpha software. It will very likely not   G")
-	fmt.Fprintln(os.Stderr, "W   do what it is supposed to do, and things may go   G")
-	fmt.Fprintln(os.Stderr, "W   horribly wrong. You have been warned. Proceed     G")
-	fmt.Fprintln(os.Stderr, "W   at your own risk.                                 G")
-	if runtime.GOOS == "linux" {
-		shouldQuit = os.Getenv("WG_I_PREFER_BUGGY_USERSPACE_TO_POLISHED_KMOD") != "1"
-
+	fmt.Fprintln(os.Stderr, "W   You are running this software on a Linux kernel,  G")
+	fmt.Fprintln(os.Stderr, "W   which is probably unnecessary and foolish. This   G")
+	fmt.Fprintln(os.Stderr, "W   is because the Linux kernel has built-in first    G")
+	fmt.Fprintln(os.Stderr, "W   class support for WireGuard, and this support is  G")
+	fmt.Fprintln(os.Stderr, "W   much more refined than this slower userspace      G")
+	fmt.Fprintln(os.Stderr, "W   implementation. For more information on           G")
+	fmt.Fprintln(os.Stderr, "W   installing the kernel module, please visit:       G")
+	fmt.Fprintln(os.Stderr, "W           https://www.wireguard.com/install         G")
+	if shouldQuit {
 		fmt.Fprintln(os.Stderr, "W                                                     G")
-		fmt.Fprintln(os.Stderr, "W   Furthermore, you are running this software on a   G")
-		fmt.Fprintln(os.Stderr, "W   Linux kernel, which is probably unnecessary and   G")
-		fmt.Fprintln(os.Stderr, "W   foolish. This is because the Linux kernel has     G")
-		fmt.Fprintln(os.Stderr, "W   built-in first class support for WireGuard, and   G")
-		fmt.Fprintln(os.Stderr, "W   this support is much more refined than this       G")
-		fmt.Fprintln(os.Stderr, "W   program. For more information on installing the   G")
-		fmt.Fprintln(os.Stderr, "W   kernel module, please visit:                      G")
-		fmt.Fprintln(os.Stderr, "W           https://www.wireguard.com/install         G")
-		if shouldQuit {
-			fmt.Fprintln(os.Stderr, "W                                                     G")
-			fmt.Fprintln(os.Stderr, "W   If you still want to use this program, against    G")
-			fmt.Fprintln(os.Stderr, "W   the sage advice here, please first export this    G")
-			fmt.Fprintln(os.Stderr, "W   environment variable:                             G")
-			fmt.Fprintln(os.Stderr, "W   WG_I_PREFER_BUGGY_USERSPACE_TO_POLISHED_KMOD=1    G")
-		}
+		fmt.Fprintln(os.Stderr, "W   If you still want to use this program, against    G")
+		fmt.Fprintln(os.Stderr, "W   the advice here, please first export this         G")
+		fmt.Fprintln(os.Stderr, "W   environment variable:                             G")
+		fmt.Fprintln(os.Stderr, "W   WG_I_PREFER_BUGGY_USERSPACE_TO_POLISHED_KMOD=1    G")
 	}
 	fmt.Fprintln(os.Stderr, "W                                                     G")
 	fmt.Fprintln(os.Stderr, "WARNING WARNING WARNING WARNING WARNING WARNING WARNING")
