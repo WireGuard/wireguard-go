@@ -60,7 +60,7 @@ type DevInfoData struct {
 
 // DevInfoListDetailData is a structure for detailed information on a device information set (used for SetupDiGetDeviceInfoListDetail which supercedes the functionality of SetupDiGetDeviceInfoListClass).
 type DevInfoListDetailData struct {
-	size                uint32
+	size                uint32 // Warning: unsafe.Sizeof(DevInfoListDetailData) > sizeof(SP_DEVINFO_LIST_DETAIL_DATA) when GOARCH == 386 => use sizeofDevInfoListDetailData const.
 	ClassGUID           windows.GUID
 	RemoteMachineHandle windows.Handle
 	remoteMachineName   [SP_MAX_MACHINENAME_LENGTH]uint16
@@ -371,7 +371,7 @@ func (data *DrvInfoData) IsNewer(driverDate windows.Filetime, driverVersion uint
 
 // DrvInfoDetailData is driver information details structure (provides detailed information about a particular driver information structure)
 type DrvInfoDetailData struct {
-	size            uint32 // On input, this must be exactly the sizeof(DrvInfoDetailData). On output, we set this member to the actual size of structure data.
+	size            uint32 // Warning: unsafe.Sizeof(DrvInfoDetailData) > sizeof(SP_DRVINFO_DETAIL_DATA) when GOARCH == 386 => use sizeofDrvInfoDetailData const.
 	InfDate         windows.Filetime
 	compatIDsOffset uint32
 	compatIDsLength uint32

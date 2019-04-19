@@ -34,7 +34,7 @@ func SetupDiCreateDeviceInfoListEx(classGUID *windows.GUID, hwndParent uintptr, 
 // SetupDiGetDeviceInfoListDetail function retrieves information associated with a device information set including the class GUID, remote computer handle, and remote computer name.
 func SetupDiGetDeviceInfoListDetail(deviceInfoSet DevInfo) (deviceInfoSetDetailData *DevInfoListDetailData, err error) {
 	data := &DevInfoListDetailData{}
-	data.size = uint32(unsafe.Sizeof(*data))
+	data.size = sizeofDevInfoListDetailData
 
 	return data, setupDiGetDeviceInfoListDetail(deviceInfoSet, data)
 }
@@ -155,10 +155,7 @@ func SetupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoDa
 	var bufLen uint32
 
 	data := (*DrvInfoDetailData)(unsafe.Pointer(&buf[0]))
-
-	// unsafe.Sizeof(data) >= sizeof(SP_DRVINFO_DETAIL_DATA) due to Go trailing padding. SetupAPI expects exactly sizeof(SP_DRVINFO_DETAIL_DATA).
-	sizeAPI := ((unsafe.Sizeof(uintptr(0)) - 1) | (unsafe.Offsetof(data.hardwareID) + unsafe.Sizeof(data.hardwareID) - 1) + 1)
-	data.size = uint32(sizeAPI)
+	data.size = sizeofDrvInfoDetailData
 
 	err := setupDiGetDriverInfoDetail(deviceInfoSet, deviceInfoData, driverInfoData, data, bufCapacity, &bufLen)
 	if err == nil {
@@ -171,7 +168,7 @@ func SetupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoDa
 		// The buffer was too small. Now that we got the required size, create another one big enough and retry.
 		buf := make([]byte, bufLen)
 		data := (*DrvInfoDetailData)(unsafe.Pointer(&buf[0]))
-		data.size = uint32(sizeAPI)
+		data.size = sizeofDrvInfoDetailData
 
 		err = setupDiGetDriverInfoDetail(deviceInfoSet, deviceInfoData, driverInfoData, data, bufLen, &bufLen)
 		if err == nil {
