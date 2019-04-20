@@ -54,15 +54,15 @@ func nanotime() int64
 // CreateTUN creates a Wintun interface with the given name. Should a Wintun
 // interface with the same name exist, it is reused.
 //
-func CreateTUN(ifname string) (Device, error) {
-	return CreateTUNWithRequestedGUID(ifname, nil)
+func CreateTUN(ifname string, mtu int) (Device, error) {
+	return CreateTUNWithRequestedGUID(ifname, nil, mtu)
 }
 
 //
 // CreateTUNWithRequestedGUID creates a Wintun interface with the given name and
 // a requested GUID. Should a Wintun interface with the same name exist, it is reused.
 //
-func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Device, error) {
+func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu int) (Device, error) {
 	var err error
 	var wt *wintun.Interface
 
@@ -80,12 +80,17 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Dev
 		return nil, fmt.Errorf("Error creating interface: %v", err)
 	}
 
+	forcedMTU := 1420
+	if mtu > 0 {
+		forcedMTU = mtu
+	}
+
 	tun := &NativeTun{
 		wt:        wt,
 		handle:    windows.InvalidHandle,
 		events:    make(chan Event, 10),
 		errors:    make(chan error, 1),
-		forcedMTU: 1500,
+		forcedMTU: forcedMTU,
 	}
 
 	err = tun.rings.Init()

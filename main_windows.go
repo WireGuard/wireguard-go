@@ -37,7 +37,7 @@ func main() {
 	logger.Info.Println("Starting wireguard-go version", device.WireGuardGoVersion)
 	logger.Debug.Println("Debug log enabled")
 
-	tun, err := tun.CreateTUN(interfaceName)
+	tun, err := tun.CreateTUN(interfaceName, 0)
 	if err == nil {
 		realInterfaceName, err2 := tun.Name()
 		if err2 == nil {
