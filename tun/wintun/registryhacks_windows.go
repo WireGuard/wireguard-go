@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	numRetries = 25
-	retryTimeout = 100 * time.Millisecond
+	numRetries = 100
+	retryTimeout = 150 * time.Millisecond
 )
 
 func registryOpenKeyRetry(k registry.Key, path string, access uint32) (key registry.Key, err error) {
