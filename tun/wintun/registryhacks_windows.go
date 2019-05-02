@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	numRetries = 100
+	numRetries   = 100
 	retryTimeout = 150 * time.Millisecond
 )
 
@@ -21,7 +21,7 @@ func registryOpenKeyRetry(k registry.Key, path string, access uint32) (key regis
 		if err == nil {
 			break
 		}
-		if i != numRetries - 1 {
+		if i != numRetries-1 {
 			time.Sleep(retryTimeout)
 		}
 	}
@@ -34,7 +34,7 @@ func keyGetStringValueRetry(k registry.Key, name string) (val string, valtype ui
 		if err == nil {
 			break
 		}
-		if i != numRetries - 1 {
+		if i != numRetries-1 {
 			time.Sleep(retryTimeout)
 		}
 	}

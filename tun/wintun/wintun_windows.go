@@ -38,7 +38,7 @@ const machineName = ""
 //
 // MakeWintun creates interface handle and populates it from device registry key
 //
-func MakeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) (*Wintun, error) {
+func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData, wait bool) (*Wintun, error) {
 	// Open HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\<class>\<id> registry key.
 	key, err := deviceInfoSet.OpenDevRegKey(deviceInfoData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.READ)
 	if err != nil {
@@ -50,7 +50,11 @@ func MakeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 	var valueType uint32
 
 	// Read the NetCfgInstanceId value.
-	valueStr, valueType, err = keyGetStringValueRetry(key, "NetCfgInstanceId")
+	if wait {
+		valueStr, valueType, err = keyGetStringValueRetry(key, "NetCfgInstanceId")
+	} else {
+		valueStr, valueType, err = key.GetStringValue("NetCfgInstanceId")
+	}
 	if err != nil {
 		return nil, errors.New("RegQueryStringValue(\"NetCfgInstanceId\") failed: " + err.Error())
 	}
@@ -121,13 +125,14 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 		}
 
 		// Get interface ID.
-		wintun, err := MakeWintun(devInfoList, deviceData)
+		wintun, err := makeWintun(devInfoList, deviceData, false)
 		if err != nil {
 			continue
 		}
 
+		//TODO: is there a better way than comparing ifnames?
 		// Get interface name.
-		ifname2, err := wintun.GetInterfaceName()
+		ifname2, err := wintun.getInterfaceNameNoRetry()
 		if err != nil {
 			continue
 		}
@@ -301,7 +306,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 		// installation continues in the background. It might take a while, before all registry
 		// keys and values are populated.
 		for numAttempts := 0; numAttempts < 30; numAttempts++ {
-			wintun, err = MakeWintun(devInfoList, deviceData)
+			wintun, err = makeWintun(devInfoList, deviceData, true)
 			if err != nil {
 				if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_FILE_NOT_FOUND {
 					// Wait and retry. TODO: Wait for a cancellable event instead.
@@ -371,7 +376,8 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 		}
 
 		// Get interface ID.
-		wintun2, err := MakeWintun(devInfoList, deviceData)
+		//TODO: Store some ID in the Wintun object such that this call isn't required.
+		wintun2, err := makeWintun(devInfoList, deviceData, false)
 		if err != nil {
 			continue
 		}
@@ -437,6 +443,17 @@ func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInf
 //
 func (wintun *Wintun) GetInterfaceName() (string, error) {
 	key, err := registryOpenKeyRetry(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.QUERY_VALUE)
+	if err != nil {
+		return "", errors.New("Network-specific registry key open failed: " + err.Error())
+	}
+	defer key.Close()
+
+	// Get the interface name.
+	return getRegStringValue(key, "Name")
+}
+
+func (wintun *Wintun) getInterfaceNameNoRetry() (string, error) {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.QUERY_VALUE)
 	if err != nil {
 		return "", errors.New("Network-specific registry key open failed: " + err.Error())
 	}
