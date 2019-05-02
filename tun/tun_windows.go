@@ -7,6 +7,7 @@ package tun
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -59,32 +60,43 @@ func packetAlign(size uint32) uint32 {
 // adapter with the same name exist, it is reused.
 //
 func CreateTUN(ifname string) (TUNDevice, error) {
-	// Does an interface with this name already exist?
-	wt, err := wintun.GetInterface(ifname, 0)
-	if wt == nil {
-		// Interface does not exist or an error occured. Create one.
-		wt, _, err = wintun.CreateInterface("WireGuard Tunnel Adapter", 0)
-		if err != nil {
-			return nil, errors.New("Creating Wintun adapter failed: " + err.Error())
+	var err error
+	var wt *wintun.Wintun
+	for i := 0; i < 3; i++ {
+		// Does an interface with this name already exist?
+		wt, err = wintun.GetInterface(ifname, 0)
+		if wt == nil {
+			// Interface does not exist or an error occured. Create one.
+			wt, _, err = wintun.CreateInterface("WireGuard Tunnel Adapter", 0)
+			if err != nil {
+				err = fmt.Errorf("wintun.CreateInterface: %v", err)
+				continue
+			}
+		} else if err != nil {
+			// Foreign interface with the same name found.
+			// We could create a Wintun interface under a temporary name. But, should our
+			// process die without deleting this interface first, the interface would remain
+			// orphaned.
+			err = fmt.Errorf("wintun.GetInterface: %v", err)
+			continue
 		}
-	} else if err != nil {
-		// Foreign interface with the same name found.
-		// We could create a Wintun interface under a temporary name. But, should our
-		// proces die without deleting this interface first, the interface would remain
-		// orphaned.
-		return nil, err
-	}
 
-	err = wt.SetInterfaceName(ifname)
+		err = wt.SetInterfaceName(ifname) //TODO: This is the function that most often fails
+		if err != nil {
+			wt.DeleteInterface(0)
+			wt = nil
+			err = fmt.Errorf("wintun.SetInterfaceName: %v", err)
+			continue
+		}
+	}
 	if err != nil {
-		wt.DeleteInterface(0)
 		return nil, err
 	}
 
 	err = wt.FlushInterface()
 	if err != nil {
 		wt.DeleteInterface(0)
-		return nil, errors.New("Flushing interface failed: " + err.Error())
+		return nil, fmt.Errorf("wintun.FlushInterface: %v", err)
 	}
 
 	return &NativeTun{
