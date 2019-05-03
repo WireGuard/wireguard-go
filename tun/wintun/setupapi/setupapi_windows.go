@@ -8,6 +8,7 @@ package setupapi
 import (
 	"encoding/binary"
 	"fmt"
+	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -261,9 +262,13 @@ func SetupDiGetDeviceRegistryProperty(deviceInfoSet DevInfo, deviceInfoData *Dev
 func getRegistryValue(buf []byte, dataType uint32) (interface{}, error) {
 	switch dataType {
 	case windows.REG_SZ:
-		return windows.UTF16ToString(BufToUTF16(buf)), nil
+		ret := windows.UTF16ToString(bufToUTF16(buf))
+		runtime.KeepAlive(buf)
+		return ret, nil
 	case windows.REG_EXPAND_SZ:
-		return registry.ExpandString(windows.UTF16ToString(BufToUTF16(buf)))
+		ret, err := registry.ExpandString(windows.UTF16ToString(bufToUTF16(buf)))
+		runtime.KeepAlive(buf)
+		return ret, err
 	case windows.REG_BINARY:
 		return buf, nil
 	case windows.REG_DWORD_LITTLE_ENDIAN:
@@ -271,7 +276,7 @@ func getRegistryValue(buf []byte, dataType uint32) (interface{}, error) {
 	case windows.REG_DWORD_BIG_ENDIAN:
 		return binary.BigEndian.Uint32(buf), nil
 	case windows.REG_MULTI_SZ:
-		bufW := BufToUTF16(buf)
+		bufW := bufToUTF16(buf)
 		a := []string{}
 		for i := 0; i < len(bufW); {
 			j := i + wcslen(bufW[i:])
@@ -280,6 +285,7 @@ func getRegistryValue(buf []byte, dataType uint32) (interface{}, error) {
 			}
 			i = j + 1
 		}
+		runtime.KeepAlive(buf)
 		return a, nil
 	case windows.REG_QWORD_LITTLE_ENDIAN:
 		return binary.LittleEndian.Uint64(buf), nil
@@ -288,8 +294,8 @@ func getRegistryValue(buf []byte, dataType uint32) (interface{}, error) {
 	}
 }
 
-// BufToUTF16 function reinterprets []byte buffer as []uint16
-func BufToUTF16(buf []byte) []uint16 {
+// bufToUTF16 function reinterprets []byte buffer as []uint16
+func bufToUTF16(buf []byte) []uint16 {
 	sl := struct {
 		addr *uint16
 		len  int
@@ -298,8 +304,8 @@ func BufToUTF16(buf []byte) []uint16 {
 	return *(*[]uint16)(unsafe.Pointer(&sl))
 }
 
-// UTF16ToBuf function reinterprets []uint16 as []byte
-func UTF16ToBuf(buf []uint16) []byte {
+// utf16ToBuf function reinterprets []uint16 as []byte
+func utf16ToBuf(buf []uint16) []byte {
 	sl := struct {
 		addr *byte
 		len  int
@@ -332,6 +338,16 @@ func SetupDiSetDeviceRegistryProperty(deviceInfoSet DevInfo, deviceInfoData *Dev
 // SetDeviceRegistryProperty function sets a Plug and Play device property for a device.
 func (deviceInfoSet DevInfo) SetDeviceRegistryProperty(deviceInfoData *DevInfoData, property SPDRP, propertyBuffers []byte) error {
 	return SetupDiSetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, propertyBuffers)
+}
+
+func (deviceInfoSet DevInfo) SetDeviceRegistryPropertyString(deviceInfoData *DevInfoData, property SPDRP, str string) error {
+	str16, err := windows.UTF16FromString(str)
+	if err != nil {
+		return err
+	}
+	err = SetupDiSetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, utf16ToBuf(append(str16, 0)))
+	runtime.KeepAlive(str16)
+	return err
 }
 
 //sys	setupDiGetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, deviceInstallParams *DevInstallParams) (err error) = setupapi.SetupDiGetDeviceInstallParamsW

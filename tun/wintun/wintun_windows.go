@@ -218,11 +218,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 	}
 
 	// Set Plug&Play device hardware ID property.
-	hwid, err := syscall.UTF16FromString(hardwareID)
-	if err != nil {
-		return nil, false, err // syscall.UTF16FromString(hardwareID) should never fail: hardwareID is const string without NUL chars.
-	}
-	err = devInfoList.SetDeviceRegistryProperty(deviceData, setupapi.SPDRP_HARDWAREID, setupapi.UTF16ToBuf(append(hwid, 0)))
+	err = devInfoList.SetDeviceRegistryPropertyString(deviceData, setupapi.SPDRP_HARDWAREID, hardwareID)
 	if err != nil {
 		return nil, false, errors.New("SetupDiSetDeviceRegistryProperty(SPDRP_HARDWAREID) failed: " + err.Error())
 	}

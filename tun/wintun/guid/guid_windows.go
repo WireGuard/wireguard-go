@@ -12,7 +12,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-//sys	clsidFromString(lpsz *uint16, pclsid *windows.GUID) (hr int32) = ole32.CLSIDFromString
+//sys	clsidFromString(lpsz *uint16, pclsid *windows.GUID) (err error) [failretval!=0] = ole32.CLSIDFromString
 
 //
 // FromString parses "{XXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" string to GUID.
@@ -22,14 +22,11 @@ func FromString(str string) (*windows.GUID, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	guid := &windows.GUID{}
-
-	hr := clsidFromString(strUTF16, guid)
-	if hr < 0 {
-		return nil, syscall.Errno(hr)
+	err = clsidFromString(strUTF16, guid)
+	if err != nil {
+		return nil, err
 	}
-
 	return guid, nil
 }
 

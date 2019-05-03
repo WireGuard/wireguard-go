@@ -42,8 +42,14 @@ var (
 	procCLSIDFromString = modole32.NewProc("CLSIDFromString")
 )
 
-func clsidFromString(lpsz *uint16, pclsid *windows.GUID) (hr int32) {
-	r0, _, _ := syscall.Syscall(procCLSIDFromString.Addr(), 2, uintptr(unsafe.Pointer(lpsz)), uintptr(unsafe.Pointer(pclsid)), 0)
-	hr = int32(r0)
+func clsidFromString(lpsz *uint16, pclsid *windows.GUID) (err error) {
+	r1, _, e1 := syscall.Syscall(procCLSIDFromString.Addr(), 2, uintptr(unsafe.Pointer(lpsz)), uintptr(unsafe.Pointer(pclsid)), 0)
+	if r1 != 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
 	return
 }
