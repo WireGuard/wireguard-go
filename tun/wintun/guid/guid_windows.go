@@ -37,5 +37,5 @@ func FromString(str string) (*windows.GUID, error) {
 // The resulting string is uppercase.
 //
 func ToString(guid *windows.GUID) string {
-	return fmt.Sprintf("{%06X-%04X-%04X-%04X-%012X}", guid.Data1, guid.Data2, guid.Data3, guid.Data4[:2], guid.Data4[2:])
+	return fmt.Sprintf("{%08X-%04X-%04X-%04X-%012X}", guid.Data1, guid.Data2, guid.Data3, guid.Data4[:2], guid.Data4[2:])
 }
