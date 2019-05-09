@@ -10,6 +10,7 @@ import (
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
 	"net"
+	"strings"
 )
 
 const (
@@ -41,12 +42,17 @@ type Endpoint interface {
 }
 
 func parseEndpoint(s string) (*net.UDPAddr, error) {
-
 	// ensure that the host is an IP address
 
 	host, _, err := net.SplitHostPort(s)
 	if err != nil {
 		return nil, err
+	}
+	if i := strings.LastIndexByte(host, '%'); i > 0 && strings.IndexByte(host, ':') >= 0 {
+		// Remove the scope, if any. ResolveUDPAddr below will use it, but here we're just
+		// trying to make sure with a small sanity test that this is a real IP address and
+		// not something that's likely to incur DNS lookups.
+		host = host[:i]
 	}
 	if ip := net.ParseIP(host); ip == nil {
 		return nil, errors.New("Failed to parse IP address: " + host)
