@@ -8,7 +8,6 @@ package wintun
 import (
 	"errors"
 	"fmt"
-	"golang.zx2c4.com/wireguard/tun/wintun/netshell"
 	"strings"
 	"syscall"
 	"time"
@@ -17,6 +16,8 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"golang.zx2c4.com/wireguard/tun/wintun/guid"
+	"golang.zx2c4.com/wireguard/tun/wintun/netshell"
+	registryEx "golang.zx2c4.com/wireguard/tun/wintun/registry"
 	"golang.zx2c4.com/wireguard/tun/wintun/setupapi"
 )
 
@@ -34,32 +35,23 @@ var deviceClassNetGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0
 const hardwareID = "Wintun"
 const enumerator = ""
 const machineName = ""
+const waitForRegistryTimeout = time.Second * 5
 
 //
 // MakeWintun creates interface handle and populates it from device registry key
 //
-func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData, wait bool) (*Wintun, error) {
+func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) (*Wintun, error) {
 	// Open HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\<class>\<id> registry key.
-	key, err := deviceInfoSet.OpenDevRegKey(deviceInfoData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.READ)
+	key, err := deviceInfoSet.OpenDevRegKey(deviceInfoData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.QUERY_VALUE)
 	if err != nil {
 		return nil, errors.New("Device-specific registry key open failed: " + err.Error())
 	}
 	defer key.Close()
 
-	var valueStr string
-	var valueType uint32
-
 	// Read the NetCfgInstanceId value.
-	if wait {
-		valueStr, valueType, err = keyGetStringValueRetry(key, "NetCfgInstanceId")
-	} else {
-		valueStr, valueType, err = key.GetStringValue("NetCfgInstanceId")
-	}
+	valueStr, err := registryEx.GetStringValue(key, "NetCfgInstanceId")
 	if err != nil {
 		return nil, errors.New("RegQueryStringValue(\"NetCfgInstanceId\") failed: " + err.Error())
-	}
-	if valueType != registry.SZ {
-		return nil, fmt.Errorf("NetCfgInstanceId registry value is not REG_SZ (expected: %v, provided: %v)", registry.SZ, valueType)
 	}
 
 	// Convert to windows.GUID.
@@ -69,13 +61,13 @@ func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 	}
 
 	// Read the NetLuidIndex value.
-	luidIdx, valueType, err := key.GetIntegerValue("NetLuidIndex")
+	luidIdx, _, err := key.GetIntegerValue("NetLuidIndex")
 	if err != nil {
 		return nil, errors.New("RegQueryValue(\"NetLuidIndex\") failed: " + err.Error())
 	}
 
 	// Read the NetLuidIndex value.
-	ifType, valueType, err := key.GetIntegerValue("*IfType")
+	ifType, _, err := key.GetIntegerValue("*IfType")
 	if err != nil {
 		return nil, errors.New("RegQueryValue(\"*IfType\") failed: " + err.Error())
 	}
@@ -125,14 +117,14 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 		}
 
 		// Get interface ID.
-		wintun, err := makeWintun(devInfoList, deviceData, false)
+		wintun, err := makeWintun(devInfoList, deviceData)
 		if err != nil {
 			continue
 		}
 
 		//TODO: is there a better way than comparing ifnames?
 		// Get interface name.
-		ifname2, err := wintun.getInterfaceNameNoRetry()
+		ifname2, err := wintun.GetInterfaceName()
 		if err != nil {
 			continue
 		}
@@ -298,22 +290,83 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 			rebootRequired = true
 		}
 
-		// Get network interface. DIF_INSTALLDEVICE returns almost immediately, while the device
-		// installation continues in the background. It might take a while, before all registry
+		// DIF_INSTALLDEVICE returns almost immediately, while the device installation
+		// continues in the background. It might take a while, before all registry
 		// keys and values are populated.
-		for numAttempts := 0; numAttempts < 30; numAttempts++ {
-			wintun, err = makeWintun(devInfoList, deviceData, true)
-			if err != nil {
-				if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_FILE_NOT_FOUND {
-					// Wait and retry. TODO: Wait for a cancellable event instead.
-					err = errors.New("Time-out waiting for adapter to get ready")
-					time.Sleep(time.Second / 4)
-					continue
-				}
-			}
 
-			break
+		// Wait for device registry key to emerge and populate.
+		key, err := registryEx.OpenKeyWait(
+			registry.LOCAL_MACHINE,
+			fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Class\\%v\\%04d", guid.ToString(&deviceClassNetGUID), deviceData.DevInst),
+			registry.QUERY_VALUE|registryEx.KEY_NOTIFY,
+			waitForRegistryTimeout)
+		if err == nil {
+			_, err = registryEx.GetStringValueWait(key, "NetCfgInstanceId", waitForRegistryTimeout)
+			if err == nil {
+				_, err = registryEx.GetIntegerValueWait(key, "NetLuidIndex", waitForRegistryTimeout)
+			}
+			if err == nil {
+				_, err = registryEx.GetIntegerValueWait(key, "*IfType", waitForRegistryTimeout)
+			}
+			key.Close()
 		}
+		// Clear error and let makeWintun() open the key using SetupAPI's devInfoList.OpenDevRegKey().
+		err = nil
+	}
+
+	if err == nil {
+		// Get network interface.
+		wintun, err = makeWintun(devInfoList, deviceData)
+	}
+
+	if err == nil {
+		// Wait for network registry key to emerge and populate.
+		key, err := registryEx.OpenKeyWait(
+			registry.LOCAL_MACHINE,
+			wintun.GetNetRegKeyName(),
+			registry.QUERY_VALUE|registryEx.KEY_NOTIFY,
+			waitForRegistryTimeout)
+		if err == nil {
+			_, err = registryEx.GetStringValueWait(key, "Name", waitForRegistryTimeout)
+			key.Close()
+		}
+	}
+
+	if err == nil {
+		// Wait for TCP/IP adapter registry key to emerge and populate.
+		key, err := registryEx.OpenKeyWait(
+			registry.LOCAL_MACHINE,
+			wintun.GetTcpipAdapterRegKeyName(), registry.QUERY_VALUE|registryEx.KEY_NOTIFY,
+			waitForRegistryTimeout)
+		if err == nil {
+			_, err = registryEx.GetStringValueWait(key, "IpConfig", waitForRegistryTimeout)
+			key.Close()
+		}
+	}
+
+	if err == nil {
+		// Wait for TCP/IP interface registry key to emerge.
+		key, err := registryEx.OpenKeyWait(
+			registry.LOCAL_MACHINE,
+			wintun.GetTcpipInterfaceRegKeyName(), registry.QUERY_VALUE,
+			waitForRegistryTimeout)
+		if err == nil {
+			key.Close()
+		}
+	}
+
+	//
+	// All the registry keys and values we're relying on are present now.
+	//
+
+	if err == nil {
+		// Disable dead gateway detection on our interface.
+		key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetTcpipInterfaceRegKeyName(), registry.SET_VALUE)
+		if err != nil {
+			err = errors.New("Error opening interface-specific TCP/IP network registry key: " + err.Error())
+		}
+		key.SetDWordValue("EnableDeadGWDetect", 0)
+		key.Close()
 	}
 
 	if err == nil {
@@ -373,7 +426,7 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 
 		// Get interface ID.
 		//TODO: Store some ID in the Wintun object such that this call isn't required.
-		wintun2, err := makeWintun(devInfoList, deviceData, false)
+		wintun2, err := makeWintun(devInfoList, deviceData)
 		if err != nil {
 			continue
 		}
@@ -438,17 +491,6 @@ func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInf
 // GetInterfaceName returns network interface name.
 //
 func (wintun *Wintun) GetInterfaceName() (string, error) {
-	key, err := registryOpenKeyRetry(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.QUERY_VALUE)
-	if err != nil {
-		return "", errors.New("Network-specific registry key open failed: " + err.Error())
-	}
-	defer key.Close()
-
-	// Get the interface name.
-	return getRegStringValue(key, "Name")
-}
-
-func (wintun *Wintun) getInterfaceNameNoRetry() (string, error) {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.QUERY_VALUE)
 	if err != nil {
 		return "", errors.New("Network-specific registry key open failed: " + err.Error())
@@ -456,20 +498,13 @@ func (wintun *Wintun) getInterfaceNameNoRetry() (string, error) {
 	defer key.Close()
 
 	// Get the interface name.
-	return getRegStringValue(key, "Name")
+	return registryEx.GetStringValue(key, "Name")
 }
 
 //
 // SetInterfaceName sets network interface name.
 //
 func (wintun *Wintun) SetInterfaceName(ifname string) error {
-	// We open the registry key before calling HrRename, because the registry open will wait until the key exists.
-	key, err := registryOpenKeyRetry(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.SET_VALUE)
-	if err != nil {
-		return errors.New("Network-specific registry key open failed: " + err.Error())
-	}
-	defer key.Close()
-
 	// We have to tell the various runtime COM services about the new name too. We ignore the
 	// error because netshell isn't available on servercore.
 	// TODO: netsh.exe falls back to NciSetConnection in this case. If somebody complains, maybe
@@ -477,6 +512,11 @@ func (wintun *Wintun) SetInterfaceName(ifname string) error {
 	_ = netshell.HrRenameConnection(&wintun.CfgInstanceID, windows.StringToUTF16Ptr(ifname))
 
 	// Set the interface name. The above line should have done this too, but in case it failed, we force it.
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.SET_VALUE)
+	if err != nil {
+		return errors.New("Network-specific registry key open failed: " + err.Error())
+	}
+	defer key.Close()
 	return key.SetStringValue("Name", ifname)
 }
 
@@ -488,31 +528,28 @@ func (wintun *Wintun) GetNetRegKeyName() string {
 }
 
 //
-// getRegStringValue function reads a string value from registry.
+// GetTcpipAdapterRegKeyName returns adapter-specific TCP/IP network registry key name.
 //
-// If the value type is REG_EXPAND_SZ the environment variables are expanded.
-// Should expanding fail, original string value and nil error are returned.
+func (wintun *Wintun) GetTcpipAdapterRegKeyName() string {
+	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Adapters\\%v", guid.ToString(&wintun.CfgInstanceID))
+}
+
 //
-func getRegStringValue(key registry.Key, name string) (string, error) {
-	// Read string value.
-	value, valueType, err := keyGetStringValueRetry(key, name)
+// GetTcpipInterfaceRegKeyName returns interface-specific TCP/IP network registry key name.
+//
+func (wintun *Wintun) GetTcpipInterfaceRegKeyName() string {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetTcpipAdapterRegKeyName(), registry.QUERY_VALUE)
 	if err != nil {
-		return "", err
+		err = errors.New("Error opening adapter-specific TCP/IP network registry key: " + err.Error())
 	}
+	defer key.Close()
 
-	if valueType != registry.EXPAND_SZ {
-		// Value does not require expansion.
-		return value, nil
-	}
-
-	valueExp, err := registry.ExpandString(value)
+	path, err := registryEx.GetStringValue(key, "IpConfig")
 	if err != nil {
-		// Expanding failed: return original sting value.
-		return value, nil
+		err = errors.New("Error reading IpConfig: " + err.Error())
 	}
 
-	// Return expanded value.
-	return valueExp, nil
+	return "SYSTEM\\CurrentControlSet\\Services\\" + path
 }
 
 //
