@@ -190,6 +190,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 	if err != nil {
 		return nil, false, fmt.Errorf("SetupDiCreateDeviceInfoListEx(%s) failed: %v", guid.ToString(&deviceClassNetGUID), err)
 	}
+	defer devInfoList.Close()
 
 	// Get the device class name from GUID.
 	className, err := setupapi.SetupDiClassNameFromGuidEx(&deviceClassNetGUID, machineName)
