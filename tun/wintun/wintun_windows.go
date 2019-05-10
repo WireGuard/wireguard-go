@@ -217,7 +217,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 	}
 
 	// Search for the driver.
-	const driverType = setupapi.SPDIT_CLASSDRIVER
+	const driverType = setupapi.SPDIT_COMPATDRIVER
 	err = devInfoList.BuildDriverInfoList(deviceData, driverType) //TODO: This takes ~510ms
 	if err != nil {
 		return nil, false, fmt.Errorf("SetupDiBuildDriverInfoList failed: %v", err)
