@@ -111,7 +111,7 @@ func WaitForKey(k registry.Key, path string, timeout time.Duration) error {
 //
 // Key must be opened with at least QUERY_VALUE|KEY_NOTIFY access.
 //
-func getStringValueRetry(key registry.Key, name string, timeout time.Duration) (string, uint32, error) {
+func getStringValueRetry(key registry.Key, name string, timeout time.Duration, useFirstFromMulti bool) (string, uint32, error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
@@ -128,8 +128,15 @@ func getStringValueRetry(key registry.Key, name string, timeout time.Duration) (
 			return "", 0, fmt.Errorf("Setting up change notification on registry value failed: %v", err)
 		}
 
-		value, valueType, err := key.GetStringValue(name)
-		if err == windows.ERROR_FILE_NOT_FOUND || err == windows.ERROR_PATH_NOT_FOUND {
+		var value string
+		var values []string
+		var valueType uint32
+		if !useFirstFromMulti {
+			value, valueType, err = key.GetStringValue(name)
+		} else {
+			values, valueType, err = key.GetStringsValue(name)
+		}
+		if err == windows.ERROR_FILE_NOT_FOUND || err == windows.ERROR_PATH_NOT_FOUND || (useFirstFromMulti && len(values) == 0) {
 			timeout := time.Until(deadline) / time.Millisecond
 			if timeout < 0 {
 				timeout = 0
@@ -144,7 +151,11 @@ func getStringValueRetry(key registry.Key, name string, timeout time.Duration) (
 		} else if err != nil {
 			return "", 0, fmt.Errorf("Error reading registry value %v: %v", name, err)
 		} else {
-			return value, valueType, nil
+			if !useFirstFromMulti {
+				return value, valueType, nil
+			} else {
+				return values[0], registry.SZ, nil
+			}
 		}
 	}
 }
@@ -179,7 +190,14 @@ func expandString(value string, valueType uint32, err error) (string, error) {
 // Should expanding fail, original string value and nil error are returned.
 //
 func GetStringValueWait(key registry.Key, name string, timeout time.Duration) (string, error) {
-	return expandString(getStringValueRetry(key, name, timeout))
+	return expandString(getStringValueRetry(key, name, timeout, false))
+}
+
+//
+// Same as GetStringValueWait, but returns the first from a MULTI_SZ.
+//
+func GetFirstStringValueWait(key registry.Key, name string, timeout time.Duration) (string, error) {
+	return expandString(getStringValueRetry(key, name, timeout, true))
 }
 
 //

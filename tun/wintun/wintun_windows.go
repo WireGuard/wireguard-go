@@ -44,14 +44,14 @@ func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 	// Open HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\<class>\<id> registry key.
 	key, err := deviceInfoSet.OpenDevRegKey(deviceInfoData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.QUERY_VALUE)
 	if err != nil {
-		return nil, errors.New("Device-specific registry key open failed: " + err.Error())
+		return nil, fmt.Errorf("Device-specific registry key open failed: %v", err)
 	}
 	defer key.Close()
 
 	// Read the NetCfgInstanceId value.
 	valueStr, err := registryEx.GetStringValue(key, "NetCfgInstanceId")
 	if err != nil {
-		return nil, errors.New("RegQueryStringValue(\"NetCfgInstanceId\") failed: " + err.Error())
+		return nil, fmt.Errorf("RegQueryStringValue(\"NetCfgInstanceId\") failed: %v", err)
 	}
 
 	// Convert to windows.GUID.
@@ -63,13 +63,13 @@ func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 	// Read the NetLuidIndex value.
 	luidIdx, _, err := key.GetIntegerValue("NetLuidIndex")
 	if err != nil {
-		return nil, errors.New("RegQueryValue(\"NetLuidIndex\") failed: " + err.Error())
+		return nil, fmt.Errorf("RegQueryValue(\"NetLuidIndex\") failed: %v", err)
 	}
 
 	// Read the NetLuidIndex value.
 	ifType, _, err := key.GetIntegerValue("*IfType")
 	if err != nil {
-		return nil, errors.New("RegQueryValue(\"*IfType\") failed: " + err.Error())
+		return nil, fmt.Errorf("RegQueryValue(\"*IfType\") failed: %v", err)
 	}
 
 	return &Wintun{
@@ -95,7 +95,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 	// Create a list of network devices.
 	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, enumerator, hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), machineName)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("SetupDiGetClassDevsEx(%v) failed: ", guid.ToString(&deviceClassNetGUID)) + err.Error())
+		return nil, fmt.Errorf("SetupDiGetClassDevsEx(%s) failed: %v", guid.ToString(&deviceClassNetGUID), err)
 	}
 	defer devInfoList.Close()
 
@@ -134,7 +134,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 			const driverType = setupapi.SPDIT_COMPATDRIVER
 			err = devInfoList.BuildDriverInfoList(deviceData, driverType)
 			if err != nil {
-				return nil, errors.New("SetupDiBuildDriverInfoList failed: " + err.Error())
+				return nil, fmt.Errorf("SetupDiBuildDriverInfoList failed: %v", err)
 			}
 			defer devInfoList.DestroyDriverInfoList(deviceData, driverType)
 
@@ -188,44 +188,44 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 	// Create an empty device info set for network adapter device class.
 	devInfoList, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, hwndParent, machineName)
 	if err != nil {
-		return nil, false, errors.New(fmt.Sprintf("SetupDiCreateDeviceInfoListEx(%v) failed: ", guid.ToString(&deviceClassNetGUID)) + err.Error())
+		return nil, false, fmt.Errorf("SetupDiCreateDeviceInfoListEx(%s) failed: %v", guid.ToString(&deviceClassNetGUID), err)
 	}
 
 	// Get the device class name from GUID.
 	className, err := setupapi.SetupDiClassNameFromGuidEx(&deviceClassNetGUID, machineName)
 	if err != nil {
-		return nil, false, errors.New(fmt.Sprintf("SetupDiClassNameFromGuidEx(%v) failed: ", guid.ToString(&deviceClassNetGUID)) + err.Error())
+		return nil, false, fmt.Errorf("SetupDiClassNameFromGuidEx(%s) failed: %v", guid.ToString(&deviceClassNetGUID), err)
 	}
 
 	// Create a new device info element and add it to the device info set.
 	deviceData, err := devInfoList.CreateDeviceInfo(className, &deviceClassNetGUID, description, hwndParent, setupapi.DICD_GENERATE_ID)
 	if err != nil {
-		return nil, false, errors.New("SetupDiCreateDeviceInfo failed: " + err.Error())
+		return nil, false, fmt.Errorf("SetupDiCreateDeviceInfo failed: %v", err)
 	}
 
 	// Set a device information element as the selected member of a device information set.
 	err = devInfoList.SetSelectedDevice(deviceData)
 	if err != nil {
-		return nil, false, errors.New("SetupDiSetSelectedDevice failed: " + err.Error())
+		return nil, false, fmt.Errorf("SetupDiSetSelectedDevice failed: %v", err)
 	}
 
 	// Set Plug&Play device hardware ID property.
 	err = devInfoList.SetDeviceRegistryPropertyString(deviceData, setupapi.SPDRP_HARDWAREID, hardwareID)
 	if err != nil {
-		return nil, false, errors.New("SetupDiSetDeviceRegistryProperty(SPDRP_HARDWAREID) failed: " + err.Error())
+		return nil, false, fmt.Errorf("SetupDiSetDeviceRegistryProperty(SPDRP_HARDWAREID) failed: %v", err)
 	}
 
 	// Search for the driver.
 	const driverType = setupapi.SPDIT_CLASSDRIVER
-	err = devInfoList.BuildDriverInfoList(deviceData, driverType)
+	err = devInfoList.BuildDriverInfoList(deviceData, driverType) //TODO: This takes ~510ms
 	if err != nil {
-		return nil, false, errors.New("SetupDiBuildDriverInfoList failed: " + err.Error())
+		return nil, false, fmt.Errorf("SetupDiBuildDriverInfoList failed: %v", err)
 	}
 	defer devInfoList.DestroyDriverInfoList(deviceData, driverType)
 
 	driverDate := windows.Filetime{}
 	driverVersion := uint64(0)
-	for index := 0; ; index++ {
+	for index := 0; ; index++ { //TODO: This loop takes ~600ms
 		// Get a driver from the list.
 		driverData, err := devInfoList.EnumDriverInfo(deviceData, driverType, index)
 		if err != nil {
@@ -266,7 +266,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 	// Call appropriate class installer.
 	err = devInfoList.CallClassInstaller(setupapi.DIF_REGISTERDEVICE, deviceData)
 	if err != nil {
-		return nil, false, errors.New("SetupDiCallClassInstaller(DIF_REGISTERDEVICE) failed: " + err.Error())
+		return nil, false, fmt.Errorf("SetupDiCallClassInstaller(DIF_REGISTERDEVICE) failed: %v", err)
 	}
 
 	// Register device co-installers if any. (Ignore errors)
@@ -275,15 +275,15 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 	// Install interfaces if any. (Ignore errors)
 	devInfoList.CallClassInstaller(setupapi.DIF_INSTALLINTERFACES, deviceData)
 
-	var wintun *Wintun
-	var rebootRequired bool
-	var key registry.Key
-
 	// Install the device.
 	err = devInfoList.CallClassInstaller(setupapi.DIF_INSTALLDEVICE, deviceData)
 	if err != nil {
-		err = errors.New("SetupDiCallClassInstaller(DIF_INSTALLDEVICE) failed: " + err.Error())
+		err = fmt.Errorf("SetupDiCallClassInstaller(DIF_INSTALLDEVICE) failed: %v", err)
 	}
+
+	var wintun *Wintun
+	var rebootRequired bool
+	var key registry.Key
 
 	if err == nil {
 		// Check if a system reboot is required. (Ignore errors)
@@ -341,19 +341,23 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 			wintun.GetTcpipAdapterRegKeyName(), registry.QUERY_VALUE|registryEx.KEY_NOTIFY,
 			waitForRegistryTimeout)
 		if err == nil {
-			_, err = registryEx.GetStringValueWait(key, "IpConfig", waitForRegistryTimeout)
+			_, err = registryEx.GetFirstStringValueWait(key, "IpConfig", waitForRegistryTimeout)
 			key.Close()
 		}
 	}
 
+	var tcpipInterfaceRegKeyName string
 	if err == nil {
-		// Wait for TCP/IP interface registry key to emerge.
-		key, err = registryEx.OpenKeyWait(
-			registry.LOCAL_MACHINE,
-			wintun.GetTcpipInterfaceRegKeyName(), registry.QUERY_VALUE,
-			waitForRegistryTimeout)
+		tcpipInterfaceRegKeyName, err = wintun.GetTcpipInterfaceRegKeyName()
 		if err == nil {
-			key.Close()
+			// Wait for TCP/IP interface registry key to emerge.
+			key, err = registryEx.OpenKeyWait(
+				registry.LOCAL_MACHINE,
+				tcpipInterfaceRegKeyName, registry.QUERY_VALUE,
+				waitForRegistryTimeout)
+			if err == nil {
+				key.Close()
+			}
 		}
 	}
 
@@ -363,9 +367,9 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 
 	if err == nil {
 		// Disable dead gateway detection on our interface.
-		key, err = registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetTcpipInterfaceRegKeyName(), registry.SET_VALUE)
+		key, err = registry.OpenKey(registry.LOCAL_MACHINE, tcpipInterfaceRegKeyName, registry.SET_VALUE)
 		if err != nil {
-			err = errors.New("Error opening interface-specific TCP/IP network registry key: " + err.Error())
+			err = fmt.Errorf("Error opening interface-specific TCP/IP network registry key: %v", err)
 		}
 		key.SetDWordValue("EnableDeadGWDetect", 0)
 		key.Close()
@@ -411,7 +415,7 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 	// Create a list of network devices.
 	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, enumerator, hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), machineName)
 	if err != nil {
-		return false, false, errors.New(fmt.Sprintf("SetupDiGetClassDevsEx(%v) failed: ", guid.ToString(&deviceClassNetGUID)) + err.Error())
+		return false, false, fmt.Errorf("SetupDiGetClassDevsEx(%s) failed: %v", guid.ToString(&deviceClassNetGUID), err.Error())
 	}
 	defer devInfoList.Close()
 
@@ -443,13 +447,13 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 			// Set class installer parameters for DIF_REMOVE.
 			err = devInfoList.SetClassInstallParams(deviceData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams)))
 			if err != nil {
-				return false, false, errors.New("SetupDiSetClassInstallParams failed: " + err.Error())
+				return false, false, fmt.Errorf("SetupDiSetClassInstallParams failed: %v", err)
 			}
 
 			// Call appropriate class installer.
 			err = devInfoList.CallClassInstaller(setupapi.DIF_REMOVE, deviceData)
 			if err != nil {
-				return false, false, errors.New("SetupDiCallClassInstaller failed: " + err.Error())
+				return false, false, fmt.Errorf("SetupDiCallClassInstaller failed: %v", err)
 			}
 
 			// Check if a system reboot is required. (Ignore errors)
@@ -495,7 +499,7 @@ func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInf
 func (wintun *Wintun) GetInterfaceName() (string, error) {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.QUERY_VALUE)
 	if err != nil {
-		return "", errors.New("Network-specific registry key open failed: " + err.Error())
+		return "", fmt.Errorf("Network-specific registry key open failed: %v", err)
 	}
 	defer key.Close()
 
@@ -516,7 +520,7 @@ func (wintun *Wintun) SetInterfaceName(ifname string) error {
 	// Set the interface name. The above line should have done this too, but in case it failed, we force it.
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.SET_VALUE)
 	if err != nil {
-		return errors.New("Network-specific registry key open failed: " + err.Error())
+		return fmt.Errorf("Network-specific registry key open failed: %v", err)
 	}
 	defer key.Close()
 	return key.SetStringValue("Name", ifname)
@@ -526,32 +530,33 @@ func (wintun *Wintun) SetInterfaceName(ifname string) error {
 // GetNetRegKeyName returns interface-specific network registry key name.
 //
 func (wintun *Wintun) GetNetRegKeyName() string {
-	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Network\\%v\\%v\\Connection", guid.ToString(&deviceClassNetGUID), guid.ToString(&wintun.CfgInstanceID))
+	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Network\\%s\\%s\\Connection", guid.ToString(&deviceClassNetGUID), guid.ToString(&wintun.CfgInstanceID))
 }
 
 //
 // GetTcpipAdapterRegKeyName returns adapter-specific TCP/IP network registry key name.
 //
 func (wintun *Wintun) GetTcpipAdapterRegKeyName() string {
-	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Adapters\\%v", guid.ToString(&wintun.CfgInstanceID))
+	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Adapters\\%s", guid.ToString(&wintun.CfgInstanceID))
 }
 
 //
 // GetTcpipInterfaceRegKeyName returns interface-specific TCP/IP network registry key name.
 //
-func (wintun *Wintun) GetTcpipInterfaceRegKeyName() string {
+func (wintun *Wintun) GetTcpipInterfaceRegKeyName() (path string, err error) {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetTcpipAdapterRegKeyName(), registry.QUERY_VALUE)
 	if err != nil {
-		err = errors.New("Error opening adapter-specific TCP/IP network registry key: " + err.Error())
+		return "", fmt.Errorf("Error opening adapter-specific TCP/IP network registry key: %v", err)
 	}
-	defer key.Close()
-
-	path, err := registryEx.GetStringValue(key, "IpConfig")
+	paths, _, err := key.GetStringsValue("IpConfig")
+	key.Close()
 	if err != nil {
-		err = errors.New("Error reading IpConfig: " + err.Error())
+		return "", fmt.Errorf("Error reading IpConfig registry key: %v", err)
 	}
-
-	return "SYSTEM\\CurrentControlSet\\Services\\" + path
+	if len(paths) == 0 {
+		return "", errors.New("No TCP/IP interfaces found on adapter")
+	}
+	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\%s", paths[0]), nil
 }
 
 //
