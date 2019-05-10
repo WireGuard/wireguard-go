@@ -277,6 +277,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 
 	var wintun *Wintun
 	var rebootRequired bool
+	var key registry.Key
 
 	// Install the device.
 	err = devInfoList.CallClassInstaller(setupapi.DIF_INSTALLDEVICE, deviceData)
@@ -295,7 +296,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 		// keys and values are populated.
 
 		// Wait for device registry key to emerge and populate.
-		key, err := registryEx.OpenKeyWait(
+		key, err = registryEx.OpenKeyWait(
 			registry.LOCAL_MACHINE,
 			fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Class\\%v\\%04d", guid.ToString(&deviceClassNetGUID), deviceData.DevInst),
 			registry.QUERY_VALUE|registryEx.KEY_NOTIFY,
@@ -321,7 +322,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 
 	if err == nil {
 		// Wait for network registry key to emerge and populate.
-		key, err := registryEx.OpenKeyWait(
+		key, err = registryEx.OpenKeyWait(
 			registry.LOCAL_MACHINE,
 			wintun.GetNetRegKeyName(),
 			registry.QUERY_VALUE|registryEx.KEY_NOTIFY,
@@ -334,7 +335,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 
 	if err == nil {
 		// Wait for TCP/IP adapter registry key to emerge and populate.
-		key, err := registryEx.OpenKeyWait(
+		key, err = registryEx.OpenKeyWait(
 			registry.LOCAL_MACHINE,
 			wintun.GetTcpipAdapterRegKeyName(), registry.QUERY_VALUE|registryEx.KEY_NOTIFY,
 			waitForRegistryTimeout)
@@ -346,7 +347,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 
 	if err == nil {
 		// Wait for TCP/IP interface registry key to emerge.
-		key, err := registryEx.OpenKeyWait(
+		key, err = registryEx.OpenKeyWait(
 			registry.LOCAL_MACHINE,
 			wintun.GetTcpipInterfaceRegKeyName(), registry.QUERY_VALUE,
 			waitForRegistryTimeout)
@@ -361,7 +362,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 
 	if err == nil {
 		// Disable dead gateway detection on our interface.
-		key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetTcpipInterfaceRegKeyName(), registry.SET_VALUE)
+		key, err = registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetTcpipInterfaceRegKeyName(), registry.SET_VALUE)
 		if err != nil {
 			err = errors.New("Error opening interface-specific TCP/IP network registry key: " + err.Error())
 		}
