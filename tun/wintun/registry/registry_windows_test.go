@@ -66,7 +66,7 @@ func Test_GetValueWait(t *testing.T) {
 		key.Close()
 	}()
 
-	key, err := OpenKeyWait(keyRoot, path, registry.QUERY_VALUE|KEY_NOTIFY, time.Second*2)
+	key, err := OpenKeyWait(keyRoot, path, registry.QUERY_VALUE|registry.NOTIFY, time.Second*2)
 	if err != nil {
 		t.Errorf("Error waiting for registry key: %v", err)
 	}

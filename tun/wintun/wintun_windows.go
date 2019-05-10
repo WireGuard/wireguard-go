@@ -299,7 +299,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 			if i != 0 {
 				time.Sleep(pollTimeout)
 			}
-			key, err = devInfoList.OpenDevRegKey(deviceData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.QUERY_VALUE|registryEx.KEY_NOTIFY)
+			key, err = devInfoList.OpenDevRegKey(deviceData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.QUERY_VALUE|registry.NOTIFY)
 			if err == nil {
 				break
 			}
@@ -326,7 +326,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 		key, err = registryEx.OpenKeyWait(
 			registry.LOCAL_MACHINE,
 			wintun.GetNetRegKeyName(),
-			registry.QUERY_VALUE|registryEx.KEY_NOTIFY,
+			registry.QUERY_VALUE|registry.NOTIFY,
 			waitForRegistryTimeout)
 		if err == nil {
 			_, err = registryEx.GetStringValueWait(key, "Name", waitForRegistryTimeout)
@@ -338,7 +338,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 		// Wait for TCP/IP adapter registry key to emerge and populate.
 		key, err = registryEx.OpenKeyWait(
 			registry.LOCAL_MACHINE,
-			wintun.GetTcpipAdapterRegKeyName(), registry.QUERY_VALUE|registryEx.KEY_NOTIFY,
+			wintun.GetTcpipAdapterRegKeyName(), registry.QUERY_VALUE|registry.NOTIFY,
 			waitForRegistryTimeout)
 		if err == nil {
 			_, err = registryEx.GetFirstStringValueWait(key, "IpConfig", waitForRegistryTimeout)

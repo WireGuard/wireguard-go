@@ -17,10 +17,6 @@ import (
 )
 
 const (
-	KEY_NOTIFY uint32 = 0x0010 // should be defined upstream as registry.KEY_NOTIFY
-)
-
-const (
 	// REG_NOTIFY_CHANGE_NAME notifies the caller if a subkey is added or deleted.
 	REG_NOTIFY_CHANGE_NAME uint32 = 0x00000001
 
@@ -66,7 +62,7 @@ func OpenKeyWait(k registry.Key, path string, access uint32, timeout time.Durati
 			if isLast {
 				accessFlags = access
 			} else {
-				accessFlags = KEY_NOTIFY
+				accessFlags = registry.NOTIFY
 			}
 			key, err = registry.OpenKey(k, keyName, accessFlags)
 			if err == windows.ERROR_FILE_NOT_FOUND || err == windows.ERROR_PATH_NOT_FOUND {
@@ -97,7 +93,7 @@ func OpenKeyWait(k registry.Key, path string, access uint32, timeout time.Durati
 }
 
 func WaitForKey(k registry.Key, path string, timeout time.Duration) error {
-	key, err := OpenKeyWait(k, path, KEY_NOTIFY, timeout)
+	key, err := OpenKeyWait(k, path, registry.NOTIFY, timeout)
 	if err != nil {
 		return err
 	}
@@ -109,7 +105,7 @@ func WaitForKey(k registry.Key, path string, timeout time.Duration) error {
 // getStringValueRetry function reads a string value from registry. It waits for
 // the registry value to become available or returns error on timeout.
 //
-// Key must be opened with at least QUERY_VALUE|KEY_NOTIFY access.
+// Key must be opened with at least QUERY_VALUE|NOTIFY access.
 //
 func getStringValueRetry(key registry.Key, name string, timeout time.Duration, useFirstFromMulti bool) (string, uint32, error) {
 	runtime.LockOSThread()
@@ -184,7 +180,7 @@ func expandString(value string, valueType uint32, err error) (string, error) {
 // GetStringValueWait function reads a string value from registry. It waits
 // for the registry value to become available or returns error on timeout.
 //
-// Key must be opened with at least QUERY_VALUE|KEY_NOTIFY access.
+// Key must be opened with at least QUERY_VALUE|NOTIFY access.
 //
 // If the value type is REG_EXPAND_SZ the environment variables are expanded.
 // Should expanding fail, original string value and nil error are returned.
@@ -217,7 +213,7 @@ func GetStringValue(key registry.Key, name string) (string, error) {
 // It waits for the registry value to become available or returns error on
 // timeout.
 //
-// Key must be opened with at least QUERY_VALUE|KEY_NOTIFY access.
+// Key must be opened with at least QUERY_VALUE|NOTIFY access.
 //
 func GetIntegerValueWait(key registry.Key, name string, timeout time.Duration) (uint64, error) {
 	runtime.LockOSThread()
