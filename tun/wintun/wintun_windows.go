@@ -294,13 +294,16 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 		// DIF_INSTALLDEVICE returns almost immediately, while the device installation
 		// continues in the background. It might take a while, before all registry
 		// keys and values are populated.
-
-		// Wait for device registry key to emerge and populate.
-		key, err = registryEx.OpenKeyWait(
-			registry.LOCAL_MACHINE,
-			fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Class\\%v\\%04d", guid.ToString(&deviceClassNetGUID), deviceData.DevInst),
-			registry.QUERY_VALUE|registryEx.KEY_NOTIFY,
-			waitForRegistryTimeout)
+		const pollTimeout = time.Millisecond * 50
+		for i := 0; i < int(waitForRegistryTimeout/pollTimeout); i++ {
+			if i != 0 {
+				time.Sleep(pollTimeout)
+			}
+			key, err = devInfoList.OpenDevRegKey(deviceData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.QUERY_VALUE|registryEx.KEY_NOTIFY)
+			if err == nil {
+				break
+			}
+		}
 		if err == nil {
 			_, err = registryEx.GetStringValueWait(key, "NetCfgInstanceId", waitForRegistryTimeout)
 			if err == nil {
@@ -311,8 +314,6 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 			}
 			key.Close()
 		}
-		// Clear error and let makeWintun() open the key using SetupAPI's devInfoList.OpenDevRegKey().
-		err = nil
 	}
 
 	if err == nil {
