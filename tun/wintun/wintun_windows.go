@@ -342,7 +342,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 			wintun.GetTcpipAdapterRegKeyName(), registry.QUERY_VALUE|registry.NOTIFY,
 			waitForRegistryTimeout)
 		if err == nil {
-			_, err = registryEx.GetFirstStringValueWait(key, "IpConfig", waitForRegistryTimeout)
+			_, err = registryEx.GetStringValueWait(key, "IpConfig", waitForRegistryTimeout)
 			key.Close()
 		}
 	}
