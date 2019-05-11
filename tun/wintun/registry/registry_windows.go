@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
-	"syscall"
 	"time"
 	"unsafe"
 
@@ -104,26 +103,26 @@ func WaitForKey(k registry.Key, path string, timeout time.Duration) error {
 }
 
 //
-// getValue is the same as windows/registry's getValue, which is unfortunately
-// private.
+// getValue is more or less the same as windows/registry's getValue.
 //
-func getValue(k registry.Key, name string, buf []byte) ([]byte, uint32, error) {
-	p, err := syscall.UTF16PtrFromString(name)
+func getValue(k registry.Key, name string, buf []byte) (value []byte, valueType uint32, err error) {
+	var name16 *uint16
+	name16, err = windows.UTF16PtrFromString(name)
 	if err != nil {
-		return nil, 0, err
+		return
 	}
-	var t uint32
 	n := uint32(len(buf))
 	for {
-		err = syscall.RegQueryValueEx(syscall.Handle(k), p, nil, &t, (*byte)(unsafe.Pointer(&buf[0])), &n)
+		err = windows.RegQueryValueEx(windows.Handle(k), name16, nil, &valueType, (*byte)(unsafe.Pointer(&buf[0])), &n)
 		if err == nil {
-			return buf[:n], t, nil
+			value = buf[:n]
+			return
 		}
-		if err != syscall.ERROR_MORE_DATA {
-			return nil, 0, err
+		if err != windows.ERROR_MORE_DATA {
+			return
 		}
 		if n <= uint32(len(buf)) {
-			return nil, 0, err
+			return
 		}
 		buf = make([]byte, n)
 	}
@@ -184,7 +183,7 @@ func toString(buf []byte, valueType uint32, err error) (string, error) {
 		if len(buf) == 0 {
 			return "", nil
 		}
-		value = syscall.UTF16ToString((*[1 << 29]uint16)(unsafe.Pointer(&buf[0]))[:len(buf)/2])
+		value = windows.UTF16ToString((*[(1 << 30) - 1]uint16)(unsafe.Pointer(&buf[0]))[:len(buf)/2])
 
 	default:
 		return "", registry.ErrUnexpectedType
@@ -215,13 +214,17 @@ func toInteger(buf []byte, valueType uint32, err error) (uint64, error) {
 		if len(buf) != 4 {
 			return 0, errors.New("DWORD value is not 4 bytes long")
 		}
-		return uint64(*(*uint32)(unsafe.Pointer(&buf[0]))), nil
+		var val uint32
+		copy((*[4]byte)(unsafe.Pointer(&val))[:], buf)
+		return uint64(val), nil
 
 	case registry.QWORD:
 		if len(buf) != 8 {
 			return 0, errors.New("QWORD value is not 8 bytes long")
 		}
-		return uint64(*(*uint64)(unsafe.Pointer(&buf[0]))), nil
+		var val uint64
+		copy((*[8]byte)(unsafe.Pointer(&val))[:], buf)
+		return val, nil
 
 	default:
 		return 0, registry.ErrUnexpectedType
@@ -240,7 +243,7 @@ func toInteger(buf []byte, valueType uint32, err error) (uint64, error) {
 // If the value type is REG_MULTI_SZ only the first string is returned.
 //
 func GetStringValueWait(key registry.Key, name string, timeout time.Duration) (string, error) {
-	return toString(getValueRetry(key, name, make([]byte, 64), timeout))
+	return toString(getValueRetry(key, name, make([]byte, 256), timeout))
 }
 
 //
@@ -254,7 +257,7 @@ func GetStringValueWait(key registry.Key, name string, timeout time.Duration) (s
 // If the value type is REG_MULTI_SZ only the first string is returned.
 //
 func GetStringValue(key registry.Key, name string) (string, error) {
-	return toString(getValue(key, name, make([]byte, 64)))
+	return toString(getValue(key, name, make([]byte, 256)))
 }
 
 //
