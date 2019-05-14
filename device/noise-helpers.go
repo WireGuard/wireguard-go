@@ -9,9 +9,10 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/subtle"
+	"hash"
+
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/curve25519"
-	"hash"
 )
 
 /* KDF related functions.

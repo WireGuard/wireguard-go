@@ -7,9 +7,10 @@ package rwcancel
 
 import (
 	"errors"
-	"golang.org/x/sys/unix"
 	"os"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 func max(a, b int) int {

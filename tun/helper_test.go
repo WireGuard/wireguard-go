@@ -8,9 +8,10 @@ package tun
 import (
 	"bytes"
 	"errors"
-	"golang.zx2c4.com/wireguard/tun"
 	"os"
 	"testing"
+
+	"golang.zx2c4.com/wireguard/tun"
 )
 
 /* Helpers for writing unit tests

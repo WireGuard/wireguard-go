@@ -10,11 +10,12 @@ package ipc
 import (
 	"errors"
 	"fmt"
-	"golang.org/x/sys/unix"
 	"net"
 	"os"
 	"path"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 var socketDirectory = "/var/run/wireguard"

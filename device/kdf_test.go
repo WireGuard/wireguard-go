@@ -7,8 +7,9 @@ package device
 
 import (
 	"encoding/hex"
-	"golang.org/x/crypto/blake2s"
 	"testing"
+
+	"golang.org/x/crypto/blake2s"
 )
 
 type KDFTest struct {

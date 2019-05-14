@@ -6,8 +6,9 @@
 package ipc
 
 import (
-	"github.com/Microsoft/go-winio"
 	"net"
+
+	"github.com/Microsoft/go-winio"
 )
 
 //TODO: replace these with actual standard windows error numbers from the win package

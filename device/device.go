@@ -6,12 +6,13 @@
 package device
 
 import (
-	"golang.zx2c4.com/wireguard/ratelimiter"
-	"golang.zx2c4.com/wireguard/tun"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.zx2c4.com/wireguard/ratelimiter"
+	"golang.zx2c4.com/wireguard/tun"
 )
 
 const (

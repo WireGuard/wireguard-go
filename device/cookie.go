@@ -8,10 +8,11 @@ package device
 import (
 	"crypto/hmac"
 	"crypto/rand"
-	"golang.org/x/crypto/blake2s"
-	"golang.org/x/crypto/chacha20poly1305"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/blake2s"
+	"golang.org/x/crypto/chacha20poly1305"
 )
 
 type CookieChecker struct {

@@ -7,8 +7,9 @@ package device
 
 import (
 	"encoding/binary"
-	"golang.org/x/sys/windows"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 const (

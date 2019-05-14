@@ -7,13 +7,14 @@ package tun
 
 import (
 	"fmt"
-	"golang.org/x/net/ipv6"
-	"golang.org/x/sys/unix"
 	"io/ioutil"
 	"net"
 	"os"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/net/ipv6"
+	"golang.org/x/sys/unix"
 )
 
 const utunControlName = "com.apple.net.utun_control"

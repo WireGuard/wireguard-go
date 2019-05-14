@@ -12,15 +12,16 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"golang.org/x/net/ipv6"
-	"golang.org/x/sys/unix"
-	"golang.zx2c4.com/wireguard/rwcancel"
 	"net"
 	"os"
 	"sync"
 	"syscall"
 	"time"
 	"unsafe"
+
+	"golang.org/x/net/ipv6"
+	"golang.org/x/sys/unix"
+	"golang.zx2c4.com/wireguard/rwcancel"
 )
 
 const (

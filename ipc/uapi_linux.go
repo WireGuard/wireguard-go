@@ -8,11 +8,12 @@ package ipc
 import (
 	"errors"
 	"fmt"
-	"golang.org/x/sys/unix"
-	"golang.zx2c4.com/wireguard/rwcancel"
 	"net"
 	"os"
 	"path"
+
+	"golang.org/x/sys/unix"
+	"golang.zx2c4.com/wireguard/rwcancel"
 )
 
 var socketDirectory = "/var/run/wireguard"

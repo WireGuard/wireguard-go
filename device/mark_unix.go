@@ -8,8 +8,9 @@
 package device
 
 import (
-	"golang.org/x/sys/unix"
 	"runtime"
+
+	"golang.org/x/sys/unix"
 )
 
 var fwmarkIoctl int

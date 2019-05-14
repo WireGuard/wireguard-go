@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	modnetshell = windows.NewLazySystemDLL("netshell.dll")
+	modnetshell            = windows.NewLazySystemDLL("netshell.dll")
 	procHrRenameConnection = modnetshell.NewProc("HrRenameConnection")
 )
 

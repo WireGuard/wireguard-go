@@ -8,13 +8,14 @@ package device
 import (
 	"bufio"
 	"fmt"
-	"golang.zx2c4.com/wireguard/ipc"
 	"io"
 	"net"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"golang.zx2c4.com/wireguard/ipc"
 )
 
 type IPCError struct {

@@ -18,13 +18,14 @@ package device
 
 import (
 	"errors"
-	"golang.org/x/sys/unix"
-	"golang.zx2c4.com/wireguard/rwcancel"
 	"net"
 	"strconv"
 	"sync"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
+	"golang.zx2c4.com/wireguard/rwcancel"
 )
 
 const (

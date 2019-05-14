@@ -7,9 +7,10 @@ package device
 
 import (
 	"crypto/cipher"
-	"golang.zx2c4.com/wireguard/replay"
 	"sync"
 	"time"
+
+	"golang.zx2c4.com/wireguard/replay"
 )
 
 /* Due to limitations in Go and /x/crypto there is currently

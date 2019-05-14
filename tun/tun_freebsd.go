@@ -9,12 +9,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"golang.org/x/net/ipv6"
-	"golang.org/x/sys/unix"
 	"net"
 	"os"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/net/ipv6"
+	"golang.org/x/sys/unix"
 )
 
 // _TUNSIFHEAD, value derived from sys/net/{if_tun,ioccom}.h
