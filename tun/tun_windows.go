@@ -48,7 +48,7 @@ type NativeTun struct {
 	wrBuff       *exchgBufWrite
 	events       chan TUNEvent
 	errors       chan error
-	forcedMtu    int
+	forcedMTU    int
 }
 
 func packetAlign(size uint32) uint32 {
@@ -97,7 +97,7 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 		wrBuff:    &exchgBufWrite{},
 		events:    make(chan TUNEvent, 10),
 		errors:    make(chan error, 1),
-		forcedMtu: 1500,
+		forcedMTU: 1500,
 	}, nil
 }
 
@@ -221,12 +221,12 @@ func (tun *NativeTun) Close() error {
 }
 
 func (tun *NativeTun) MTU() (int, error) {
-	return tun.forcedMtu, nil
+	return tun.forcedMTU, nil
 }
 
 //TODO: This is a temporary hack. We really need to be monitoring the interface in real time and adapting to MTU changes.
-func (tun *NativeTun) ForceMtu(mtu int) {
-	tun.forcedMtu = mtu
+func (tun *NativeTun) ForceMTU(mtu int) {
+	tun.forcedMTU = mtu
 }
 
 func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
