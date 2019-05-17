@@ -8,7 +8,7 @@ all: generate-version-and-build
 
 ifeq ($(shell go env GOOS)|$(wildcard .git),linux|)
 $(error Do not build this for Linux. Instead use the Linux kernel module. See wireguard.com/install/ for more info.)
-else
+else ifeq ($(shell go env GOOS),linux)
 ireallywantobuildon_linux.go:
 	@printf "WARNING: This software is meant for use on non-Linux\nsystems. For Linux, please use the kernel module\ninstead. See wireguard.com/install/ for more info.\n\n" >&2
 	@printf 'package main\nconst UseTheKernelModuleInstead = 0xdeadbabe\n' > "$@"
