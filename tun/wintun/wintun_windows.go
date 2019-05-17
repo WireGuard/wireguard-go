@@ -471,15 +471,6 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 }
 
 //
-// FlushInterface removes all properties from the interface and gives it only a very
-// vanilla IPv4 and IPv6 configuration with no addresses of any sort assigned.
-//
-func (wintun *Wintun) FlushInterface() error {
-	//TODO: implement me!
-	return nil
-}
-
-//
 // checkReboot checks device install parameters if a system reboot is required.
 //
 func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) (bool, error) {
