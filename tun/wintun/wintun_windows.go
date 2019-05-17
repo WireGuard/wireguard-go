@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
+
 	"golang.zx2c4.com/wireguard/tun/wintun/guid"
 	"golang.zx2c4.com/wireguard/tun/wintun/netshell"
 	registryEx "golang.zx2c4.com/wireguard/tun/wintun/registry"
@@ -25,9 +26,9 @@ import (
 // Wintun is a handle of a Wintun adapter
 //
 type Wintun struct {
-	CfgInstanceID windows.GUID
-	LUIDIndex     uint32
-	IfType        uint32
+	cfgInstanceID windows.GUID
+	luidIndex     uint32
+	ifType        uint32
 }
 
 var deviceClassNetGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0x11ce, Data4: [8]byte{0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}}
@@ -73,9 +74,9 @@ func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 	}
 
 	return &Wintun{
-		CfgInstanceID: *ifid,
-		LUIDIndex:     uint32(luidIdx),
-		IfType:        uint32(ifType),
+		cfgInstanceID: *ifid,
+		luidIndex:     uint32(luidIdx),
+		ifType:        uint32(ifType),
 	}, nil
 }
 
@@ -326,7 +327,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 		// Wait for network registry key to emerge and populate.
 		key, err = registryEx.OpenKeyWait(
 			registry.LOCAL_MACHINE,
-			wintun.GetNetRegKeyName(),
+			wintun.netRegKeyName(),
 			registry.QUERY_VALUE|registry.NOTIFY,
 			waitForRegistryTimeout)
 		if err == nil {
@@ -339,7 +340,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 		// Wait for TCP/IP adapter registry key to emerge and populate.
 		key, err = registryEx.OpenKeyWait(
 			registry.LOCAL_MACHINE,
-			wintun.GetTcpipAdapterRegKeyName(), registry.QUERY_VALUE|registry.NOTIFY,
+			wintun.tcpipAdapterRegKeyName(), registry.QUERY_VALUE|registry.NOTIFY,
 			waitForRegistryTimeout)
 		if err == nil {
 			_, err = registryEx.GetStringValueWait(key, "IpConfig", waitForRegistryTimeout)
@@ -349,7 +350,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 
 	var tcpipInterfaceRegKeyName string
 	if err == nil {
-		tcpipInterfaceRegKeyName, err = wintun.GetTcpipInterfaceRegKeyName()
+		tcpipInterfaceRegKeyName, err = wintun.tcpipInterfaceRegKeyName()
 		if err == nil {
 			// Wait for TCP/IP interface registry key to emerge.
 			key, err = registryEx.OpenKeyWait(
@@ -438,7 +439,7 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 			continue
 		}
 
-		if wintun.CfgInstanceID == wintun2.CfgInstanceID {
+		if wintun.cfgInstanceID == wintun2.cfgInstanceID {
 			// Remove the device.
 			removeDeviceParams := setupapi.RemoveDeviceParams{
 				ClassInstallHeader: *setupapi.MakeClassInstallHeader(setupapi.DIF_REMOVE),
@@ -498,7 +499,7 @@ func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInf
 // GetInterfaceName returns network interface name.
 //
 func (wintun *Wintun) GetInterfaceName() (string, error) {
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.QUERY_VALUE)
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.netRegKeyName(), registry.QUERY_VALUE)
 	if err != nil {
 		return "", fmt.Errorf("Network-specific registry key open failed: %v", err)
 	}
@@ -517,10 +518,10 @@ func (wintun *Wintun) SetInterfaceName(ifname string) error {
 	// separate thread.
 	// TODO: netsh.exe falls back to NciSetConnection in this case. If somebody complains, maybe
 	// we should do the same.
-	go netshell.HrRenameConnection(&wintun.CfgInstanceID, windows.StringToUTF16Ptr(ifname))
+	go netshell.HrRenameConnection(&wintun.cfgInstanceID, windows.StringToUTF16Ptr(ifname))
 
 	// Set the interface name. The above line should have done this too, but in case it failed, we force it.
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetNetRegKeyName(), registry.SET_VALUE)
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.netRegKeyName(), registry.SET_VALUE)
 	if err != nil {
 		return fmt.Errorf("Network-specific registry key open failed: %v", err)
 	}
@@ -529,24 +530,24 @@ func (wintun *Wintun) SetInterfaceName(ifname string) error {
 }
 
 //
-// GetNetRegKeyName returns interface-specific network registry key name.
+// netRegKeyName returns interface-specific network registry key name.
 //
-func (wintun *Wintun) GetNetRegKeyName() string {
-	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Network\\%s\\%s\\Connection", guid.ToString(&deviceClassNetGUID), guid.ToString(&wintun.CfgInstanceID))
+func (wintun *Wintun) netRegKeyName() string {
+	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Network\\%s\\%s\\Connection", guid.ToString(&deviceClassNetGUID), guid.ToString(&wintun.cfgInstanceID))
 }
 
 //
-// GetTcpipAdapterRegKeyName returns adapter-specific TCP/IP network registry key name.
+// tcpipAdapterRegKeyName returns adapter-specific TCP/IP network registry key name.
 //
-func (wintun *Wintun) GetTcpipAdapterRegKeyName() string {
-	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Adapters\\%s", guid.ToString(&wintun.CfgInstanceID))
+func (wintun *Wintun) tcpipAdapterRegKeyName() string {
+	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Adapters\\%s", guid.ToString(&wintun.cfgInstanceID))
 }
 
 //
-// GetTcpipInterfaceRegKeyName returns interface-specific TCP/IP network registry key name.
+// tcpipInterfaceRegKeyName returns interface-specific TCP/IP network registry key name.
 //
-func (wintun *Wintun) GetTcpipInterfaceRegKeyName() (path string, err error) {
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.GetTcpipAdapterRegKeyName(), registry.QUERY_VALUE)
+func (wintun *Wintun) tcpipInterfaceRegKeyName() (path string, err error) {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.tcpipAdapterRegKeyName(), registry.QUERY_VALUE)
 	if err != nil {
 		return "", fmt.Errorf("Error opening adapter-specific TCP/IP network registry key: %v", err)
 	}
@@ -565,5 +566,19 @@ func (wintun *Wintun) GetTcpipInterfaceRegKeyName() (path string, err error) {
 // DataFileName returns Wintun device data pipe name.
 //
 func (wintun *Wintun) DataFileName() string {
-	return fmt.Sprintf("\\\\.\\Global\\WINTUN%d", wintun.LUIDIndex)
+	return fmt.Sprintf("\\\\.\\Global\\WINTUN%d", wintun.luidIndex)
+}
+
+//
+// GUID returns the GUID of the interface.
+//
+func (wintun *Wintun) GUID() windows.GUID {
+	return wintun.cfgInstanceID
+}
+
+//
+// LUID returns the LUID of the interface.
+//
+func (wintun *Wintun) LUID() uint64 {
+	return ((uint64(wintun.luidIndex) & ((1 << 24) - 1)) << 24) | ((uint64(wintun.ifType) & ((1 << 16) - 1)) << 48)
 }
