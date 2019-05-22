@@ -66,7 +66,7 @@ type DevInfoListDetailData struct {
 	remoteMachineName   [SP_MAX_MACHINENAME_LENGTH]uint16
 }
 
-func (data *DevInfoListDetailData) GetRemoteMachineName() string {
+func (data *DevInfoListDetailData) RemoteMachineName() string {
 	return windows.UTF16ToString(data.remoteMachineName[:])
 }
 
@@ -138,7 +138,7 @@ type DevInstallParams struct {
 	driverPath               [windows.MAX_PATH]uint16
 }
 
-func (params *DevInstallParams) GetDriverPath() string {
+func (params *DevInstallParams) DriverPath() string {
 	return windows.UTF16ToString(params.driverPath[:])
 }
 
@@ -304,7 +304,7 @@ type DrvInfoData struct {
 	DriverVersion uint64
 }
 
-func (data *DrvInfoData) GetDescription() string {
+func (data *DrvInfoData) Description() string {
 	return windows.UTF16ToString(data.description[:])
 }
 
@@ -317,7 +317,7 @@ func (data *DrvInfoData) SetDescription(description string) error {
 	return nil
 }
 
-func (data *DrvInfoData) GetMfgName() string {
+func (data *DrvInfoData) MfgName() string {
 	return windows.UTF16ToString(data.mfgName[:])
 }
 
@@ -330,7 +330,7 @@ func (data *DrvInfoData) SetMfgName(mfgName string) error {
 	return nil
 }
 
-func (data *DrvInfoData) GetProviderName() string {
+func (data *DrvInfoData) ProviderName() string {
 	return windows.UTF16ToString(data.providerName[:])
 }
 
@@ -382,19 +382,19 @@ type DrvInfoDetailData struct {
 	hardwareID      [ANYSIZE_ARRAY]uint16
 }
 
-func (data *DrvInfoDetailData) GetSectionName() string {
+func (data *DrvInfoDetailData) SectionName() string {
 	return windows.UTF16ToString(data.sectionName[:])
 }
 
-func (data *DrvInfoDetailData) GetInfFileName() string {
+func (data *DrvInfoDetailData) InfFileName() string {
 	return windows.UTF16ToString(data.infFileName[:])
 }
 
-func (data *DrvInfoDetailData) GetDrvDescription() string {
+func (data *DrvInfoDetailData) DrvDescription() string {
 	return windows.UTF16ToString(data.drvDescription[:])
 }
 
-func (data *DrvInfoDetailData) GetHardwareID() string {
+func (data *DrvInfoDetailData) HardwareID() string {
 	if data.compatIDsOffset > 1 {
 		bufW := data.getBuf()
 		return windows.UTF16ToString(bufW[:wcslen(bufW)])
@@ -403,7 +403,7 @@ func (data *DrvInfoDetailData) GetHardwareID() string {
 	return ""
 }
 
-func (data *DrvInfoDetailData) GetCompatIDs() []string {
+func (data *DrvInfoDetailData) CompatIDs() []string {
 	a := make([]string, 0)
 
 	if data.compatIDsLength > 0 {
@@ -434,10 +434,10 @@ func (data *DrvInfoDetailData) getBuf() []uint16 {
 // IsCompatible method tests if given hardware ID matches the driver or is listed on the compatible ID list.
 func (data *DrvInfoDetailData) IsCompatible(hwid string) bool {
 	hwidLC := strings.ToLower(hwid)
-	if strings.ToLower(data.GetHardwareID()) == hwidLC {
+	if strings.ToLower(data.HardwareID()) == hwidLC {
 		return true
 	}
-	a := data.GetCompatIDs()
+	a := data.CompatIDs()
 	for i := range a {
 		if strings.ToLower(a[i]) == hwidLC {
 			return true

@@ -52,7 +52,7 @@ func TestSetupDiGetDeviceInfoListDetail(t *testing.T) {
 	}
 	defer devInfoList.Close()
 
-	data, err := devInfoList.GetDeviceInfoListDetail()
+	data, err := devInfoList.DeviceInfoListDetail()
 	if err != nil {
 		t.Errorf("Error calling SetupDiGetDeviceInfoListDetail: %s", err.Error())
 	} else {
@@ -64,7 +64,7 @@ func TestSetupDiGetDeviceInfoListDetail(t *testing.T) {
 			t.Error("SetupDiGetDeviceInfoListDetail returned non-NULL remote machine handle")
 		}
 
-		if data.GetRemoteMachineName() != "" {
+		if data.RemoteMachineName() != "" {
 			t.Error("SetupDiGetDeviceInfoListDetail returned non-NULL remote machine name")
 		}
 	}
@@ -75,7 +75,7 @@ func TestSetupDiGetDeviceInfoListDetail(t *testing.T) {
 	}
 	defer devInfoList.Close()
 
-	data, err = devInfoList.GetDeviceInfoListDetail()
+	data, err = devInfoList.DeviceInfoListDetail()
 	if err != nil {
 		t.Errorf("Error calling SetupDiGetDeviceInfoListDetail: %s", err.Error())
 	} else {
@@ -87,14 +87,14 @@ func TestSetupDiGetDeviceInfoListDetail(t *testing.T) {
 			t.Error("SetupDiGetDeviceInfoListDetail returned NULL remote machine handle")
 		}
 
-		if data.GetRemoteMachineName() != computerName {
+		if data.RemoteMachineName() != computerName {
 			t.Error("SetupDiGetDeviceInfoListDetail returned different remote machine name")
 		}
 	}
 
 	data = &DevInfoListDetailData{}
 	data.SetRemoteMachineName("foobar")
-	if data.GetRemoteMachineName() != "foobar" {
+	if data.RemoteMachineName() != "foobar" {
 		t.Error("DevInfoListDetailData.(Get|Set)RemoteMachineName() differ")
 	}
 }
@@ -210,7 +210,7 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 				selectedDriverData = driverData
 			}
 
-			driverDetailData, err := devInfoList.GetDriverInfoDetail(deviceData, driverData)
+			driverDetailData, err := devInfoList.DriverInfoDetail(deviceData, driverData)
 			if err != nil {
 				t.Errorf("Error calling SetupDiGetDriverInfoDetail: %s", err.Error())
 			}
@@ -218,10 +218,10 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 			if driverDetailData.IsCompatible("foobar-aab6e3a4-144e-4786-88d3-6cec361e1edd") {
 				t.Error("Invalid HWID compatibitlity reported")
 			}
-			if !driverDetailData.IsCompatible(strings.ToUpper(driverDetailData.GetHardwareID())) {
+			if !driverDetailData.IsCompatible(strings.ToUpper(driverDetailData.HardwareID())) {
 				t.Error("HWID compatibitlity missed")
 			}
-			a := driverDetailData.GetCompatIDs()
+			a := driverDetailData.CompatIDs()
 			for k := range a {
 				if !driverDetailData.IsCompatible(strings.ToUpper(a[k])) {
 					t.Error("HWID compatibitlity missed")
@@ -229,7 +229,7 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 			}
 		}
 
-		selectedDriverData2, err := devInfoList.GetSelectedDriver(deviceData)
+		selectedDriverData2, err := devInfoList.SelectedDriver(deviceData)
 		if err != nil {
 			t.Errorf("Error calling SetupDiGetSelectedDriver: %s", err.Error())
 		} else if *selectedDriverData != *selectedDriverData2 {
@@ -239,15 +239,15 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 
 	data := &DrvInfoData{}
 	data.SetDescription("foobar")
-	if data.GetDescription() != "foobar" {
+	if data.Description() != "foobar" {
 		t.Error("DrvInfoData.(Get|Set)Description() differ")
 	}
 	data.SetMfgName("foobar")
-	if data.GetMfgName() != "foobar" {
+	if data.MfgName() != "foobar" {
 		t.Error("DrvInfoData.(Get|Set)MfgName() differ")
 	}
 	data.SetProviderName("foobar")
-	if data.GetProviderName() != "foobar" {
+	if data.ProviderName() != "foobar" {
 		t.Error("DrvInfoData.(Get|Set)ProviderName() differ")
 	}
 }
@@ -311,14 +311,14 @@ func TestSetupDiGetDeviceRegistryProperty(t *testing.T) {
 			continue
 		}
 
-		val, err := devInfoList.GetDeviceRegistryProperty(data, SPDRP_CLASS)
+		val, err := devInfoList.DeviceRegistryProperty(data, SPDRP_CLASS)
 		if err != nil {
 			t.Errorf("Error calling SetupDiGetDeviceRegistryProperty(SPDRP_CLASS): %s", err.Error())
 		} else if class, ok := val.(string); !ok || strings.ToLower(class) != "net" {
 			t.Errorf("SetupDiGetDeviceRegistryProperty(SPDRP_CLASS) should return \"Net\"")
 		}
 
-		val, err = devInfoList.GetDeviceRegistryProperty(data, SPDRP_CLASSGUID)
+		val, err = devInfoList.DeviceRegistryProperty(data, SPDRP_CLASSGUID)
 		if err != nil {
 			t.Errorf("Error calling SetupDiGetDeviceRegistryProperty(SPDRP_CLASSGUID): %s", err.Error())
 		} else if valStr, ok := val.(string); !ok {
@@ -332,7 +332,7 @@ func TestSetupDiGetDeviceRegistryProperty(t *testing.T) {
 			}
 		}
 
-		val, err = devInfoList.GetDeviceRegistryProperty(data, SPDRP_COMPATIBLEIDS)
+		val, err = devInfoList.DeviceRegistryProperty(data, SPDRP_COMPATIBLEIDS)
 		if err != nil {
 			// Some devices have no SPDRP_COMPATIBLEIDS.
 			if errWin, ok := err.(syscall.Errno); !ok || errWin != windows.ERROR_INVALID_DATA {
@@ -340,12 +340,12 @@ func TestSetupDiGetDeviceRegistryProperty(t *testing.T) {
 			}
 		}
 
-		val, err = devInfoList.GetDeviceRegistryProperty(data, SPDRP_CONFIGFLAGS)
+		val, err = devInfoList.DeviceRegistryProperty(data, SPDRP_CONFIGFLAGS)
 		if err != nil {
 			t.Errorf("Error calling SetupDiGetDeviceRegistryProperty(SPDRP_CONFIGFLAGS): %s", err.Error())
 		}
 
-		val, err = devInfoList.GetDeviceRegistryProperty(data, SPDRP_DEVICE_POWER_DATA)
+		val, err = devInfoList.DeviceRegistryProperty(data, SPDRP_DEVICE_POWER_DATA)
 		if err != nil {
 			t.Errorf("Error calling SetupDiGetDeviceRegistryProperty(SPDRP_DEVICE_POWER_DATA): %s", err.Error())
 		}
@@ -368,7 +368,7 @@ func TestSetupDiGetDeviceInstallParams(t *testing.T) {
 			continue
 		}
 
-		_, err = devInfoList.GetDeviceInstallParams(data)
+		_, err = devInfoList.DeviceInstallParams(data)
 		if err != nil {
 			t.Errorf("Error calling SetupDiGetDeviceInstallParams: %s", err.Error())
 		}
@@ -376,7 +376,7 @@ func TestSetupDiGetDeviceInstallParams(t *testing.T) {
 
 	params := &DevInstallParams{}
 	params.SetDriverPath("foobar")
-	if params.GetDriverPath() != "foobar" {
+	if params.DriverPath() != "foobar" {
 		t.Error("DevInstallParams.(Get|Set)DriverPath() differ")
 	}
 }
@@ -452,7 +452,7 @@ func TestSetupDiGetSelectedDevice(t *testing.T) {
 			t.Errorf("Error calling SetupDiSetSelectedDevice: %s", err.Error())
 		}
 
-		data2, err := devInfoList.GetSelectedDevice()
+		data2, err := devInfoList.SelectedDevice()
 		if err != nil {
 			t.Errorf("Error calling SetupDiGetSelectedDevice: %s", err.Error())
 		} else if *data != *data2 {

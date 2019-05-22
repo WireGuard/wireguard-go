@@ -125,7 +125,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 
 		//TODO: is there a better way than comparing ifnames?
 		// Get interface name.
-		ifname2, err := wintun.GetInterfaceName()
+		ifname2, err := wintun.InterfaceName()
 		if err != nil {
 			continue
 		}
@@ -151,7 +151,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 				}
 
 				// Get driver info details.
-				driverDetailData, err := devInfoList.GetDriverInfoDetail(deviceData, driverData)
+				driverDetailData, err := devInfoList.DriverInfoDetail(deviceData, driverData)
 				if err != nil {
 					// Something is wrong with this driver. Skip it.
 					continue
@@ -241,7 +241,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 		// Check the driver version first, since the check is trivial and will save us iterating over hardware IDs for any driver versioned prior our best match.
 		if driverData.IsNewer(driverDate, driverVersion) {
 			// Get driver info details.
-			driverDetailData, err := devInfoList.GetDriverInfoDetail(deviceData, driverData)
+			driverDetailData, err := devInfoList.DriverInfoDetail(deviceData, driverData)
 			if err != nil {
 				// Something is wrong with this driver. Skip it.
 				continue
@@ -474,7 +474,7 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 // checkReboot checks device install parameters if a system reboot is required.
 //
 func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) (bool, error) {
-	devInstallParams, err := deviceInfoSet.GetDeviceInstallParams(deviceInfoData)
+	devInstallParams, err := deviceInfoSet.DeviceInstallParams(deviceInfoData)
 	if err != nil {
 		return false, err
 	}
@@ -487,9 +487,9 @@ func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInf
 }
 
 //
-// GetInterfaceName returns network interface name.
+// InterfaceName returns network interface name.
 //
-func (wintun *Wintun) GetInterfaceName() (string, error) {
+func (wintun *Wintun) InterfaceName() (string, error) {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.netRegKeyName(), registry.QUERY_VALUE)
 	if err != nil {
 		return "", fmt.Errorf("Network-specific registry key open failed: %v", err)

@@ -40,8 +40,8 @@ func SetupDiGetDeviceInfoListDetail(deviceInfoSet DevInfo) (deviceInfoSetDetailD
 	return data, setupDiGetDeviceInfoListDetail(deviceInfoSet, data)
 }
 
-// GetDeviceInfoListDetail method retrieves information associated with a device information set including the class GUID, remote computer handle, and remote computer name.
-func (deviceInfoSet DevInfo) GetDeviceInfoListDetail() (*DevInfoListDetailData, error) {
+// DeviceInfoListDetail method retrieves information associated with a device information set including the class GUID, remote computer handle, and remote computer name.
+func (deviceInfoSet DevInfo) DeviceInfoListDetail() (*DevInfoListDetailData, error) {
 	return SetupDiGetDeviceInfoListDetail(deviceInfoSet)
 }
 
@@ -135,8 +135,8 @@ func SetupDiGetSelectedDriver(deviceInfoSet DevInfo, deviceInfoData *DevInfoData
 	return data, setupDiGetSelectedDriver(deviceInfoSet, deviceInfoData, data)
 }
 
-// GetSelectedDriver method retrieves the selected driver for a device information set or a particular device information element.
-func (deviceInfoSet DevInfo) GetSelectedDriver(deviceInfoData *DevInfoData) (*DrvInfoData, error) {
+// SelectedDriver method retrieves the selected driver for a device information set or a particular device information element.
+func (deviceInfoSet DevInfo) SelectedDriver(deviceInfoData *DevInfoData) (*DrvInfoData, error) {
 	return SetupDiGetSelectedDriver(deviceInfoSet, deviceInfoData)
 }
 
@@ -181,8 +181,8 @@ func SetupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoDa
 	return nil, err
 }
 
-// GetDriverInfoDetail method retrieves driver information detail for a device information set or a particular device information element in the device information set.
-func (deviceInfoSet DevInfo) GetDriverInfoDetail(deviceInfoData *DevInfoData, driverInfoData *DrvInfoData) (*DrvInfoDetailData, error) {
+// DriverInfoDetail method retrieves driver information detail for a device information set or a particular device information element in the device information set.
+func (deviceInfoSet DevInfo) DriverInfoDetail(deviceInfoData *DevInfoData, driverInfoData *DrvInfoData) (*DrvInfoDetailData, error) {
 	return SetupDiGetDriverInfoDetail(deviceInfoSet, deviceInfoData, driverInfoData)
 }
 
@@ -323,8 +323,8 @@ func wcslen(str []uint16) int {
 	return len(str)
 }
 
-// GetDeviceRegistryProperty method retrieves a specified Plug and Play device property.
-func (deviceInfoSet DevInfo) GetDeviceRegistryProperty(deviceInfoData *DevInfoData, property SPDRP) (interface{}, error) {
+// DeviceRegistryProperty method retrieves a specified Plug and Play device property.
+func (deviceInfoSet DevInfo) DeviceRegistryProperty(deviceInfoData *DevInfoData, property SPDRP) (interface{}, error) {
 	return SetupDiGetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property)
 }
 
@@ -360,16 +360,16 @@ func SetupDiGetDeviceInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInf
 	return params, setupDiGetDeviceInstallParams(deviceInfoSet, deviceInfoData, params)
 }
 
-// GetDeviceInstallParams method retrieves device installation parameters for a device information set or a particular device information element.
-func (deviceInfoSet DevInfo) GetDeviceInstallParams(deviceInfoData *DevInfoData) (*DevInstallParams, error) {
+// DeviceInstallParams method retrieves device installation parameters for a device information set or a particular device information element.
+func (deviceInfoSet DevInfo) DeviceInstallParams(deviceInfoData *DevInfoData) (*DevInstallParams, error) {
 	return SetupDiGetDeviceInstallParams(deviceInfoSet, deviceInfoData)
 }
 
 // SetupDiGetClassInstallParams function retrieves class installation parameters for a device information set or a particular device information element.
 //sys	SetupDiGetClassInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, classInstallParams *ClassInstallHeader, classInstallParamsSize uint32, requiredSize *uint32) (err error) = setupapi.SetupDiGetClassInstallParamsW
 
-// GetClassInstallParams method retrieves class installation parameters for a device information set or a particular device information element.
-func (deviceInfoSet DevInfo) GetClassInstallParams(deviceInfoData *DevInfoData, classInstallParams *ClassInstallHeader, classInstallParamsSize uint32, requiredSize *uint32) error {
+// ClassInstallParams method retrieves class installation parameters for a device information set or a particular device information element.
+func (deviceInfoSet DevInfo) ClassInstallParams(deviceInfoData *DevInfoData, classInstallParams *ClassInstallHeader, classInstallParamsSize uint32, requiredSize *uint32) error {
 	return SetupDiGetClassInstallParams(deviceInfoSet, deviceInfoData, classInstallParams, classInstallParamsSize, requiredSize)
 }
 
@@ -460,8 +460,8 @@ func SetupDiGetSelectedDevice(deviceInfoSet DevInfo) (*DevInfoData, error) {
 	return data, setupDiGetSelectedDevice(deviceInfoSet, data)
 }
 
-// GetSelectedDevice method retrieves the selected device information element in a device information set.
-func (deviceInfoSet DevInfo) GetSelectedDevice() (*DevInfoData, error) {
+// SelectedDevice method retrieves the selected device information element in a device information set.
+func (deviceInfoSet DevInfo) SelectedDevice() (*DevInfoData, error) {
 	return SetupDiGetSelectedDevice(deviceInfoSet)
 }
 

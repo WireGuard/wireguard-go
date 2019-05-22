@@ -185,7 +185,7 @@ func (tun *NativeTun) getTUN() (read *os.File, write *os.File, err error) {
 }
 
 func (tun *NativeTun) Name() (string, error) {
-	return tun.wt.GetInterfaceName()
+	return tun.wt.InterfaceName()
 }
 
 func (tun *NativeTun) File() *os.File {
