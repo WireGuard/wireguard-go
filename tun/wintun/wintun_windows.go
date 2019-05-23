@@ -168,7 +168,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 		}
 	}
 
-	return nil, nil
+	return nil, windows.ERROR_OBJECT_NOT_FOUND
 }
 
 //
