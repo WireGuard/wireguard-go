@@ -8,7 +8,7 @@ package ipc
 import (
 	"net"
 
-	"github.com/Microsoft/go-winio"
+	"golang.zx2c4.com/wireguard/ipc/winpipe"
 )
 
 //TODO: replace these with actual standard windows error numbers from the win package
@@ -59,10 +59,10 @@ func GetSystemSecurityDescriptor() string {
 }
 
 func UAPIListen(name string) (net.Listener, error) {
-	config := winio.PipeConfig{
+	config := winpipe.PipeConfig{
 		SecurityDescriptor: GetSystemSecurityDescriptor(),
 	}
-	listener, err := winio.ListenPipe("\\\\.\\pipe\\WireGuard\\"+name, &config)
+	listener, err := winpipe.ListenPipe("\\\\.\\pipe\\WireGuard\\"+name, &config)
 	if err != nil {
 		return nil, err
 	}
