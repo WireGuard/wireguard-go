@@ -89,8 +89,9 @@ func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 // optional and can be 0. If a specific top-level window is not required, set
 // hwndParent to 0.
 //
-// Function returns interface if found, or nil otherwise. If the interface is
-// found but not Wintun-class, the function returns interface and an error.
+// Function returns interface if found, or windows.ERROR_OBJECT_NOT_FOUND
+// otherwise. If the interface is found but not Wintun-class, the function
+// returns windows.ERROR_ALREADY_EXISTS.
 //
 func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 	// Create a list of network devices.
@@ -164,7 +165,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 			}
 
 			// This interface is not using Wintun driver.
-			return nil, errors.New("Foreign network interface with the same name exists")
+			return nil, windows.ERROR_ALREADY_EXISTS
 		}
 	}
 

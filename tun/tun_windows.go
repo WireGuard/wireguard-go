@@ -71,6 +71,8 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Unable to delete already existing Wintun interface: %v", err)
 		}
+	} else if err == windows.ERROR_ALREADY_EXISTS {
+		return nil, fmt.Errorf("Foreign network interface with the same name exists")
 	}
 	wt, _, err = wintun.CreateInterface("WireGuard Tunnel Adapter", 0)
 	if err != nil {
