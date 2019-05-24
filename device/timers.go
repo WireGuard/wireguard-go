@@ -147,7 +147,7 @@ func expiredPersistentKeepalive(peer *Peer) {
 /* Should be called after an authenticated data packet is sent. */
 func (peer *Peer) timersDataSent() {
 	if peer.timersActive() && !peer.timers.newHandshake.IsPending() {
-		peer.timers.newHandshake.Mod(KeepaliveTimeout + RekeyTimeout)
+		peer.timers.newHandshake.Mod(KeepaliveTimeout + RekeyTimeout + time.Millisecond*time.Duration(rand.Int31n(RekeyTimeoutJitterMaxMs)))
 	}
 }
 
