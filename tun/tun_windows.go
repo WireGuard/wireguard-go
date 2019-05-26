@@ -361,7 +361,7 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 	return len(buff) - offset, nil
 }
 
-///
+//
 // LUID returns Windows adapter instance ID.
 //
 func (tun *NativeTun) LUID() uint64 {
