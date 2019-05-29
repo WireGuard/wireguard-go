@@ -15,11 +15,15 @@ import (
  */
 func TestMonotonic(t *testing.T) {
 	old := Now()
-	for i := 0; i < 10000; i++ {
-		time.Sleep(time.Nanosecond)
+	for i := 0; i < 50; i++ {
 		next := Now()
+		if next.After(old) {
+			t.Error("Whitening insufficient")
+		}
+		time.Sleep(time.Duration(whitenerMask)/time.Nanosecond + 1)
+		next = Now()
 		if !next.After(old) {
-			t.Error("TAI64N, not monotonically increasing on nano-second scale")
+			t.Error("Not monotonically increasing on whitened nano-second scale")
 		}
 		old = next
 	}
