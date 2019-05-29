@@ -9,21 +9,17 @@ package device
  * without network dependencies
  */
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
 func TestDevice(t *testing.T) {
 
 	// prepare tun devices for generating traffic
 
-	tun1, err := CreateDummyTUN("tun1")
-	if err != nil {
-		t.Error("failed to create tun:", err.Error())
-	}
-
-	tun2, err := CreateDummyTUN("tun2")
-	if err != nil {
-		t.Error("failed to create tun:", err.Error())
-	}
+	tun1 := newDummyTUN("tun1")
+	tun2 := newDummyTUN("tun2")
 
 	_ = tun1
 	_ = tun2
@@ -45,4 +41,28 @@ func TestDevice(t *testing.T) {
 
 	// create binds
 
+}
+
+func randDevice(t *testing.T) *Device {
+	sk, err := newPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tun := newDummyTUN("dummy")
+	logger := NewLogger(LogLevelError, "")
+	device := NewDevice(tun, logger)
+	device.SetPrivateKey(sk)
+	return device
+}
+
+func assertNil(t *testing.T, err error) {
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertEqual(t *testing.T, a []byte, b []byte) {
+	if bytes.Compare(a, b) != 0 {
+		t.Fatal(a, "!=", b)
+	}
 }
