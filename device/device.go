@@ -396,3 +396,20 @@ func (device *Device) Close() {
 func (device *Device) Wait() chan struct{} {
 	return device.signals.stop
 }
+
+func (device *Device) SendKeepalivesToPeersWithCurrentKeypair() {
+	if device.isClosed.Get() {
+		return
+	}
+
+	device.peers.RLock()
+	for _, peer := range device.peers.keyMap {
+		peer.keypairs.RLock()
+		sendKeepalive := peer.keypairs.current != nil && !peer.keypairs.current.created.Add(RejectAfterTime).Before(time.Now())
+		peer.keypairs.RUnlock()
+		if sendKeepalive {
+			peer.SendKeepalive()
+		}
+	}
+	device.peers.RUnlock()
+}
