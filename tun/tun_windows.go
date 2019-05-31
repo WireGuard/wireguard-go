@@ -8,6 +8,7 @@ package tun
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -230,6 +231,7 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	default:
 	}
 
+	retries := 1000
 	for {
 		if tun.rdBuff.offset+packetExchangeAlignment <= tun.rdBuff.avail {
 			// Get packet from the exchange buffer.
@@ -255,31 +257,31 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 			return 0, err
 		}
 
-		// Fill queue.
-		retries := 1000
-		for {
-			n, err := file.Read(tun.rdBuff.data[:])
-			if err != nil {
-				tun.rdBuff.offset = 0
-				tun.rdBuff.avail = 0
-				pe, ok := err.(*os.PathError)
-				if tun.close {
-					return 0, os.ErrClosed
-				}
-				if retries > 0 && ok && pe.Err == windows.ERROR_OPERATION_ABORTED {
-					retries--
-					continue
-				}
-				if ok && pe.Err == windows.ERROR_HANDLE_EOF {
-					tun.closeTUN()
-					break
-				}
-				return 0, err
-			}
+		n, err := file.Read(tun.rdBuff.data[:])
+		if err != nil {
 			tun.rdBuff.offset = 0
-			tun.rdBuff.avail = uint32(n)
-			break
+			tun.rdBuff.avail = 0
+			pe, ok := err.(*os.PathError)
+			if tun.close {
+				return 0, os.ErrClosed
+			}
+			if retries > 0 && ok && (pe.Err == windows.ERROR_HANDLE_EOF || pe.Err == windows.ERROR_OPERATION_ABORTED) {
+				retries--
+				tun.closeTUN()
+				time.Sleep(time.Millisecond * 2)
+				continue
+			}
+			return 0, err
 		}
+		if n == 0 {
+			if retries == 0 {
+				return 0, io.ErrShortBuffer
+			}
+			retries--
+			continue
+		}
+		tun.rdBuff.offset = 0
+		tun.rdBuff.avail = uint32(n)
 	}
 }
 
@@ -289,6 +291,11 @@ func (tun *NativeTun) Flush() error {
 	if tun.wrBuff.offset == 0 {
 		return nil
 	}
+	defer func() {
+		tun.wrBuff.packetNum = 0
+		tun.wrBuff.offset = 0
+	}()
+	retries := 1000
 
 	for {
 		// Get TUN data pipe.
@@ -297,23 +304,22 @@ func (tun *NativeTun) Flush() error {
 			return err
 		}
 
-		// Flush write buffer.
-		retries := 1000
 		for {
 			_, err = file.Write(tun.wrBuff.data[:tun.wrBuff.offset])
-			tun.wrBuff.packetNum = 0
-			tun.wrBuff.offset = 0
 			if err != nil {
 				pe, ok := err.(*os.PathError)
 				if tun.close {
 					return os.ErrClosed
 				}
-				if retries > 0 && ok && pe.Err == windows.ERROR_OPERATION_ABORTED {
+				if retries > 0 && ok && pe.Err == windows.ERROR_OPERATION_ABORTED { // Adapter is paused or in low-power state.
 					retries--
+					time.Sleep(time.Millisecond * 2)
 					continue
 				}
-				if ok && pe.Err == windows.ERROR_HANDLE_EOF {
+				if retries > 0 && ok && pe.Err == windows.ERROR_HANDLE_EOF { // Adapter is going down.
+					retries--
 					tun.closeTUN()
+					time.Sleep(time.Millisecond * 2)
 					break
 				}
 				return err
