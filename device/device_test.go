@@ -61,8 +61,8 @@ func assertNil(t *testing.T, err error) {
 	}
 }
 
-func assertEqual(t *testing.T, a []byte, b []byte) {
-	if bytes.Compare(a, b) != 0 {
+func assertEqual(t *testing.T, a, b []byte) {
+	if !bytes.Equal(a, b) {
 		t.Fatal(a, "!=", b)
 	}
 }
