@@ -268,14 +268,33 @@ func MakeClassInstallHeader(installFunction DI_FUNCTION) *ClassInstallHeader {
 	return hdr
 }
 
+// DICS_STATE specifies values indicating a change in a device's state
+type DICS_STATE uint32
+
+const (
+	DICS_ENABLE     DICS_STATE = 0x00000001 // The device is being enabled.
+	DICS_DISABLE    DICS_STATE = 0x00000002 // The device is being disabled.
+	DICS_PROPCHANGE DICS_STATE = 0x00000003 // The properties of the device have changed.
+	DICS_START      DICS_STATE = 0x00000004 // The device is being started (if the request is for the currently active hardware profile).
+	DICS_STOP       DICS_STATE = 0x00000005 // The device is being stopped. The driver stack will be unloaded and the CSCONFIGFLAG_DO_NOT_START flag will be set for the device.
+)
+
 // DICS_FLAG specifies the scope of a device property change
 type DICS_FLAG uint32
 
 const (
 	DICS_FLAG_GLOBAL         DICS_FLAG = 0x00000001 // make change in all hardware profiles
 	DICS_FLAG_CONFIGSPECIFIC DICS_FLAG = 0x00000002 // make change in specified profile only
-	DICS_FLAG_CONFIGGENERAL  DICS_FLAG = 0x00000004 // 1 or more hardware profile-specific changes to follow
+	DICS_FLAG_CONFIGGENERAL  DICS_FLAG = 0x00000004 // 1 or more hardware profile-specific changes to follow (obsolete)
 )
+
+// PropChangeParams is a structure corresponding to a DIF_PROPERTYCHANGE install function.
+type PropChangeParams struct {
+	ClassInstallHeader ClassInstallHeader
+	StateChange        DICS_STATE
+	Scope              DICS_FLAG
+	HwProfile          uint32
+}
 
 // DI_REMOVEDEVICE specifies the scope of the device removal
 type DI_REMOVEDEVICE uint32
