@@ -129,14 +129,14 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	}
 
 	peer.handshake.mutex.RLock()
-	if time.Now().Sub(peer.handshake.lastSentHandshake) < RekeyTimeout {
+	if time.Since(peer.handshake.lastSentHandshake) < RekeyTimeout {
 		peer.handshake.mutex.RUnlock()
 		return nil
 	}
 	peer.handshake.mutex.RUnlock()
 
 	peer.handshake.mutex.Lock()
-	if time.Now().Sub(peer.handshake.lastSentHandshake) < RekeyTimeout {
+	if time.Since(peer.handshake.lastSentHandshake) < RekeyTimeout {
 		peer.handshake.mutex.Unlock()
 		return nil
 	}
@@ -232,7 +232,7 @@ func (peer *Peer) keepKeyFreshSending() {
 		return
 	}
 	nonce := atomic.LoadUint64(&keypair.sendNonce)
-	if nonce > RekeyAfterMessages || (keypair.isInitiator && time.Now().Sub(keypair.created) > RekeyAfterTime) {
+	if nonce > RekeyAfterMessages || (keypair.isInitiator && time.Since(keypair.created) > RekeyAfterTime) {
 		peer.SendHandshakeInitiation(false)
 	}
 }
@@ -390,7 +390,7 @@ func (peer *Peer) RoutineNonce() {
 
 				keypair = peer.keypairs.Current()
 				if keypair != nil && keypair.sendNonce < RejectAfterMessages {
-					if time.Now().Sub(keypair.created) < RejectAfterTime {
+					if time.Since(keypair.created) < RejectAfterTime {
 						break
 					}
 				}

@@ -79,7 +79,7 @@ func (peer *Peer) keepKeyFreshReceiving() {
 		return
 	}
 	keypair := peer.keypairs.Current()
-	if keypair != nil && keypair.isInitiator && time.Now().Sub(keypair.created) > (RejectAfterTime-KeepaliveTimeout-RekeyTimeout) {
+	if keypair != nil && keypair.isInitiator && time.Since(keypair.created) > (RejectAfterTime-KeepaliveTimeout-RekeyTimeout) {
 		peer.timers.sentLastMinuteHandshake.Set(true)
 		peer.SendHandshakeInitiation(false)
 	}

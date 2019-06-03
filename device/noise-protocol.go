@@ -301,7 +301,7 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 
 	var ok bool
 	ok = timestamp.After(handshake.lastTimestamp)
-	ok = ok && time.Now().Sub(handshake.lastInitiationConsumption) > HandshakeInitationRate
+	ok = ok && time.Since(handshake.lastInitiationConsumption) > HandshakeInitationRate
 	handshake.mutex.RUnlock()
 	if !ok {
 		return nil

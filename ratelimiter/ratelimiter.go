@@ -76,7 +76,7 @@ func (rate *Ratelimiter) Init() {
 
 					for key, entry := range rate.tableIPv4 {
 						entry.Lock()
-						if time.Now().Sub(entry.lastTime) > garbageCollectTime {
+						if time.Since(entry.lastTime) > garbageCollectTime {
 							delete(rate.tableIPv4, key)
 						}
 						entry.Unlock()
@@ -84,7 +84,7 @@ func (rate *Ratelimiter) Init() {
 
 					for key, entry := range rate.tableIPv6 {
 						entry.Lock()
-						if time.Now().Sub(entry.lastTime) > garbageCollectTime {
+						if time.Since(entry.lastTime) > garbageCollectTime {
 							delete(rate.tableIPv6, key)
 						}
 						entry.Unlock()
