@@ -417,71 +417,41 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 // optional and can be 0. If a specific top-level window is not required, set
 // hwndParent to 0.
 //
-// Function returns true if the interface was found and deleted and a flag if
-// reboot is required.
+// Function silently succeeds if the interface was not found.
 //
-func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
-	// Create a list of network devices.
-	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, enumerator, hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), machineName)
+// Function returns true if a reboot is required.
+//
+func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, error) {
+	devInfoList, deviceData, err := wintun.deviceData(hwndParent)
+	if err == windows.ERROR_OBJECT_NOT_FOUND {
+		return false, nil
+	}
 	if err != nil {
-		return false, false, fmt.Errorf("SetupDiGetClassDevsEx(%s) failed: %v", guid.ToString(&deviceClassNetGUID), err.Error())
+		return false, err
 	}
 	defer devInfoList.Close()
 
-	// Iterate.
-	for index := 0; ; index++ {
-		// Get the device from the list. Should anything be wrong with this device, continue with next.
-		deviceData, err := devInfoList.EnumDeviceInfo(index)
-		if err != nil {
-			if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
-				break
-			}
-			continue
-		}
-
-		// Get interface ID.
-		//TODO: Store some ID in the Wintun object such that this call isn't required.
-		wintun2, err := makeWintun(devInfoList, deviceData)
-		if err != nil {
-			continue
-		}
-
-		if wintun.cfgInstanceID == wintun2.cfgInstanceID {
-			if hwndParent == 0 {
-				err = setQuietInstall(devInfoList, deviceData)
-				if err != nil {
-					return false, false, fmt.Errorf("Setting quiet installation failed: %v", err)
-				}
-			}
-
-			// Remove the device.
-			removeDeviceParams := setupapi.RemoveDeviceParams{
-				ClassInstallHeader: *setupapi.MakeClassInstallHeader(setupapi.DIF_REMOVE),
-				Scope:              setupapi.DI_REMOVEDEVICE_GLOBAL,
-			}
-
-			// Set class installer parameters for DIF_REMOVE.
-			err = devInfoList.SetClassInstallParams(deviceData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams)))
-			if err != nil {
-				return false, false, fmt.Errorf("SetupDiSetClassInstallParams failed: %v", err)
-			}
-
-			// Call appropriate class installer.
-			err = devInfoList.CallClassInstaller(setupapi.DIF_REMOVE, deviceData)
-			if err != nil {
-				return false, false, fmt.Errorf("SetupDiCallClassInstaller failed: %v", err)
-			}
-
-			// Check if a system reboot is required. (Ignore errors)
-			if ret, _ := checkReboot(devInfoList, deviceData); ret {
-				return true, true, nil
-			}
-
-			return true, false, nil
-		}
+	// Remove the device.
+	removeDeviceParams := setupapi.RemoveDeviceParams{
+		ClassInstallHeader: *setupapi.MakeClassInstallHeader(setupapi.DIF_REMOVE),
+		Scope:              setupapi.DI_REMOVEDEVICE_GLOBAL,
 	}
 
-	return false, false, nil
+	// Set class installer parameters for DIF_REMOVE.
+	err = devInfoList.SetClassInstallParams(deviceData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams)))
+	if err != nil {
+		return false, fmt.Errorf("SetupDiSetClassInstallParams failed: %v", err)
+	}
+
+	// Call appropriate class installer.
+	err = devInfoList.CallClassInstaller(setupapi.DIF_REMOVE, deviceData)
+	if err != nil {
+		return false, fmt.Errorf("SetupDiCallClassInstaller failed: %v", err)
+	}
+
+	// Check if a system reboot is required. (Ignore errors)
+	ret, _ := checkReboot(devInfoList, deviceData)
+	return ret, nil
 }
 
 //
@@ -573,6 +543,57 @@ func (wintun *Wintun) tcpipInterfaceRegKeyName() (path string, err error) {
 		return "", errors.New("No TCP/IP interfaces found on adapter")
 	}
 	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\%s", paths[0]), nil
+}
+
+//
+// deviceData returns TUN device info list handle and interface device info
+// data.
+//
+// The device info list handle must be closed after use.
+//
+// In case the device is not found, windows.ERROR_OBJECT_NOT_FOUND is
+// returned.
+//
+func (wintun *Wintun) deviceData(hwndParent uintptr) (setupapi.DevInfo, *setupapi.DevInfoData, error) {
+	// Create a list of network devices.
+	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, enumerator, hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), machineName)
+	if err != nil {
+		return 0, nil, fmt.Errorf("SetupDiGetClassDevsEx(%s) failed: %v", guid.ToString(&deviceClassNetGUID), err.Error())
+	}
+
+	// Iterate.
+	for index := 0; ; index++ {
+		// Get the device from the list. Should anything be wrong with this device, continue with next.
+		deviceData, err := devInfoList.EnumDeviceInfo(index)
+		if err != nil {
+			if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
+				break
+			}
+			continue
+		}
+
+		// Get interface ID.
+		//TODO: Store some ID in the Wintun object such that this call isn't required.
+		wintun2, err := makeWintun(devInfoList, deviceData)
+		if err != nil {
+			continue
+		}
+
+		if wintun.cfgInstanceID == wintun2.cfgInstanceID {
+			if hwndParent == 0 {
+				err = setQuietInstall(devInfoList, deviceData)
+				if err != nil {
+					devInfoList.Close()
+					return 0, nil, fmt.Errorf("Setting quiet installation failed: %v", err)
+				}
+			}
+
+			return devInfoList, deviceData, nil
+		}
+	}
+
+	devInfoList.Close()
+	return 0, nil, windows.ERROR_OBJECT_NOT_FOUND
 }
 
 //

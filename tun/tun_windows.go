@@ -67,7 +67,7 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 	wt, err = wintun.GetInterface(ifname, 0)
 	if err == nil {
 		// If so, we delete it, in case it has weird residual configuration.
-		_, _, err = wt.DeleteInterface(0)
+		_, err = wt.DeleteInterface(0)
 		if err != nil {
 			return nil, fmt.Errorf("Unable to delete already existing Wintun interface: %v", err)
 		}
@@ -206,7 +206,7 @@ func (tun *NativeTun) Close() error {
 		close(tun.events)
 	}
 
-	_, _, err2 := tun.wt.DeleteInterface(0)
+	_, err2 := tun.wt.DeleteInterface(0)
 	if err1 == nil {
 		err1 = err2
 	}
