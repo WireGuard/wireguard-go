@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"runtime"
-	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -22,7 +21,7 @@ import (
 func SetupDiCreateDeviceInfoListEx(classGUID *windows.GUID, hwndParent uintptr, machineName string) (deviceInfoSet DevInfo, err error) {
 	var machineNameUTF16 *uint16
 	if machineName != "" {
-		machineNameUTF16, err = syscall.UTF16PtrFromString(machineName)
+		machineNameUTF16, err = windows.UTF16PtrFromString(machineName)
 		if err != nil {
 			return
 		}
@@ -49,14 +48,14 @@ func (deviceInfoSet DevInfo) DeviceInfoListDetail() (*DevInfoListDetailData, err
 
 // SetupDiCreateDeviceInfo function creates a new device information element and adds it as a new member to the specified device information set.
 func SetupDiCreateDeviceInfo(deviceInfoSet DevInfo, deviceName string, classGUID *windows.GUID, deviceDescription string, hwndParent uintptr, creationFlags DICD) (deviceInfoData *DevInfoData, err error) {
-	deviceNameUTF16, err := syscall.UTF16PtrFromString(deviceName)
+	deviceNameUTF16, err := windows.UTF16PtrFromString(deviceName)
 	if err != nil {
 		return
 	}
 
 	var deviceDescriptionUTF16 *uint16
 	if deviceDescription != "" {
-		deviceDescriptionUTF16, err = syscall.UTF16PtrFromString(deviceDescription)
+		deviceDescriptionUTF16, err = windows.UTF16PtrFromString(deviceDescription)
 		if err != nil {
 			return
 		}
@@ -165,7 +164,7 @@ func SetupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoDa
 		return data, nil
 	}
 
-	if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
+	if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
 		// The buffer was too small. Now that we got the required size, create another one big enough and retry.
 		buf := make([]byte, bufLen)
 		data := (*DrvInfoDetailData)(unsafe.Pointer(&buf[0]))
@@ -199,14 +198,14 @@ func (deviceInfoSet DevInfo) DestroyDriverInfoList(deviceInfoData *DevInfoData, 
 func SetupDiGetClassDevsEx(classGUID *windows.GUID, enumerator string, hwndParent uintptr, flags DIGCF, deviceInfoSet DevInfo, machineName string) (handle DevInfo, err error) {
 	var enumeratorUTF16 *uint16
 	if enumerator != "" {
-		enumeratorUTF16, err = syscall.UTF16PtrFromString(enumerator)
+		enumeratorUTF16, err = windows.UTF16PtrFromString(enumerator)
 		if err != nil {
 			return
 		}
 	}
 	var machineNameUTF16 *uint16
 	if machineName != "" {
-		machineNameUTF16, err = syscall.UTF16PtrFromString(machineName)
+		machineNameUTF16, err = windows.UTF16PtrFromString(machineName)
 		if err != nil {
 			return
 		}
@@ -247,7 +246,7 @@ func SetupDiGetDeviceRegistryProperty(deviceInfoSet DevInfo, deviceInfoData *Dev
 		return getRegistryValue(buf[:bufLen], dataType)
 	}
 
-	if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
+	if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
 		// The buffer was too small. Now that we got the required size, create another one big enough and retry.
 		buf = make([]byte, bufLen)
 		err = setupDiGetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, &dataType, &buf[0], uint32(cap(buf)), &bufLen)
@@ -396,7 +395,7 @@ func SetupDiClassNameFromGuidEx(classGUID *windows.GUID, machineName string) (cl
 
 	var machineNameUTF16 *uint16
 	if machineName != "" {
-		machineNameUTF16, err = syscall.UTF16PtrFromString(machineName)
+		machineNameUTF16, err = windows.UTF16PtrFromString(machineName)
 		if err != nil {
 			return
 		}
@@ -415,7 +414,7 @@ func SetupDiClassNameFromGuidEx(classGUID *windows.GUID, machineName string) (cl
 
 // SetupDiClassGuidsFromNameEx function retrieves the GUIDs associated with the specified class name. This resulting list contains the classes currently installed on a local or remote computer.
 func SetupDiClassGuidsFromNameEx(className string, machineName string) ([]windows.GUID, error) {
-	classNameUTF16, err := syscall.UTF16PtrFromString(className)
+	classNameUTF16, err := windows.UTF16PtrFromString(className)
 	if err != nil {
 		return nil, err
 	}
@@ -426,7 +425,7 @@ func SetupDiClassGuidsFromNameEx(className string, machineName string) ([]window
 
 	var machineNameUTF16 *uint16
 	if machineName != "" {
-		machineNameUTF16, err = syscall.UTF16PtrFromString(machineName)
+		machineNameUTF16, err = windows.UTF16PtrFromString(machineName)
 		if err != nil {
 			return nil, err
 		}
@@ -438,7 +437,7 @@ func SetupDiClassGuidsFromNameEx(className string, machineName string) ([]window
 		return buf[:bufLen], nil
 	}
 
-	if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
+	if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
 		// The GUID array was too small. Now that we got the required size, create another one big enough and retry.
 		buf := make([]windows.GUID, bufLen)
 		err = setupDiClassGuidsFromNameEx(classNameUTF16, &buf[0], bufLen, &bufLen, machineNameUTF16, 0)

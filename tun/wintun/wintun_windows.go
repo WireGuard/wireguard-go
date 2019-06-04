@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"syscall"
 	"time"
 	"unsafe"
 
@@ -112,7 +111,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 		// Get the device from the list. Should anything be wrong with this device, continue with next.
 		deviceData, err := devInfoList.EnumDeviceInfo(index)
 		if err != nil {
-			if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
+			if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
 				break
 			}
 			continue
@@ -144,7 +143,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 				// Get a driver from the list.
 				driverData, err := devInfoList.EnumDriverInfo(deviceData, driverType, index)
 				if err != nil {
-					if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
+					if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
 						break
 					}
 					// Something is wrong with this driver. Skip it.
@@ -239,7 +238,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 		// Get a driver from the list.
 		driverData, err := devInfoList.EnumDriverInfo(deviceData, driverType, index)
 		if err != nil {
-			if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
+			if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
 				break
 			}
 			// Something is wrong with this driver. Skip it.
@@ -434,7 +433,7 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 		// Get the device from the list. Should anything be wrong with this device, continue with next.
 		deviceData, err := devInfoList.EnumDeviceInfo(index)
 		if err != nil {
-			if errWin, ok := err.(syscall.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
+			if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
 				break
 			}
 			continue

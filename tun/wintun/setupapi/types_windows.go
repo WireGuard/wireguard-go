@@ -7,7 +7,6 @@ package setupapi
 
 import (
 	"strings"
-	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -71,7 +70,7 @@ func (data *DevInfoListDetailData) RemoteMachineName() string {
 }
 
 func (data *DevInfoListDetailData) SetRemoteMachineName(remoteMachineName string) error {
-	str, err := syscall.UTF16FromString(remoteMachineName)
+	str, err := windows.UTF16FromString(remoteMachineName)
 	if err != nil {
 		return err
 	}
@@ -143,7 +142,7 @@ func (params *DevInstallParams) DriverPath() string {
 }
 
 func (params *DevInstallParams) SetDriverPath(driverPath string) error {
-	str, err := syscall.UTF16FromString(driverPath)
+	str, err := windows.UTF16FromString(driverPath)
 	if err != nil {
 		return err
 	}
@@ -328,7 +327,7 @@ func (data *DrvInfoData) Description() string {
 }
 
 func (data *DrvInfoData) SetDescription(description string) error {
-	str, err := syscall.UTF16FromString(description)
+	str, err := windows.UTF16FromString(description)
 	if err != nil {
 		return err
 	}
@@ -341,7 +340,7 @@ func (data *DrvInfoData) MfgName() string {
 }
 
 func (data *DrvInfoData) SetMfgName(mfgName string) error {
-	str, err := syscall.UTF16FromString(mfgName)
+	str, err := windows.UTF16FromString(mfgName)
 	if err != nil {
 		return err
 	}
@@ -354,7 +353,7 @@ func (data *DrvInfoData) ProviderName() string {
 }
 
 func (data *DrvInfoData) SetProviderName(providerName string) error {
-	str, err := syscall.UTF16FromString(providerName)
+	str, err := windows.UTF16FromString(providerName)
 	if err != nil {
 		return err
 	}
