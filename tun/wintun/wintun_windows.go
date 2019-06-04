@@ -206,6 +206,13 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 		return nil, false, fmt.Errorf("SetupDiCreateDeviceInfo failed: %v", err)
 	}
 
+	if hwndParent == 0 {
+		err = setQuietInstall(devInfoList, deviceData)
+		if err != nil {
+			return nil, false, fmt.Errorf("Setting quiet installation failed: %v", err)
+		}
+	}
+
 	// Set a device information element as the selected member of a device information set.
 	err = devInfoList.SetSelectedDevice(deviceData)
 	if err != nil {
@@ -441,6 +448,13 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, bool, error) {
 		}
 
 		if wintun.cfgInstanceID == wintun2.cfgInstanceID {
+			if hwndParent == 0 {
+				err = setQuietInstall(devInfoList, deviceData)
+				if err != nil {
+					return false, false, fmt.Errorf("Setting quiet installation failed: %v", err)
+				}
+			}
+
 			// Remove the device.
 			removeDeviceParams := setupapi.RemoveDeviceParams{
 				ClassInstallHeader: *setupapi.MakeClassInstallHeader(setupapi.DIF_REMOVE),
@@ -480,11 +494,20 @@ func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInf
 		return false, err
 	}
 
-	if (devInstallParams.Flags & (setupapi.DI_NEEDREBOOT | setupapi.DI_NEEDRESTART)) != 0 {
-		return true, nil
+	return (devInstallParams.Flags & (setupapi.DI_NEEDREBOOT | setupapi.DI_NEEDRESTART)) != 0, nil
+}
+
+//
+// setQuietInstall sets device install parameters for a quiet installation
+//
+func setQuietInstall(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) error {
+	devInstallParams, err := deviceInfoSet.DeviceInstallParams(deviceInfoData)
+	if err != nil {
+		return err
 	}
 
-	return false, nil
+	devInstallParams.Flags |= setupapi.DI_QUIETINSTALL
+	return deviceInfoSet.SetDeviceInstallParams(deviceInfoData, devInstallParams)
 }
 
 //
