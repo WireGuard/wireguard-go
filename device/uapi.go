@@ -105,7 +105,7 @@ func (device *Device) IpcGetOperation(socket *bufio.Writer) *IPCError {
 	return nil
 }
 
-func (device *Device) IpcSetOperation(socket *bufio.Reader) *IPCError {
+func (device *Device) IpcSetOperation(socket *bufio.Reader) error {
 	scanner := bufio.NewScanner(socket)
 	logError := device.log.Error
 	logDebug := device.log.Debug
@@ -420,7 +420,14 @@ func (device *Device) IpcHandle(socket net.Conn) {
 
 	switch op {
 	case "set=1\n":
-		status = device.IpcSetOperation(buffered.Reader)
+		err := device.IpcSetOperation(buffered.Reader)
+		if err != nil {
+			status, _ = err.(*IPCError)
+			if status == nil {
+				device.log.Error.Println("Invalid UAPI error:", err)
+				status = &IPCError{1}
+			}
+		}
 
 	case "get=1\n":
 		status = device.IpcGetOperation(buffered.Writer)
