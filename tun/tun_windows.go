@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	packetExchangeMax       uint32 = 256                              // Number of packets that may be written at a time
 	packetExchangeAlignment uint32 = 16                               // Number of bytes packets are aligned to in exchange buffers
 	packetSizeMax           uint32 = 0xf000 - packetExchangeAlignment // Maximum packet size
 	packetExchangeSize      uint32 = 0x100000                         // Exchange buffer size (defaults to 1MiB)
@@ -339,7 +338,7 @@ func (tun *NativeTun) putTunPacket(buff []byte) error {
 	}
 	pSize := packetAlign(packetExchangeAlignment + size)
 
-	if tun.wrBuff.packetNum >= packetExchangeMax || tun.wrBuff.offset+pSize >= packetExchangeSize {
+	if tun.wrBuff.offset+pSize >= packetExchangeSize {
 		// Exchange buffer is full -> flush first.
 		err := tun.Flush()
 		if err != nil {
