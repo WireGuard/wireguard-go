@@ -528,11 +528,10 @@ func (wintun *Wintun) InterfaceName() (string, error) {
 //
 func (wintun *Wintun) SetInterfaceName(ifname string) error {
 	// We have to tell the various runtime COM services about the new name too. We ignore the
-	// error because netshell isn't available on servercore. It's also slow, so we run it in a
-	// separate thread.
+	// error because netshell isn't available on servercore.
 	// TODO: netsh.exe falls back to NciSetConnection in this case. If somebody complains, maybe
 	// we should do the same.
-	go netshell.HrRenameConnection(&wintun.cfgInstanceID, windows.StringToUTF16Ptr(ifname))
+	netshell.HrRenameConnection(&wintun.cfgInstanceID, windows.StringToUTF16Ptr(ifname))
 
 	// Set the interface name. The above line should have done this too, but in case it failed, we force it.
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.netRegKeyName(), registry.SET_VALUE)
