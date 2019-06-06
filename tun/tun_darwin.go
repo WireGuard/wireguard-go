@@ -286,7 +286,7 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 }
 
 func (tun *NativeTun) Flush() error {
-	//TODO: can flushing be implemented by buffering and using sendmmsg?
+	// TODO: can flushing be implemented by buffering and using sendmmsg?
 	return nil
 }
 

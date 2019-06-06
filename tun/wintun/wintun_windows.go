@@ -122,7 +122,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 			continue
 		}
 
-		//TODO: is there a better way than comparing ifnames?
+		// TODO: is there a better way than comparing ifnames?
 		// Get interface name.
 		ifname2, err := wintun.InterfaceName()
 		if err != nil {
@@ -225,7 +225,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 
 	// Search for the driver.
 	const driverType = setupapi.SPDIT_COMPATDRIVER
-	err = devInfoList.BuildDriverInfoList(deviceData, driverType) //TODO: This takes ~510ms
+	err = devInfoList.BuildDriverInfoList(deviceData, driverType) // TODO: This takes ~510ms
 	if err != nil {
 		return nil, false, fmt.Errorf("SetupDiBuildDriverInfoList failed: %v", err)
 	}
@@ -233,7 +233,7 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 
 	driverDate := windows.Filetime{}
 	driverVersion := uint64(0)
-	for index := 0; ; index++ { //TODO: This loop takes ~600ms
+	for index := 0; ; index++ { // TODO: This loop takes ~600ms
 		// Get a driver from the list.
 		driverData, err := devInfoList.EnumDriverInfo(deviceData, driverType, index)
 		if err != nil {
@@ -572,7 +572,7 @@ func (wintun *Wintun) deviceData(hwndParent uintptr) (setupapi.DevInfo, *setupap
 		}
 
 		// Get interface ID.
-		//TODO: Store some ID in the Wintun object such that this call isn't required.
+		// TODO: Store some ID in the Wintun object such that this call isn't required.
 		wintun2, err := makeWintun(devInfoList, deviceData)
 		if err != nil {
 			continue

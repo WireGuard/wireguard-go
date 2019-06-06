@@ -218,7 +218,7 @@ func (tun *NativeTun) MTU() (int, error) {
 	return tun.forcedMTU, nil
 }
 
-//TODO: This is a temporary hack. We really need to be monitoring the interface in real time and adapting to MTU changes.
+// TODO: This is a temporary hack. We really need to be monitoring the interface in real time and adapting to MTU changes.
 func (tun *NativeTun) ForceMTU(mtu int) {
 	tun.forcedMTU = mtu
 }

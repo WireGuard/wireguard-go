@@ -11,7 +11,7 @@ import (
 	"golang.zx2c4.com/wireguard/ipc/winpipe"
 )
 
-//TODO: replace these with actual standard windows error numbers from the win package
+// TODO: replace these with actual standard windows error numbers from the win package
 const (
 	IpcErrorIO        = -int64(5)
 	IpcErrorProtocol  = -int64(71)

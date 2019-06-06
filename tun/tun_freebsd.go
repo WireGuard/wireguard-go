@@ -26,7 +26,7 @@ const (
 	_TUNSIFPID  = 0x2000745f
 )
 
-//TODO: move into x/sys/unix
+// TODO: move into x/sys/unix
 const (
 	SIOCGIFINFO_IN6        = 0xc048696c
 	SIOCSIFINFO_IN6        = 0xc048696d
@@ -467,7 +467,7 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 }
 
 func (tun *NativeTun) Flush() error {
-	//TODO: can flushing be implemented by buffering and using sendmmsg?
+	// TODO: can flushing be implemented by buffering and using sendmmsg?
 	return nil
 }
 
