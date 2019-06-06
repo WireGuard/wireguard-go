@@ -15,7 +15,6 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 
-	"golang.zx2c4.com/wireguard/tun/wintun/guid"
 	"golang.zx2c4.com/wireguard/tun/wintun/netshell"
 	registryEx "golang.zx2c4.com/wireguard/tun/wintun/registry"
 	"golang.zx2c4.com/wireguard/tun/wintun/setupapi"
@@ -54,8 +53,8 @@ func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 		return nil, fmt.Errorf("RegQueryStringValue(\"NetCfgInstanceId\") failed: %v", err)
 	}
 
-	// Convert to windows.GUID.
-	ifid, err := guid.FromString(valueStr)
+	// Convert to GUID.
+	ifid, err := windows.GUIDFromString(valueStr)
 	if err != nil {
 		return nil, fmt.Errorf("NetCfgInstanceId registry value is not a GUID (expected: \"{...}\", provided: %q)", valueStr)
 	}
@@ -73,7 +72,7 @@ func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 	}
 
 	return &Wintun{
-		cfgInstanceID: *ifid,
+		cfgInstanceID: ifid,
 		luidIndex:     uint32(luidIdx),
 		ifType:        uint32(ifType),
 	}, nil
@@ -96,7 +95,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 	// Create a list of network devices.
 	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, enumerator, hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), machineName)
 	if err != nil {
-		return nil, fmt.Errorf("SetupDiGetClassDevsEx(%s) failed: %v", guid.ToString(&deviceClassNetGUID), err)
+		return nil, fmt.Errorf("SetupDiGetClassDevsEx(%v) failed: %v", deviceClassNetGUID, err)
 	}
 	defer devInfoList.Close()
 
@@ -189,14 +188,14 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 	// Create an empty device info set for network adapter device class.
 	devInfoList, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, hwndParent, machineName)
 	if err != nil {
-		return nil, false, fmt.Errorf("SetupDiCreateDeviceInfoListEx(%s) failed: %v", guid.ToString(&deviceClassNetGUID), err)
+		return nil, false, fmt.Errorf("SetupDiCreateDeviceInfoListEx(%v) failed: %v", deviceClassNetGUID, err)
 	}
 	defer devInfoList.Close()
 
 	// Get the device class name from GUID.
 	className, err := setupapi.SetupDiClassNameFromGuidEx(&deviceClassNetGUID, machineName)
 	if err != nil {
-		return nil, false, fmt.Errorf("SetupDiClassNameFromGuidEx(%s) failed: %v", guid.ToString(&deviceClassNetGUID), err)
+		return nil, false, fmt.Errorf("SetupDiClassNameFromGuidEx(%v) failed: %v", deviceClassNetGUID, err)
 	}
 
 	// Create a new device info element and add it to the device info set.
@@ -516,14 +515,14 @@ func (wintun *Wintun) SetInterfaceName(ifname string) error {
 // netRegKeyName returns interface-specific network registry key name.
 //
 func (wintun *Wintun) netRegKeyName() string {
-	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Network\\%s\\%s\\Connection", guid.ToString(&deviceClassNetGUID), guid.ToString(&wintun.cfgInstanceID))
+	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Network\\%v\\%v\\Connection", deviceClassNetGUID, wintun.cfgInstanceID)
 }
 
 //
 // tcpipAdapterRegKeyName returns adapter-specific TCP/IP network registry key name.
 //
 func (wintun *Wintun) tcpipAdapterRegKeyName() string {
-	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Adapters\\%s", guid.ToString(&wintun.cfgInstanceID))
+	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Adapters\\%v", wintun.cfgInstanceID)
 }
 
 //
@@ -558,7 +557,7 @@ func (wintun *Wintun) deviceData(hwndParent uintptr) (setupapi.DevInfo, *setupap
 	// Create a list of network devices.
 	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, enumerator, hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), machineName)
 	if err != nil {
-		return 0, nil, fmt.Errorf("SetupDiGetClassDevsEx(%s) failed: %v", guid.ToString(&deviceClassNetGUID), err.Error())
+		return 0, nil, fmt.Errorf("SetupDiGetClassDevsEx(%v) failed: %v", deviceClassNetGUID, err.Error())
 	}
 
 	// Iterate.

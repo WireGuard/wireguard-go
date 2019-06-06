@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"golang.org/x/sys/windows"
-	"golang.zx2c4.com/wireguard/tun/wintun/guid"
 )
 
 var deviceClassNetGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0x11ce, Data4: [8]byte{0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}}
@@ -323,10 +322,10 @@ func TestSetupDiGetDeviceRegistryProperty(t *testing.T) {
 		} else if valStr, ok := val.(string); !ok {
 			t.Errorf("SetupDiGetDeviceRegistryProperty(SPDRP_CLASSGUID) should return string")
 		} else {
-			classGUID, err := guid.FromString(valStr)
+			classGUID, err := windows.GUIDFromString(valStr)
 			if err != nil {
 				t.Errorf("Error parsing GUID returned by SetupDiGetDeviceRegistryProperty(SPDRP_CLASSGUID): %s", err.Error())
-			} else if *classGUID != deviceClassNetGUID {
+			} else if classGUID != deviceClassNetGUID {
 				t.Errorf("SetupDiGetDeviceRegistryProperty(SPDRP_CLASSGUID) should return %x", deviceClassNetGUID)
 			}
 		}
