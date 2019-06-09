@@ -60,6 +60,14 @@ func packetAlign(size uint32) uint32 {
 // adapter with the same name exist, it is reused.
 //
 func CreateTUN(ifname string) (TUNDevice, error) {
+	return CreateTUNWithRequestedGUID(ifname, nil)
+}
+
+//
+// CreateTUNWithRequestedGUID creates a Wintun adapter with the given name and
+// a requested GUID. Should a Wintun adapter with the same name exist, it is reused.
+//
+func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (TUNDevice, error) {
 	var err error
 	var wt *wintun.Wintun
 
@@ -74,7 +82,7 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 	} else if err == windows.ERROR_ALREADY_EXISTS {
 		return nil, fmt.Errorf("Foreign network interface with the same name exists")
 	}
-	wt, _, err = wintun.CreateInterface("WireGuard Tunnel Adapter", 0)
+	wt, _, err = wintun.CreateInterface("WireGuard Tunnel Adapter", requestedGUID, 0)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create Wintun interface: %v", err)
 	}

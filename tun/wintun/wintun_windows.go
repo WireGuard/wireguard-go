@@ -176,6 +176,13 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 // description is a string that supplies the text description of the device.
 // description is optional and can be "".
 //
+// requestedGUID is the GUID of the created network interface, which then
+// influences NLA generation deterministically. If it is set to nil, the GUID
+// is chosen by the system at random, and hence a new NLA entry is created for
+// each new interface. It is called "requested" GUID because the API it uses
+// is completely undocumented, and so there could be minor interesting
+// complications with its usage.
+//
 // hwndParent is a handle to the top-level window to use for any user
 // interface that is related to non-device-specific actions (such as a select-
 // device dialog box that uses the global class driver list). This handle is
@@ -184,7 +191,7 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 //
 // Function returns the network interface ID and a flag if reboot is required.
 //
-func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, error) {
+func CreateInterface(description string, requestedGUID *windows.GUID, hwndParent uintptr) (*Wintun, bool, error) {
 	// Create an empty device info set for network adapter device class.
 	devInfoList, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, hwndParent, machineName)
 	if err != nil {
@@ -279,6 +286,18 @@ func CreateInterface(description string, hwndParent uintptr) (*Wintun, bool, err
 
 	// Register device co-installers if any. (Ignore errors)
 	devInfoList.CallClassInstaller(setupapi.DIF_REGISTER_COINSTALLERS, deviceData)
+
+	if requestedGUID != nil {
+		key, err := devInfoList.OpenDevRegKey(deviceData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.SET_VALUE)
+		if err != nil {
+			return nil, false, fmt.Errorf("OpenDevRegKey failed: %v", err)
+		}
+		err = key.SetStringValue("NetSetupAnticipatedInstanceId", requestedGUID.String())
+		key.Close()
+		if err != nil {
+			return nil, false, fmt.Errorf("SetStringValue(NetSetupAnticipatedInstanceId) failed: %v", err)
+		}
+	}
 
 	// Install interfaces if any. (Ignore errors)
 	devInfoList.CallClassInstaller(setupapi.DIF_INSTALLINTERFACES, deviceData)
