@@ -364,6 +364,29 @@ func (deviceInfoSet DevInfo) DeviceInstallParams(deviceInfoData *DevInfoData) (*
 	return SetupDiGetDeviceInstallParams(deviceInfoSet, deviceInfoData)
 }
 
+//sys	setupDiGetDeviceInstanceId(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, instanceId *uint16, instanceIdSize uint32, instanceIdRequiredSize *uint32) (err error) = setupapi.SetupDiGetDeviceInstanceIdW
+
+// SetupDiGetDeviceInstanceId function retrieves the instance ID of the device
+func SetupDiGetDeviceInstanceId(deviceInfoSet DevInfo, deviceInfoData *DevInfoData) (string, error) {
+	reqSize := uint32(1024)
+	for {
+		buf := make([]uint16, reqSize)
+		err := setupDiGetDeviceInstanceId(deviceInfoSet, deviceInfoData, &buf[0], uint32(len(buf)), &reqSize)
+		if err == windows.ERROR_INSUFFICIENT_BUFFER {
+			continue
+		}
+		if err != nil {
+			return "", err
+		}
+		return windows.UTF16ToString(buf), nil
+	}
+}
+
+// DeviceInstanceID method retrieves the instance ID of the device.
+func (deviceInfoSet DevInfo) DeviceInstanceID(deviceInfoData *DevInfoData) (string, error) {
+	return SetupDiGetDeviceInstanceId(deviceInfoSet, deviceInfoData)
+}
+
 // SetupDiGetClassInstallParams function retrieves class installation parameters for a device information set or a particular device information element.
 //sys	SetupDiGetClassInstallParams(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, classInstallParams *ClassInstallHeader, classInstallParamsSize uint32, requiredSize *uint32) (err error) = setupapi.SetupDiGetClassInstallParamsW
 

@@ -139,6 +139,11 @@ func TestSetupDiEnumDeviceInfo(t *testing.T) {
 		if data.ClassGUID != deviceClassNetGUID {
 			t.Error("SetupDiEnumDeviceInfo returned different class GUID")
 		}
+
+		_, err = devInfoList.DeviceInstanceID(data)
+		if err != nil {
+			t.Errorf("Error calling SetupDiGetDeviceInstanceId: %s", err.Error())
+		}
 	}
 }
 
