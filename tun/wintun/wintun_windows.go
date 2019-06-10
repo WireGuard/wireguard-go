@@ -20,9 +20,7 @@ import (
 	"golang.zx2c4.com/wireguard/tun/wintun/setupapi"
 )
 
-//
-// Wintun is a handle of a Wintun adapter
-//
+// Wintun is a handle of a Wintun adapter.
 type Wintun struct {
 	cfgInstanceID windows.GUID
 	luidIndex     uint32
@@ -31,14 +29,12 @@ type Wintun struct {
 
 var deviceClassNetGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0x11ce, Data4: [8]byte{0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}}
 
-const hardwareID = "Wintun"
-const enumerator = ""
-const machineName = ""
-const waitForRegistryTimeout = time.Second * 5
+const (
+	hardwareID = "Wintun"
+	waitForRegistryTimeout = time.Second * 5
+)
 
-//
-// MakeWintun creates interface handle and populates it from device registry key
-//
+// makeWintun creates a Wintun interface handle and populates it from the device's registry key.
 func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) (*Wintun, error) {
 	// Open HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\<class>\<id> registry key.
 	key, err := deviceInfoSet.OpenDevRegKey(deviceInfoData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.QUERY_VALUE)
@@ -78,22 +74,13 @@ func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 	}, nil
 }
 
-//
-// GetInterface finds interface by name.
-//
-// hwndParent is a handle to the top-level window to use for any user
-// interface that is related to non-device-specific actions (such as a select-
-// device dialog box that uses the global class driver list). This handle is
-// optional and can be 0. If a specific top-level window is not required, set
-// hwndParent to 0.
-//
-// Function returns interface if found, or windows.ERROR_OBJECT_NOT_FOUND
-// otherwise. If the interface is found but not Wintun-class, the function
-// returns windows.ERROR_ALREADY_EXISTS.
-//
-func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
+// GetInterface finds a Wintun interface by its name. This function returns
+// the interface if found, or windows.ERROR_OBJECT_NOT_FOUND otherwise. If
+// the interface is found but not a Wintun-class, this function returns
+// windows.ERROR_ALREADY_EXISTS.
+func GetInterface(ifname string) (*Wintun, error) {
 	// Create a list of network devices.
-	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, enumerator, hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), machineName)
+	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
 	if err != nil {
 		return nil, fmt.Errorf("SetupDiGetClassDevsEx(%v) failed: %v", deviceClassNetGUID, err)
 	}
@@ -170,52 +157,39 @@ func GetInterface(ifname string, hwndParent uintptr) (*Wintun, error) {
 	return nil, windows.ERROR_OBJECT_NOT_FOUND
 }
 
+// CreateInterface creates a Wintun interface. description is a string that
+// supplies the text description of the device. The description is optional
+// and can be "". requestedGUID is the GUID of the created network interface,
+// which then influences NLA generation deterministically. If it is set to nil,
+// the GUID is chosen by the system at random, and hence a new NLA entry is
+// created for each new interface. It is called "requested" GUID because the
+// API it uses is completely undocumented, and so there could be minor
+// interesting complications with its usage. This function returns the network
+// interface ID and a flag if reboot is required.
 //
-// CreateInterface creates a TUN interface.
-//
-// description is a string that supplies the text description of the device.
-// description is optional and can be "".
-//
-// requestedGUID is the GUID of the created network interface, which then
-// influences NLA generation deterministically. If it is set to nil, the GUID
-// is chosen by the system at random, and hence a new NLA entry is created for
-// each new interface. It is called "requested" GUID because the API it uses
-// is completely undocumented, and so there could be minor interesting
-// complications with its usage.
-//
-// hwndParent is a handle to the top-level window to use for any user
-// interface that is related to non-device-specific actions (such as a select-
-// device dialog box that uses the global class driver list). This handle is
-// optional and can be 0. If a specific top-level window is not required, set
-// hwndParent to 0.
-//
-// Function returns the network interface ID and a flag if reboot is required.
-//
-func CreateInterface(description string, requestedGUID *windows.GUID, hwndParent uintptr) (*Wintun, bool, error) {
+func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *Wintun, rebootRequired bool, err error) {
 	// Create an empty device info set for network adapter device class.
-	devInfoList, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, hwndParent, machineName)
+	devInfoList, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, "")
 	if err != nil {
 		return nil, false, fmt.Errorf("SetupDiCreateDeviceInfoListEx(%v) failed: %v", deviceClassNetGUID, err)
 	}
 	defer devInfoList.Close()
 
 	// Get the device class name from GUID.
-	className, err := setupapi.SetupDiClassNameFromGuidEx(&deviceClassNetGUID, machineName)
+	className, err := setupapi.SetupDiClassNameFromGuidEx(&deviceClassNetGUID, "")
 	if err != nil {
 		return nil, false, fmt.Errorf("SetupDiClassNameFromGuidEx(%v) failed: %v", deviceClassNetGUID, err)
 	}
 
 	// Create a new device info element and add it to the device info set.
-	deviceData, err := devInfoList.CreateDeviceInfo(className, &deviceClassNetGUID, description, hwndParent, setupapi.DICD_GENERATE_ID)
+	deviceData, err := devInfoList.CreateDeviceInfo(className, &deviceClassNetGUID, description, 0, setupapi.DICD_GENERATE_ID)
 	if err != nil {
 		return nil, false, fmt.Errorf("SetupDiCreateDeviceInfo failed: %v", err)
 	}
 
-	if hwndParent == 0 {
-		err = setQuietInstall(devInfoList, deviceData)
-		if err != nil {
-			return nil, false, fmt.Errorf("Setting quiet installation failed: %v", err)
-		}
+	err = setQuietInstall(devInfoList, deviceData)
+	if err != nil {
+		return nil, false, fmt.Errorf("Setting quiet installation failed: %v", err)
 	}
 
 	// Set a device information element as the selected member of a device information set.
@@ -308,10 +282,7 @@ func CreateInterface(description string, requestedGUID *windows.GUID, hwndParent
 		err = fmt.Errorf("SetupDiCallClassInstaller(DIF_INSTALLDEVICE) failed: %v", err)
 	}
 
-	var wintun *Wintun
-	var rebootRequired bool
 	var key registry.Key
-
 	if err == nil {
 		// Check if a system reboot is required. (Ignore errors)
 		if ret, _ := checkReboot(devInfoList, deviceData); ret {
@@ -426,21 +397,11 @@ func CreateInterface(description string, requestedGUID *windows.GUID, hwndParent
 	return nil, rebootRequired, err
 }
 
-//
-// DeleteInterface deletes a TUN interface.
-//
-// hwndParent is a handle to the top-level window to use for any user
-// interface that is related to non-device-specific actions (such as a select-
-// device dialog box that uses the global class driver list). This handle is
-// optional and can be 0. If a specific top-level window is not required, set
-// hwndParent to 0.
-//
-// Function silently succeeds if the interface was not found.
-//
-// Function returns true if a reboot is required.
-//
-func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, error) {
-	devInfoList, deviceData, err := wintun.deviceData(hwndParent)
+// DeleteInterface deletes a Wintun interface. This function succeeds
+// if the interface was not found. It returns a bool indicating whether
+// a reboot is required.
+func (wintun *Wintun) DeleteInterface() (rebootRequired bool, err error) {
+	devInfoList, deviceData, err := wintun.deviceData()
 	if err == windows.ERROR_OBJECT_NOT_FOUND {
 		return false, nil
 	}
@@ -468,13 +429,11 @@ func (wintun *Wintun) DeleteInterface(hwndParent uintptr) (bool, error) {
 	}
 
 	// Check if a system reboot is required. (Ignore errors)
-	ret, _ := checkReboot(devInfoList, deviceData)
-	return ret, nil
+	rebootRequired, _ = checkReboot(devInfoList, deviceData)
+	return rebootRequired, nil
 }
 
-//
 // checkReboot checks device install parameters if a system reboot is required.
-//
 func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) (bool, error) {
 	devInstallParams, err := deviceInfoSet.DeviceInstallParams(deviceInfoData)
 	if err != nil {
@@ -484,9 +443,7 @@ func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInf
 	return (devInstallParams.Flags & (setupapi.DI_NEEDREBOOT | setupapi.DI_NEEDRESTART)) != 0, nil
 }
 
-//
 // setQuietInstall sets device install parameters for a quiet installation
-//
 func setQuietInstall(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) error {
 	devInstallParams, err := deviceInfoSet.DeviceInstallParams(deviceInfoData)
 	if err != nil {
@@ -497,9 +454,7 @@ func setQuietInstall(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.De
 	return deviceInfoSet.SetDeviceInstallParams(deviceInfoData, devInstallParams)
 }
 
-//
-// InterfaceName returns network interface name.
-//
+// InterfaceName returns the name of the Wintun interface.
 func (wintun *Wintun) InterfaceName() (string, error) {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.netRegKeyName(), registry.QUERY_VALUE)
 	if err != nil {
@@ -511,9 +466,7 @@ func (wintun *Wintun) InterfaceName() (string, error) {
 	return registryEx.GetStringValue(key, "Name")
 }
 
-//
-// SetInterfaceName sets network interface name.
-//
+// SetInterfaceName sets name of the Wintun interface.
 func (wintun *Wintun) SetInterfaceName(ifname string) error {
 	// We have to tell the various runtime COM services about the new name too. We ignore the
 	// error because netshell isn't available on servercore.
@@ -530,23 +483,17 @@ func (wintun *Wintun) SetInterfaceName(ifname string) error {
 	return key.SetStringValue("Name", ifname)
 }
 
-//
-// netRegKeyName returns interface-specific network registry key name.
-//
+// netRegKeyName returns the interface-specific network registry key name.
 func (wintun *Wintun) netRegKeyName() string {
 	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Network\\%v\\%v\\Connection", deviceClassNetGUID, wintun.cfgInstanceID)
 }
 
-//
-// tcpipAdapterRegKeyName returns adapter-specific TCP/IP network registry key name.
-//
+// tcpipAdapterRegKeyName returns the adapter-specific TCP/IP network registry key name.
 func (wintun *Wintun) tcpipAdapterRegKeyName() string {
 	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Adapters\\%v", wintun.cfgInstanceID)
 }
 
-//
-// tcpipInterfaceRegKeyName returns interface-specific TCP/IP network registry key name.
-//
+// tcpipInterfaceRegKeyName returns the interface-specific TCP/IP network registry key name.
 func (wintun *Wintun) tcpipInterfaceRegKeyName() (path string, err error) {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.tcpipAdapterRegKeyName(), registry.QUERY_VALUE)
 	if err != nil {
@@ -563,23 +510,16 @@ func (wintun *Wintun) tcpipInterfaceRegKeyName() (path string, err error) {
 	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\%s", paths[0]), nil
 }
 
-//
 // deviceData returns TUN device info list handle and interface device info
-// data.
-//
-// The device info list handle must be closed after use.
-//
-// In case the device is not found, windows.ERROR_OBJECT_NOT_FOUND is
-// returned.
-//
-func (wintun *Wintun) deviceData(hwndParent uintptr) (setupapi.DevInfo, *setupapi.DevInfoData, error) {
+// data. The device info list handle must be closed after use. In case the
+// device is not found, windows.ERROR_OBJECT_NOT_FOUND is returned.
+func (wintun *Wintun) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, error) {
 	// Create a list of network devices.
-	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, enumerator, hwndParent, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), machineName)
+	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
 	if err != nil {
 		return 0, nil, fmt.Errorf("SetupDiGetClassDevsEx(%v) failed: %v", deviceClassNetGUID, err.Error())
 	}
 
-	// Iterate.
 	for index := 0; ; index++ {
 		// Get the device from the list. Should anything be wrong with this device, continue with next.
 		deviceData, err := devInfoList.EnumDeviceInfo(index)
@@ -598,14 +538,11 @@ func (wintun *Wintun) deviceData(hwndParent uintptr) (setupapi.DevInfo, *setupap
 		}
 
 		if wintun.cfgInstanceID == wintun2.cfgInstanceID {
-			if hwndParent == 0 {
-				err = setQuietInstall(devInfoList, deviceData)
-				if err != nil {
-					devInfoList.Close()
-					return 0, nil, fmt.Errorf("Setting quiet installation failed: %v", err)
-				}
+			err = setQuietInstall(devInfoList, deviceData)
+			if err != nil {
+				devInfoList.Close()
+				return 0, nil, fmt.Errorf("Setting quiet installation failed: %v", err)
 			}
-
 			return devInfoList, deviceData, nil
 		}
 	}
@@ -614,23 +551,17 @@ func (wintun *Wintun) deviceData(hwndParent uintptr) (setupapi.DevInfo, *setupap
 	return 0, nil, windows.ERROR_OBJECT_NOT_FOUND
 }
 
-//
-// DataFileName returns Wintun device data pipe name.
-//
+// DataFileName returns the Wintun device data pipe name.
 func (wintun *Wintun) DataFileName() string {
 	return fmt.Sprintf("\\\\.\\Global\\WINTUN%d", wintun.luidIndex)
 }
 
-//
 // GUID returns the GUID of the interface.
-//
 func (wintun *Wintun) GUID() windows.GUID {
 	return wintun.cfgInstanceID
 }
 
-//
 // LUID returns the LUID of the interface.
-//
 func (wintun *Wintun) LUID() uint64 {
 	return ((uint64(wintun.luidIndex) & ((1 << 24) - 1)) << 24) | ((uint64(wintun.ifType) & ((1 << 16) - 1)) << 48)
 }
