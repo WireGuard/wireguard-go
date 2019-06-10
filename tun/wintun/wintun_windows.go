@@ -94,23 +94,20 @@ func GetInterface(ifname string) (*Wintun, error) {
 	ifname = strings.ToLower(ifname)
 
 	for index := 0; ; index++ {
-		// Get the device from the list. Should anything be wrong with this device, continue with next.
 		deviceData, err := devInfoList.EnumDeviceInfo(index)
 		if err != nil {
-			if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
+			if err == windows.ERROR_NO_MORE_ITEMS {
 				break
 			}
 			continue
 		}
 
-		// Get interface ID.
 		wintun, err := makeWintun(devInfoList, deviceData)
 		if err != nil {
 			continue
 		}
 
 		// TODO: is there a better way than comparing ifnames?
-		// Get interface name.
 		ifname2, err := wintun.InterfaceName()
 		if err != nil {
 			continue
@@ -126,25 +123,21 @@ func GetInterface(ifname string) (*Wintun, error) {
 			defer devInfoList.DestroyDriverInfoList(deviceData, driverType)
 
 			for index := 0; ; index++ {
-				// Get a driver from the list.
 				driverData, err := devInfoList.EnumDriverInfo(deviceData, driverType, index)
 				if err != nil {
-					if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
+					if err == windows.ERROR_NO_MORE_ITEMS {
 						break
 					}
-					// Something is wrong with this driver. Skip it.
 					continue
 				}
 
 				// Get driver info details.
 				driverDetailData, err := devInfoList.DriverInfoDetail(deviceData, driverData)
 				if err != nil {
-					// Something is wrong with this driver. Skip it.
 					continue
 				}
 
 				if driverDetailData.IsCompatible(hardwareID) {
-					// Matching hardware ID found.
 					return wintun, nil
 				}
 			}
@@ -204,7 +197,6 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 		return nil, false, fmt.Errorf("SetupDiSetDeviceRegistryProperty(SPDRP_HARDWAREID) failed: %v", err)
 	}
 
-	// Search for the driver.
 	const driverType = setupapi.SPDIT_COMPATDRIVER
 	err = devInfoList.BuildDriverInfoList(deviceData, driverType) // TODO: This takes ~510ms
 	if err != nil {
@@ -215,30 +207,24 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 	driverDate := windows.Filetime{}
 	driverVersion := uint64(0)
 	for index := 0; ; index++ { // TODO: This loop takes ~600ms
-		// Get a driver from the list.
 		driverData, err := devInfoList.EnumDriverInfo(deviceData, driverType, index)
 		if err != nil {
-			if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
+			if err == windows.ERROR_NO_MORE_ITEMS {
 				break
 			}
-			// Something is wrong with this driver. Skip it.
 			continue
 		}
 
 		// Check the driver version first, since the check is trivial and will save us iterating over hardware IDs for any driver versioned prior our best match.
 		if driverData.IsNewer(driverDate, driverVersion) {
-			// Get driver info details.
 			driverDetailData, err := devInfoList.DriverInfoDetail(deviceData, driverData)
 			if err != nil {
-				// Something is wrong with this driver. Skip it.
 				continue
 			}
 
 			if driverDetailData.IsCompatible(hardwareID) {
-				// Matching hardware ID found. Select the driver.
 				err := devInfoList.SetSelectedDriver(deviceData, driverData)
 				if err != nil {
-					// Something is wrong with this driver. Skip it.
 					continue
 				}
 
@@ -521,10 +507,9 @@ func (wintun *Wintun) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, err
 	}
 
 	for index := 0; ; index++ {
-		// Get the device from the list. Should anything be wrong with this device, continue with next.
 		deviceData, err := devInfoList.EnumDeviceInfo(index)
 		if err != nil {
-			if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_NO_MORE_ITEMS {
+			if err == windows.ERROR_NO_MORE_ITEMS {
 				break
 			}
 			continue
