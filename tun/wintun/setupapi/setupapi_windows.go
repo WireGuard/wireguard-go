@@ -321,6 +321,7 @@ func (deviceInfoSet DevInfo) SetDeviceRegistryProperty(deviceInfoData *DevInfoDa
 	return SetupDiSetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, propertyBuffers)
 }
 
+// SetDeviceRegistryPropertyString method sets a Plug and Play device property string for a device.
 func (deviceInfoSet DevInfo) SetDeviceRegistryPropertyString(deviceInfoData *DevInfoData, property SPDRP, str string) error {
 	str16, err := windows.UTF16FromString(str)
 	if err != nil {
@@ -348,7 +349,7 @@ func (deviceInfoSet DevInfo) DeviceInstallParams(deviceInfoData *DevInfoData) (*
 
 //sys	setupDiGetDeviceInstanceId(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, instanceId *uint16, instanceIdSize uint32, instanceIdRequiredSize *uint32) (err error) = setupapi.SetupDiGetDeviceInstanceIdW
 
-// SetupDiGetDeviceInstanceId function retrieves the instance ID of the device
+// SetupDiGetDeviceInstanceId function retrieves the instance ID of the device.
 func SetupDiGetDeviceInstanceId(deviceInfoSet DevInfo, deviceInfoData *DevInfoData) (string, error) {
 	reqSize := uint32(1024)
 	for {
