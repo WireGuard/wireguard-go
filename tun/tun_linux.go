@@ -31,11 +31,11 @@ const (
 
 type NativeTun struct {
 	tunFile                 *os.File
-	index                   int32         // if index
-	name                    string        // name of interface
-	errors                  chan error    // async error handling
-	events                  chan TUNEvent // device related events
-	nopi                    bool          // the device was pased IFF_NO_PI
+	index                   int32      // if index
+	name                    string     // name of interface
+	errors                  chan error // async error handling
+	events                  chan Event // device related events
+	nopi                    bool       // the device was pased IFF_NO_PI
 	netlinkSock             int
 	netlinkCancel           *rwcancel.RWCancel
 	hackListenerClosed      sync.Mutex
@@ -64,9 +64,9 @@ func (tun *NativeTun) routineHackListener() {
 		}
 		switch err {
 		case unix.EINVAL:
-			tun.events <- TUNEventUp
+			tun.events <- EventUp
 		case unix.EIO:
-			tun.events <- TUNEventDown
+			tun.events <- EventDown
 		default:
 			return
 		}
@@ -148,14 +148,14 @@ func (tun *NativeTun) routineNetlinkListener() {
 				}
 
 				if info.Flags&unix.IFF_RUNNING != 0 {
-					tun.events <- TUNEventUp
+					tun.events <- EventUp
 				}
 
 				if info.Flags&unix.IFF_RUNNING == 0 {
-					tun.events <- TUNEventDown
+					tun.events <- EventDown
 				}
 
-				tun.events <- TUNEventMTUUpdate
+				tun.events <- EventMTUUpdate
 
 			default:
 				remain = remain[hdr.Len:]
@@ -342,7 +342,7 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	}
 }
 
-func (tun *NativeTun) Events() chan TUNEvent {
+func (tun *NativeTun) Events() chan Event {
 	return tun.events
 }
 
@@ -364,7 +364,7 @@ func (tun *NativeTun) Close() error {
 	return err2
 }
 
-func CreateTUN(name string, mtu int) (TUNDevice, error) {
+func CreateTUN(name string, mtu int) (Device, error) {
 	nfd, err := unix.Open(cloneDevicePath, os.O_RDWR, 0)
 	if err != nil {
 		return nil, err
@@ -400,10 +400,10 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 	return CreateTUNFromFile(fd, mtu)
 }
 
-func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
+func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 	tun := &NativeTun{
 		tunFile:                 file,
-		events:                  make(chan TUNEvent, 5),
+		events:                  make(chan Event, 5),
 		errors:                  make(chan error, 5),
 		statusListenersShutdown: make(chan struct{}),
 		nopi:                    false,
@@ -445,7 +445,7 @@ func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
 	return tun, nil
 }
 
-func CreateUnmonitoredTUNFromFD(fd int) (TUNDevice, string, error) {
+func CreateUnmonitoredTUNFromFD(fd int) (Device, string, error) {
 	err := unix.SetNonblock(fd, true)
 	if err != nil {
 		return nil, "", err
@@ -453,7 +453,7 @@ func CreateUnmonitoredTUNFromFD(fd int) (TUNDevice, string, error) {
 	file := os.NewFile(uintptr(fd), "/dev/tun")
 	tun := &NativeTun{
 		tunFile: file,
-		events:  make(chan TUNEvent, 5),
+		events:  make(chan Event, 5),
 		errors:  make(chan error, 5),
 		nopi:    true,
 	}

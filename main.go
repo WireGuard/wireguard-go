@@ -125,7 +125,7 @@ func main() {
 
 	// open TUN device (or use supplied fd)
 
-	tun, err := func() (tun.TUNDevice, error) {
+	tun, err := func() (tun.Device, error) {
 		tunFdStr := os.Getenv(ENV_WG_TUN_FD)
 		if tunFdStr == "" {
 			return tun.CreateTUN(interfaceName, device.DefaultMTU)

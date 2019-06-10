@@ -86,7 +86,7 @@ type Device struct {
 	}
 
 	tun struct {
-		device tun.TUNDevice
+		device tun.Device
 		mtu    int32
 	}
 }
@@ -252,7 +252,7 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 	return nil
 }
 
-func NewDevice(tunDevice tun.TUNDevice, logger *Logger) *Device {
+func NewDevice(tunDevice tun.Device, logger *Logger) *Device {
 	device := new(Device)
 
 	device.isUp.Set(false)
@@ -324,7 +324,6 @@ func (device *Device) LookupPeer(pk NoisePublicKey) *Peer {
 func (device *Device) RemovePeer(key NoisePublicKey) {
 	device.peers.Lock()
 	defer device.peers.Unlock()
-
 	// stop peer and remove from routing
 
 	peer, ok := device.peers.keyMap[key]

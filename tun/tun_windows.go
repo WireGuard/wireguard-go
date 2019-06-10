@@ -46,7 +46,7 @@ type NativeTun struct {
 	close        bool
 	rdBuff       *exchgBufRead
 	wrBuff       *exchgBufWrite
-	events       chan TUNEvent
+	events       chan Event
 	errors       chan error
 	forcedMTU    int
 }
@@ -59,7 +59,7 @@ func packetAlign(size uint32) uint32 {
 // CreateTUN creates a Wintun adapter with the given name. Should a Wintun
 // adapter with the same name exist, it is reused.
 //
-func CreateTUN(ifname string) (TUNDevice, error) {
+func CreateTUN(ifname string) (Device, error) {
 	return CreateTUNWithRequestedGUID(ifname, nil)
 }
 
@@ -67,7 +67,7 @@ func CreateTUN(ifname string) (TUNDevice, error) {
 // CreateTUNWithRequestedGUID creates a Wintun adapter with the given name and
 // a requested GUID. Should a Wintun adapter with the same name exist, it is reused.
 //
-func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (TUNDevice, error) {
+func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Device, error) {
 	var err error
 	var wt *wintun.Wintun
 
@@ -97,7 +97,7 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (TUN
 		wt:        wt,
 		rdBuff:    &exchgBufRead{},
 		wrBuff:    &exchgBufWrite{},
-		events:    make(chan TUNEvent, 10),
+		events:    make(chan Event, 10),
 		errors:    make(chan error, 1),
 		forcedMTU: 1500,
 	}, nil
@@ -202,7 +202,7 @@ func (tun *NativeTun) File() *os.File {
 	return nil
 }
 
-func (tun *NativeTun) Events() chan TUNEvent {
+func (tun *NativeTun) Events() chan Event {
 	return tun.events
 }
 

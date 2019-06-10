@@ -29,7 +29,7 @@ const _TUNSIFMODE = 0x8004745d
 type NativeTun struct {
 	name        string
 	tunFile     *os.File
-	events      chan TUNEvent
+	events      chan Event
 	errors      chan error
 	routeSocket int
 }
@@ -75,16 +75,16 @@ func (tun *NativeTun) routineRouteListener(tunIfindex int) {
 		// Up / Down event
 		up := (iface.Flags & net.FlagUp) != 0
 		if up != statusUp && up {
-			tun.events <- TUNEventUp
+			tun.events <- EventUp
 		}
 		if up != statusUp && !up {
-			tun.events <- TUNEventDown
+			tun.events <- EventDown
 		}
 		statusUp = up
 
 		// MTU changes
 		if iface.MTU != statusMTU {
-			tun.events <- TUNEventMTUUpdate
+			tun.events <- EventMTUUpdate
 		}
 		statusMTU = iface.MTU
 	}
@@ -100,7 +100,7 @@ func errorIsEBUSY(err error) bool {
 	return false
 }
 
-func CreateTUN(name string, mtu int) (TUNDevice, error) {
+func CreateTUN(name string, mtu int) (Device, error) {
 	ifIndex := -1
 	if name != "tun" {
 		_, err := fmt.Sscanf(name, "tun%d", &ifIndex)
@@ -139,11 +139,11 @@ func CreateTUN(name string, mtu int) (TUNDevice, error) {
 	return tun, err
 }
 
-func CreateTUNFromFile(file *os.File, mtu int) (TUNDevice, error) {
+func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 
 	tun := &NativeTun{
 		tunFile: file,
-		events:  make(chan TUNEvent, 10),
+		events:  make(chan Event, 10),
 		errors:  make(chan error, 1),
 	}
 
@@ -197,7 +197,7 @@ func (tun *NativeTun) File() *os.File {
 	return tun.tunFile
 }
 
-func (tun *NativeTun) Events() chan TUNEvent {
+func (tun *NativeTun) Events() chan Event {
 	return tun.events
 }
 
