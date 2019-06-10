@@ -150,34 +150,21 @@ func (deviceInfoSet DevInfo) SetSelectedDriver(deviceInfoData *DevInfoData, driv
 
 // SetupDiGetDriverInfoDetail function retrieves driver information detail for a device information set or a particular device information element in the device information set.
 func SetupDiGetDriverInfoDetail(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, driverInfoData *DrvInfoData) (*DrvInfoDetailData, error) {
-	const bufCapacity = 0x800
-	buf := [bufCapacity]byte{}
-	var bufLen uint32
-
-	data := (*DrvInfoDetailData)(unsafe.Pointer(&buf[0]))
-	data.size = sizeofDrvInfoDetailData
-
-	err := setupDiGetDriverInfoDetail(deviceInfoSet, deviceInfoData, driverInfoData, data, bufCapacity, &bufLen)
-	if err == nil {
-		// The buffer was was sufficiently big.
-		data.size = bufLen
-		return data, nil
-	}
-
-	if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
-		// The buffer was too small. Now that we got the required size, create another one big enough and retry.
-		buf := make([]byte, bufLen)
+	reqSize := uint32(2048)
+	for {
+		buf := make([]byte, reqSize)
 		data := (*DrvInfoDetailData)(unsafe.Pointer(&buf[0]))
 		data.size = sizeofDrvInfoDetailData
-
-		err = setupDiGetDriverInfoDetail(deviceInfoSet, deviceInfoData, driverInfoData, data, bufLen, &bufLen)
-		if err == nil {
-			data.size = bufLen
-			return data, nil
+		err := setupDiGetDriverInfoDetail(deviceInfoSet, deviceInfoData, driverInfoData, data, uint32(len(buf)), &reqSize)
+		if err == windows.ERROR_INSUFFICIENT_BUFFER {
+			continue
 		}
+		if err != nil {
+			return nil, err
+		}
+		data.size = reqSize
+		return data, nil
 	}
-
-	return nil, err
 }
 
 // DriverInfoDetail method retrieves driver information detail for a device information set or a particular device information element in the device information set.
@@ -238,24 +225,19 @@ func (deviceInfoSet DevInfo) OpenDevRegKey(DeviceInfoData *DevInfoData, Scope DI
 
 // SetupDiGetDeviceRegistryProperty function retrieves a specified Plug and Play device property.
 func SetupDiGetDeviceRegistryProperty(deviceInfoSet DevInfo, deviceInfoData *DevInfoData, property SPDRP) (value interface{}, err error) {
-	buf := make([]byte, 0x100)
-	var dataType, bufLen uint32
-	err = setupDiGetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, &dataType, &buf[0], uint32(cap(buf)), &bufLen)
-	if err == nil {
-		// The buffer was sufficiently big.
-		return getRegistryValue(buf[:bufLen], dataType)
-	}
-
-	if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
-		// The buffer was too small. Now that we got the required size, create another one big enough and retry.
-		buf = make([]byte, bufLen)
-		err = setupDiGetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, &dataType, &buf[0], uint32(cap(buf)), &bufLen)
-		if err == nil {
-			return getRegistryValue(buf[:bufLen], dataType)
+	reqSize := uint32(256)
+	for {
+		var dataType uint32
+		buf := make([]byte, reqSize)
+		err = setupDiGetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, &dataType, &buf[0], uint32(len(buf)), &reqSize)
+		if err == windows.ERROR_INSUFFICIENT_BUFFER {
+			continue
 		}
+		if err != nil {
+			return
+		}
+		return getRegistryValue(buf[:reqSize], dataType)
 	}
-
-	return
 }
 
 func getRegistryValue(buf []byte, dataType uint32) (interface{}, error) {
@@ -442,10 +424,6 @@ func SetupDiClassGuidsFromNameEx(className string, machineName string) ([]window
 		return nil, err
 	}
 
-	const bufCapacity = 4
-	var buf [bufCapacity]windows.GUID
-	var bufLen uint32
-
 	var machineNameUTF16 *uint16
 	if machineName != "" {
 		machineNameUTF16, err = windows.UTF16PtrFromString(machineName)
@@ -454,22 +432,18 @@ func SetupDiClassGuidsFromNameEx(className string, machineName string) ([]window
 		}
 	}
 
-	err = setupDiClassGuidsFromNameEx(classNameUTF16, &buf[0], bufCapacity, &bufLen, machineNameUTF16, 0)
-	if err == nil {
-		// The GUID array was sufficiently big. Return its slice.
-		return buf[:bufLen], nil
-	}
-
-	if errWin, ok := err.(windows.Errno); ok && errWin == windows.ERROR_INSUFFICIENT_BUFFER {
-		// The GUID array was too small. Now that we got the required size, create another one big enough and retry.
-		buf := make([]windows.GUID, bufLen)
-		err = setupDiClassGuidsFromNameEx(classNameUTF16, &buf[0], bufLen, &bufLen, machineNameUTF16, 0)
-		if err == nil {
-			return buf[:bufLen], nil
+	reqSize := uint32(4)
+	for {
+		buf := make([]windows.GUID, reqSize)
+		err = setupDiClassGuidsFromNameEx(classNameUTF16, &buf[0], uint32(len(buf)), &reqSize, machineNameUTF16, 0)
+		if err == windows.ERROR_INSUFFICIENT_BUFFER {
+			continue
 		}
+		if err != nil {
+			return nil, err
+		}
+		return buf[:reqSize], nil
 	}
-
-	return nil, err
 }
 
 //sys	setupDiGetSelectedDevice(deviceInfoSet DevInfo, deviceInfoData *DevInfoData) (err error) = setupapi.SetupDiGetSelectedDevice
