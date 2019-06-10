@@ -114,16 +114,14 @@ func GetInterface(ifname string) (*Wintun, error) {
 		}
 
 		if ifname == strings.ToLower(ifname2) {
-			// Interface name found. Check its driver.
-			const driverType = setupapi.SPDIT_COMPATDRIVER
-			err = devInfoList.BuildDriverInfoList(deviceData, driverType)
+			err = devInfoList.BuildDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER)
 			if err != nil {
 				return nil, fmt.Errorf("SetupDiBuildDriverInfoList failed: %v", err)
 			}
-			defer devInfoList.DestroyDriverInfoList(deviceData, driverType)
+			defer devInfoList.DestroyDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER)
 
 			for index := 0; ; index++ {
-				driverData, err := devInfoList.EnumDriverInfo(deviceData, driverType, index)
+				driverData, err := devInfoList.EnumDriverInfo(deviceData, setupapi.SPDIT_COMPATDRIVER, index)
 				if err != nil {
 					if err == windows.ERROR_NO_MORE_ITEMS {
 						break
@@ -197,17 +195,16 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 		return nil, false, fmt.Errorf("SetupDiSetDeviceRegistryProperty(SPDRP_HARDWAREID) failed: %v", err)
 	}
 
-	const driverType = setupapi.SPDIT_COMPATDRIVER
-	err = devInfoList.BuildDriverInfoList(deviceData, driverType) // TODO: This takes ~510ms
+	err = devInfoList.BuildDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER) // TODO: This takes ~510ms
 	if err != nil {
 		return nil, false, fmt.Errorf("SetupDiBuildDriverInfoList failed: %v", err)
 	}
-	defer devInfoList.DestroyDriverInfoList(deviceData, driverType)
+	defer devInfoList.DestroyDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER)
 
 	driverDate := windows.Filetime{}
 	driverVersion := uint64(0)
 	for index := 0; ; index++ { // TODO: This loop takes ~600ms
-		driverData, err := devInfoList.EnumDriverInfo(deviceData, driverType, index)
+		driverData, err := devInfoList.EnumDriverInfo(deviceData, setupapi.SPDIT_COMPATDRIVER, index)
 		if err != nil {
 			if err == windows.ERROR_NO_MORE_ITEMS {
 				break
@@ -417,6 +414,82 @@ func (wintun *Wintun) DeleteInterface() (rebootRequired bool, err error) {
 	// Check if a system reboot is required. (Ignore errors)
 	rebootRequired, _ = checkReboot(devInfoList, deviceData)
 	return rebootRequired, nil
+}
+
+// DeleteAllInterfaces deletes all Wintun interfaces, and returns which
+// ones it deleted, whether a reboot is required after, and which errors
+// occurred during the process.
+func DeleteAllInterfaces() (deviceInstancesDeleted []uint32, rebootRequired bool, errors []error) {
+	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
+	if err != nil {
+		return nil, false, []error{fmt.Errorf("SetupDiGetClassDevsEx(%v) failed: %v", deviceClassNetGUID, err.Error())}
+	}
+	defer devInfoList.Close()
+
+	for i := 0; ; i++ {
+		deviceData, err := devInfoList.EnumDeviceInfo(i)
+		if err != nil {
+			if err == windows.ERROR_NO_MORE_ITEMS {
+				break
+			}
+			continue
+		}
+
+		err = devInfoList.BuildDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER)
+		if err != nil {
+			continue
+		}
+		defer devInfoList.DestroyDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER)
+
+		isWintun := false
+		for j := 0; ; j++ {
+			driverData, err := devInfoList.EnumDriverInfo(deviceData, setupapi.SPDIT_COMPATDRIVER, j)
+			if err != nil {
+				if err == windows.ERROR_NO_MORE_ITEMS {
+					break
+				}
+				continue
+			}
+			driverDetailData, err := devInfoList.DriverInfoDetail(deviceData, driverData)
+			if err != nil {
+				continue
+			}
+			if driverDetailData.IsCompatible(hardwareID) {
+				isWintun = true
+				break
+			}
+		}
+		if !isWintun {
+			continue
+		}
+
+		err = setQuietInstall(devInfoList, deviceData)
+		if err != nil {
+			errors = append(errors, err)
+			continue
+		}
+
+		inst := deviceData.DevInst
+		removeDeviceParams := setupapi.RemoveDeviceParams{
+			ClassInstallHeader: *setupapi.MakeClassInstallHeader(setupapi.DIF_REMOVE),
+			Scope:              setupapi.DI_REMOVEDEVICE_GLOBAL,
+		}
+		err = devInfoList.SetClassInstallParams(deviceData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams)))
+		if err != nil {
+			errors = append(errors, err)
+			continue
+		}
+		err = devInfoList.CallClassInstaller(setupapi.DIF_REMOVE, deviceData)
+		if err != nil {
+			errors = append(errors, err)
+			continue
+		}
+		if !rebootRequired {
+			rebootRequired, _ = checkReboot(devInfoList, deviceData)
+		}
+		deviceInstancesDeleted = append(deviceInstancesDeleted, inst)
+	}
+	return
 }
 
 // checkReboot checks device install parameters if a system reboot is required.
