@@ -31,7 +31,7 @@ var deviceClassNetGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0
 
 const (
 	hardwareID = "Wintun"
-	waitForRegistryTimeout = time.Second * 5
+	waitForRegistryTimeout = time.Second * 10
 )
 
 // makeWintun creates a Wintun interface handle and populates it from the device's registry key.
