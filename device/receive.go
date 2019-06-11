@@ -427,6 +427,7 @@ func (device *Device) RoutineHandshake() {
 			peer.SetEndpointFromPacket(elem.endpoint)
 
 			logDebug.Println(peer, "- Received handshake initiation")
+			atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
 
 			peer.SendHandshakeResponse()
 
@@ -457,6 +458,7 @@ func (device *Device) RoutineHandshake() {
 			peer.SetEndpointFromPacket(elem.endpoint)
 
 			logDebug.Println(peer, "- Received handshake response")
+			atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
 
 			// update timers
 
@@ -581,6 +583,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		peer.keepKeyFreshReceiving()
 		peer.timersAnyAuthenticatedPacketTraversal()
 		peer.timersAnyAuthenticatedPacketReceived()
+		atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)+MinMessageSize))
 
 		// check for keepalive
 
@@ -656,7 +659,6 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		// write to tun device
 
 		offset := MessageTransportOffsetContent
-		atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
 		_, err := device.tun.device.Write(elem.buffer[:offset+len(elem.packet)], offset)
 		if err == nil {
 			shouldFlush = true

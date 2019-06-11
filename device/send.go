@@ -600,7 +600,6 @@ func (peer *Peer) RoutineSequentialSender() {
 
 			// send message and return buffer to pool
 
-			length := uint64(len(elem.packet))
 			err := peer.SendBuffer(elem.packet)
 			if len(elem.packet) != MessageKeepaliveSize {
 				peer.timersDataSent()
@@ -611,7 +610,6 @@ func (peer *Peer) RoutineSequentialSender() {
 				logError.Println(peer, "- Failed to send data packet", err)
 				continue
 			}
-			atomic.AddUint64(&peer.stats.txBytes, length)
 
 			peer.keepKeyFreshSending()
 		}

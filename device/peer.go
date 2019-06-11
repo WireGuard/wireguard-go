@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -140,7 +141,11 @@ func (peer *Peer) SendBuffer(buffer []byte) error {
 		return errors.New("no known endpoint for peer")
 	}
 
-	return peer.device.net.bind.Send(buffer, peer.endpoint)
+	err := peer.device.net.bind.Send(buffer, peer.endpoint)
+	if err == nil {
+		atomic.AddUint64(&peer.stats.txBytes, uint64(len(buffer)))
+	}
+	return err
 }
 
 func (peer *Peer) String() string {
