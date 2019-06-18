@@ -30,7 +30,7 @@ type Wintun struct {
 var deviceClassNetGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0x11ce, Data4: [8]byte{0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}}
 
 const (
-	hardwareID = "Wintun"
+	hardwareID             = "Wintun"
 	waitForRegistryTimeout = time.Second * 10
 )
 

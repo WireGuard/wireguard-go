@@ -55,6 +55,15 @@ func packetAlign(size uint32) uint32 {
 	return (size + (packetExchangeAlignment - 1)) &^ (packetExchangeAlignment - 1)
 }
 
+var shouldRetryOpen = windows.RtlGetVersion().MajorVersion < 10
+
+func maybeRetry(x int) int {
+	if shouldRetryOpen {
+		return x
+	}
+	return 0
+}
+
 //
 // CreateTUN creates a Wintun adapter with the given name. Should a Wintun
 // adapter with the same name exist, it is reused.
@@ -104,7 +113,7 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Dev
 }
 
 func (tun *NativeTun) openTUN() error {
-	retries := retryTimeout * retryRate
+	retries := maybeRetry(retryTimeout * retryRate)
 	if tun.close {
 		return os.ErrClosed
 	}
@@ -238,7 +247,7 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	default:
 	}
 
-	retries := 1000
+	retries := maybeRetry(1000)
 	for {
 		if tun.rdBuff.offset+packetExchangeAlignment <= tun.rdBuff.avail {
 			// Get packet from the exchange buffer.
@@ -302,7 +311,7 @@ func (tun *NativeTun) Flush() error {
 		tun.wrBuff.packetNum = 0
 		tun.wrBuff.offset = 0
 	}()
-	retries := 1000
+	retries := maybeRetry(1000)
 
 	for {
 		// Get TUN data pipe.
