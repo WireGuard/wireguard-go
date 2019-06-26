@@ -141,6 +141,12 @@ func (tun *NativeTun) openTUN() error {
 			}
 			return err
 		}
+		firstSize := (*uint32)(unsafe.Pointer(&tun.wrBuff.data[0]))
+		saved := *firstSize
+		*firstSize = 0
+		// Set the maximum buffer length with an invalid write.
+		tun.tunFileWrite.Write(tun.wrBuff.data[:])
+		*firstSize = saved
 	}
 	return nil
 }
