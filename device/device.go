@@ -21,9 +21,12 @@ import (
 )
 
 type Device struct {
-	isUp     AtomicBool // device is (going) up
-	isClosed AtomicBool // device is closed? (acting as guard)
-	log      *Logger
+	isUp           AtomicBool // device is (going) up
+	isClosed       AtomicBool // device is closed? (acting as guard)
+	log            *Logger
+	skipBindUpdate bool
+	createBind     func(uport uint16) (conn.Bind, uint16, error)
+	createEndpoint func(key [32]byte, s string) (conn.Endpoint, error)
 
 	// synchronized resources (locks acquired in order)
 
@@ -261,11 +264,24 @@ type DeviceOptions struct {
 	// validated peer with an unexpected internal IP address.
 	// The packet is then dropped.
 	UnexpectedIP func(key *wgcfg.Key, ip wgcfg.IP)
+
+	// CreateEndpoint creates a conn.Endpoint for a given address.
+	// If unset, conn.CreateEndpoint is used.
+	CreateEndpoint func(key [32]byte, addr string) (conn.Endpoint, error)
+
+	// CreateBind creates a conn.Bind bound to uport.
+	// If unset, conn.CreateBind is used.
+	CreateBind func(uport uint16) (conn.Bind, uint16, error)
+
+	// SkipBindUpdate instructs Device to only call CreateBind once.
+	//
+	// TODO(crawshaw): remove this, it isn't useful externally.
+	SkipBindUpdate bool
 }
 
 // TODO move logger into DeviceOptions
 // TODO make opts non-vararg
-func NewDevice(tunDevice tun.Device, logger *Logger, opts ...DeviceOptions) *Device {
+func NewDevice(tunDevice tun.Device, logger *Logger, varOpts ...DeviceOptions) *Device {
 	device := new(Device)
 
 	device.isUp.Set(false)
@@ -273,13 +289,37 @@ func NewDevice(tunDevice tun.Device, logger *Logger, opts ...DeviceOptions) *Dev
 
 	device.log = logger
 
-	if len(opts) != 0 && opts[0].UnexpectedIP != nil {
-		device.unexpectedip = opts[0].UnexpectedIP
+	var opts DeviceOptions
+	if len(varOpts) != 0 {
+		if len(varOpts) != 1 {
+			panic("too many DeviceOptions")
+		}
+		opts = varOpts[0]
+	}
+	if opts.UnexpectedIP != nil {
+		device.unexpectedip = opts.UnexpectedIP
 	} else {
 		device.unexpectedip = func(key *wgcfg.Key, ip wgcfg.IP) {
 			device.log.Info.Printf("IPv4 packet with disallowed source address %s from %v", ip, key)
 		}
 	}
+	if opts.CreateEndpoint != nil {
+		device.createEndpoint = opts.CreateEndpoint
+	} else {
+		device.createEndpoint = func(_ [32]byte, s string) (conn.Endpoint, error) {
+			return conn.CreateEndpoint(s)
+		}
+	}
+	if opts.CreateBind != nil {
+		device.createBind = func(uport uint16) (conn.Bind, uint16, error) {
+			return opts.CreateBind(uport)
+		}
+	} else {
+		device.createBind = func(uport uint16) (conn.Bind, uint16, error) {
+			return conn.CreateBind(uport)
+		}
+	}
+	device.skipBindUpdate = opts.SkipBindUpdate
 
 	device.tun.device = tunDevice
 	mtu, err := device.tun.device.MTU()
@@ -490,6 +530,11 @@ func (device *Device) BindUpdate() error {
 	device.net.Lock()
 	defer device.net.Unlock()
 
+	if device.skipBindUpdate && device.net.bind != nil {
+		device.log.Debug.Println("UDP bind update skipped")
+		return nil
+	}
+
 	// close existing sockets
 
 	if err := unsafeCloseBind(device); err != nil {
@@ -504,7 +549,7 @@ func (device *Device) BindUpdate() error {
 
 		var err error
 		netc := &device.net
-		netc.bind, netc.port, err = conn.CreateBind(netc.port)
+		netc.bind, netc.port, err = device.createBind(netc.port)
 		if err != nil {
 			netc.bind = nil
 			netc.port = 0
