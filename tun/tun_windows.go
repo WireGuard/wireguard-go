@@ -35,7 +35,6 @@ type exchgBufRead struct {
 type exchgBufWrite struct {
 	data      [packetExchangeSize]byte
 	offset    uint32
-	packetNum uint32
 }
 
 type NativeTun struct {
@@ -314,7 +313,6 @@ func (tun *NativeTun) Flush() error {
 		return nil
 	}
 	defer func() {
-		tun.wrBuff.packetNum = 0
 		tun.wrBuff.offset = 0
 	}()
 	retries := maybeRetry(1000)
@@ -375,7 +373,6 @@ func (tun *NativeTun) putTunPacket(buff []byte) error {
 	packet = packet[packetExchangeAlignment : packetExchangeAlignment+size]
 	copy(packet, buff)
 
-	tun.wrBuff.packetNum++
 	tun.wrBuff.offset += pSize
 
 	return nil
