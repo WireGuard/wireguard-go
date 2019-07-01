@@ -485,33 +485,6 @@ func (device *Device) RoutineHandshake() {
 	}
 }
 
-func (peer *Peer) elementStopOrFlush(shouldFlush *bool) (stop bool, elemOk bool, elem *QueueInboundElement) {
-	if !*shouldFlush {
-		select {
-		case <-peer.routines.stop:
-			stop = true
-			return
-		case elem, elemOk = <-peer.queue.inbound:
-			return
-		}
-	} else {
-		select {
-		case <-peer.routines.stop:
-			stop = true
-			return
-		case elem, elemOk = <-peer.queue.inbound:
-			return
-		default:
-			*shouldFlush = false
-			err := peer.device.tun.device.Flush()
-			if err != nil {
-				peer.device.log.Error.Printf("Unable to flush packets: %v", err)
-			}
-			return peer.elementStopOrFlush(shouldFlush)
-		}
-	}
-}
-
 func (peer *Peer) RoutineSequentialReceiver() {
 
 	device := peer.device
@@ -520,10 +493,6 @@ func (peer *Peer) RoutineSequentialReceiver() {
 	logDebug := device.log.Debug
 
 	var elem *QueueInboundElement
-	var ok bool
-	var stop bool
-
-	shouldFlush := false
 
 	defer func() {
 		logDebug.Println(peer, "- Routine: sequential receiver - stopped")
@@ -549,9 +518,14 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			elem = nil
 		}
 
-		stop, ok, elem = peer.elementStopOrFlush(&shouldFlush)
-		if stop || !ok {
+		var elemOk bool
+		select {
+		case <-peer.routines.stop:
 			return
+		case elem, elemOk = <-peer.queue.inbound:
+			if !elemOk {
+				return
+			}
 		}
 
 		// wait for decryption
@@ -660,8 +634,11 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 		offset := MessageTransportOffsetContent
 		_, err := device.tun.device.Write(elem.buffer[:offset+len(elem.packet)], offset)
-		if err == nil {
-			shouldFlush = true
+		if len(peer.queue.inbound) == 0 {
+			err = device.tun.device.Flush()
+			if err != nil {
+				peer.device.log.Error.Printf("Unable to flush packets: %v", err)
+			}
 		}
 		if err != nil && !device.isClosed.Get() {
 			logError.Println("Failed to write packet to TUN device:", err)
