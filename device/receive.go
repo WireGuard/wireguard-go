@@ -619,8 +619,8 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			src := elem.packet[IPv6offsetSrc : IPv6offsetSrc+net.IPv6len]
 			if device.allowedips.LookupIPv6(src) != peer {
 				logInfo.Println(
+					"IPv6 packet with disallowed source address from",
 					peer,
-					"sent packet with disallowed IPv6 source",
 				)
 				continue
 			}
