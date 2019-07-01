@@ -1,6 +1,3 @@
-// +build !linux android
-// +build !windows
-
 /* SPDX-License-Identifier: MIT
  *
  * Copyright (C) 2017-2019 WireGuard LLC. All Rights Reserved.
@@ -14,16 +11,11 @@ import (
 	"syscall"
 )
 
-/* This code is meant to be a temporary solution
- * on platforms for which the sticky socket / source caching behavior
- * has not yet been implemented.
- *
- * See conn_linux.go for an implementation on the linux platform.
- */
-
 type nativeBind struct {
 	ipv4 *net.UDPConn
+	ipv4Raw syscall.RawConn
 	ipv6 *net.UDPConn
+	ipv6Raw syscall.RawConn
 }
 
 type NativeEndpoint net.UDPAddr
@@ -117,6 +109,24 @@ func CreateBind(uport uint16, device *Device) (Bind, uint16, error) {
 		return nil, 0, err
 	}
 
+	bind.ipv4Raw, err = bind.ipv4.SyscallConn()
+	if err != nil {
+		bind.ipv4.Close()
+		bind.ipv4 = nil
+		return nil, 0, err
+		bind.ipv6.Close()
+		bind.ipv6 = nil
+		return nil, 0, err
+	}
+	bind.ipv6Raw, err = bind.ipv6.SyscallConn()
+	if err != nil {
+		bind.ipv4.Close()
+		bind.ipv4 = nil
+		return nil, 0, err
+		bind.ipv6.Close()
+		bind.ipv6 = nil
+		return nil, 0, err
+	}
 	return &bind, uint16(port), nil
 }
 
