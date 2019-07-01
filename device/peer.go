@@ -126,7 +126,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	return peer, nil
 }
 
-func (peer *Peer) SendBuffer(buffer []byte) error {
+func (peer *Peer) SendBuffer(buffer []byte, now bool) error {
 	peer.device.net.RLock()
 	defer peer.device.net.RUnlock()
 
@@ -141,7 +141,7 @@ func (peer *Peer) SendBuffer(buffer []byte) error {
 		return errors.New("no known endpoint for peer")
 	}
 
-	err := peer.device.net.bind.Send(buffer, peer.endpoint)
+	err := peer.device.net.bind.Send(buffer, peer.endpoint, now)
 	if err == nil {
 		atomic.AddUint64(&peer.stats.txBytes, uint64(len(buffer)))
 	}

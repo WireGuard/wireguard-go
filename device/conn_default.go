@@ -152,7 +152,7 @@ func (bind *nativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
 	return n, (*NativeEndpoint)(endpoint), err
 }
 
-func (bind *nativeBind) Send(buff []byte, endpoint Endpoint) error {
+func (bind *nativeBind) Send(buff []byte, endpoint Endpoint, now bool) error {
 	var err error
 	nend := endpoint.(*NativeEndpoint)
 	if nend.IP.To4() != nil {
@@ -167,4 +167,8 @@ func (bind *nativeBind) Send(buff []byte, endpoint Endpoint) error {
 		_, err = bind.ipv6.WriteToUDP(buff, (*net.UDPAddr)(nend))
 	}
 	return err
+}
+
+func (bind *nativeBind) Flush() error {
+	return nil
 }

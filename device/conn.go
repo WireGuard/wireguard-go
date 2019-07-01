@@ -24,7 +24,8 @@ type Bind interface {
 	SetMark(value uint32) error
 	ReceiveIPv6(buff []byte) (int, Endpoint, error)
 	ReceiveIPv4(buff []byte) (int, Endpoint, error)
-	Send(buff []byte, end Endpoint) error
+	Send(buff []byte, end Endpoint, now bool) error
+	Flush() error
 	Close() error
 }
 

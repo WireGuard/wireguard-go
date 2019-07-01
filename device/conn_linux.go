@@ -259,7 +259,7 @@ func (bind *nativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
 	return n, &end, err
 }
 
-func (bind *nativeBind) Send(buff []byte, end Endpoint) error {
+func (bind *nativeBind) Send(buff []byte, end Endpoint, now bool) error {
 	nend := end.(*NativeEndpoint)
 	if !nend.isV6 {
 		if bind.sock4 == -1 {
@@ -272,6 +272,10 @@ func (bind *nativeBind) Send(buff []byte, end Endpoint) error {
 		}
 		return send6(bind.sock6, nend, buff)
 	}
+}
+
+func (bind *nativeBind) Flush() error {
+	return nil
 }
 
 func (end *NativeEndpoint) SrcIP() net.IP {

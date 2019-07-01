@@ -485,7 +485,7 @@ func (device *Device) RoutineHandshake() {
 	}
 }
 
-func (peer *Peer) elementStopOrFlush(shouldFlush *bool) (stop bool, elemOk bool, elem *QueueInboundElement) {
+func (peer *Peer) receiveElementStopOrFlush(shouldFlush *bool) (stop bool, elemOk bool, elem *QueueInboundElement) {
 	if !*shouldFlush {
 		select {
 		case <-peer.routines.stop:
@@ -505,9 +505,9 @@ func (peer *Peer) elementStopOrFlush(shouldFlush *bool) (stop bool, elemOk bool,
 			*shouldFlush = false
 			err := peer.device.tun.device.Flush()
 			if err != nil {
-				peer.device.log.Error.Printf("Unable to flush packets: %v", err)
+				peer.device.log.Error.Printf("Unable to flush receive packets: %v", err)
 			}
-			return peer.elementStopOrFlush(shouldFlush)
+			return peer.receiveElementStopOrFlush(shouldFlush)
 		}
 	}
 }
@@ -549,7 +549,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			elem = nil
 		}
 
-		stop, ok, elem = peer.elementStopOrFlush(&shouldFlush)
+		stop, ok, elem = peer.receiveElementStopOrFlush(&shouldFlush)
 		if stop || !ok {
 			return
 		}
