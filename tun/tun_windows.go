@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -38,16 +39,17 @@ type exchgBufWrite struct {
 }
 
 type NativeTun struct {
-	wt           *wintun.Wintun
-	tunFileRead  *os.File
-	tunFileWrite *os.File
-	tunLock      sync.Mutex
-	close        bool
-	rdBuff       *exchgBufRead
-	wrBuff       *exchgBufWrite
-	events       chan Event
-	errors       chan error
-	forcedMTU    int
+	wt                        *wintun.Wintun
+	tunFileRead               *os.File
+	tunFileWrite              *os.File
+	haveRegisteredWriteBuffer int32
+	tunLock                   sync.Mutex
+	close                     bool
+	rdBuff                    *exchgBufRead
+	wrBuff                    *exchgBufWrite
+	events                    chan Event
+	errors                    chan error
+	forcedMTU                 int
 }
 
 func packetAlign(size uint32) uint32 {
@@ -140,12 +142,7 @@ func (tun *NativeTun) openTUN() error {
 			}
 			return err
 		}
-		firstSize := (*uint32)(unsafe.Pointer(&tun.wrBuff.data[0]))
-		saved := *firstSize
-		*firstSize = 0
-		// Set the maximum buffer length with an invalid write.
-		tun.tunFileWrite.Write(tun.wrBuff.data[:])
-		*firstSize = saved
+		atomic.StoreInt32(&tun.haveRegisteredWriteBuffer, 0)
 	}
 	return nil
 }
@@ -322,6 +319,15 @@ func (tun *NativeTun) Flush() error {
 		_, file, err := tun.getTUN()
 		if err != nil {
 			return err
+		}
+
+		if atomic.CompareAndSwapInt32(&tun.haveRegisteredWriteBuffer, 0, 1) {
+			firstSize := (*uint32)(unsafe.Pointer(&tun.wrBuff.data[0]))
+			saved := *firstSize
+			*firstSize = 0
+			// Set the maximum buffer length with an invalid write.
+			tun.tunFileWrite.Write(tun.wrBuff.data[:])
+			*firstSize = saved
 		}
 
 		for {
