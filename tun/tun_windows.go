@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	packetExchangeAlignment uint32 = 16                               // Number of bytes packets are aligned to in exchange buffers
+	packetExchangeAlignment uint32 = 4                                // Number of bytes packets are aligned to in exchange buffers
 	packetSizeMax           uint32 = 0xf000 - packetExchangeAlignment // Maximum packet size
 	packetExchangeSize      uint32 = 0x100000                         // Exchange buffer size (defaults to 1MiB)
 	retryRate                      = 4                                // Number of retries per second to reopen device pipe
@@ -255,7 +255,7 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 			// Get packet from the exchange buffer.
 			packet := tun.rdBuff.data[tun.rdBuff.offset:]
 			size := *(*uint32)(unsafe.Pointer(&packet[0]))
-			pSize := packetAlign(packetExchangeAlignment + size)
+			pSize := packetAlign(size) + packetExchangeAlignment
 			if packetSizeMax < size || tun.rdBuff.avail < tun.rdBuff.offset+pSize {
 				// Invalid packet size.
 				tun.rdBuff.avail = 0
@@ -363,7 +363,7 @@ func (tun *NativeTun) putTunPacket(buff []byte) error {
 	if size > packetSizeMax {
 		return errors.New("Packet too big")
 	}
-	pSize := packetAlign(packetExchangeAlignment + size)
+	pSize := packetAlign(size) + packetExchangeAlignment
 
 	if tun.wrBuff.offset+pSize >= packetExchangeSize {
 		// Exchange buffer is full -> flush first.
