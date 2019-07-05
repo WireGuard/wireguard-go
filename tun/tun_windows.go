@@ -11,11 +11,11 @@ import (
 	"io"
 	"os"
 	"sync"
-	"sync/atomic"
 	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+
 	"golang.zx2c4.com/wireguard/tun/wintun"
 )
 
@@ -42,7 +42,6 @@ type NativeTun struct {
 	wt                        *wintun.Wintun
 	tunFileRead               *os.File
 	tunFileWrite              *os.File
-	haveRegisteredWriteBuffer int32
 	tunLock                   sync.Mutex
 	close                     bool
 	rdBuff                    *exchgBufRead
@@ -142,7 +141,6 @@ func (tun *NativeTun) openTUN() error {
 			}
 			return err
 		}
-		atomic.StoreInt32(&tun.haveRegisteredWriteBuffer, 0)
 	}
 	return nil
 }
@@ -319,15 +317,6 @@ func (tun *NativeTun) Flush() error {
 		_, file, err := tun.getTUN()
 		if err != nil {
 			return err
-		}
-
-		if atomic.CompareAndSwapInt32(&tun.haveRegisteredWriteBuffer, 0, 1) {
-			firstSize := (*uint32)(unsafe.Pointer(&tun.wrBuff.data[0]))
-			saved := *firstSize
-			*firstSize = 0
-			// Set the maximum buffer length with an invalid write.
-			tun.tunFileWrite.Write(tun.wrBuff.data[:])
-			*firstSize = saved
 		}
 
 		for {
