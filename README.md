@@ -34,7 +34,7 @@ This runs on macOS using the utun driver. It does not yet support sticky sockets
 
 ### Windows
 
-It is currently a work in progress to strip out the beginnings of an experiment done with the OpenVPN tuntap driver and instead port to the new UWP APIs for tunnels. In other words, this does not *yet* work on Windows.
+This runs on Windows, but you should instead use it from the more [fully featured Windows app](https://git.zx2c4.com/wireguard-windows/about/), which uses this as a module.
 
 ### FreeBSD
 
