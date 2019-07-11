@@ -232,6 +232,25 @@ func (peer *Peer) ZeroAndFlushAll() {
 	peer.FlushNonceQueue()
 }
 
+func (peer *Peer) ExpireCurrentKeypairs() {
+	handshake := &peer.handshake
+	handshake.mutex.Lock()
+	peer.device.indexTable.Delete(handshake.localIndex)
+	handshake.Clear()
+	handshake.mutex.Unlock()
+	peer.handshake.lastSentHandshake = time.Now().Add(-(RekeyTimeout + time.Second))
+
+	keypairs := &peer.keypairs
+	keypairs.Lock()
+	if keypairs.current != nil {
+		keypairs.current.sendNonce = RejectAfterMessages
+	}
+	if keypairs.next != nil {
+		keypairs.next.sendNonce = RejectAfterMessages
+	}
+	keypairs.Unlock()
+}
+
 func (peer *Peer) Stop() {
 
 	// prevent simultaneous start/stop operations

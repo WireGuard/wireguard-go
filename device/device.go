@@ -207,6 +207,10 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 	device.staticIdentity.Lock()
 	defer device.staticIdentity.Unlock()
 
+	if sk.Equals(device.staticIdentity.privateKey) {
+		return nil
+	}
+
 	device.peers.Lock()
 	defer device.peers.Unlock()
 
@@ -246,6 +250,8 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 
 		if isZero(handshake.precomputedStaticStatic[:]) {
 			unsafeRemovePeer(device, peer, key)
+		} else {
+			peer.ExpireCurrentKeypairs()
 		}
 	}
 
