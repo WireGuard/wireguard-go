@@ -173,10 +173,13 @@ func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 
 	go tun.routineRouteListener(tunIfindex)
 
-	err = tun.setMTU(mtu)
-	if err != nil {
-		tun.Close()
-		return nil, err
+	currentMTU, err := tun.MTU()
+	if err != nil || currentMTU != mtu {
+		err = tun.setMTU(mtu)
+		if err != nil {
+			tun.Close()
+			return nil, err
+		}
 	}
 
 	return tun, nil
