@@ -267,6 +267,9 @@ func (tun *NativeTun) ForceMTU(mtu int) {
 	tun.forcedMTU = mtu
 }
 
+//go:linkname procyield runtime.procyield
+func procyield(cycles uint32)
+
 // Note: Read() and Write() assume the caller comes only from a single thread; there's no locking.
 
 func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
@@ -277,6 +280,7 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 	}
 
 	retries := maybeRetry(1000)
+top:
 	for !tun.close {
 		_, err := tun.getTUN()
 		if err != nil {
@@ -288,10 +292,21 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 			return 0, errors.New("send ring head out of bounds")
 		}
 
-		buffTail := atomic.LoadUint32(&tun.rings.send.ring.tail)
-		if buffHead == buffTail {
-			windows.WaitForSingleObject(tun.rings.send.tailMoved, windows.INFINITE)
-			continue
+		start := time.Now()
+		var buffTail uint32
+		for {
+			buffTail = atomic.LoadUint32(&tun.rings.send.ring.tail)
+			if buffHead != buffTail {
+				break
+			}
+			if tun.close {
+				return 0, os.ErrClosed
+			}
+			if time.Since(start) >= time.Millisecond*50 {
+				windows.WaitForSingleObject(tun.rings.send.tailMoved, windows.INFINITE)
+				continue top
+			}
+			procyield(1)
 		}
 		if buffTail >= packetCapacity {
 			if retries > 0 {
