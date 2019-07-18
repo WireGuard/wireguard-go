@@ -22,7 +22,7 @@ import (
 const (
 	packetAlignment    uint32 = 4        // Number of bytes packets are aligned to in rings
 	packetSizeMax      uint32 = 0xffff   // Maximum packet size
-	packetCapacity     uint32 = 0x100000 // Ring capacity (defaults to 1MiB, must be a power of 2)
+	packetCapacity     uint32 = 0x800000 // Ring capacity, 8MiB
 	packetTrailingSize uint32 = uint32(unsafe.Sizeof(packetHeader{})) + ((packetSizeMax + (packetAlignment - 1)) &^ (packetAlignment - 1)) - packetAlignment
 
 	ioctlRegisterRings uint32 = (0x22 /*FILE_DEVICE_UNKNOWN*/ << 16) | (0x800 << 2) | 0 /*METHOD_BUFFERED*/ | (0x3 /*FILE_READ_DATA | FILE_WRITE_DATA*/ << 14)
@@ -381,7 +381,7 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 
 		buffSpace := tun.rings.receive.ring.wrap(buffHead - buffTail - packetAlignment)
 		if alignedPacketSize > buffSpace {
-			return 0, errors.New("receive ring full")
+			return 0, nil // Dropping when ring is full.
 		}
 
 		packet := (*packet)(unsafe.Pointer(&tun.rings.receive.ring.data[buffTail]))
