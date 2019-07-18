@@ -311,6 +311,9 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 			waitForRegistryTimeout)
 		if err == nil {
 			_, err = registryEx.GetStringValueWait(key, "Name", waitForRegistryTimeout)
+			if err == nil {
+				_, err = registryEx.GetStringValueWait(key, "PnPInstanceId", waitForRegistryTimeout)
+			}
 			key.Close()
 		}
 	}
@@ -612,6 +615,23 @@ func (wintun *Wintun) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, err
 // DataFileName returns the Wintun device data pipe name.
 func (wintun *Wintun) DataFileName() string {
 	return fmt.Sprintf("\\\\.\\Global\\WINTUN%d", wintun.luidIndex)
+}
+
+// NdisFileName returns the Wintun NDIS device object name.
+func (wintun *Wintun) NdisFileName() (string, error) {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.netRegKeyName(), registry.QUERY_VALUE)
+	if err != nil {
+		return "", fmt.Errorf("Network-specific registry key open failed: %v", err)
+	}
+	defer key.Close()
+
+	// Get the interface name.
+	pnpInstanceID, err := registryEx.GetStringValue(key, "PnPInstanceId")
+	if err != nil {
+		return "", fmt.Errorf("PnpInstanceId registry key read failed: %v", err)
+	}
+	mangledPnpNode := strings.ReplaceAll(fmt.Sprintf("%s\\{cac88484-7515-4c03-82e6-71a87abac361}", pnpInstanceID), "\\", "#")
+	return fmt.Sprintf("\\\\.\\Global\\%s", mangledPnpNode), nil
 }
 
 // GUID returns the GUID of the interface.
