@@ -142,6 +142,15 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Dev
 		return nil, fmt.Errorf("Error creating event: %v", err)
 	}
 
+	_, err = tun.getTUN()
+	if err != nil {
+		windows.CloseHandle(tun.rings.send.tailMoved)
+		windows.CloseHandle(tun.rings.receive.tailMoved)
+		tun.closeTUN()
+		wt.DeleteInterface()
+		return nil, err
+	}
+
 	return tun, nil
 }
 
