@@ -146,13 +146,17 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Dev
 }
 
 func (tun *NativeTun) openTUN() error {
+	filename, err := tun.wt.NdisFileName()
+	if err != nil {
+		return err
+	}
+
 	retries := maybeRetry(retryTimeout * retryRate)
 	if tun.close {
 		return os.ErrClosed
 	}
 
-	var err error
-	name, err := windows.UTF16PtrFromString(tun.wt.DataFileName())
+	name, err := windows.UTF16PtrFromString(filename)
 	if err != nil {
 		return err
 	}

@@ -612,11 +612,6 @@ func (wintun *Wintun) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, err
 	return 0, nil, windows.ERROR_OBJECT_NOT_FOUND
 }
 
-// DataFileName returns the Wintun device data pipe name.
-func (wintun *Wintun) DataFileName() string {
-	return fmt.Sprintf("\\\\.\\Global\\WINTUN%d", wintun.luidIndex)
-}
-
 // NdisFileName returns the Wintun NDIS device object name.
 func (wintun *Wintun) NdisFileName() (string, error) {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.netRegKeyName(), registry.QUERY_VALUE)
