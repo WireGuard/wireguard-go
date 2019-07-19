@@ -25,7 +25,7 @@ const (
 	packetCapacity     uint32 = 0x800000 // Ring capacity, 8MiB
 	packetTrailingSize uint32 = uint32(unsafe.Sizeof(packetHeader{})) + ((packetSizeMax + (packetAlignment - 1)) &^ (packetAlignment - 1)) - packetAlignment
 
-	ioctlRegisterRings uint32 = (0x22 /*FILE_DEVICE_UNKNOWN*/ << 16) | (0x800 << 2) | 0 /*METHOD_BUFFERED*/ | (0x3 /*FILE_READ_DATA | FILE_WRITE_DATA*/ << 14)
+	ioctlRegisterRings uint32 = (51820 << 16) | (0x970 << 2) | 0 /*METHOD_BUFFERED*/ | (0x3 /*FILE_READ_DATA | FILE_WRITE_DATA*/ << 14)
 
 	retryRate    = 4  // Number of retries per second to reopen device pipe
 	retryTimeout = 30 // Number of seconds to tolerate adapter unavailable
