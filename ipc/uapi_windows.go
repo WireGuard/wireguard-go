@@ -47,20 +47,12 @@ func (l *UAPIListener) Addr() net.Addr {
 	return l.listener.Addr()
 }
 
-func GetSystemSecurityDescriptor() string {
-	//
-	// SDDL encoded.
-	//
-	// (system = SECURITY_NT_AUTHORITY | SECURITY_LOCAL_SYSTEM_RID)
-	// owner: system
-	// grant: GENERIC_ALL to system
-	//
-	return "O:SYD:(A;;GA;;;SY)"
-}
+/* SDDL_DEVOBJ_SYS_ALL from the WDK */
+var UAPISecurityDescriptor = "O:SYD:P(A;;GA;;;SY)"
 
 func UAPIListen(name string) (net.Listener, error) {
 	config := winpipe.PipeConfig{
-		SecurityDescriptor: GetSystemSecurityDescriptor(),
+		SecurityDescriptor: UAPISecurityDescriptor,
 	}
 	listener, err := winpipe.ListenPipe("\\\\.\\pipe\\WireGuard\\"+name, &config)
 	if err != nil {
