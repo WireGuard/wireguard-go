@@ -626,7 +626,7 @@ func (wintun *Wintun) AdapterHandle() (windows.Handle, error) {
 		return windows.InvalidHandle, fmt.Errorf("PnPInstanceId registry key read failed: %v", err)
 	}
 	mangledPnpNode := strings.ReplaceAll(fmt.Sprintf("%s\\{cac88484-7515-4c03-82e6-71a87abac361}", pnpInstanceID), "\\", "#")
-	handle, err := windows.CreateFile(windows.StringToUTF16Ptr(fmt.Sprintf("\\\\.\\Global\\%s", mangledPnpNode)), windows.GENERIC_READ|windows.GENERIC_WRITE, 0, nil, windows.OPEN_EXISTING, 0, 0)
+	handle, err := windows.CreateFile(windows.StringToUTF16Ptr(fmt.Sprintf("\\\\.\\Global\\%s", mangledPnpNode)), windows.GENERIC_READ|windows.GENERIC_WRITE, windows.FILE_SHARE_READ | windows.FILE_SHARE_WRITE | windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING, 0, 0)
 	if err != nil {
 		return windows.InvalidHandle, fmt.Errorf("CreateFile on mangled PnPInstanceId path failed: %v", err)
 	}
