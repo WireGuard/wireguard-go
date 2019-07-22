@@ -171,6 +171,7 @@ func (tun *NativeTun) Close() error {
 	if tun.wt != nil {
 		_, err = tun.wt.DeleteInterface()
 	}
+	close(tun.events)
 	return err
 }
 
