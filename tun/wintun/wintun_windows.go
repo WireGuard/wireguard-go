@@ -23,11 +23,13 @@ import (
 // Wintun is a handle of a Wintun adapter.
 type Wintun struct {
 	cfgInstanceID windows.GUID
+	devInstanceID string
 	luidIndex     uint32
 	ifType        uint32
 }
 
 var deviceClassNetGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0x11ce, Data4: [8]byte{0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}}
+var deviceInterfaceNetGUID = windows.GUID{Data1: 0xcac88484, Data2: 0x7515, Data3: 0x4c03, Data4: [8]byte{ 0x82, 0xe6, 0x71, 0xa8, 0x7a, 0xba, 0xc3, 0x61}}
 
 const (
 	hardwareID             = "Wintun"
@@ -67,8 +69,14 @@ func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 		return nil, fmt.Errorf("RegQueryValue(\"*IfType\") failed: %v", err)
 	}
 
+	instanceId, err := deviceInfoSet.DeviceInstanceID(deviceInfoData)
+	if err != nil {
+		return nil, fmt.Errorf("DeviceInstanceID failed: %v", err)
+	}
+
 	return &Wintun{
 		cfgInstanceID: ifid,
+		devInstanceID: instanceId,
 		luidIndex:     uint32(luidIdx),
 		ifType:        uint32(ifType),
 	}, nil
@@ -614,21 +622,10 @@ func (wintun *Wintun) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, err
 
 // AdapterHandle returns a handle to the adapter device object.
 func (wintun *Wintun) AdapterHandle() (windows.Handle, error) {
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.netRegKeyName(), registry.QUERY_VALUE)
-	if err != nil {
-		return windows.InvalidHandle, fmt.Errorf("Network-specific registry key open failed: %v", err)
-	}
-	defer key.Close()
-
-	// Get the interface name.
-	pnpInstanceID, err := registryEx.GetStringValue(key, "PnPInstanceId")
-	if err != nil {
-		return windows.InvalidHandle, fmt.Errorf("PnPInstanceId registry key read failed: %v", err)
-	}
-	mangledPnpNode := strings.ReplaceAll(fmt.Sprintf("%s\\{cac88484-7515-4c03-82e6-71a87abac361}", pnpInstanceID), "\\", "#")
+	mangledPnpNode := strings.ReplaceAll(fmt.Sprintf("%s\\%s", wintun.devInstanceID, deviceInterfaceNetGUID.String()), "\\", "#")
 	handle, err := windows.CreateFile(windows.StringToUTF16Ptr(fmt.Sprintf("\\\\.\\Global\\%s", mangledPnpNode)), windows.GENERIC_READ|windows.GENERIC_WRITE, windows.FILE_SHARE_READ | windows.FILE_SHARE_WRITE | windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING, 0, 0)
 	if err != nil {
-		return windows.InvalidHandle, fmt.Errorf("CreateFile on mangled PnPInstanceId path failed: %v", err)
+		return windows.InvalidHandle, fmt.Errorf("Open NDIS device failed: %v", err)
 	}
 	return handle, nil
 }
