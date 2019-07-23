@@ -104,7 +104,7 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Dev
 
 	tun := &NativeTun{
 		wt:        wt,
-		handle: windows.InvalidHandle,
+		handle:    windows.InvalidHandle,
 		events:    make(chan Event, 10),
 		errors:    make(chan error, 1),
 		forcedMTU: 1500,
