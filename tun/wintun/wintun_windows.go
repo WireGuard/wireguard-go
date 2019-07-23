@@ -29,7 +29,7 @@ type Wintun struct {
 }
 
 var deviceClassNetGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0x11ce, Data4: [8]byte{0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}}
-var deviceInterfaceNetGUID = windows.GUID{Data1: 0xcac88484, Data2: 0x7515, Data3: 0x4c03, Data4: [8]byte{ 0x82, 0xe6, 0x71, 0xa8, 0x7a, 0xba, 0xc3, 0x61}}
+var deviceInterfaceNetGUID = windows.GUID{Data1: 0xcac88484, Data2: 0x7515, Data3: 0x4c03, Data4: [8]byte{0x82, 0xe6, 0x71, 0xa8, 0x7a, 0xba, 0xc3, 0x61}}
 
 const (
 	hardwareID             = "Wintun"
@@ -622,8 +622,11 @@ func (wintun *Wintun) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, err
 
 // AdapterHandle returns a handle to the adapter device object.
 func (wintun *Wintun) AdapterHandle() (windows.Handle, error) {
-	mangledPnpNode := strings.ReplaceAll(fmt.Sprintf("%s\\%s", wintun.devInstanceID, deviceInterfaceNetGUID.String()), "\\", "#")
-	handle, err := windows.CreateFile(windows.StringToUTF16Ptr(fmt.Sprintf("\\\\.\\Global\\%s", mangledPnpNode)), windows.GENERIC_READ|windows.GENERIC_WRITE, windows.FILE_SHARE_READ | windows.FILE_SHARE_WRITE | windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING, 0, 0)
+	interfaces, err := setupapi.CM_Get_Device_Interface_List(wintun.devInstanceID, &deviceInterfaceNetGUID, setupapi.CM_GET_DEVICE_INTERFACE_LIST_PRESENT)
+	if err != nil {
+		return windows.InvalidHandle, err
+	}
+	handle, err := windows.CreateFile(windows.StringToUTF16Ptr(interfaces[0]), windows.GENERIC_READ|windows.GENERIC_WRITE, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING, 0, 0)
 	if err != nil {
 		return windows.InvalidHandle, fmt.Errorf("Open NDIS device failed: %v", err)
 	}

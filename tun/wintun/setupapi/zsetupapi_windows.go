@@ -38,33 +38,36 @@ func errnoErr(e syscall.Errno) error {
 
 var (
 	modsetupapi = windows.NewLazySystemDLL("setupapi.dll")
+	modCfgMgr32 = windows.NewLazySystemDLL("CfgMgr32.dll")
 
-	procSetupDiCreateDeviceInfoListExW    = modsetupapi.NewProc("SetupDiCreateDeviceInfoListExW")
-	procSetupDiGetDeviceInfoListDetailW   = modsetupapi.NewProc("SetupDiGetDeviceInfoListDetailW")
-	procSetupDiCreateDeviceInfoW          = modsetupapi.NewProc("SetupDiCreateDeviceInfoW")
-	procSetupDiEnumDeviceInfo             = modsetupapi.NewProc("SetupDiEnumDeviceInfo")
-	procSetupDiDestroyDeviceInfoList      = modsetupapi.NewProc("SetupDiDestroyDeviceInfoList")
-	procSetupDiBuildDriverInfoList        = modsetupapi.NewProc("SetupDiBuildDriverInfoList")
-	procSetupDiCancelDriverInfoSearch     = modsetupapi.NewProc("SetupDiCancelDriverInfoSearch")
-	procSetupDiEnumDriverInfoW            = modsetupapi.NewProc("SetupDiEnumDriverInfoW")
-	procSetupDiGetSelectedDriverW         = modsetupapi.NewProc("SetupDiGetSelectedDriverW")
-	procSetupDiSetSelectedDriverW         = modsetupapi.NewProc("SetupDiSetSelectedDriverW")
-	procSetupDiGetDriverInfoDetailW       = modsetupapi.NewProc("SetupDiGetDriverInfoDetailW")
-	procSetupDiDestroyDriverInfoList      = modsetupapi.NewProc("SetupDiDestroyDriverInfoList")
-	procSetupDiGetClassDevsExW            = modsetupapi.NewProc("SetupDiGetClassDevsExW")
-	procSetupDiCallClassInstaller         = modsetupapi.NewProc("SetupDiCallClassInstaller")
-	procSetupDiOpenDevRegKey              = modsetupapi.NewProc("SetupDiOpenDevRegKey")
-	procSetupDiGetDeviceRegistryPropertyW = modsetupapi.NewProc("SetupDiGetDeviceRegistryPropertyW")
-	procSetupDiSetDeviceRegistryPropertyW = modsetupapi.NewProc("SetupDiSetDeviceRegistryPropertyW")
-	procSetupDiGetDeviceInstallParamsW    = modsetupapi.NewProc("SetupDiGetDeviceInstallParamsW")
-	procSetupDiGetDeviceInstanceIdW       = modsetupapi.NewProc("SetupDiGetDeviceInstanceIdW")
-	procSetupDiGetClassInstallParamsW     = modsetupapi.NewProc("SetupDiGetClassInstallParamsW")
-	procSetupDiSetDeviceInstallParamsW    = modsetupapi.NewProc("SetupDiSetDeviceInstallParamsW")
-	procSetupDiSetClassInstallParamsW     = modsetupapi.NewProc("SetupDiSetClassInstallParamsW")
-	procSetupDiClassNameFromGuidExW       = modsetupapi.NewProc("SetupDiClassNameFromGuidExW")
-	procSetupDiClassGuidsFromNameExW      = modsetupapi.NewProc("SetupDiClassGuidsFromNameExW")
-	procSetupDiGetSelectedDevice          = modsetupapi.NewProc("SetupDiGetSelectedDevice")
-	procSetupDiSetSelectedDevice          = modsetupapi.NewProc("SetupDiSetSelectedDevice")
+	procSetupDiCreateDeviceInfoListExW     = modsetupapi.NewProc("SetupDiCreateDeviceInfoListExW")
+	procSetupDiGetDeviceInfoListDetailW    = modsetupapi.NewProc("SetupDiGetDeviceInfoListDetailW")
+	procSetupDiCreateDeviceInfoW           = modsetupapi.NewProc("SetupDiCreateDeviceInfoW")
+	procSetupDiEnumDeviceInfo              = modsetupapi.NewProc("SetupDiEnumDeviceInfo")
+	procSetupDiDestroyDeviceInfoList       = modsetupapi.NewProc("SetupDiDestroyDeviceInfoList")
+	procSetupDiBuildDriverInfoList         = modsetupapi.NewProc("SetupDiBuildDriverInfoList")
+	procSetupDiCancelDriverInfoSearch      = modsetupapi.NewProc("SetupDiCancelDriverInfoSearch")
+	procSetupDiEnumDriverInfoW             = modsetupapi.NewProc("SetupDiEnumDriverInfoW")
+	procSetupDiGetSelectedDriverW          = modsetupapi.NewProc("SetupDiGetSelectedDriverW")
+	procSetupDiSetSelectedDriverW          = modsetupapi.NewProc("SetupDiSetSelectedDriverW")
+	procSetupDiGetDriverInfoDetailW        = modsetupapi.NewProc("SetupDiGetDriverInfoDetailW")
+	procSetupDiDestroyDriverInfoList       = modsetupapi.NewProc("SetupDiDestroyDriverInfoList")
+	procSetupDiGetClassDevsExW             = modsetupapi.NewProc("SetupDiGetClassDevsExW")
+	procSetupDiCallClassInstaller          = modsetupapi.NewProc("SetupDiCallClassInstaller")
+	procSetupDiOpenDevRegKey               = modsetupapi.NewProc("SetupDiOpenDevRegKey")
+	procSetupDiGetDeviceRegistryPropertyW  = modsetupapi.NewProc("SetupDiGetDeviceRegistryPropertyW")
+	procSetupDiSetDeviceRegistryPropertyW  = modsetupapi.NewProc("SetupDiSetDeviceRegistryPropertyW")
+	procSetupDiGetDeviceInstallParamsW     = modsetupapi.NewProc("SetupDiGetDeviceInstallParamsW")
+	procSetupDiGetDeviceInstanceIdW        = modsetupapi.NewProc("SetupDiGetDeviceInstanceIdW")
+	procSetupDiGetClassInstallParamsW      = modsetupapi.NewProc("SetupDiGetClassInstallParamsW")
+	procSetupDiSetDeviceInstallParamsW     = modsetupapi.NewProc("SetupDiSetDeviceInstallParamsW")
+	procSetupDiSetClassInstallParamsW      = modsetupapi.NewProc("SetupDiSetClassInstallParamsW")
+	procSetupDiClassNameFromGuidExW        = modsetupapi.NewProc("SetupDiClassNameFromGuidExW")
+	procSetupDiClassGuidsFromNameExW       = modsetupapi.NewProc("SetupDiClassGuidsFromNameExW")
+	procSetupDiGetSelectedDevice           = modsetupapi.NewProc("SetupDiGetSelectedDevice")
+	procSetupDiSetSelectedDevice           = modsetupapi.NewProc("SetupDiSetSelectedDevice")
+	procCM_Get_Device_Interface_List_SizeW = modCfgMgr32.NewProc("CM_Get_Device_Interface_List_SizeW")
+	procCM_Get_Device_Interface_ListW      = modCfgMgr32.NewProc("CM_Get_Device_Interface_ListW")
 )
 
 func setupDiCreateDeviceInfoListEx(classGUID *windows.GUID, hwndParent uintptr, machineName *uint16, reserved uintptr) (handle DevInfo, err error) {
@@ -379,5 +382,17 @@ func SetupDiSetSelectedDevice(deviceInfoSet DevInfo, deviceInfoData *DevInfoData
 			err = syscall.EINVAL
 		}
 	}
+	return
+}
+
+func cm_Get_Device_Interface_List_Size(len *uint32, interfaceClass *windows.GUID, deviceID *uint16, flags uint32) (ret uint32) {
+	r0, _, _ := syscall.Syscall6(procCM_Get_Device_Interface_List_SizeW.Addr(), 4, uintptr(unsafe.Pointer(len)), uintptr(unsafe.Pointer(interfaceClass)), uintptr(unsafe.Pointer(deviceID)), uintptr(flags), 0, 0)
+	ret = uint32(r0)
+	return
+}
+
+func cm_Get_Device_Interface_List(interfaceClass *windows.GUID, deviceID *uint16, buffer *uint16, bufferLen uint32, flags uint32) (ret uint32) {
+	r0, _, _ := syscall.Syscall6(procCM_Get_Device_Interface_ListW.Addr(), 5, uintptr(unsafe.Pointer(interfaceClass)), uintptr(unsafe.Pointer(deviceID)), uintptr(unsafe.Pointer(buffer)), uintptr(bufferLen), uintptr(flags), 0)
+	ret = uint32(r0)
 	return
 }

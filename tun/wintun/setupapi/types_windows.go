@@ -556,3 +556,13 @@ const (
 
 	SPDRP_MAXIMUM_PROPERTY SPDRP = 0x00000025 // Upper bound on ordinals
 )
+
+const (
+	CR_SUCCESS      = 0x0
+	CR_BUFFER_SMALL = 0x1a
+)
+
+const (
+	CM_GET_DEVICE_INTERFACE_LIST_PRESENT     = 0 // only currently 'live' device interfaces
+	CM_GET_DEVICE_INTERFACE_LIST_ALL_DEVICES = 1 // all registered device interfaces, live or not
+)

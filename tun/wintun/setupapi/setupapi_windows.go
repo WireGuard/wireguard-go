@@ -469,3 +469,38 @@ func (deviceInfoSet DevInfo) SelectedDevice() (*DevInfoData, error) {
 func (deviceInfoSet DevInfo) SetSelectedDevice(deviceInfoData *DevInfoData) error {
 	return SetupDiSetSelectedDevice(deviceInfoSet, deviceInfoData)
 }
+
+//sys cm_Get_Device_Interface_List_Size(len *uint32, interfaceClass *windows.GUID, deviceID *uint16, flags uint32) (ret uint32) = CfgMgr32.CM_Get_Device_Interface_List_SizeW
+//sys cm_Get_Device_Interface_List(interfaceClass *windows.GUID, deviceID *uint16, buffer *uint16, bufferLen uint32, flags uint32) (ret uint32) = CfgMgr32.CM_Get_Device_Interface_ListW
+
+func CM_Get_Device_Interface_List(deviceID string, interfaceClass *windows.GUID, flags uint32) ([]string, error) {
+	deviceID16, err := windows.UTF16PtrFromString(deviceID)
+	if err != nil {
+		return nil, err
+	}
+	var buf []uint16
+	var buflen uint32
+	for {
+		if ret := cm_Get_Device_Interface_List_Size(&buflen, interfaceClass, deviceID16, flags); ret != CR_SUCCESS {
+			return nil, fmt.Errorf("CfgMgr error: 0x%x", ret)
+		}
+		buf = make([]uint16, buflen)
+		if ret := cm_Get_Device_Interface_List(interfaceClass, deviceID16, &buf[0], buflen, flags); ret == CR_SUCCESS {
+			break
+		} else if ret != CR_BUFFER_SMALL {
+			return nil, fmt.Errorf("CfgMgr error: 0x%x", ret)
+		}
+	}
+	var interfaces []string
+	for i := 0; i < len(buf); {
+		j := i + wcslen(buf[i:])
+		if i < j {
+			interfaces = append(interfaces, windows.UTF16ToString(buf[i:j]))
+		}
+		i = j + 1
+	}
+	if interfaces == nil {
+		return nil, fmt.Errorf("no interfaces found")
+	}
+	return interfaces, nil
+}
