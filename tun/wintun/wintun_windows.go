@@ -290,10 +290,7 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 			if devInfoList.SetClassInstallParams(deviceData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams))) == nil {
 				// Call appropriate class installer.
 				if devInfoList.CallClassInstaller(setupapi.DIF_REMOVE, deviceData) == nil {
-					// Check if a system reboot is required. (Ignore errors)
-					if ret, _ := checkReboot(devInfoList, deviceData); ret {
-						rebootRequired = true
-					}
+					rebootRequired = rebootRequired || checkReboot(devInfoList, deviceData)
 				}
 			}
 
@@ -307,11 +304,7 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 		err = fmt.Errorf("SetupDiCallClassInstaller(DIF_INSTALLDEVICE) failed: %v", err)
 		return
 	}
-
-	// Check if a system reboot is required. (Ignore errors)
-	if ret, _ := checkReboot(devInfoList, deviceData); ret {
-		rebootRequired = true
-	}
+	rebootRequired = checkReboot(devInfoList, deviceData)
 
 	// DIF_INSTALLDEVICE returns almost immediately, while the device installation
 	// continues in the background. It might take a while, before all registry
@@ -456,9 +449,7 @@ func (wintun *Wintun) DeleteInterface() (rebootRequired bool, err error) {
 		return false, fmt.Errorf("SetupDiCallClassInstaller failed: %v", err)
 	}
 
-	// Check if a system reboot is required. (Ignore errors)
-	rebootRequired, _ = checkReboot(devInfoList, deviceData)
-	return rebootRequired, nil
+	return checkReboot(devInfoList, deviceData), nil
 }
 
 // DeleteAllInterfaces deletes all Wintun interfaces, and returns which
@@ -529,22 +520,20 @@ func DeleteAllInterfaces() (deviceInstancesDeleted []uint32, rebootRequired bool
 			errors = append(errors, err)
 			continue
 		}
-		if !rebootRequired {
-			rebootRequired, _ = checkReboot(devInfoList, deviceData)
-		}
+		rebootRequired = rebootRequired || checkReboot(devInfoList, deviceData)
 		deviceInstancesDeleted = append(deviceInstancesDeleted, inst)
 	}
 	return
 }
 
 // checkReboot checks device install parameters if a system reboot is required.
-func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) (bool, error) {
+func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) bool {
 	devInstallParams, err := deviceInfoSet.DeviceInstallParams(deviceInfoData)
 	if err != nil {
-		return false, err
+		return false
 	}
 
-	return (devInstallParams.Flags & (setupapi.DI_NEEDREBOOT | setupapi.DI_NEEDRESTART)) != 0, nil
+	return (devInstallParams.Flags & (setupapi.DI_NEEDREBOOT | setupapi.DI_NEEDRESTART)) != 0
 }
 
 // setQuietInstall sets device install parameters for a quiet installation
