@@ -22,24 +22,24 @@ func init() {
 
 func TestSetupDiCreateDeviceInfoListEx(t *testing.T) {
 	devInfoList, err := SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, "")
-	if err == nil {
-		devInfoList.Close()
-	} else {
+	if err != nil {
 		t.Errorf("Error calling SetupDiCreateDeviceInfoListEx: %s", err.Error())
+	} else {
+		devInfoList.Close()
 	}
 
 	devInfoList, err = SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, computerName)
-	if err == nil {
-		devInfoList.Close()
-	} else {
+	if err != nil {
 		t.Errorf("Error calling SetupDiCreateDeviceInfoListEx: %s", err.Error())
+	} else {
+		devInfoList.Close()
 	}
 
 	devInfoList, err = SetupDiCreateDeviceInfoListEx(nil, 0, "")
-	if err == nil {
-		devInfoList.Close()
-	} else {
+	if err != nil {
 		t.Errorf("Error calling SetupDiCreateDeviceInfoListEx(nil): %s", err.Error())
+	} else {
+		devInfoList.Close()
 	}
 }
 
@@ -257,20 +257,20 @@ func TestDevInfo_BuildDriverInfoList(t *testing.T) {
 
 func TestSetupDiGetClassDevsEx(t *testing.T) {
 	devInfoList, err := SetupDiGetClassDevsEx(&deviceClassNetGUID, "PCI", 0, DIGCF_PRESENT, DevInfo(0), computerName)
-	if err == nil {
-		devInfoList.Close()
-	} else {
+	if err != nil {
 		t.Errorf("Error calling SetupDiGetClassDevsEx: %s", err.Error())
+	} else {
+		devInfoList.Close()
 	}
 
 	devInfoList, err = SetupDiGetClassDevsEx(nil, "", 0, DIGCF_PRESENT, DevInfo(0), "")
-	if err == nil {
-		devInfoList.Close()
-		t.Errorf("SetupDiGetClassDevsEx(nil, ...) should fail")
-	} else {
+	if err != nil {
 		if errWin, ok := err.(windows.Errno); !ok || errWin != windows.ERROR_INVALID_PARAMETER {
 			t.Errorf("SetupDiGetClassDevsEx(nil, ...) should fail with ERROR_INVALID_PARAMETER")
 		}
+	} else {
+		devInfoList.Close()
+		t.Errorf("SetupDiGetClassDevsEx(nil, ...) should fail")
 	}
 }
 
@@ -400,12 +400,12 @@ func TestSetupDiClassNameFromGuidEx(t *testing.T) {
 	}
 
 	_, err = SetupDiClassNameFromGuidEx(nil, "")
-	if err == nil {
-		t.Errorf("SetupDiClassNameFromGuidEx(nil) should fail")
-	} else {
+	if err != nil {
 		if errWin, ok := err.(windows.Errno); !ok || errWin != windows.ERROR_INVALID_USER_BUFFER {
 			t.Errorf("SetupDiClassNameFromGuidEx(nil) should fail with ERROR_INVALID_USER_BUFFER")
 		}
+	} else {
+		t.Errorf("SetupDiClassNameFromGuidEx(nil) should fail")
 	}
 }
 
@@ -464,12 +464,12 @@ func TestSetupDiGetSelectedDevice(t *testing.T) {
 	}
 
 	err = devInfoList.SetSelectedDevice(nil)
-	if err == nil {
-		t.Errorf("SetupDiSetSelectedDevice(nil) should fail")
-	} else {
+	if err != nil {
 		if errWin, ok := err.(windows.Errno); !ok || errWin != windows.ERROR_INVALID_PARAMETER {
 			t.Errorf("SetupDiSetSelectedDevice(nil) should fail with ERROR_INVALID_USER_BUFFER")
 		}
+	} else {
+		t.Errorf("SetupDiSetSelectedDevice(nil) should fail")
 	}
 }
 
