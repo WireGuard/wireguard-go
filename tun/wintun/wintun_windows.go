@@ -362,9 +362,10 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 		key, err = registry.OpenKey(registry.LOCAL_MACHINE, tcpipInterfaceRegKeyName, registry.SET_VALUE)
 		if err != nil {
 			err = fmt.Errorf("Error opening interface-specific TCP/IP network registry key: %v", err)
+		} else {
+			key.SetDWordValue("EnableDeadGWDetect", 0)
+			key.Close()
 		}
-		key.SetDWordValue("EnableDeadGWDetect", 0)
-		key.Close()
 	}
 
 	if err == nil {
