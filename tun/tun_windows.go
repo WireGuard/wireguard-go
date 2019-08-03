@@ -215,7 +215,7 @@ retry:
 		if tun.close {
 			return 0, os.ErrClosed
 		}
-		if time.Since(start) >= time.Millisecond*50 {
+		if time.Since(start) >= time.Millisecond/80 /* ~1gbit/s */ {
 			windows.WaitForSingleObject(tun.rings.send.tailMoved, windows.INFINITE)
 			goto retry
 		}
