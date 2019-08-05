@@ -68,7 +68,6 @@ type Peer struct {
 }
 
 func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
-
 	if device.isClosed.Get() {
 		return nil, errors.New("device closed")
 	}
@@ -103,19 +102,27 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	if ok {
 		return nil, errors.New("adding existing peer")
 	}
-	device.peers.keyMap[pk] = peer
 
 	// pre-compute DH
 
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
-	handshake.remoteStatic = pk
 	handshake.precomputedStaticStatic = device.staticIdentity.privateKey.sharedSecret(pk)
+	ssIsZero := isZero(handshake.precomputedStaticStatic[:])
+	handshake.remoteStatic = pk
 	handshake.mutex.Unlock()
 
 	// reset endpoint
 
 	peer.endpoint = nil
+
+	// conditionally add
+
+	if !ssIsZero {
+		device.peers.keyMap[pk] = peer
+	} else {
+		return nil, nil
+	}
 
 	// start peer
 

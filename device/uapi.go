@@ -243,7 +243,12 @@ func (device *Device) IpcSetOperation(socket *bufio.Reader) *IPCError {
 						logError.Println("Failed to create new peer:", err)
 						return &IPCError{ipc.IpcErrorInvalid}
 					}
-					logDebug.Println(peer, "- UAPI: Created")
+					if peer == nil {
+						dummy = true
+						peer = &Peer{}
+					} else {
+						logDebug.Println(peer, "- UAPI: Created")
+					}
 				}
 
 			case "remove":
