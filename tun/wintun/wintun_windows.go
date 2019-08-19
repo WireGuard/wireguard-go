@@ -32,6 +32,7 @@ var deviceClassNetGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0
 var deviceInterfaceNetGUID = windows.GUID{Data1: 0xcac88484, Data2: 0x7515, Data3: 0x4c03, Data4: [8]byte{0x82, 0xe6, 0x71, 0xa8, 0x7a, 0xba, 0xc3, 0x61}}
 
 const (
+	deviceTypeName         = "WireGuard Tunnel"
 	hardwareID             = "Wintun"
 	waitForRegistryTimeout = time.Second * 10
 )
@@ -341,6 +342,24 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 		return
 	}
 
+	// Name ourselves.
+	deviceKey, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.deviceRegKeyName(), registry.SET_VALUE)
+	if err != nil {
+		err = fmt.Errorf("Device-level registry key open failed: %v", err)
+		return
+	}
+	defer deviceKey.Close()
+	err = deviceKey.SetStringValue("DeviceDesc", deviceTypeName)
+	if err != nil {
+		err = fmt.Errorf("SetStringValue(DeviceDesc) failed: %v", err)
+		return
+	}
+	err = deviceKey.SetStringValue("FriendlyName", deviceTypeName)
+	if err != nil {
+		err = fmt.Errorf("SetStringValue(FriendlyName) failed: %v", err)
+		return
+	}
+
 	// Wait for network registry key to emerge and populate.
 	key, err = registryEx.OpenKeyWait(
 		registry.LOCAL_MACHINE,
@@ -578,6 +597,11 @@ func (wintun *Wintun) netRegKeyName() string {
 // tcpipAdapterRegKeyName returns the adapter-specific TCP/IP network registry key name.
 func (wintun *Wintun) tcpipAdapterRegKeyName() string {
 	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Adapters\\%v", wintun.cfgInstanceID)
+}
+
+// deviceRegKeyName returns the device-level registry key name
+func (wintun *Wintun) deviceRegKeyName() string {
+	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%v", wintun.devInstanceID)
 }
 
 // tcpipInterfaceRegKeyName returns the interface-specific TCP/IP network registry key name.
