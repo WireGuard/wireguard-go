@@ -563,19 +563,34 @@ func (wintun *Wintun) InterfaceName() (string, error) {
 
 // SetInterfaceName sets name of the Wintun interface.
 func (wintun *Wintun) SetInterfaceName(ifname string) error {
+	netRegKey, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.netRegKeyName(), registry.SET_VALUE)
+	if err != nil {
+		return fmt.Errorf("Network-specific registry key open failed: %v", err)
+	}
+	defer netRegKey.Close()
+	err = netRegKey.SetStringValue("Name", ifname)
+	if err != nil {
+		return err
+	}
+	deviceRegKey, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.deviceRegKeyName(), registry.SET_VALUE)
+	if err != nil {
+		return fmt.Errorf("Device-level registry key open failed: %v", err)
+	}
+	defer deviceRegKey.Close()
+	err = deviceRegKey.SetStringValue("DeviceDesc", deviceTypeName)
+	if err != nil {
+		return err
+	}
+	err = deviceRegKey.SetStringValue("FriendlyName", deviceTypeName)
+	if err != nil {
+		return err
+	}
 	// We have to tell the various runtime COM services about the new name too. We ignore the
 	// error because netshell isn't available on servercore.
 	// TODO: netsh.exe falls back to NciSetConnection in this case. If somebody complains, maybe
 	// we should do the same.
 	netshell.HrRenameConnection(&wintun.cfgInstanceID, windows.StringToUTF16Ptr(ifname))
-
-	// Set the interface name. The above line should have done this too, but in case it failed, we force it.
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.netRegKeyName(), registry.SET_VALUE)
-	if err != nil {
-		return fmt.Errorf("Network-specific registry key open failed: %v", err)
-	}
-	defer key.Close()
-	return key.SetStringValue("Name", ifname)
+	return nil
 }
 
 // netRegKeyName returns the interface-specific network registry key name.
