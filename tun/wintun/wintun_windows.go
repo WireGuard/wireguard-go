@@ -262,13 +262,13 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 	// Register device co-installers if any. (Ignore errors)
 	devInfoList.CallClassInstaller(setupapi.DIF_REGISTER_COINSTALLERS, deviceData)
 
-	var key registry.Key
+	var netDevRegKey registry.Key
 	const pollTimeout = time.Millisecond * 50
 	for i := 0; i < int(waitForRegistryTimeout/pollTimeout); i++ {
 		if i != 0 {
 			time.Sleep(pollTimeout)
 		}
-		key, err = devInfoList.OpenDevRegKey(deviceData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.SET_VALUE|registry.QUERY_VALUE|registry.NOTIFY)
+		netDevRegKey, err = devInfoList.OpenDevRegKey(deviceData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.SET_VALUE|registry.QUERY_VALUE|registry.NOTIFY)
 		if err == nil {
 			break
 		}
@@ -277,9 +277,9 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 		err = fmt.Errorf("SetupDiOpenDevRegKey failed: %v", err)
 		return
 	}
-	defer key.Close()
+	defer netDevRegKey.Close()
 	if requestedGUID != nil {
-		err = key.SetStringValue("NetSetupAnticipatedInstanceId", requestedGUID.String())
+		err = netDevRegKey.SetStringValue("NetSetupAnticipatedInstanceId", requestedGUID.String())
 		if err != nil {
 			err = fmt.Errorf("SetStringValue(NetSetupAnticipatedInstanceId) failed: %v", err)
 			return
@@ -319,17 +319,17 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 	// DIF_INSTALLDEVICE returns almost immediately, while the device installation
 	// continues in the background. It might take a while, before all registry
 	// keys and values are populated.
-	_, err = registryEx.GetStringValueWait(key, "NetCfgInstanceId", waitForRegistryTimeout)
+	_, err = registryEx.GetStringValueWait(netDevRegKey, "NetCfgInstanceId", waitForRegistryTimeout)
 	if err != nil {
 		err = fmt.Errorf("GetStringValueWait(NetCfgInstanceId) failed: %v", err)
 		return
 	}
-	_, err = registryEx.GetIntegerValueWait(key, "NetLuidIndex", waitForRegistryTimeout)
+	_, err = registryEx.GetIntegerValueWait(netDevRegKey, "NetLuidIndex", waitForRegistryTimeout)
 	if err != nil {
 		err = fmt.Errorf("GetIntegerValueWait(NetLuidIndex) failed: %v", err)
 		return
 	}
-	_, err = registryEx.GetIntegerValueWait(key, "*IfType", waitForRegistryTimeout)
+	_, err = registryEx.GetIntegerValueWait(netDevRegKey, "*IfType", waitForRegistryTimeout)
 	if err != nil {
 		err = fmt.Errorf("GetIntegerValueWait(*IfType) failed: %v", err)
 		return
@@ -343,25 +343,25 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 	}
 
 	// Name ourselves.
-	deviceKey, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.deviceRegKeyName(), registry.SET_VALUE)
+	deviceRegKey, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.deviceRegKeyName(), registry.SET_VALUE)
 	if err != nil {
 		err = fmt.Errorf("Device-level registry key open failed: %v", err)
 		return
 	}
-	defer deviceKey.Close()
-	err = deviceKey.SetStringValue("DeviceDesc", deviceTypeName)
+	defer deviceRegKey.Close()
+	err = deviceRegKey.SetStringValue("DeviceDesc", deviceTypeName)
 	if err != nil {
 		err = fmt.Errorf("SetStringValue(DeviceDesc) failed: %v", err)
 		return
 	}
-	err = deviceKey.SetStringValue("FriendlyName", deviceTypeName)
+	err = deviceRegKey.SetStringValue("FriendlyName", deviceTypeName)
 	if err != nil {
 		err = fmt.Errorf("SetStringValue(FriendlyName) failed: %v", err)
 		return
 	}
 
 	// Wait for network registry key to emerge and populate.
-	key, err = registryEx.OpenKeyWait(
+	netRegKey, err := registryEx.OpenKeyWait(
 		registry.LOCAL_MACHINE,
 		wintun.netRegKeyName(),
 		registry.QUERY_VALUE|registry.NOTIFY,
@@ -370,20 +370,20 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 		err = fmt.Errorf("makeWintun failed: %v", err)
 		return
 	}
-	defer key.Close()
-	_, err = registryEx.GetStringValueWait(key, "Name", waitForRegistryTimeout)
+	defer netRegKey.Close()
+	_, err = registryEx.GetStringValueWait(netRegKey, "Name", waitForRegistryTimeout)
 	if err != nil {
 		err = fmt.Errorf("GetStringValueWait(Name) failed: %v", err)
 		return
 	}
-	_, err = registryEx.GetStringValueWait(key, "PnPInstanceId", waitForRegistryTimeout)
+	_, err = registryEx.GetStringValueWait(netRegKey, "PnPInstanceId", waitForRegistryTimeout)
 	if err != nil {
 		err = fmt.Errorf("GetStringValueWait(PnPInstanceId) failed: %v", err)
 		return
 	}
 
 	// Wait for TCP/IP adapter registry key to emerge and populate.
-	key, err = registryEx.OpenKeyWait(
+	tcpipAdapterRegKey, err := registryEx.OpenKeyWait(
 		registry.LOCAL_MACHINE,
 		wintun.tcpipAdapterRegKeyName(), registry.QUERY_VALUE|registry.NOTIFY,
 		waitForRegistryTimeout)
@@ -391,8 +391,8 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 		err = fmt.Errorf("OpenKeyWait(HKLM\\%s) failed: %v", wintun.tcpipAdapterRegKeyName(), err)
 		return
 	}
-	defer key.Close()
-	_, err = registryEx.GetStringValueWait(key, "IpConfig", waitForRegistryTimeout)
+	defer tcpipAdapterRegKey.Close()
+	_, err = registryEx.GetStringValueWait(tcpipAdapterRegKey, "IpConfig", waitForRegistryTimeout)
 	if err != nil {
 		err = fmt.Errorf("GetStringValueWait(IpConfig) failed: %v", err)
 		return
@@ -405,28 +405,17 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 	}
 
 	// Wait for TCP/IP interface registry key to emerge.
-	key, err = registryEx.OpenKeyWait(
+	tcpipInterfaceRegKey, err := registryEx.OpenKeyWait(
 		registry.LOCAL_MACHINE,
-		tcpipInterfaceRegKeyName, registry.QUERY_VALUE,
+		tcpipInterfaceRegKeyName, registry.QUERY_VALUE | registry.SET_VALUE,
 		waitForRegistryTimeout)
 	if err != nil {
 		err = fmt.Errorf("OpenKeyWait(HKLM\\%s) failed: %v", tcpipInterfaceRegKeyName, err)
 		return
 	}
-	key.Close()
-
-	//
-	// All the registry keys and values we're relying on are present now.
-	//
-
+	defer tcpipInterfaceRegKey.Close()
 	// Disable dead gateway detection on our interface.
-	key, err = registry.OpenKey(registry.LOCAL_MACHINE, tcpipInterfaceRegKeyName, registry.SET_VALUE)
-	if err != nil {
-		err = fmt.Errorf("Error opening interface-specific TCP/IP network registry key: %v", err)
-		return
-	}
-	key.SetDWordValue("EnableDeadGWDetect", 0)
-	key.Close()
+	tcpipInterfaceRegKey.SetDWordValue("EnableDeadGWDetect", 0)
 
 	return
 }
