@@ -316,6 +316,12 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 	}
 	rebootRequired = checkReboot(devInfoList, deviceData)
 
+	err = devInfoList.SetDeviceRegistryPropertyString(deviceData, setupapi.SPDRP_DEVICEDESC, deviceTypeName)
+	if err != nil {
+		err = fmt.Errorf("SetDeviceRegistryPropertyString(SPDRP_DEVICEDESC) failed: %v", err)
+		return
+	}
+
 	// DIF_INSTALLDEVICE returns almost immediately, while the device installation
 	// continues in the background. It might take a while, before all registry
 	// keys and values are populated.
@@ -339,24 +345,6 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 	wintun, err = makeWintun(devInfoList, deviceData)
 	if err != nil {
 		err = fmt.Errorf("makeWintun failed: %v", err)
-		return
-	}
-
-	// Name ourselves.
-	deviceRegKey, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.deviceRegKeyName(), registry.SET_VALUE)
-	if err != nil {
-		err = fmt.Errorf("Device-level registry key open failed: %v", err)
-		return
-	}
-	defer deviceRegKey.Close()
-	err = deviceRegKey.SetStringValue("DeviceDesc", deviceTypeName)
-	if err != nil {
-		err = fmt.Errorf("SetStringValue(DeviceDesc) failed: %v", err)
-		return
-	}
-	err = deviceRegKey.SetStringValue("FriendlyName", deviceTypeName)
-	if err != nil {
-		err = fmt.Errorf("SetStringValue(FriendlyName) failed: %v", err)
 		return
 	}
 
@@ -572,23 +560,23 @@ func (wintun *Wintun) SetInterfaceName(ifname string) error {
 	if err != nil {
 		return err
 	}
+
+	// TODO: This only sometimes works.
 	deviceRegKey, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.deviceRegKeyName(), registry.SET_VALUE)
 	if err != nil {
 		return fmt.Errorf("Device-level registry key open failed: %v", err)
 	}
 	defer deviceRegKey.Close()
-	err = deviceRegKey.SetStringValue("DeviceDesc", deviceTypeName)
-	if err != nil {
-		return err
-	}
 	err = deviceRegKey.SetStringValue("FriendlyName", deviceTypeName)
 	if err != nil {
 		return err
 	}
+
 	// We have to tell the various runtime COM services about the new name too. We ignore the
 	// error because netshell isn't available on servercore.
 	// TODO: netsh.exe falls back to NciSetConnection in this case. If somebody complains, maybe
 	// we should do the same.
+	// TODO: This only sometimes works.
 	netshell.HrRenameConnection(&wintun.cfgInstanceID, windows.StringToUTF16Ptr(ifname))
 	return nil
 }
