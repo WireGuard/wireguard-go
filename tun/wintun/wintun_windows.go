@@ -15,7 +15,7 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 
-	"golang.zx2c4.com/wireguard/tun/wintun/netshell"
+	"golang.zx2c4.com/wireguard/tun/wintun/nci"
 	registryEx "golang.zx2c4.com/wireguard/tun/wintun/registry"
 	"golang.zx2c4.com/wireguard/tun/wintun/setupapi"
 )
@@ -348,28 +348,6 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 		return
 	}
 
-	// Wait for network registry key to emerge and populate.
-	netRegKey, err := registryEx.OpenKeyWait(
-		registry.LOCAL_MACHINE,
-		wintun.netRegKeyName(),
-		registry.QUERY_VALUE|registry.NOTIFY,
-		waitForRegistryTimeout)
-	if err != nil {
-		err = fmt.Errorf("makeWintun failed: %v", err)
-		return
-	}
-	defer netRegKey.Close()
-	_, err = registryEx.GetStringValueWait(netRegKey, "Name", waitForRegistryTimeout)
-	if err != nil {
-		err = fmt.Errorf("GetStringValueWait(Name) failed: %v", err)
-		return
-	}
-	_, err = registryEx.GetStringValueWait(netRegKey, "PnPInstanceId", waitForRegistryTimeout)
-	if err != nil {
-		err = fmt.Errorf("GetStringValueWait(PnPInstanceId) failed: %v", err)
-		return
-	}
-
 	// Wait for TCP/IP adapter registry key to emerge and populate.
 	tcpipAdapterRegKey, err := registryEx.OpenKeyWait(
 		registry.LOCAL_MACHINE,
@@ -539,29 +517,17 @@ func setQuietInstall(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.De
 
 // InterfaceName returns the name of the Wintun interface.
 func (wintun *Wintun) InterfaceName() (string, error) {
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.netRegKeyName(), registry.QUERY_VALUE)
-	if err != nil {
-		return "", fmt.Errorf("Network-specific registry key open failed: %v", err)
-	}
-	defer key.Close()
-
-	// Get the interface name.
-	return registryEx.GetStringValue(key, "Name")
+	return nci.ConnectionName(&wintun.cfgInstanceID)
 }
 
 // SetInterfaceName sets name of the Wintun interface.
 func (wintun *Wintun) SetInterfaceName(ifname string) error {
-	netRegKey, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.netRegKeyName(), registry.SET_VALUE)
+	err := nci.SetConnectionName(&wintun.cfgInstanceID, ifname)
 	if err != nil {
-		return fmt.Errorf("Network-specific registry key open failed: %v", err)
-	}
-	defer netRegKey.Close()
-	err = netRegKey.SetStringValue("Name", ifname)
-	if err != nil {
-		return err
+		return fmt.Errorf("NciSetConnectionName failed: %v", err)
 	}
 
-	// TODO: This only sometimes works.
+	// TODO: This should use NetSetup2 so that it doesn't get unset.
 	deviceRegKey, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.deviceRegKeyName(), registry.SET_VALUE)
 	if err != nil {
 		return fmt.Errorf("Device-level registry key open failed: %v", err)
@@ -569,21 +535,9 @@ func (wintun *Wintun) SetInterfaceName(ifname string) error {
 	defer deviceRegKey.Close()
 	err = deviceRegKey.SetStringValue("FriendlyName", deviceTypeName)
 	if err != nil {
-		return err
+		return fmt.Errorf("SetStringValue(FriendlyName) failed: %v", err)
 	}
-
-	// We have to tell the various runtime COM services about the new name too. We ignore the
-	// error because netshell isn't available on servercore.
-	// TODO: netsh.exe falls back to NciSetConnection in this case. If somebody complains, maybe
-	// we should do the same.
-	// TODO: This only sometimes works.
-	netshell.HrRenameConnection(&wintun.cfgInstanceID, windows.StringToUTF16Ptr(ifname))
 	return nil
-}
-
-// netRegKeyName returns the interface-specific network registry key name.
-func (wintun *Wintun) netRegKeyName() string {
-	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Control\\Network\\%v\\%v\\Connection", deviceClassNetGUID, wintun.cfgInstanceID)
 }
 
 // tcpipAdapterRegKeyName returns the adapter-specific TCP/IP network registry key name.
