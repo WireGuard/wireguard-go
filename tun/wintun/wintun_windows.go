@@ -373,7 +373,7 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 	// Wait for TCP/IP interface registry key to emerge.
 	tcpipInterfaceRegKey, err := registryEx.OpenKeyWait(
 		registry.LOCAL_MACHINE,
-		tcpipInterfaceRegKeyName, registry.QUERY_VALUE | registry.SET_VALUE,
+		tcpipInterfaceRegKeyName, registry.QUERY_VALUE|registry.SET_VALUE,
 		waitForRegistryTimeout)
 	if err != nil {
 		err = fmt.Errorf("OpenKeyWait(HKLM\\%s) failed: %v", tcpipInterfaceRegKeyName, err)
@@ -522,9 +522,17 @@ func (wintun *Wintun) InterfaceName() (string, error) {
 
 // SetInterfaceName sets name of the Wintun interface.
 func (wintun *Wintun) SetInterfaceName(ifname string) error {
-	err := nci.SetConnectionName(&wintun.cfgInstanceID, ifname)
-	if err != nil {
-		return fmt.Errorf("NciSetConnectionName failed: %v", err)
+	const maxSuffix = 1000
+	availableIfname := ifname
+	for i := 0; ; i++ {
+		err := nci.SetConnectionName(&wintun.cfgInstanceID, availableIfname)
+		if err == nil {
+			break
+		}
+		if i > maxSuffix || err != windows.ERROR_DUP_NAME {
+			return fmt.Errorf("NciSetConnectionName failed: %v", err)
+		}
+		availableIfname = fmt.Sprintf("%s %d", ifname, i+1)
 	}
 
 	// TODO: This should use NetSetup2 so that it doesn't get unset.
