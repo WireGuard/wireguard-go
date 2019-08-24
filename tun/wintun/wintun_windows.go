@@ -157,17 +157,14 @@ func GetInterface(ifname string) (*Wintun, error) {
 	return nil, windows.ERROR_OBJECT_NOT_FOUND
 }
 
-// CreateInterface creates a Wintun interface. description is a string that
-// supplies the text description of the device. The description is optional
-// and can be "". requestedGUID is the GUID of the created network interface,
-// which then influences NLA generation deterministically. If it is set to nil,
-// the GUID is chosen by the system at random, and hence a new NLA entry is
-// created for each new interface. It is called "requested" GUID because the
-// API it uses is completely undocumented, and so there could be minor
-// interesting complications with its usage. This function returns the network
-// interface ID and a flag if reboot is required.
-//
-func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *Wintun, rebootRequired bool, err error) {
+// CreateInterface creates a Wintun interface. requestedGUID is the GUID of the
+// created network interface, which then influences NLA generation
+// deterministically. If it is set to nil, the GUID is chosen by the system at
+// random, and hence a new NLA entry is created for each new interface. It is
+// called "requested" GUID because the API it uses is completely undocumented,
+// and so there could be minor  interesting complications with its usage. This
+// function returns the network interface ID and a flag if reboot is required.
+func CreateInterface(requestedGUID *windows.GUID) (wintun *Wintun, rebootRequired bool, err error) {
 	// Create an empty device info set for network adapter device class.
 	devInfoList, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, "")
 	if err != nil {
@@ -184,7 +181,7 @@ func CreateInterface(description string, requestedGUID *windows.GUID) (wintun *W
 	}
 
 	// Create a new device info element and add it to the device info set.
-	deviceData, err := devInfoList.CreateDeviceInfo(className, &deviceClassNetGUID, description, 0, setupapi.DICD_GENERATE_ID)
+	deviceData, err := devInfoList.CreateDeviceInfo(className, &deviceClassNetGUID, deviceTypeName, 0, setupapi.DICD_GENERATE_ID)
 	if err != nil {
 		err = fmt.Errorf("SetupDiCreateDeviceInfo failed: %v", err)
 		return

@@ -108,7 +108,7 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Dev
 	} else if err == windows.ERROR_ALREADY_EXISTS {
 		return nil, fmt.Errorf("Foreign network interface with the same name exists")
 	}
-	wt, _, err = wintun.CreateInterface("WireGuard Tunnel Adapter", requestedGUID)
+	wt, _, err = wintun.CreateInterface(requestedGUID)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create Wintun interface: %v", err)
 	}
