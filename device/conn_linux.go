@@ -391,6 +391,11 @@ func create4(port uint16) (int, uint16, error) {
 		return FD_ERR, 0, err
 	}
 
+	sa, err := unix.Getsockname(fd)
+	if err == nil {
+		addr.Port = sa.(*unix.SockaddrInet4).Port
+	}
+
 	return fd, uint16(addr.Port), err
 }
 
@@ -448,6 +453,11 @@ func create6(port uint16) (int, uint16, error) {
 	}(); err != nil {
 		unix.Close(fd)
 		return FD_ERR, 0, err
+	}
+
+	sa, err := unix.Getsockname(fd)
+	if err == nil {
+		addr.Port = sa.(*unix.SockaddrInet6).Port
 	}
 
 	return fd, uint16(addr.Port), err
