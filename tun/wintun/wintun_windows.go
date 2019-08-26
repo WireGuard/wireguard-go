@@ -121,8 +121,15 @@ func GetInterface(ifname string) (*Wintun, error) {
 		if err != nil {
 			continue
 		}
+		ifname2 = strings.ToLower(ifname2)
+		ifname3 := strings.TrimRight(ifname2, "0123456789")
+		if ifname3 != ifname2 && len(ifname3) > 1 && ifname3[len(ifname3)-1] == ' ' {
+			ifname3 = ifname3[:len(ifname3)-1]
+		} else {
+			ifname3 = ""
+		}
 
-		if ifname == strings.ToLower(ifname2) {
+		if ifname == ifname2 || (len(ifname3) > 0 && ifname == ifname3) {
 			err = devInfoList.BuildDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER)
 			if err != nil {
 				return nil, fmt.Errorf("SetupDiBuildDriverInfoList failed: %v", err)
