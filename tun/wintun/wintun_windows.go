@@ -257,6 +257,26 @@ func CreateInterface(requestedGUID *windows.GUID) (wintun *Wintun, rebootRequire
 		return
 	}
 
+	defer func() {
+		if err != nil {
+			// The interface failed to install, or the interface ID was unobtainable. Clean-up.
+			removeDeviceParams := setupapi.RemoveDeviceParams{
+				ClassInstallHeader: *setupapi.MakeClassInstallHeader(setupapi.DIF_REMOVE),
+				Scope:              setupapi.DI_REMOVEDEVICE_GLOBAL,
+			}
+
+			// Set class installer parameters for DIF_REMOVE.
+			if devInfoList.SetClassInstallParams(deviceData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams))) == nil {
+				// Call appropriate class installer.
+				if devInfoList.CallClassInstaller(setupapi.DIF_REMOVE, deviceData) == nil {
+					rebootRequired = rebootRequired || checkReboot(devInfoList, deviceData)
+				}
+			}
+
+			wintun = nil
+		}
+	}()
+
 	// Call appropriate class installer.
 	err = devInfoList.CallClassInstaller(setupapi.DIF_REGISTERDEVICE, deviceData)
 	if err != nil {
@@ -293,25 +313,6 @@ func CreateInterface(requestedGUID *windows.GUID) (wintun *Wintun, rebootRequire
 
 	// Install interfaces if any. (Ignore errors)
 	devInfoList.CallClassInstaller(setupapi.DIF_INSTALLINTERFACES, deviceData)
-	defer func() {
-		if err != nil {
-			// The interface failed to install, or the interface ID was unobtainable. Clean-up.
-			removeDeviceParams := setupapi.RemoveDeviceParams{
-				ClassInstallHeader: *setupapi.MakeClassInstallHeader(setupapi.DIF_REMOVE),
-				Scope:              setupapi.DI_REMOVEDEVICE_GLOBAL,
-			}
-
-			// Set class installer parameters for DIF_REMOVE.
-			if devInfoList.SetClassInstallParams(deviceData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams))) == nil {
-				// Call appropriate class installer.
-				if devInfoList.CallClassInstaller(setupapi.DIF_REMOVE, deviceData) == nil {
-					rebootRequired = rebootRequired || checkReboot(devInfoList, deviceData)
-				}
-			}
-
-			wintun = nil
-		}
-	}()
 
 	// Install the device.
 	err = devInfoList.CallClassInstaller(setupapi.DIF_INSTALLDEVICE, deviceData)
