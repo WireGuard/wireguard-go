@@ -15,6 +15,7 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 
+	"golang.zx2c4.com/wireguard/tun/wintun/iphlpapi"
 	"golang.zx2c4.com/wireguard/tun/wintun/nci"
 	registryEx "golang.zx2c4.com/wireguard/tun/wintun/registry"
 	"golang.zx2c4.com/wireguard/tun/wintun/setupapi"
@@ -528,11 +529,35 @@ func (wintun *Wintun) InterfaceName() (string, error) {
 func (wintun *Wintun) SetInterfaceName(ifname string) error {
 	const maxSuffix = 1000
 	availableIfname := ifname
+setloop:
 	for i := 0; ; i++ {
 		err := nci.SetConnectionName(&wintun.cfgInstanceID, availableIfname)
 		if err == nil {
 			break
 		}
+		if err == windows.ERROR_DUP_NAME {
+			duplicateGuid, err2 := iphlpapi.InterfaceGUIDFromAlias(availableIfname)
+			if err2 == nil {
+				for j := 0; j < 1000; j++ {
+					proposal := fmt.Sprintf("%s %d", ifname, j+1)
+					if proposal == availableIfname {
+						continue
+					}
+					err2 = nci.SetConnectionName(duplicateGuid, proposal)
+					if err2 == windows.ERROR_DUP_NAME {
+						continue
+					}
+					if err2 == nil {
+						err = nci.SetConnectionName(&wintun.cfgInstanceID, availableIfname)
+						if err == nil {
+							break setloop
+						}
+					}
+					break
+				}
+			}
+		}
+
 		if i > maxSuffix || err != windows.ERROR_DUP_NAME {
 			return fmt.Errorf("NciSetConnectionName failed: %v", err)
 		}
