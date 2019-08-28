@@ -426,10 +426,10 @@ func (wintun *Wintun) DeleteInterface() (rebootRequired bool, err error) {
 	return checkReboot(devInfoList, deviceData), nil
 }
 
-// DeleteAllInterfaces deletes all Wintun interfaces, and returns which
-// ones it deleted, whether a reboot is required after, and which errors
-// occurred during the process.
-func DeleteAllInterfaces() (deviceInstancesDeleted []uint32, rebootRequired bool, errors []error) {
+// DeleteMatchingInterfaces deletes all Wintun interfaces, which match
+// given criteria, and returns which ones it deleted, whether a reboot
+// is required after, and which errors occurred during the process.
+func DeleteMatchingInterfaces(matches func(wintun *Wintun) bool) (deviceInstancesDeleted []uint32, rebootRequired bool, errors []error) {
 	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
 	if err != nil {
 		return nil, false, []error{fmt.Errorf("SetupDiGetClassDevsEx(%v) failed: %v", deviceClassNetGUID, err.Error())}
@@ -472,6 +472,22 @@ func DeleteAllInterfaces() (deviceInstancesDeleted []uint32, rebootRequired bool
 		if !isWintun {
 			continue
 		}
+		deviceDescVal, err := devInfoList.DeviceRegistryProperty(deviceData, setupapi.SPDRP_DEVICEDESC)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("DeviceRegistryPropertyString(SPDRP_DEVICEDESC) failed: %v", err))
+			continue
+		}
+		if deviceDesc, ok := deviceDescVal.(string); !ok || deviceDesc != deviceTypeName {
+			continue
+		}
+		wintun, err := makeWintun(devInfoList, deviceData)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("makeWintun failed: %v", err))
+			continue
+		}
+		if !matches(wintun) {
+			continue
+		}
 
 		err = setQuietInstall(devInfoList, deviceData)
 		if err != nil {
@@ -498,6 +514,15 @@ func DeleteAllInterfaces() (deviceInstancesDeleted []uint32, rebootRequired bool
 		deviceInstancesDeleted = append(deviceInstancesDeleted, inst)
 	}
 	return
+}
+
+// DeleteAllInterfaces deletes all Wintun interfaces, and returns which
+// ones it deleted, whether a reboot is required after, and which errors
+// occurred during the process.
+func DeleteAllInterfaces() (deviceInstancesDeleted []uint32, rebootRequired bool, errors []error) {
+	return DeleteMatchingInterfaces(func(wintun *Wintun) bool {
+		return true
+	})
 }
 
 // checkReboot checks device install parameters if a system reboot is required.
