@@ -84,6 +84,14 @@ func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 	}, nil
 }
 
+func removeNumberedSuffix(ifname string) string {
+	removed := strings.TrimRight(ifname, "0123456789")
+	if removed != ifname && len(removed) > 1 && removed[len(removed)-1] == ' ' {
+		return removed[:len(removed)-1]
+	}
+	return ifname
+}
+
 // GetInterface finds a Wintun interface by its name. This function returns
 // the interface if found, or windows.ERROR_OBJECT_NOT_FOUND otherwise. If
 // the interface is found but not a Wintun-class, this function returns
@@ -123,14 +131,9 @@ func GetInterface(ifname string) (*Wintun, error) {
 			continue
 		}
 		ifname2 = strings.ToLower(ifname2)
-		ifname3 := strings.TrimRight(ifname2, "0123456789")
-		if ifname3 != ifname2 && len(ifname3) > 1 && ifname3[len(ifname3)-1] == ' ' {
-			ifname3 = ifname3[:len(ifname3)-1]
-		} else {
-			ifname3 = ""
-		}
+		ifname3 := removeNumberedSuffix(ifname2)
 
-		if ifname == ifname2 || (len(ifname3) > 0 && ifname == ifname3) {
+		if ifname == ifname2 || ifname == ifname3 {
 			err = devInfoList.BuildDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER)
 			if err != nil {
 				return nil, fmt.Errorf("SetupDiBuildDriverInfoList failed: %v", err)
@@ -472,14 +475,24 @@ func DeleteMatchingInterfaces(matches func(wintun *Wintun) bool) (deviceInstance
 		if !isWintun {
 			continue
 		}
+
 		deviceDescVal, err := devInfoList.DeviceRegistryProperty(deviceData, setupapi.SPDRP_DEVICEDESC)
 		if err != nil {
 			errors = append(errors, fmt.Errorf("DeviceRegistryPropertyString(SPDRP_DEVICEDESC) failed: %v", err))
 			continue
 		}
-		if deviceDesc, ok := deviceDescVal.(string); !ok || deviceDesc != deviceTypeName {
+		deviceDesc, _ := deviceDescVal.(string)
+		friendlyNameVal, err := devInfoList.DeviceRegistryProperty(deviceData, setupapi.SPDRP_FRIENDLYNAME)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("DeviceRegistryPropertyString(SPDRP_FRIENDLYNAME) failed: %v", err))
 			continue
 		}
+		friendlyName, _ := friendlyNameVal.(string)
+		if friendlyName != deviceTypeName && deviceDesc != deviceTypeName &&
+			removeNumberedSuffix(friendlyName) != deviceTypeName && removeNumberedSuffix(deviceDesc) != deviceTypeName {
+			continue
+		}
+
 		wintun, err := makeWintun(devInfoList, deviceData)
 		if err != nil {
 			errors = append(errors, fmt.Errorf("makeWintun failed: %v", err))
@@ -564,7 +577,7 @@ setloop:
 		if err == windows.ERROR_DUP_NAME {
 			duplicateGuid, err2 := iphlpapi.InterfaceGUIDFromAlias(availableIfname)
 			if err2 == nil {
-				for j := 0; j < 1000; j++ {
+				for j := 0; j < maxSuffix; j++ {
 					proposal := fmt.Sprintf("%s %d", ifname, j+1)
 					if proposal == availableIfname {
 						continue
