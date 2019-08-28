@@ -687,11 +687,11 @@ func (wintun *Wintun) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, err
 func (wintun *Wintun) AdapterHandle() (windows.Handle, error) {
 	interfaces, err := setupapi.CM_Get_Device_Interface_List(wintun.devInstanceID, &deviceInterfaceNetGUID, setupapi.CM_GET_DEVICE_INTERFACE_LIST_PRESENT)
 	if err != nil {
-		return windows.InvalidHandle, err
+		return windows.InvalidHandle, fmt.Errorf("Error listing NDIS interfaces: %v", err)
 	}
 	handle, err := windows.CreateFile(windows.StringToUTF16Ptr(interfaces[0]), windows.GENERIC_READ|windows.GENERIC_WRITE, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING, 0, 0)
 	if err != nil {
-		return windows.InvalidHandle, fmt.Errorf("Open NDIS device failed: %v", err)
+		return windows.InvalidHandle, fmt.Errorf("Error opening NDIS device: %v", err)
 	}
 	return handle, nil
 }
