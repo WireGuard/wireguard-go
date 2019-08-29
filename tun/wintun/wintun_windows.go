@@ -532,15 +532,6 @@ func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Interface) bool) 
 	return
 }
 
-// DeleteAllInterfaces deletes all Wintun interfaces, and returns which
-// ones it deleted, whether a reboot is required after, and which errors
-// occurred during the process.
-func (pool Pool) DeleteAllInterfaces() (deviceInstancesDeleted []uint32, rebootRequired bool, errors []error) {
-	return pool.DeleteMatchingInterfaces(func(wintun *Interface) bool {
-		return true
-	})
-}
-
 // isMember checks if SPDRP_DEVICEDESC or SPDRP_FRIENDLYNAME match device type name.
 func (pool Pool) isMember(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) (bool, error) {
 	deviceDescVal, err := deviceInfoSet.DeviceRegistryProperty(deviceInfoData, setupapi.SPDRP_DEVICEDESC)
