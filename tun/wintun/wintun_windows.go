@@ -568,12 +568,8 @@ func (wintun *Wintun) InterfaceName() (string, error) {
 func (wintun *Wintun) SetInterfaceName(ifname string) error {
 	const maxSuffix = 1000
 	availableIfname := ifname
-setloop:
 	for i := 0; ; i++ {
 		err := nci.SetConnectionName(&wintun.cfgInstanceID, availableIfname)
-		if err == nil {
-			break
-		}
 		if err == windows.ERROR_DUP_NAME {
 			duplicateGuid, err2 := iphlpapi.InterfaceGUIDFromAlias(availableIfname)
 			if err2 == nil {
@@ -589,12 +585,15 @@ setloop:
 					if err2 == nil {
 						err = nci.SetConnectionName(&wintun.cfgInstanceID, availableIfname)
 						if err == nil {
-							break setloop
+							break
 						}
 					}
 					break
 				}
 			}
+		}
+		if err == nil {
+			break
 		}
 
 		if i > maxSuffix || err != windows.ERROR_DUP_NAME {
