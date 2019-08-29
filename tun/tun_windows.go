@@ -71,6 +71,8 @@ type NativeTun struct {
 	rate      rateJuggler
 }
 
+const WintunPool = wintun.Pool("WireGuard")
+
 //go:linkname procyield runtime.procyield
 func procyield(cycles uint32)
 
@@ -98,22 +100,20 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Dev
 	var wt *wintun.Wintun
 
 	// Does an interface with this name already exist?
-	wt, err = wintun.GetInterface(ifname)
+	wt, err = WintunPool.GetInterface(ifname)
 	if err == nil {
 		// If so, we delete it, in case it has weird residual configuration.
 		_, err = wt.DeleteInterface()
 		if err != nil {
 			return nil, fmt.Errorf("Unable to delete already existing Wintun interface: %v", err)
 		}
-	} else if err == windows.ERROR_ALREADY_EXISTS {
-		return nil, fmt.Errorf("Foreign network interface with the same name exists")
 	}
-	wt, _, err = wintun.CreateInterface(requestedGUID)
+	wt, _, err = WintunPool.CreateInterface(requestedGUID)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create Wintun interface: %v", err)
 	}
 
-	err = wt.SetInterfaceName(ifname)
+	err = wt.SetInterfaceName(ifname, WintunPool)
 	if err != nil {
 		wt.DeleteInterface()
 		return nil, fmt.Errorf("Unable to set name of Wintun interface: %v", err)
