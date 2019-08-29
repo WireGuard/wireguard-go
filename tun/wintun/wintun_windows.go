@@ -29,6 +29,7 @@ type Wintun struct {
 	devInstanceID string
 	luidIndex     uint32
 	ifType        uint32
+	pool          Pool
 }
 
 var deviceClassNetGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0x11ce, Data4: [8]byte{0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}}
@@ -40,7 +41,7 @@ const (
 )
 
 // makeWintun creates a Wintun interface handle and populates it from the device's registry key.
-func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) (*Wintun, error) {
+func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData, pool Pool) (*Wintun, error) {
 	// Open HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\<class>\<id> registry key.
 	key, err := deviceInfoSet.OpenDevRegKey(deviceInfoData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.QUERY_VALUE)
 	if err != nil {
@@ -82,6 +83,7 @@ func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 		devInstanceID: instanceID,
 		luidIndex:     uint32(luidIdx),
 		ifType:        uint32(ifType),
+		pool:          pool,
 	}, nil
 }
 
@@ -121,7 +123,7 @@ func (pool Pool) GetInterface(ifname string) (*Wintun, error) {
 			continue
 		}
 
-		wintun, err := makeWintun(devInfoList, deviceData)
+		wintun, err := makeWintun(devInfoList, deviceData, pool)
 		if err != nil {
 			continue
 		}
@@ -361,7 +363,7 @@ func (pool Pool) CreateInterface(requestedGUID *windows.GUID) (wintun *Wintun, r
 	}
 
 	// Get network interface.
-	wintun, err = makeWintun(devInfoList, deviceData)
+	wintun, err = makeWintun(devInfoList, deviceData, pool)
 	if err != nil {
 		err = fmt.Errorf("makeWintun failed: %v", err)
 		return
@@ -495,7 +497,7 @@ func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Wintun) bool) (de
 			continue
 		}
 
-		wintun, err := makeWintun(devInfoList, deviceData)
+		wintun, err := makeWintun(devInfoList, deviceData, pool)
 		if err != nil {
 			errors = append(errors, fmt.Errorf("makeWintun failed: %v", err))
 			continue
@@ -589,7 +591,7 @@ func (wintun *Wintun) InterfaceName() (string, error) {
 }
 
 // SetInterfaceName sets name of the Wintun interface.
-func (wintun *Wintun) SetInterfaceName(ifname string, pool Pool) error {
+func (wintun *Wintun) SetInterfaceName(ifname string) error {
 	const maxSuffix = 1000
 	availableIfname := ifname
 	for i := 0; ; i++ {
@@ -632,7 +634,7 @@ func (wintun *Wintun) SetInterfaceName(ifname string, pool Pool) error {
 		return fmt.Errorf("Device-level registry key open failed: %v", err)
 	}
 	defer deviceRegKey.Close()
-	err = deviceRegKey.SetStringValue("FriendlyName", pool.DeviceTypeName())
+	err = deviceRegKey.SetStringValue("FriendlyName", wintun.pool.DeviceTypeName())
 	if err != nil {
 		return fmt.Errorf("SetStringValue(FriendlyName) failed: %v", err)
 	}
@@ -687,7 +689,7 @@ func (wintun *Wintun) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, err
 
 		// Get interface ID.
 		// TODO: Store some ID in the Wintun object such that this call isn't required.
-		wintun2, err := makeWintun(devInfoList, deviceData)
+		wintun2, err := makeWintun(devInfoList, deviceData, wintun.pool)
 		if err != nil {
 			continue
 		}
