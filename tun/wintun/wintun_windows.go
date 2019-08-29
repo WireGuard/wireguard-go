@@ -6,14 +6,17 @@
 package wintun
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 	"unsafe"
 
+	"golang.org/x/crypto/blake2s"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
+	"golang.org/x/text/unicode/norm"
 
 	"golang.zx2c4.com/wireguard/tun/wintun/iphlpapi"
 	"golang.zx2c4.com/wireguard/tun/wintun/nci"
@@ -99,6 +102,15 @@ func removeNumberedSuffix(ifname string) string {
 // the interface is found but not a Wintun-class or a member of the pool,
 // this function returns windows.ERROR_ALREADY_EXISTS.
 func (pool Pool) GetInterface(ifname string) (*Interface, error) {
+	mutex, err := pool.takeNameMutex()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		windows.ReleaseMutex(mutex)
+		windows.CloseHandle(mutex)
+	}()
+
 	// Create a list of network devices.
 	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
 	if err != nil {
@@ -178,14 +190,15 @@ func (pool Pool) GetInterface(ifname string) (*Interface, error) {
 	return nil, windows.ERROR_OBJECT_NOT_FOUND
 }
 
-// CreateInterface creates a Wintun interface. requestedGUID is the GUID of the
-// created network interface, which then influences NLA generation
-// deterministically. If it is set to nil, the GUID is chosen by the system at
-// random, and hence a new NLA entry is created for each new interface. It is
-// called "requested" GUID because the API it uses is completely undocumented,
-// and so there could be minor  interesting complications with its usage. This
-// function returns the network interface ID and a flag if reboot is required.
-func (pool Pool) CreateInterface(requestedGUID *windows.GUID) (wintun *Interface, rebootRequired bool, err error) {
+// CreateInterface creates a Wintun interface. ifname is the requested name of
+// the interface, while requestedGUID is the GUID of the created network
+// interface, which then influences NLA generation deterministically. If it is
+// set to nil, the GUID is chosen by the system at random, and hence a new NLA
+// entry is created for each new interface. It is called "requested" GUID
+// because the API it uses is completely undocumented, and so there could be minor
+// interesting complications with its usage. This function returns the network
+// interface ID and a flag if reboot is required.
+func (pool Pool) CreateInterface(ifname string, requestedGUID *windows.GUID) (wintun *Interface, rebootRequired bool, err error) {
 	// Create an empty device info set for network adapter device class.
 	devInfoList, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, "")
 	if err != nil {
@@ -270,6 +283,15 @@ func (pool Pool) CreateInterface(requestedGUID *windows.GUID) (wintun *Interface
 		err = fmt.Errorf("No driver for device %q installed", hardwareID)
 		return
 	}
+
+	mutex, err := pool.takeNameMutex()
+	if err != nil {
+		return
+	}
+	defer func() {
+		windows.ReleaseMutex(mutex)
+		windows.CloseHandle(mutex)
+	}()
 
 	defer func() {
 		if err != nil {
@@ -403,6 +425,12 @@ func (pool Pool) CreateInterface(requestedGUID *windows.GUID) (wintun *Interface
 	// Disable dead gateway detection on our interface.
 	tcpipInterfaceRegKey.SetDWordValue("EnableDeadGWDetect", 0)
 
+	err = wintun.SetName(ifname)
+	if err != nil {
+		err = fmt.Errorf("Unable to set name of Wintun interface: %v", err)
+		return
+	}
+
 	return
 }
 
@@ -444,6 +472,16 @@ func (wintun *Interface) DeleteInterface() (rebootRequired bool, err error) {
 // given criteria, and returns which ones it deleted, whether a reboot
 // is required after, and which errors occurred during the process.
 func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Interface) bool) (deviceInstancesDeleted []uint32, rebootRequired bool, errors []error) {
+	mutex, err := pool.takeNameMutex()
+	if err != nil {
+		errors = append(errors, err)
+		return
+	}
+	defer func() {
+		windows.ReleaseMutex(mutex)
+		windows.CloseHandle(mutex)
+	}()
+
 	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
 	if err != nil {
 		return nil, false, []error{fmt.Errorf("SetupDiGetClassDevsEx(%v) failed: %v", deviceClassNetGUID, err.Error())}
@@ -498,7 +536,7 @@ func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Interface) bool) 
 
 		wintun, err := makeWintun(devInfoList, deviceData, pool)
 		if err != nil {
-			errors = append(errors, fmt.Errorf("makeWintun failed: %v", err))
+			errors = append(errors, fmt.Errorf("Unable to make Wintun interface object: %v", err))
 			continue
 		}
 		if !matches(wintun) {
@@ -719,4 +757,27 @@ func (wintun *Interface) GUID() windows.GUID {
 // LUID returns the LUID of the interface.
 func (wintun *Interface) LUID() uint64 {
 	return ((uint64(wintun.luidIndex) & ((1 << 24) - 1)) << 24) | ((uint64(wintun.ifType) & ((1 << 16) - 1)) << 48)
+}
+
+func (pool Pool) takeNameMutex() (windows.Handle, error) {
+	const mutexLabel = "WireGuard Adapter Name Mutex Stable Suffix v1 jason@zx2c4.com"
+	b2, _ := blake2s.New256(nil)
+	b2.Write([]byte(mutexLabel))
+	b2.Write(norm.NFC.Bytes([]byte(string(pool))))
+	mutexName := `Global\Wintun-Name-Mutex-` + hex.EncodeToString(b2.Sum(nil))
+	mutex, err := windows.CreateMutex(nil, false, windows.StringToUTF16Ptr(mutexName))
+	if err != nil {
+		err = fmt.Errorf("Error creating name mutex: %v", err)
+		return 0, err
+	}
+	event, err := windows.WaitForSingleObject(mutex, windows.INFINITE)
+	if err != nil {
+		windows.CloseHandle(mutex)
+		return 0, fmt.Errorf("Error waiting on name mutex: %v", err)
+	}
+	if event != windows.WAIT_OBJECT_0 {
+		windows.CloseHandle(mutex)
+		return 0, errors.New("Error with event trigger of name mutex")
+	}
+	return mutex, nil
 }
