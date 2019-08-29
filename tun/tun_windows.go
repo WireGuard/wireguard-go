@@ -61,7 +61,7 @@ type rateJuggler struct {
 }
 
 type NativeTun struct {
-	wt        *wintun.Wintun
+	wt        *wintun.Interface
 	handle    windows.Handle
 	close     bool
 	rings     ringDescriptor
@@ -84,20 +84,20 @@ func packetAlign(size uint32) uint32 {
 }
 
 //
-// CreateTUN creates a Wintun adapter with the given name. Should a Wintun
-// adapter with the same name exist, it is reused.
+// CreateTUN creates a Wintun interface with the given name. Should a Wintun
+// interface with the same name exist, it is reused.
 //
 func CreateTUN(ifname string) (Device, error) {
 	return CreateTUNWithRequestedGUID(ifname, nil)
 }
 
 //
-// CreateTUNWithRequestedGUID creates a Wintun adapter with the given name and
-// a requested GUID. Should a Wintun adapter with the same name exist, it is reused.
+// CreateTUNWithRequestedGUID creates a Wintun interface with the given name and
+// a requested GUID. Should a Wintun interface with the same name exist, it is reused.
 //
 func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Device, error) {
 	var err error
-	var wt *wintun.Wintun
+	var wt *wintun.Interface
 
 	// Does an interface with this name already exist?
 	wt, err = WintunPool.GetInterface(ifname)
@@ -113,7 +113,7 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Dev
 		return nil, fmt.Errorf("Unable to create Wintun interface: %v", err)
 	}
 
-	err = wt.SetInterfaceName(ifname, WintunPool)
+	err = wt.SetName(ifname)
 	if err != nil {
 		wt.DeleteInterface()
 		return nil, fmt.Errorf("Unable to set name of Wintun interface: %v", err)
@@ -143,7 +143,7 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Dev
 		return nil, fmt.Errorf("Error creating event: %v", err)
 	}
 
-	tun.handle, err = tun.wt.AdapterHandle()
+	tun.handle, err = tun.wt.Handle()
 	if err != nil {
 		tun.Close()
 		return nil, err
@@ -159,7 +159,7 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Dev
 }
 
 func (tun *NativeTun) Name() (string, error) {
-	return tun.wt.InterfaceName()
+	return tun.wt.Name()
 }
 
 func (tun *NativeTun) File() *os.File {
@@ -300,7 +300,7 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 	return int(packetSize), nil
 }
 
-// LUID returns Windows adapter instance ID.
+// LUID returns Windows interface instance ID.
 func (tun *NativeTun) LUID() uint64 {
 	return tun.wt.LUID()
 }

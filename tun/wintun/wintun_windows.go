@@ -23,8 +23,7 @@ import (
 
 type Pool string
 
-// Wintun is a handle of a Wintun adapter.
-type Wintun struct {
+type Interface struct {
 	cfgInstanceID windows.GUID
 	devInstanceID string
 	luidIndex     uint32
@@ -41,7 +40,7 @@ const (
 )
 
 // makeWintun creates a Wintun interface handle and populates it from the device's registry key.
-func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData, pool Pool) (*Wintun, error) {
+func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData, pool Pool) (*Interface, error) {
 	// Open HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\<class>\<id> registry key.
 	key, err := deviceInfoSet.OpenDevRegKey(deviceInfoData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.QUERY_VALUE)
 	if err != nil {
@@ -78,7 +77,7 @@ func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 		return nil, fmt.Errorf("DeviceInstanceID failed: %v", err)
 	}
 
-	return &Wintun{
+	return &Interface{
 		cfgInstanceID: ifid,
 		devInstanceID: instanceID,
 		luidIndex:     uint32(luidIdx),
@@ -99,7 +98,7 @@ func removeNumberedSuffix(ifname string) string {
 // the interface if found, or windows.ERROR_OBJECT_NOT_FOUND otherwise. If
 // the interface is found but not a Wintun-class or a member of the pool,
 // this function returns windows.ERROR_ALREADY_EXISTS.
-func (pool Pool) GetInterface(ifname string) (*Wintun, error) {
+func (pool Pool) GetInterface(ifname string) (*Interface, error) {
 	// Create a list of network devices.
 	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
 	if err != nil {
@@ -129,7 +128,7 @@ func (pool Pool) GetInterface(ifname string) (*Wintun, error) {
 		}
 
 		// TODO: is there a better way than comparing ifnames?
-		ifname2, err := wintun.InterfaceName()
+		ifname2, err := wintun.Name()
 		if err != nil {
 			continue
 		}
@@ -186,7 +185,7 @@ func (pool Pool) GetInterface(ifname string) (*Wintun, error) {
 // called "requested" GUID because the API it uses is completely undocumented,
 // and so there could be minor  interesting complications with its usage. This
 // function returns the network interface ID and a flag if reboot is required.
-func (pool Pool) CreateInterface(requestedGUID *windows.GUID) (wintun *Wintun, rebootRequired bool, err error) {
+func (pool Pool) CreateInterface(requestedGUID *windows.GUID) (wintun *Interface, rebootRequired bool, err error) {
 	// Create an empty device info set for network adapter device class.
 	devInfoList, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, "")
 	if err != nil {
@@ -203,7 +202,7 @@ func (pool Pool) CreateInterface(requestedGUID *windows.GUID) (wintun *Wintun, r
 	}
 
 	// Create a new device info element and add it to the device info set.
-	deviceTypeName := pool.DeviceTypeName()
+	deviceTypeName := pool.deviceTypeName()
 	deviceData, err := devInfoList.CreateDeviceInfo(className, &deviceClassNetGUID, deviceTypeName, 0, setupapi.DICD_GENERATE_ID)
 	if err != nil {
 		err = fmt.Errorf("SetupDiCreateDeviceInfo failed: %v", err)
@@ -410,7 +409,7 @@ func (pool Pool) CreateInterface(requestedGUID *windows.GUID) (wintun *Wintun, r
 // DeleteInterface deletes a Wintun interface. This function succeeds
 // if the interface was not found. It returns a bool indicating whether
 // a reboot is required.
-func (wintun *Wintun) DeleteInterface() (rebootRequired bool, err error) {
+func (wintun *Interface) DeleteInterface() (rebootRequired bool, err error) {
 	devInfoList, deviceData, err := wintun.deviceData()
 	if err == windows.ERROR_OBJECT_NOT_FOUND {
 		return false, nil
@@ -444,7 +443,7 @@ func (wintun *Wintun) DeleteInterface() (rebootRequired bool, err error) {
 // DeleteMatchingInterfaces deletes all Wintun interfaces, which match
 // given criteria, and returns which ones it deleted, whether a reboot
 // is required after, and which errors occurred during the process.
-func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Wintun) bool) (deviceInstancesDeleted []uint32, rebootRequired bool, errors []error) {
+func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Interface) bool) (deviceInstancesDeleted []uint32, rebootRequired bool, errors []error) {
 	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
 	if err != nil {
 		return nil, false, []error{fmt.Errorf("SetupDiGetClassDevsEx(%v) failed: %v", deviceClassNetGUID, err.Error())}
@@ -537,7 +536,7 @@ func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Wintun) bool) (de
 // ones it deleted, whether a reboot is required after, and which errors
 // occurred during the process.
 func (pool Pool) DeleteAllInterfaces() (deviceInstancesDeleted []uint32, rebootRequired bool, errors []error) {
-	return pool.DeleteMatchingInterfaces(func(wintun *Wintun) bool {
+	return pool.DeleteMatchingInterfaces(func(wintun *Interface) bool {
 		return true
 	})
 }
@@ -554,7 +553,7 @@ func (pool Pool) isMember(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupa
 		return false, fmt.Errorf("DeviceRegistryPropertyString(SPDRP_FRIENDLYNAME) failed: %v", err)
 	}
 	friendlyName, _ := friendlyNameVal.(string)
-	deviceTypeName := pool.DeviceTypeName()
+	deviceTypeName := pool.deviceTypeName()
 	return friendlyName == deviceTypeName || deviceDesc == deviceTypeName ||
 		removeNumberedSuffix(friendlyName) == deviceTypeName || removeNumberedSuffix(deviceDesc) == deviceTypeName, nil
 }
@@ -580,18 +579,18 @@ func setQuietInstall(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.De
 	return deviceInfoSet.SetDeviceInstallParams(deviceInfoData, devInstallParams)
 }
 
-// DeviceTypeName returns pool-specific device type name.
-func (pool Pool) DeviceTypeName() string {
+// deviceTypeName returns pool-specific device type name.
+func (pool Pool) deviceTypeName() string {
 	return fmt.Sprintf("%s Tunnel", pool)
 }
 
-// InterfaceName returns the name of the Wintun interface.
-func (wintun *Wintun) InterfaceName() (string, error) {
+// Name returns the name of the Wintun interface.
+func (wintun *Interface) Name() (string, error) {
 	return nci.ConnectionName(&wintun.cfgInstanceID)
 }
 
-// SetInterfaceName sets name of the Wintun interface.
-func (wintun *Wintun) SetInterfaceName(ifname string) error {
+// SetName sets name of the Wintun interface.
+func (wintun *Interface) SetName(ifname string) error {
 	const maxSuffix = 1000
 	availableIfname := ifname
 	for i := 0; ; i++ {
@@ -634,7 +633,7 @@ func (wintun *Wintun) SetInterfaceName(ifname string) error {
 		return fmt.Errorf("Device-level registry key open failed: %v", err)
 	}
 	defer deviceRegKey.Close()
-	err = deviceRegKey.SetStringValue("FriendlyName", wintun.pool.DeviceTypeName())
+	err = deviceRegKey.SetStringValue("FriendlyName", wintun.pool.deviceTypeName())
 	if err != nil {
 		return fmt.Errorf("SetStringValue(FriendlyName) failed: %v", err)
 	}
@@ -642,17 +641,17 @@ func (wintun *Wintun) SetInterfaceName(ifname string) error {
 }
 
 // tcpipAdapterRegKeyName returns the adapter-specific TCP/IP network registry key name.
-func (wintun *Wintun) tcpipAdapterRegKeyName() string {
+func (wintun *Interface) tcpipAdapterRegKeyName() string {
 	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Adapters\\%v", wintun.cfgInstanceID)
 }
 
 // deviceRegKeyName returns the device-level registry key name
-func (wintun *Wintun) deviceRegKeyName() string {
+func (wintun *Interface) deviceRegKeyName() string {
 	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%v", wintun.devInstanceID)
 }
 
 // tcpipInterfaceRegKeyName returns the interface-specific TCP/IP network registry key name.
-func (wintun *Wintun) tcpipInterfaceRegKeyName() (path string, err error) {
+func (wintun *Interface) tcpipInterfaceRegKeyName() (path string, err error) {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, wintun.tcpipAdapterRegKeyName(), registry.QUERY_VALUE)
 	if err != nil {
 		return "", fmt.Errorf("Error opening adapter-specific TCP/IP network registry key: %v", err)
@@ -671,7 +670,7 @@ func (wintun *Wintun) tcpipInterfaceRegKeyName() (path string, err error) {
 // deviceData returns TUN device info list handle and interface device info
 // data. The device info list handle must be closed after use. In case the
 // device is not found, windows.ERROR_OBJECT_NOT_FOUND is returned.
-func (wintun *Wintun) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, error) {
+func (wintun *Interface) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, error) {
 	// Create a list of network devices.
 	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
 	if err != nil {
@@ -708,8 +707,8 @@ func (wintun *Wintun) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, err
 	return 0, nil, windows.ERROR_OBJECT_NOT_FOUND
 }
 
-// AdapterHandle returns a handle to the adapter device object.
-func (wintun *Wintun) AdapterHandle() (windows.Handle, error) {
+// Handle returns a handle to the interface device object.
+func (wintun *Interface) Handle() (windows.Handle, error) {
 	interfaces, err := setupapi.CM_Get_Device_Interface_List(wintun.devInstanceID, &deviceInterfaceNetGUID, setupapi.CM_GET_DEVICE_INTERFACE_LIST_PRESENT)
 	if err != nil {
 		return windows.InvalidHandle, fmt.Errorf("Error listing NDIS interfaces: %v", err)
@@ -722,11 +721,11 @@ func (wintun *Wintun) AdapterHandle() (windows.Handle, error) {
 }
 
 // GUID returns the GUID of the interface.
-func (wintun *Wintun) GUID() windows.GUID {
+func (wintun *Interface) GUID() windows.GUID {
 	return wintun.cfgInstanceID
 }
 
 // LUID returns the LUID of the interface.
-func (wintun *Wintun) LUID() uint64 {
+func (wintun *Interface) LUID() uint64 {
 	return ((uint64(wintun.luidIndex) & ((1 << 24) - 1)) << 24) | ((uint64(wintun.ifType) & ((1 << 16) - 1)) << 48)
 }
