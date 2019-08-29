@@ -698,8 +698,8 @@ func (wintun *Interface) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, 
 	return 0, nil, windows.ERROR_OBJECT_NOT_FOUND
 }
 
-// Handle returns a handle to the interface device object.
-func (wintun *Interface) Handle() (windows.Handle, error) {
+// handle returns a handle to the interface device object.
+func (wintun *Interface) handle() (windows.Handle, error) {
 	interfaces, err := setupapi.CM_Get_Device_Interface_List(wintun.devInstanceID, &deviceInterfaceNetGUID, setupapi.CM_GET_DEVICE_INTERFACE_LIST_PRESENT)
 	if err != nil {
 		return windows.InvalidHandle, fmt.Errorf("Error listing NDIS interfaces: %v", err)
