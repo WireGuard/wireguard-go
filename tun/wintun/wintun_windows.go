@@ -6,17 +6,14 @@
 package wintun
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 	"unsafe"
 
-	"golang.org/x/crypto/blake2s"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
-	"golang.org/x/text/unicode/norm"
 
 	"golang.zx2c4.com/wireguard/tun/wintun/iphlpapi"
 	"golang.zx2c4.com/wireguard/tun/wintun/nci"
@@ -757,27 +754,4 @@ func (wintun *Interface) GUID() windows.GUID {
 // LUID returns the LUID of the interface.
 func (wintun *Interface) LUID() uint64 {
 	return ((uint64(wintun.luidIndex) & ((1 << 24) - 1)) << 24) | ((uint64(wintun.ifType) & ((1 << 16) - 1)) << 48)
-}
-
-func (pool Pool) takeNameMutex() (windows.Handle, error) {
-	const mutexLabel = "WireGuard Adapter Name Mutex Stable Suffix v1 jason@zx2c4.com"
-	b2, _ := blake2s.New256(nil)
-	b2.Write([]byte(mutexLabel))
-	b2.Write(norm.NFC.Bytes([]byte(string(pool))))
-	mutexName := `Global\Wintun-Name-Mutex-` + hex.EncodeToString(b2.Sum(nil))
-	mutex, err := windows.CreateMutex(nil, false, windows.StringToUTF16Ptr(mutexName))
-	if err != nil {
-		err = fmt.Errorf("Error creating name mutex: %v", err)
-		return 0, err
-	}
-	event, err := windows.WaitForSingleObject(mutex, windows.INFINITE)
-	if err != nil {
-		windows.CloseHandle(mutex)
-		return 0, fmt.Errorf("Error waiting on name mutex: %v", err)
-	}
-	if event != windows.WAIT_OBJECT_0 {
-		windows.CloseHandle(mutex)
-		return 0, errors.New("Error with event trigger of name mutex")
-	}
-	return mutex, nil
 }
