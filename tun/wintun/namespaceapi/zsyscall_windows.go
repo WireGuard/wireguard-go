@@ -65,8 +65,8 @@ func deleteBoundaryDescriptor(boundaryDescriptor windows.Handle) {
 	return
 }
 
-func addSIDToBoundaryDescriptor(boundaryDescriptor windows.Handle, requiredSid *windows.SID) (err error) {
-	r1, _, e1 := syscall.Syscall(procAddSIDToBoundaryDescriptor.Addr(), 2, uintptr(boundaryDescriptor), uintptr(unsafe.Pointer(requiredSid)), 0)
+func addSIDToBoundaryDescriptor(boundaryDescriptor *windows.Handle, requiredSid *windows.SID) (err error) {
+	r1, _, e1 := syscall.Syscall(procAddSIDToBoundaryDescriptor.Addr(), 2, uintptr(unsafe.Pointer(boundaryDescriptor)), uintptr(unsafe.Pointer(requiredSid)), 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)

@@ -9,7 +9,7 @@ import "golang.org/x/sys/windows"
 
 //sys	createBoundaryDescriptor(name *uint16, flags uint32) (handle windows.Handle, err error) = kernel32.CreateBoundaryDescriptorW
 //sys	deleteBoundaryDescriptor(boundaryDescriptor windows.Handle) = kernel32.DeleteBoundaryDescriptor
-//sys	addSIDToBoundaryDescriptor(boundaryDescriptor windows.Handle, requiredSid *windows.SID) (err error) = kernel32.AddSIDToBoundaryDescriptor
+//sys	addSIDToBoundaryDescriptor(boundaryDescriptor *windows.Handle, requiredSid *windows.SID) (err error) = kernel32.AddSIDToBoundaryDescriptor
 //sys	createPrivateNamespace(privateNamespaceAttributes *windows.SecurityAttributes, boundaryDescriptor windows.Handle, aliasPrefix *uint16) (handle windows.Handle, err error) = kernel32.CreatePrivateNamespaceW
 //sys	openPrivateNamespace(boundaryDescriptor windows.Handle, aliasPrefix *uint16) (handle windows.Handle, err error) = kernel32.OpenPrivateNamespaceW
 //sys	closePrivateNamespace(handle windows.Handle, flags uint32) (err error) = kernel32.ClosePrivateNamespace
@@ -37,7 +37,7 @@ func (bd BoundaryDescriptor) Delete() {
 
 // AddSid adds a security identifier (SID) to the specified boundary descriptor.
 func (bd BoundaryDescriptor) AddSid(requiredSid *windows.SID) error {
-	return addSIDToBoundaryDescriptor(windows.Handle(bd), requiredSid)
+	return addSIDToBoundaryDescriptor((*windows.Handle)(&bd), requiredSid)
 }
 
 // PrivateNamespace represents a private namespace. Duh?!
