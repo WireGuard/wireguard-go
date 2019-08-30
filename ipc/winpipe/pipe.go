@@ -211,7 +211,7 @@ func tryDialPipe(ctx context.Context, path *string) (syscall.Handle, error) {
 // DialPipe connects to a named pipe by path, timing out if the connection
 // takes longer than the specified duration. If timeout is nil, then we use
 // a default timeout of 2 seconds.  (We do not use WaitNamedPipe.)
-func DialPipe(path string, timeout *time.Duration) (net.Conn, error) {
+func DialPipe(path string, timeout *time.Duration, expectedOwner *syscall.SID) (net.Conn, error) {
 	var absTimeout time.Time
 	if timeout != nil {
 		absTimeout = time.Now().Add(*timeout)
@@ -219,7 +219,7 @@ func DialPipe(path string, timeout *time.Duration) (net.Conn, error) {
 		absTimeout = time.Now().Add(time.Second * 2)
 	}
 	ctx, _ := context.WithDeadline(context.Background(), absTimeout)
-	conn, err := DialPipeContext(ctx, path)
+	conn, err := DialPipeContext(ctx, path, expectedOwner)
 	if err == context.DeadlineExceeded {
 		return nil, ErrTimeout
 	}
@@ -228,7 +228,7 @@ func DialPipe(path string, timeout *time.Duration) (net.Conn, error) {
 
 // DialPipeContext attempts to connect to a named pipe by `path` until `ctx`
 // cancellation or timeout.
-func DialPipeContext(ctx context.Context, path string) (net.Conn, error) {
+func DialPipeContext(ctx context.Context, path string, expectedOwner *syscall.SID) (net.Conn, error) {
 	var err error
 	var h syscall.Handle
 	h, err = tryDialPipe(ctx, &path)
@@ -236,9 +236,25 @@ func DialPipeContext(ctx context.Context, path string) (net.Conn, error) {
 		return nil, err
 	}
 
+	if expectedOwner != nil {
+		var realOwner *syscall.SID
+		var realSd uintptr
+		err = getSecurityInfo(h, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &realOwner, nil, nil, nil, &realSd)
+		if err != nil {
+			syscall.Close(h)
+			return nil, err
+		}
+		defer localFree(realSd)
+		if !equalSid(realOwner, expectedOwner) {
+			syscall.Close(h)
+			return nil, syscall.ERROR_ACCESS_DENIED
+		}
+	}
+
 	var flags uint32
 	err = getNamedPipeInfo(h, &flags, nil, nil, nil)
 	if err != nil {
+		syscall.Close(h)
 		return nil, err
 	}
 

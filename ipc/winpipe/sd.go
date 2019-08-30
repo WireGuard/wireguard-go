@@ -12,9 +12,16 @@ import (
 	"unsafe"
 )
 
-//sys convertStringSecurityDescriptorToSecurityDescriptor(str string, revision uint32, sd *uintptr, size *uint32) (err error) = advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW
-//sys localFree(mem uintptr) = LocalFree
-//sys getSecurityDescriptorLength(sd uintptr) (len uint32) = advapi32.GetSecurityDescriptorLength
+//sys	convertStringSecurityDescriptorToSecurityDescriptor(str string, revision uint32, sd *uintptr, size *uint32) (err error) = advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW
+//sys	localFree(mem uintptr) = LocalFree
+//sys	getSecurityDescriptorLength(sd uintptr) (len uint32) = advapi32.GetSecurityDescriptorLength
+//sys	getSecurityInfo(handle syscall.Handle, objectType uint32, securityInformation uint32, owner **syscall.SID, group **syscall.SID, dacl *uintptr, sacl *uintptr, sd *uintptr) (ret error) = advapi32.GetSecurityInfo
+//sys	equalSid(sid1 *syscall.SID, sid2 *syscall.SID) (isEqual bool) = advapi32.EqualSid
+
+const (
+	SE_FILE_OBJECT             = 1
+	OWNER_SECURITY_INFORMATION = 1
+)
 
 func SddlToSecurityDescriptor(sddl string) ([]byte, error) {
 	var sdBuffer uintptr
