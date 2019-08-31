@@ -54,7 +54,7 @@ func UAPIListen(name string) (net.Listener, error) {
 	config := winpipe.PipeConfig{
 		SecurityDescriptor: UAPISecurityDescriptor,
 	}
-	listener, err := winpipe.ListenPipe("\\\\.\\pipe\\WireGuard\\"+name, &config)
+	listener, err := winpipe.ListenPipe(`\\.\pipe\ProtectedPrefix\Administrators\WireGuard\`+name, &config)
 	if err != nil {
 		return nil, err
 	}
