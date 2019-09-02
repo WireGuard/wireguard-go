@@ -91,7 +91,7 @@ func (pool Pool) takeNameMutex() (windows.Handle, error) {
 		windows.CloseHandle(mutex)
 		return 0, fmt.Errorf("Error waiting on name mutex: %v", err)
 	}
-	if event != windows.WAIT_OBJECT_0 {
+	if event != windows.WAIT_OBJECT_0 && event != windows.WAIT_ABANDONED {
 		windows.CloseHandle(mutex)
 		return 0, errors.New("Error with event trigger of name mutex")
 	}
