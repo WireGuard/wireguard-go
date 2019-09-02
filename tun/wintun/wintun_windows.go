@@ -196,6 +196,15 @@ func (pool Pool) GetInterface(ifname string) (*Interface, error) {
 // interesting complications with its usage. This function returns the network
 // interface ID and a flag if reboot is required.
 func (pool Pool) CreateInterface(ifname string, requestedGUID *windows.GUID) (wintun *Interface, rebootRequired bool, err error) {
+	mutex, err := pool.takeNameMutex()
+	if err != nil {
+		return
+	}
+	defer func() {
+		windows.ReleaseMutex(mutex)
+		windows.CloseHandle(mutex)
+	}()
+
 	// Create an empty device info set for network adapter device class.
 	devInfoList, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, "")
 	if err != nil {
@@ -280,15 +289,6 @@ func (pool Pool) CreateInterface(ifname string, requestedGUID *windows.GUID) (wi
 		err = fmt.Errorf("No driver for device %q installed", hardwareID)
 		return
 	}
-
-	mutex, err := pool.takeNameMutex()
-	if err != nil {
-		return
-	}
-	defer func() {
-		windows.ReleaseMutex(mutex)
-		windows.CloseHandle(mutex)
-	}()
 
 	defer func() {
 		if err != nil {
