@@ -36,8 +36,8 @@ func (bd BoundaryDescriptor) Delete() {
 }
 
 // AddSid adds a security identifier (SID) to the specified boundary descriptor.
-func (bd BoundaryDescriptor) AddSid(requiredSid *windows.SID) error {
-	return addSIDToBoundaryDescriptor((*windows.Handle)(&bd), requiredSid)
+func (bd *BoundaryDescriptor) AddSid(requiredSid *windows.SID) error {
+	return addSIDToBoundaryDescriptor((*windows.Handle)(bd), requiredSid)
 }
 
 // PrivateNamespace represents a private namespace. Duh?!
