@@ -42,34 +42,11 @@ func (tun *NativeTun) routineRouteListener(tunIfindex int) {
 
 	defer close(tun.events)
 
-	data := make([]byte, os.Getpagesize())
-	for {
-	retry:
-		n, err := unix.Read(tun.routeSocket, data)
-		if err != nil {
-			if errno, ok := err.(syscall.Errno); ok && errno == syscall.EINTR {
-				goto retry
-			}
-			tun.errors <- err
-			return
-		}
-
-		if n < 8 {
-			continue
-		}
-
-		if data[3 /* type */] != unix.RTM_IFINFO {
-			continue
-		}
-		ifindex := int(*(*uint16)(unsafe.Pointer(&data[6 /* ifindex */])))
-		if ifindex != tunIfindex {
-			continue
-		}
-
-		iface, err := net.InterfaceByIndex(ifindex)
+	check := func() bool {
+		iface, err := net.InterfaceByIndex(tunIfindex)
 		if err != nil {
 			tun.errors <- err
-			return
+			return true
 		}
 
 		// Up / Down event
@@ -87,6 +64,38 @@ func (tun *NativeTun) routineRouteListener(tunIfindex int) {
 			tun.events <- EventMTUUpdate
 		}
 		statusMTU = iface.MTU
+		return false
+	}
+
+	if check() {
+		return
+	}
+
+	data := make([]byte, os.Getpagesize())
+	for {
+		n, err := unix.Read(tun.routeSocket, data)
+		if err != nil {
+			if errno, ok := err.(syscall.Errno); ok && errno == syscall.EINTR {
+				continue
+			}
+			tun.errors <- err
+			return
+		}
+
+		if n < 8 {
+			continue
+		}
+
+		if data[3 /* type */] != unix.RTM_IFINFO {
+			continue
+		}
+		ifindex := int(*(*uint16)(unsafe.Pointer(&data[6 /* ifindex */])))
+		if ifindex != tunIfindex {
+			continue
+		}
+		if check() {
+			return
+		}
 	}
 }
 
@@ -140,7 +149,6 @@ func CreateTUN(name string, mtu int) (Device, error) {
 }
 
 func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
-
 	tun := &NativeTun{
 		tunFile: file,
 		events:  make(chan Event, 10),
