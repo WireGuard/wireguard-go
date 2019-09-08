@@ -72,12 +72,12 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID) (Dev
 		// If so, we delete it, in case it has weird residual configuration.
 		_, err = wt.DeleteInterface()
 		if err != nil {
-			return nil, fmt.Errorf("Unable to delete already existing Wintun interface: %v", err)
+			return nil, fmt.Errorf("Error deleting already existing interface: %v", err)
 		}
 	}
 	wt, _, err = WintunPool.CreateInterface(ifname, requestedGUID)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create Wintun interface: %v", err)
+		return nil, fmt.Errorf("Error creating interface: %v", err)
 	}
 
 	tun := &NativeTun{
