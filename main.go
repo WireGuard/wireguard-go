@@ -40,31 +40,19 @@ func warning() {
 	if runtime.GOOS != "linux" || os.Getenv(ENV_WG_PROCESS_FOREGROUND) == "1" {
 		return
 	}
-	shouldQuit := os.Getenv("WG_I_PREFER_BUGGY_USERSPACE_TO_POLISHED_KMOD") != "1"
 
 	fmt.Fprintln(os.Stderr, "WARNING WARNING WARNING WARNING WARNING WARNING WARNING")
 	fmt.Fprintln(os.Stderr, "W                                                     G")
 	fmt.Fprintln(os.Stderr, "W   You are running this software on a Linux kernel,  G")
-	fmt.Fprintln(os.Stderr, "W   which is probably unnecessary and foolish. This   G")
+	fmt.Fprintln(os.Stderr, "W   which is probably unnecessary and misguided. This G")
 	fmt.Fprintln(os.Stderr, "W   is because the Linux kernel has built-in first    G")
 	fmt.Fprintln(os.Stderr, "W   class support for WireGuard, and this support is  G")
 	fmt.Fprintln(os.Stderr, "W   much more refined than this slower userspace      G")
 	fmt.Fprintln(os.Stderr, "W   implementation. For more information on           G")
 	fmt.Fprintln(os.Stderr, "W   installing the kernel module, please visit:       G")
 	fmt.Fprintln(os.Stderr, "W           https://www.wireguard.com/install         G")
-	if shouldQuit {
-		fmt.Fprintln(os.Stderr, "W                                                     G")
-		fmt.Fprintln(os.Stderr, "W   If you still want to use this program, against    G")
-		fmt.Fprintln(os.Stderr, "W   the advice here, please first export this         G")
-		fmt.Fprintln(os.Stderr, "W   environment variable:                             G")
-		fmt.Fprintln(os.Stderr, "W   WG_I_PREFER_BUGGY_USERSPACE_TO_POLISHED_KMOD=1    G")
-	}
 	fmt.Fprintln(os.Stderr, "W                                                     G")
 	fmt.Fprintln(os.Stderr, "WARNING WARNING WARNING WARNING WARNING WARNING WARNING")
-
-	if shouldQuit {
-		os.Exit(1)
-	}
 }
 
 func main() {
@@ -74,8 +62,6 @@ func main() {
 	}
 
 	warning()
-
-	// parse arguments
 
 	var foreground bool
 	var interfaceName string
