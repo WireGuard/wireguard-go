@@ -37,7 +37,7 @@ func initializeNamespace() error {
 		return fmt.Errorf("SddlToSecurityDescriptor failed: %v", err)
 	}
 	wintunObjectSecurityAttributes = &windows.SecurityAttributes{
-		Length:             uint32(len(sd)),
+		Length:             uint32(unsafe.Sizeof(windows.SecurityAttributes{})),
 		SecurityDescriptor: uintptr(unsafe.Pointer(&sd[0])),
 	}
 	sid, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
