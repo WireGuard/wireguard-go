@@ -16,18 +16,19 @@ import (
 	"net"
 	"os"
 	"runtime"
-	"syscall"
 	"time"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
-//sys connectNamedPipe(pipe syscall.Handle, o *syscall.Overlapped) (err error) = ConnectNamedPipe
-//sys createNamedPipe(name string, flags uint32, pipeMode uint32, maxInstances uint32, outSize uint32, inSize uint32, defaultTimeout uint32, sa *syscall.SecurityAttributes) (handle syscall.Handle, err error)  [failretval==syscall.InvalidHandle] = CreateNamedPipeW
-//sys createFile(name string, access uint32, mode uint32, sa *syscall.SecurityAttributes, createmode uint32, attrs uint32, templatefile syscall.Handle) (handle syscall.Handle, err error) [failretval==syscall.InvalidHandle] = CreateFileW
-//sys getNamedPipeInfo(pipe syscall.Handle, flags *uint32, outSize *uint32, inSize *uint32, maxInstances *uint32) (err error) = GetNamedPipeInfo
-//sys getNamedPipeHandleState(pipe syscall.Handle, state *uint32, curInstances *uint32, maxCollectionCount *uint32, collectDataTimeout *uint32, userName *uint16, maxUserNameSize uint32) (err error) = GetNamedPipeHandleStateW
+//sys connectNamedPipe(pipe windows.Handle, o *windows.Overlapped) (err error) = ConnectNamedPipe
+//sys createNamedPipe(name string, flags uint32, pipeMode uint32, maxInstances uint32, outSize uint32, inSize uint32, defaultTimeout uint32, sa *windows.SecurityAttributes) (handle windows.Handle, err error)  [failretval==windows.InvalidHandle] = CreateNamedPipeW
+//sys createFile(name string, access uint32, mode uint32, sa *windows.SecurityAttributes, createmode uint32, attrs uint32, templatefile windows.Handle) (handle windows.Handle, err error) [failretval==windows.InvalidHandle] = CreateFileW
+//sys getNamedPipeInfo(pipe windows.Handle, flags *uint32, outSize *uint32, inSize *uint32, maxInstances *uint32) (err error) = GetNamedPipeInfo
+//sys getNamedPipeHandleState(pipe windows.Handle, state *uint32, curInstances *uint32, maxCollectionCount *uint32, collectDataTimeout *uint32, userName *uint16, maxUserNameSize uint32) (err error) = GetNamedPipeHandleStateW
 //sys localAlloc(uFlags uint32, length uint32) (ptr uintptr) = LocalAlloc
-//sys ntCreateNamedPipeFile(pipe *syscall.Handle, access uint32, oa *objectAttributes, iosb *ioStatusBlock, share uint32, disposition uint32, options uint32, typ uint32, readMode uint32, completionMode uint32, maxInstances uint32, inboundQuota uint32, outputQuota uint32, timeout *int64) (status ntstatus) = ntdll.NtCreateNamedPipeFile
+//sys ntCreateNamedPipeFile(pipe *windows.Handle, access uint32, oa *objectAttributes, iosb *ioStatusBlock, share uint32, disposition uint32, options uint32, typ uint32, readMode uint32, completionMode uint32, maxInstances uint32, inboundQuota uint32, outputQuota uint32, timeout *int64) (status ntstatus) = ntdll.NtCreateNamedPipeFile
 //sys rtlNtStatusToDosError(status ntstatus) (winerr error) = ntdll.RtlNtStatusToDosErrorNoTeb
 //sys rtlDosPathNameToNtPathName(name *uint16, ntName *unicodeString, filePart uintptr, reserved uintptr) (status ntstatus) = ntdll.RtlDosPathNameToNtPathName_U
 //sys rtlDefaultNpAcl(dacl *uintptr) (status ntstatus) = ntdll.RtlDefaultNpAcl
@@ -41,7 +42,7 @@ type objectAttributes struct {
 	RootDirectory      uintptr
 	ObjectName         *unicodeString
 	Attributes         uintptr
-	SecurityDescriptor *securityDescriptor
+	SecurityDescriptor *windows.SECURITY_DESCRIPTOR
 	SecurityQoS        uintptr
 }
 
@@ -49,16 +50,6 @@ type unicodeString struct {
 	Length        uint16
 	MaximumLength uint16
 	Buffer        uintptr
-}
-
-type securityDescriptor struct {
-	Revision byte
-	Sbz1     byte
-	Control  uint16
-	Owner    uintptr
-	Group    uintptr
-	Sacl     uintptr
-	Dacl     uintptr
 }
 
 type ntstatus int32
@@ -71,11 +62,6 @@ func (status ntstatus) Err() error {
 }
 
 const (
-	cERROR_PIPE_BUSY      = syscall.Errno(231)
-	cERROR_NO_DATA        = syscall.Errno(232)
-	cERROR_PIPE_CONNECTED = syscall.Errno(535)
-	cERROR_SEM_TIMEOUT    = syscall.Errno(121)
-
 	cSECURITY_SQOS_PRESENT = 0x100000
 	cSECURITY_ANONYMOUS    = 0
 
@@ -88,8 +74,6 @@ const (
 
 	cFILE_PIPE_MESSAGE_TYPE          = 1
 	cFILE_PIPE_REJECT_REMOTE_CLIENTS = 2
-
-	cSE_DACL_PRESENT = 4
 )
 
 var (
@@ -170,7 +154,7 @@ func (f *win32MessageBytePipe) Read(b []byte) (int, error) {
 		// zero-byte message, ensure that all future Read() calls
 		// also return EOF.
 		f.readEOF = true
-	} else if err == syscall.ERROR_MORE_DATA {
+	} else if err == windows.ERROR_MORE_DATA {
 		// ERROR_MORE_DATA indicates that the pipe's read mode is message mode
 		// and the message still has more bytes. Treat this as a success, since
 		// this package presents all named pipes as byte streams.
@@ -188,17 +172,17 @@ func (s pipeAddress) String() string {
 }
 
 // tryDialPipe attempts to dial the pipe at `path` until `ctx` cancellation or timeout.
-func tryDialPipe(ctx context.Context, path *string) (syscall.Handle, error) {
+func tryDialPipe(ctx context.Context, path *string) (windows.Handle, error) {
 	for {
 		select {
 		case <-ctx.Done():
-			return syscall.Handle(0), ctx.Err()
+			return windows.Handle(0), ctx.Err()
 		default:
-			h, err := createFile(*path, syscall.GENERIC_READ|syscall.GENERIC_WRITE, 0, nil, syscall.OPEN_EXISTING, syscall.FILE_FLAG_OVERLAPPED|cSECURITY_SQOS_PRESENT|cSECURITY_ANONYMOUS, 0)
+			h, err := createFile(*path, windows.GENERIC_READ|windows.GENERIC_WRITE, 0, nil, windows.OPEN_EXISTING, windows.FILE_FLAG_OVERLAPPED|cSECURITY_SQOS_PRESENT|cSECURITY_ANONYMOUS, 0)
 			if err == nil {
 				return h, nil
 			}
-			if err != cERROR_PIPE_BUSY {
+			if err != windows.ERROR_PIPE_BUSY {
 				return h, &os.PathError{Err: err, Op: "open", Path: *path}
 			}
 			// Wait 10 msec and try again. This is a rather simplistic
@@ -211,7 +195,7 @@ func tryDialPipe(ctx context.Context, path *string) (syscall.Handle, error) {
 // DialPipe connects to a named pipe by path, timing out if the connection
 // takes longer than the specified duration. If timeout is nil, then we use
 // a default timeout of 2 seconds.  (We do not use WaitNamedPipe.)
-func DialPipe(path string, timeout *time.Duration, expectedOwner *syscall.SID) (net.Conn, error) {
+func DialPipe(path string, timeout *time.Duration, expectedOwner *windows.SID) (net.Conn, error) {
 	var absTimeout time.Time
 	if timeout != nil {
 		absTimeout = time.Now().Add(*timeout)
@@ -228,39 +212,41 @@ func DialPipe(path string, timeout *time.Duration, expectedOwner *syscall.SID) (
 
 // DialPipeContext attempts to connect to a named pipe by `path` until `ctx`
 // cancellation or timeout.
-func DialPipeContext(ctx context.Context, path string, expectedOwner *syscall.SID) (net.Conn, error) {
+func DialPipeContext(ctx context.Context, path string, expectedOwner *windows.SID) (net.Conn, error) {
 	var err error
-	var h syscall.Handle
+	var h windows.Handle
 	h, err = tryDialPipe(ctx, &path)
 	if err != nil {
 		return nil, err
 	}
 
 	if expectedOwner != nil {
-		var realOwner *syscall.SID
-		var realSd uintptr
-		err = getSecurityInfo(h, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &realOwner, nil, nil, nil, &realSd)
+		sd, err := windows.GetSecurityInfo(h, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION)
 		if err != nil {
-			syscall.Close(h)
+			windows.Close(h)
 			return nil, err
 		}
-		defer localFree(realSd)
-		if !equalSid(realOwner, expectedOwner) {
-			syscall.Close(h)
-			return nil, syscall.ERROR_ACCESS_DENIED
+		realOwner, _, err := sd.Owner()
+		if err != nil {
+			windows.Close(h)
+			return nil, err
+		}
+		if !realOwner.Equals(expectedOwner) {
+			windows.Close(h)
+			return nil, windows.ERROR_ACCESS_DENIED
 		}
 	}
 
 	var flags uint32
 	err = getNamedPipeInfo(h, &flags, nil, nil, nil)
 	if err != nil {
-		syscall.Close(h)
+		windows.Close(h)
 		return nil, err
 	}
 
 	f, err := makeWin32File(h)
 	if err != nil {
-		syscall.Close(h)
+		windows.Close(h)
 		return nil, err
 	}
 
@@ -280,7 +266,7 @@ type acceptResponse struct {
 }
 
 type win32PipeListener struct {
-	firstHandle syscall.Handle
+	firstHandle windows.Handle
 	path        string
 	config      PipeConfig
 	acceptCh    chan (chan acceptResponse)
@@ -288,8 +274,8 @@ type win32PipeListener struct {
 	doneCh      chan int
 }
 
-func makeServerPipeHandle(path string, sd []byte, c *PipeConfig, first bool) (syscall.Handle, error) {
-	path16, err := syscall.UTF16FromString(path)
+func makeServerPipeHandle(path string, sd *windows.SECURITY_DESCRIPTOR, c *PipeConfig, first bool) (windows.Handle, error) {
+	path16, err := windows.UTF16FromString(path)
 	if err != nil {
 		return 0, &os.PathError{Op: "open", Path: path, Err: err}
 	}
@@ -301,31 +287,32 @@ func makeServerPipeHandle(path string, sd []byte, c *PipeConfig, first bool) (sy
 	if err := rtlDosPathNameToNtPathName(&path16[0], &ntPath, 0, 0).Err(); err != nil {
 		return 0, &os.PathError{Op: "open", Path: path, Err: err}
 	}
-	defer localFree(ntPath.Buffer)
+	defer windows.LocalFree(windows.Handle(ntPath.Buffer))
 	oa.ObjectName = &ntPath
 
 	// The security descriptor is only needed for the first pipe.
 	if first {
 		if sd != nil {
-			len := uint32(len(sd))
-			sdb := localAlloc(0, len)
-			defer localFree(sdb)
-			copy((*[0xffff]byte)(unsafe.Pointer(sdb))[:], sd)
-			oa.SecurityDescriptor = (*securityDescriptor)(unsafe.Pointer(sdb))
+			oa.SecurityDescriptor = sd
 		} else {
 			// Construct the default named pipe security descriptor.
 			var dacl uintptr
 			if err := rtlDefaultNpAcl(&dacl).Err(); err != nil {
 				return 0, fmt.Errorf("getting default named pipe ACL: %s", err)
 			}
-			defer localFree(dacl)
-
-			sdb := &securityDescriptor{
-				Revision: 1,
-				Control:  cSE_DACL_PRESENT,
-				Dacl:     dacl,
+			defer windows.LocalFree(windows.Handle(dacl))
+			sd, err := windows.NewSecurityDescriptor()
+			if err != nil {
+				return 0, fmt.Errorf("creating new security descriptor: %s", err)
 			}
-			oa.SecurityDescriptor = sdb
+			if err = sd.SetDACL((*windows.ACL)(unsafe.Pointer(dacl)), true, false); err != nil {
+				return 0, fmt.Errorf("assigning dacl: %s", err)
+			}
+			sd, err = sd.ToSelfRelative()
+			if err != nil {
+				return 0, fmt.Errorf("converting to self-relative: %s", err)
+			}
+			oa.SecurityDescriptor = sd
 		}
 	}
 
@@ -335,22 +322,22 @@ func makeServerPipeHandle(path string, sd []byte, c *PipeConfig, first bool) (sy
 	}
 
 	disposition := uint32(cFILE_OPEN)
-	access := uint32(syscall.GENERIC_READ | syscall.GENERIC_WRITE | syscall.SYNCHRONIZE)
+	access := uint32(windows.GENERIC_READ | windows.GENERIC_WRITE | windows.SYNCHRONIZE)
 	if first {
 		disposition = cFILE_CREATE
 		// By not asking for read or write access, the named pipe file system
 		// will put this pipe into an initially disconnected state, blocking
 		// client connections until the next call with first == false.
-		access = syscall.SYNCHRONIZE
+		access = windows.SYNCHRONIZE
 	}
 
 	timeout := int64(-50 * 10000) // 50ms
 
 	var (
-		h    syscall.Handle
+		h    windows.Handle
 		iosb ioStatusBlock
 	)
-	err = ntCreateNamedPipeFile(&h, access, &oa, &iosb, syscall.FILE_SHARE_READ|syscall.FILE_SHARE_WRITE, disposition, 0, typ, 0, 0, 0xffffffff, uint32(c.InputBufferSize), uint32(c.OutputBufferSize), &timeout).Err()
+	err = ntCreateNamedPipeFile(&h, access, &oa, &iosb, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE, disposition, 0, typ, 0, 0, 0xffffffff, uint32(c.InputBufferSize), uint32(c.OutputBufferSize), &timeout).Err()
 	if err != nil {
 		return 0, &os.PathError{Op: "open", Path: path, Err: err}
 	}
@@ -366,7 +353,7 @@ func (l *win32PipeListener) makeServerPipe() (*win32File, error) {
 	}
 	f, err := makeWin32File(h)
 	if err != nil {
-		syscall.Close(h)
+		windows.Close(h)
 		return nil, err
 	}
 	return f, nil
@@ -417,7 +404,7 @@ func (l *win32PipeListener) listenerRoutine() {
 				p, err = l.makeConnectedServerPipe()
 				// If the connection was immediately closed by the client, try
 				// again.
-				if err != cERROR_NO_DATA {
+				if err != windows.ERROR_NO_DATA {
 					break
 				}
 			}
@@ -425,7 +412,7 @@ func (l *win32PipeListener) listenerRoutine() {
 			closed = err == ErrPipeListenerClosed
 		}
 	}
-	syscall.Close(l.firstHandle)
+	windows.Close(l.firstHandle)
 	l.firstHandle = 0
 	// Notify Close() and Accept() callers that the handle has been closed.
 	close(l.doneCh)
@@ -433,8 +420,8 @@ func (l *win32PipeListener) listenerRoutine() {
 
 // PipeConfig contain configuration for the pipe listener.
 type PipeConfig struct {
-	// SecurityDescriptor contains a Windows security descriptor in SDDL format.
-	SecurityDescriptor string
+	// SecurityDescriptor contains a Windows security descriptor.
+	SecurityDescriptor *windows.SECURITY_DESCRIPTOR
 
 	// MessageMode determines whether the pipe is in byte or message mode. In either
 	// case the pipe is read in byte mode by default. The only practical difference in
@@ -454,20 +441,10 @@ type PipeConfig struct {
 // ListenPipe creates a listener on a Windows named pipe path, e.g. \\.\pipe\mypipe.
 // The pipe must not already exist.
 func ListenPipe(path string, c *PipeConfig) (net.Listener, error) {
-	var (
-		sd  []byte
-		err error
-	)
 	if c == nil {
 		c = &PipeConfig{}
 	}
-	if c.SecurityDescriptor != "" {
-		sd, err = SddlToSecurityDescriptor(c.SecurityDescriptor)
-		if err != nil {
-			return nil, err
-		}
-	}
-	h, err := makeServerPipeHandle(path, sd, c, true)
+	h, err := makeServerPipeHandle(path, c.SecurityDescriptor, c, true)
 	if err != nil {
 		return nil, err
 	}
@@ -492,7 +469,7 @@ func connectPipe(p *win32File) error {
 
 	err = connectNamedPipe(p.handle, &c.o)
 	_, err = p.asyncIo(c, nil, 0, err)
-	if err != nil && err != cERROR_PIPE_CONNECTED {
+	if err != nil && err != windows.ERROR_PIPE_CONNECTED {
 		return err
 	}
 	return nil

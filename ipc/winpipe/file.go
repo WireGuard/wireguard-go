@@ -13,15 +13,16 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
+
+	"golang.org/x/sys/windows"
 )
 
-//sys cancelIoEx(file syscall.Handle, o *syscall.Overlapped) (err error) = CancelIoEx
-//sys createIoCompletionPort(file syscall.Handle, port syscall.Handle, key uintptr, threadCount uint32) (newport syscall.Handle, err error) = CreateIoCompletionPort
-//sys getQueuedCompletionStatus(port syscall.Handle, bytes *uint32, key *uintptr, o **ioOperation, timeout uint32) (err error) = GetQueuedCompletionStatus
-//sys setFileCompletionNotificationModes(h syscall.Handle, flags uint8) (err error) = SetFileCompletionNotificationModes
-//sys wsaGetOverlappedResult(h syscall.Handle, o *syscall.Overlapped, bytes *uint32, wait bool, flags *uint32) (err error) = ws2_32.WSAGetOverlappedResult
+//sys cancelIoEx(file windows.Handle, o *windows.Overlapped) (err error) = CancelIoEx
+//sys createIoCompletionPort(file windows.Handle, port windows.Handle, key uintptr, threadCount uint32) (newport windows.Handle, err error) = CreateIoCompletionPort
+//sys getQueuedCompletionStatus(port windows.Handle, bytes *uint32, key *uintptr, o **ioOperation, timeout uint32) (err error) = GetQueuedCompletionStatus
+//sys setFileCompletionNotificationModes(h windows.Handle, flags uint8) (err error) = SetFileCompletionNotificationModes
+//sys wsaGetOverlappedResult(h windows.Handle, o *windows.Overlapped, bytes *uint32, wait bool, flags *uint32) (err error) = ws2_32.WSAGetOverlappedResult
 
 type atomicBool int32
 
@@ -55,7 +56,7 @@ func (e *timeoutError) Temporary() bool { return true }
 type timeoutChan chan struct{}
 
 var ioInitOnce sync.Once
-var ioCompletionPort syscall.Handle
+var ioCompletionPort windows.Handle
 
 // ioResult contains the result of an asynchronous IO operation
 type ioResult struct {
@@ -65,12 +66,12 @@ type ioResult struct {
 
 // ioOperation represents an outstanding asynchronous Win32 IO
 type ioOperation struct {
-	o  syscall.Overlapped
+	o  windows.Overlapped
 	ch chan ioResult
 }
 
 func initIo() {
-	h, err := createIoCompletionPort(syscall.InvalidHandle, 0, 0, 0xffffffff)
+	h, err := createIoCompletionPort(windows.InvalidHandle, 0, 0, 0xffffffff)
 	if err != nil {
 		panic(err)
 	}
@@ -81,7 +82,7 @@ func initIo() {
 // win32File implements Reader, Writer, and Closer on a Win32 handle without blocking in a syscall.
 // It takes ownership of this handle and will close it if it is garbage collected.
 type win32File struct {
-	handle        syscall.Handle
+	handle        windows.Handle
 	wg            sync.WaitGroup
 	wgLock        sync.RWMutex
 	closing       atomicBool
@@ -99,7 +100,7 @@ type deadlineHandler struct {
 }
 
 // makeWin32File makes a new win32File from an existing file handle
-func makeWin32File(h syscall.Handle) (*win32File, error) {
+func makeWin32File(h windows.Handle) (*win32File, error) {
 	f := &win32File{handle: h}
 	ioInitOnce.Do(initIo)
 	_, err := createIoCompletionPort(h, ioCompletionPort, 0, 0xffffffff)
@@ -115,7 +116,7 @@ func makeWin32File(h syscall.Handle) (*win32File, error) {
 	return f, nil
 }
 
-func MakeOpenFile(h syscall.Handle) (io.ReadWriteCloser, error) {
+func MakeOpenFile(h windows.Handle) (io.ReadWriteCloser, error) {
 	return makeWin32File(h)
 }
 
@@ -129,7 +130,7 @@ func (f *win32File) closeHandle() {
 		cancelIoEx(f.handle, nil)
 		f.wg.Wait()
 		// at this point, no new IO can start
-		syscall.Close(f.handle)
+		windows.Close(f.handle)
 		f.handle = 0
 	} else {
 		f.wgLock.Unlock()
@@ -158,12 +159,12 @@ func (f *win32File) prepareIo() (*ioOperation, error) {
 }
 
 // ioCompletionProcessor processes completed async IOs forever
-func ioCompletionProcessor(h syscall.Handle) {
+func ioCompletionProcessor(h windows.Handle) {
 	for {
 		var bytes uint32
 		var key uintptr
 		var op *ioOperation
-		err := getQueuedCompletionStatus(h, &bytes, &key, &op, syscall.INFINITE)
+		err := getQueuedCompletionStatus(h, &bytes, &key, &op, windows.INFINITE)
 		if op == nil {
 			panic(err)
 		}
@@ -174,7 +175,7 @@ func ioCompletionProcessor(h syscall.Handle) {
 // asyncIo processes the return value from ReadFile or WriteFile, blocking until
 // the operation has actually completed.
 func (f *win32File) asyncIo(c *ioOperation, d *deadlineHandler, bytes uint32, err error) (int, error) {
-	if err != syscall.ERROR_IO_PENDING {
+	if err != windows.ERROR_IO_PENDING {
 		return int(bytes), err
 	}
 
@@ -193,7 +194,7 @@ func (f *win32File) asyncIo(c *ioOperation, d *deadlineHandler, bytes uint32, er
 	select {
 	case r = <-c.ch:
 		err = r.err
-		if err == syscall.ERROR_OPERATION_ABORTED {
+		if err == windows.ERROR_OPERATION_ABORTED {
 			if f.closing.isSet() {
 				err = ErrFileClosed
 			}
@@ -206,7 +207,7 @@ func (f *win32File) asyncIo(c *ioOperation, d *deadlineHandler, bytes uint32, er
 		cancelIoEx(f.handle, &c.o)
 		r = <-c.ch
 		err = r.err
-		if err == syscall.ERROR_OPERATION_ABORTED {
+		if err == windows.ERROR_OPERATION_ABORTED {
 			err = ErrTimeout
 		}
 	}
@@ -231,14 +232,14 @@ func (f *win32File) Read(b []byte) (int, error) {
 	}
 
 	var bytes uint32
-	err = syscall.ReadFile(f.handle, b, &bytes, &c.o)
+	err = windows.ReadFile(f.handle, b, &bytes, &c.o)
 	n, err := f.asyncIo(c, &f.readDeadline, bytes, err)
 	runtime.KeepAlive(b)
 
 	// Handle EOF conditions.
 	if err == nil && n == 0 && len(b) != 0 {
 		return 0, io.EOF
-	} else if err == syscall.ERROR_BROKEN_PIPE {
+	} else if err == windows.ERROR_BROKEN_PIPE {
 		return 0, io.EOF
 	} else {
 		return n, err
@@ -258,7 +259,7 @@ func (f *win32File) Write(b []byte) (int, error) {
 	}
 
 	var bytes uint32
-	err = syscall.WriteFile(f.handle, b, &bytes, &c.o)
+	err = windows.WriteFile(f.handle, b, &bytes, &c.o)
 	n, err := f.asyncIo(c, &f.writeDeadline, bytes, err)
 	runtime.KeepAlive(b)
 	return n, err
@@ -273,7 +274,7 @@ func (f *win32File) SetWriteDeadline(deadline time.Time) error {
 }
 
 func (f *win32File) Flush() error {
-	return syscall.FlushFileBuffers(f.handle)
+	return windows.FlushFileBuffers(f.handle)
 }
 
 func (f *win32File) Fd() uintptr {

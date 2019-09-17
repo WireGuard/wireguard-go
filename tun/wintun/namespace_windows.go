@@ -16,7 +16,6 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/text/unicode/norm"
 
-	"golang.zx2c4.com/wireguard/ipc/winpipe"
 	"golang.zx2c4.com/wireguard/tun/wintun/namespaceapi"
 )
 
@@ -32,13 +31,13 @@ func initializeNamespace() error {
 	if hasInitializedNamespace {
 		return nil
 	}
-	sd, err := winpipe.SddlToSecurityDescriptor("O:SYD:P(A;;GA;;;SY)")
+	sd, err := windows.SecurityDescriptorFromString("O:SYD:P(A;;GA;;;SY)")
 	if err != nil {
 		return fmt.Errorf("SddlToSecurityDescriptor failed: %v", err)
 	}
 	wintunObjectSecurityAttributes = &windows.SecurityAttributes{
 		Length:             uint32(unsafe.Sizeof(windows.SecurityAttributes{})),
-		SecurityDescriptor: uintptr(unsafe.Pointer(&sd[0])),
+		SecurityDescriptor: uintptr(unsafe.Pointer(sd)),
 	}
 	sid, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
 	if err != nil {
