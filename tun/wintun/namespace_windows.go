@@ -37,7 +37,7 @@ func initializeNamespace() error {
 	}
 	wintunObjectSecurityAttributes = &windows.SecurityAttributes{
 		Length:             uint32(unsafe.Sizeof(windows.SecurityAttributes{})),
-		SecurityDescriptor: uintptr(unsafe.Pointer(sd)),
+		SecurityDescriptor: sd,
 	}
 	sid, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
 	if err != nil {
