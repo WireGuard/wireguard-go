@@ -113,6 +113,7 @@ func (device *Device) IpcSetOperation(socket *bufio.Reader) *IPCError {
 	var peer *Peer
 
 	dummy := false
+	createdNewPeer := false
 	deviceConfig := true
 
 	for scanner.Scan() {
@@ -237,7 +238,8 @@ func (device *Device) IpcSetOperation(socket *bufio.Reader) *IPCError {
 					peer = device.LookupPeer(publicKey)
 				}
 
-				if peer == nil {
+				createdNewPeer = peer == nil
+				if createdNewPeer {
 					peer, err = device.NewPeer(publicKey)
 					if err != nil {
 						logError.Println("Failed to create new peer:", err)
@@ -249,6 +251,20 @@ func (device *Device) IpcSetOperation(socket *bufio.Reader) *IPCError {
 					} else {
 						logDebug.Println(peer, "- UAPI: Created")
 					}
+				}
+
+			case "update_only":
+
+				// allow disabling of creation
+
+				if value != "true" {
+					logError.Println("Failed to set update only, invalid value:", value)
+					return &IPCError{ipc.IpcErrorInvalid}
+				}
+				if createdNewPeer && !dummy {
+					device.RemovePeer(peer.handshake.remoteStatic)
+					peer = &Peer{}
+					dummy = true
 				}
 
 			case "remove":
