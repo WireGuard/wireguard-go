@@ -10,7 +10,7 @@ MAKEFLAGS += --no-print-directory
 generate-version-and-build:
 	@export GIT_CEILING_DIRECTORIES="$(realpath $(CURDIR)/..)" && \
 	tag="$$(git describe --dirty 2>/dev/null)" && \
-	ver="$$(printf 'package device\nconst WireGuardGoVersion = "%s"\n' "$$tag")" && \
+	ver="$$(printf 'package device\nconst WireGuardGoVersion = "%s"\n' "$${tag#v}")" && \
 	[ "$$(cat device/version.go 2>/dev/null)" != "$$ver" ] && \
 	echo "$$ver" > device/version.go && \
 	git update-index --assume-unchanged device/version.go || true
