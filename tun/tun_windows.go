@@ -244,6 +244,11 @@ func (tun *NativeTun) LUID() uint64 {
 	return tun.wt.LUID()
 }
 
+// Version returns the version of the Wintun driver and NDIS system currently loaded.
+func (tun *NativeTun) Version() (driverVersion string, ndisVersion string, err error) {
+	return tun.wt.Version()
+}
+
 func (rate *rateJuggler) update(packetLen uint64) {
 	now := nanotime()
 	total := atomic.AddUint64(&rate.nextByteCount, packetLen)

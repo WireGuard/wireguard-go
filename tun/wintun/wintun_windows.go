@@ -671,9 +671,37 @@ func (wintun *Interface) tcpipAdapterRegKeyName() string {
 	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Adapters\\%v", wintun.cfgInstanceID)
 }
 
-// deviceRegKeyName returns the device-level registry key name
+// deviceRegKeyName returns the device-level registry key name.
 func (wintun *Interface) deviceRegKeyName() string {
 	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%v", wintun.devInstanceID)
+}
+
+// Version returns the version of the Wintun driver and NDIS system currently loaded.
+func (wintun *Interface) Version() (driverVersion string, ndisVersion string, err error) {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Services\\Wintun", registry.QUERY_VALUE)
+	if err != nil {
+		return
+	}
+	defer key.Close()
+	driverMajor, _, err := key.GetIntegerValue("DriverMajorVersion")
+	if err != nil {
+		return
+	}
+	driverMinor, _, err := key.GetIntegerValue("DriverMinorVersion")
+	if err != nil {
+		return
+	}
+	ndisMajor, _, err := key.GetIntegerValue("NdisMajorVersion")
+	if err != nil {
+		return
+	}
+	ndisMinor, _, err := key.GetIntegerValue("NdisMinorVersion")
+	if err != nil {
+		return
+	}
+	driverVersion = fmt.Sprintf("%d.%d", driverMajor, driverMinor)
+	ndisVersion = fmt.Sprintf("%d.%d", ndisMajor, ndisMinor)
+	return
 }
 
 // tcpipInterfaceRegKeyName returns the interface-specific TCP/IP network registry key name.
