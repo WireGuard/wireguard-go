@@ -17,6 +17,7 @@ import (
 	"golang.zx2c4.com/wireguard/ratelimiter"
 	"golang.zx2c4.com/wireguard/rwcancel"
 	"golang.zx2c4.com/wireguard/tun"
+	"golang.zx2c4.com/wireguard/wgcfg"
 )
 
 type Device struct {
@@ -60,6 +61,8 @@ type Device struct {
 	allowedips    AllowedIPs
 	indexTable    IndexTable
 	cookieChecker CookieChecker
+
+	unexpectedip func(key *wgcfg.Key, ip wgcfg.IP)
 
 	rate struct {
 		underLoadUntil atomic.Value
@@ -253,13 +256,30 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 	return nil
 }
 
-func NewDevice(tunDevice tun.Device, logger *Logger) *Device {
+type DeviceOptions struct {
+	// UnexpectedIP is called when a packet is received from a
+	// validated peer with an unexpected internal IP address.
+	// The packet is then dropped.
+	UnexpectedIP func(key *wgcfg.Key, ip wgcfg.IP)
+}
+
+// TODO move logger into DeviceOptions
+// TODO make opts non-vararg
+func NewDevice(tunDevice tun.Device, logger *Logger, opts ...DeviceOptions) *Device {
 	device := new(Device)
 
 	device.isUp.Set(false)
 	device.isClosed.Set(false)
 
 	device.log = logger
+
+	if len(opts) != 0 && opts[0].UnexpectedIP != nil {
+		device.unexpectedip = opts[0].UnexpectedIP
+	} else {
+		device.unexpectedip = func(key *wgcfg.Key, ip wgcfg.IP) {
+			device.log.Info.Printf("IPv4 packet with disallowed source address %s from %v", ip, key)
+		}
+	}
 
 	device.tun.device = tunDevice
 	mtu, err := device.tun.device.MTU()

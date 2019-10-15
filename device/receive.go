@@ -18,6 +18,7 @@ import (
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
 	"golang.zx2c4.com/wireguard/conn"
+	"golang.zx2c4.com/wireguard/wgcfg"
 )
 
 type QueueHandshakeElement struct {
@@ -591,10 +592,9 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 			src := elem.packet[IPv4offsetSrc : IPv4offsetSrc+net.IPv4len]
 			if device.allowedips.LookupIPv4(src) != peer {
-				logInfo.Println(
-					"IPv4 packet with disallowed source address from",
-					peer,
-				)
+				ip := wgcfg.IPv4(src[0], src[1], src[2], src[3])
+				key := (*wgcfg.Key)(&peer.handshake.remoteStatic)
+				device.unexpectedip(key, ip)
 				continue
 			}
 
@@ -619,10 +619,9 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 			src := elem.packet[IPv6offsetSrc : IPv6offsetSrc+net.IPv6len]
 			if device.allowedips.LookupIPv6(src) != peer {
-				logInfo.Println(
-					"IPv6 packet with disallowed source address from",
-					peer,
-				)
+				ip := wgcfg.IPv4(src[0], src[1], src[2], src[3])
+				key := (*wgcfg.Key)(&peer.handshake.remoteStatic)
+				device.unexpectedip(key, ip)
 				continue
 			}
 
