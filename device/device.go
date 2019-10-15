@@ -24,6 +24,7 @@ type Device struct {
 	isUp           AtomicBool // device is (going) up
 	isClosed       AtomicBool // device is closed? (acting as guard)
 	log            *Logger
+	handshakeDone  func()
 	skipBindUpdate bool
 	createBind     func(uport uint16) (conn.Bind, uint16, error)
 	createEndpoint func(key [32]byte, s string) (conn.Endpoint, error)
@@ -277,6 +278,13 @@ type DeviceOptions struct {
 	//
 	// TODO(crawshaw): remove this, it isn't useful externally.
 	SkipBindUpdate bool
+
+	// HandshakeDone is called every time we complete a peer handshake.
+	//
+	// TODO(crawshaw): This isn't quite right. Library users don't care
+	//                 about the handshake, per se, they want link status.
+	//                 Evolve this in that direction.
+	HandshakeDone func()
 }
 
 // TODO move logger into DeviceOptions
@@ -320,6 +328,7 @@ func NewDevice(tunDevice tun.Device, logger *Logger, varOpts ...DeviceOptions) *
 		}
 	}
 	device.skipBindUpdate = opts.SkipBindUpdate
+	device.handshakeDone = opts.HandshakeDone
 
 	device.tun.device = tunDevice
 	mtu, err := device.tun.device.MTU()
