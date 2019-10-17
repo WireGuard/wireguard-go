@@ -40,9 +40,9 @@ const (
 )
 
 // makeWintun creates a Wintun interface handle and populates it from the device's registry key.
-func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData, pool Pool) (*Interface, error) {
+func makeWintun(devInfo setupapi.DevInfo, devInfoData *setupapi.DevInfoData, pool Pool) (*Interface, error) {
 	// Open HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\<class>\<id> registry key.
-	key, err := deviceInfoSet.OpenDevRegKey(deviceInfoData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.QUERY_VALUE)
+	key, err := devInfo.OpenDevRegKey(devInfoData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.QUERY_VALUE)
 	if err != nil {
 		return nil, fmt.Errorf("Device-specific registry key open failed: %v", err)
 	}
@@ -72,7 +72,7 @@ func makeWintun(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfo
 		return nil, fmt.Errorf("RegQueryValue(\"*IfType\") failed: %v", err)
 	}
 
-	instanceID, err := deviceInfoSet.DeviceInstanceID(deviceInfoData)
+	instanceID, err := devInfo.DeviceInstanceID(devInfoData)
 	if err != nil {
 		return nil, fmt.Errorf("DeviceInstanceID failed: %v", err)
 	}
@@ -109,11 +109,11 @@ func (pool Pool) GetInterface(ifname string) (*Interface, error) {
 	}()
 
 	// Create a list of network devices.
-	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
+	devInfo, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
 	if err != nil {
 		return nil, fmt.Errorf("SetupDiGetClassDevsEx(%v) failed: %v", deviceClassNetGUID, err)
 	}
-	defer devInfoList.Close()
+	defer devInfo.Close()
 
 	// Windows requires each interface to have a different name. When
 	// enforcing this, Windows treats interface names case-insensitive. If an
@@ -123,7 +123,7 @@ func (pool Pool) GetInterface(ifname string) (*Interface, error) {
 	ifname = strings.ToLower(ifname)
 
 	for index := 0; ; index++ {
-		deviceData, err := devInfoList.EnumDeviceInfo(index)
+		devInfoData, err := devInfo.EnumDeviceInfo(index)
 		if err != nil {
 			if err == windows.ERROR_NO_MORE_ITEMS {
 				break
@@ -132,7 +132,7 @@ func (pool Pool) GetInterface(ifname string) (*Interface, error) {
 		}
 
 		// Check the Hardware ID to make sure it's a real Wintun device first. This avoids doing slow operations on non-Wintun devices.
-		property, err := devInfoList.DeviceRegistryProperty(deviceData, setupapi.SPDRP_HARDWAREID)
+		property, err := devInfo.DeviceRegistryProperty(devInfoData, setupapi.SPDRP_HARDWAREID)
 		if err != nil {
 			continue
 		}
@@ -140,7 +140,7 @@ func (pool Pool) GetInterface(ifname string) (*Interface, error) {
 			continue
 		}
 
-		wintun, err := makeWintun(devInfoList, deviceData, pool)
+		wintun, err := makeWintun(devInfo, devInfoData, pool)
 		if err != nil {
 			continue
 		}
@@ -154,14 +154,14 @@ func (pool Pool) GetInterface(ifname string) (*Interface, error) {
 		ifname3 := removeNumberedSuffix(ifname2)
 
 		if ifname == ifname2 || ifname == ifname3 {
-			err = devInfoList.BuildDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER)
+			err = devInfo.BuildDriverInfoList(devInfoData, setupapi.SPDIT_COMPATDRIVER)
 			if err != nil {
 				return nil, fmt.Errorf("SetupDiBuildDriverInfoList failed: %v", err)
 			}
-			defer devInfoList.DestroyDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER)
+			defer devInfo.DestroyDriverInfoList(devInfoData, setupapi.SPDIT_COMPATDRIVER)
 
 			for index := 0; ; index++ {
-				driverData, err := devInfoList.EnumDriverInfo(deviceData, setupapi.SPDIT_COMPATDRIVER, index)
+				driverData, err := devInfo.EnumDriverInfo(devInfoData, setupapi.SPDIT_COMPATDRIVER, index)
 				if err != nil {
 					if err == windows.ERROR_NO_MORE_ITEMS {
 						break
@@ -170,13 +170,13 @@ func (pool Pool) GetInterface(ifname string) (*Interface, error) {
 				}
 
 				// Get driver info details.
-				driverDetailData, err := devInfoList.DriverInfoDetail(deviceData, driverData)
+				driverDetailData, err := devInfo.DriverInfoDetail(devInfoData, driverData)
 				if err != nil {
 					continue
 				}
 
 				if driverDetailData.IsCompatible(hardwareID) {
-					isMember, err := pool.isMember(devInfoList, deviceData)
+					isMember, err := pool.isMember(devInfo, devInfoData)
 					if err != nil {
 						return nil, err
 					}
@@ -215,12 +215,12 @@ func (pool Pool) CreateInterface(ifname string, requestedGUID *windows.GUID) (wi
 	}()
 
 	// Create an empty device info set for network adapter device class.
-	devInfoList, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, "")
+	devInfo, err := setupapi.SetupDiCreateDeviceInfoListEx(&deviceClassNetGUID, 0, "")
 	if err != nil {
 		err = fmt.Errorf("SetupDiCreateDeviceInfoListEx(%v) failed: %v", deviceClassNetGUID, err)
 		return
 	}
-	defer devInfoList.Close()
+	defer devInfo.Close()
 
 	// Get the device class name from GUID.
 	className, err := setupapi.SetupDiClassNameFromGuidEx(&deviceClassNetGUID, "")
@@ -231,43 +231,43 @@ func (pool Pool) CreateInterface(ifname string, requestedGUID *windows.GUID) (wi
 
 	// Create a new device info element and add it to the device info set.
 	deviceTypeName := pool.deviceTypeName()
-	deviceData, err := devInfoList.CreateDeviceInfo(className, &deviceClassNetGUID, deviceTypeName, 0, setupapi.DICD_GENERATE_ID)
+	devInfoData, err := devInfo.CreateDeviceInfo(className, &deviceClassNetGUID, deviceTypeName, 0, setupapi.DICD_GENERATE_ID)
 	if err != nil {
 		err = fmt.Errorf("SetupDiCreateDeviceInfo failed: %v", err)
 		return
 	}
 
-	err = setQuietInstall(devInfoList, deviceData)
+	err = setQuietInstall(devInfo, devInfoData)
 	if err != nil {
 		err = fmt.Errorf("Setting quiet installation failed: %v", err)
 		return
 	}
 
 	// Set a device information element as the selected member of a device information set.
-	err = devInfoList.SetSelectedDevice(deviceData)
+	err = devInfo.SetSelectedDevice(devInfoData)
 	if err != nil {
 		err = fmt.Errorf("SetupDiSetSelectedDevice failed: %v", err)
 		return
 	}
 
 	// Set Plug&Play device hardware ID property.
-	err = devInfoList.SetDeviceRegistryPropertyString(deviceData, setupapi.SPDRP_HARDWAREID, hardwareID)
+	err = devInfo.SetDeviceRegistryPropertyString(devInfoData, setupapi.SPDRP_HARDWAREID, hardwareID)
 	if err != nil {
 		err = fmt.Errorf("SetupDiSetDeviceRegistryProperty(SPDRP_HARDWAREID) failed: %v", err)
 		return
 	}
 
-	err = devInfoList.BuildDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER) // TODO: This takes ~510ms
+	err = devInfo.BuildDriverInfoList(devInfoData, setupapi.SPDIT_COMPATDRIVER) // TODO: This takes ~510ms
 	if err != nil {
 		err = fmt.Errorf("SetupDiBuildDriverInfoList failed: %v", err)
 		return
 	}
-	defer devInfoList.DestroyDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER)
+	defer devInfo.DestroyDriverInfoList(devInfoData, setupapi.SPDIT_COMPATDRIVER)
 
 	driverDate := windows.Filetime{}
 	driverVersion := uint64(0)
 	for index := 0; ; index++ { // TODO: This loop takes ~600ms
-		driverData, err := devInfoList.EnumDriverInfo(deviceData, setupapi.SPDIT_COMPATDRIVER, index)
+		driverData, err := devInfo.EnumDriverInfo(devInfoData, setupapi.SPDIT_COMPATDRIVER, index)
 		if err != nil {
 			if err == windows.ERROR_NO_MORE_ITEMS {
 				break
@@ -277,13 +277,13 @@ func (pool Pool) CreateInterface(ifname string, requestedGUID *windows.GUID) (wi
 
 		// Check the driver version first, since the check is trivial and will save us iterating over hardware IDs for any driver versioned prior our best match.
 		if driverData.IsNewer(driverDate, driverVersion) {
-			driverDetailData, err := devInfoList.DriverInfoDetail(deviceData, driverData)
+			driverDetailData, err := devInfo.DriverInfoDetail(devInfoData, driverData)
 			if err != nil {
 				continue
 			}
 
 			if driverDetailData.IsCompatible(hardwareID) {
-				err := devInfoList.SetSelectedDriver(deviceData, driverData)
+				err := devInfo.SetSelectedDriver(devInfoData, driverData)
 				if err != nil {
 					continue
 				}
@@ -308,10 +308,10 @@ func (pool Pool) CreateInterface(ifname string, requestedGUID *windows.GUID) (wi
 			}
 
 			// Set class installer parameters for DIF_REMOVE.
-			if devInfoList.SetClassInstallParams(deviceData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams))) == nil {
+			if devInfo.SetClassInstallParams(devInfoData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams))) == nil {
 				// Call appropriate class installer.
-				if devInfoList.CallClassInstaller(setupapi.DIF_REMOVE, deviceData) == nil {
-					rebootRequired = rebootRequired || checkReboot(devInfoList, deviceData)
+				if devInfo.CallClassInstaller(setupapi.DIF_REMOVE, devInfoData) == nil {
+					rebootRequired = rebootRequired || checkReboot(devInfo, devInfoData)
 				}
 			}
 
@@ -320,14 +320,14 @@ func (pool Pool) CreateInterface(ifname string, requestedGUID *windows.GUID) (wi
 	}()
 
 	// Call appropriate class installer.
-	err = devInfoList.CallClassInstaller(setupapi.DIF_REGISTERDEVICE, deviceData)
+	err = devInfo.CallClassInstaller(setupapi.DIF_REGISTERDEVICE, devInfoData)
 	if err != nil {
 		err = fmt.Errorf("SetupDiCallClassInstaller(DIF_REGISTERDEVICE) failed: %v", err)
 		return
 	}
 
 	// Register device co-installers if any. (Ignore errors)
-	devInfoList.CallClassInstaller(setupapi.DIF_REGISTER_COINSTALLERS, deviceData)
+	devInfo.CallClassInstaller(setupapi.DIF_REGISTER_COINSTALLERS, devInfoData)
 
 	var netDevRegKey registry.Key
 	const pollTimeout = time.Millisecond * 50
@@ -335,7 +335,7 @@ func (pool Pool) CreateInterface(ifname string, requestedGUID *windows.GUID) (wi
 		if i != 0 {
 			time.Sleep(pollTimeout)
 		}
-		netDevRegKey, err = devInfoList.OpenDevRegKey(deviceData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.SET_VALUE|registry.QUERY_VALUE|registry.NOTIFY)
+		netDevRegKey, err = devInfo.OpenDevRegKey(devInfoData, setupapi.DICS_FLAG_GLOBAL, 0, setupapi.DIREG_DRV, registry.SET_VALUE|registry.QUERY_VALUE|registry.NOTIFY)
 		if err == nil {
 			break
 		}
@@ -354,17 +354,17 @@ func (pool Pool) CreateInterface(ifname string, requestedGUID *windows.GUID) (wi
 	}
 
 	// Install interfaces if any. (Ignore errors)
-	devInfoList.CallClassInstaller(setupapi.DIF_INSTALLINTERFACES, deviceData)
+	devInfo.CallClassInstaller(setupapi.DIF_INSTALLINTERFACES, devInfoData)
 
 	// Install the device.
-	err = devInfoList.CallClassInstaller(setupapi.DIF_INSTALLDEVICE, deviceData)
+	err = devInfo.CallClassInstaller(setupapi.DIF_INSTALLDEVICE, devInfoData)
 	if err != nil {
 		err = fmt.Errorf("SetupDiCallClassInstaller(DIF_INSTALLDEVICE) failed: %v", err)
 		return
 	}
-	rebootRequired = checkReboot(devInfoList, deviceData)
+	rebootRequired = checkReboot(devInfo, devInfoData)
 
-	err = devInfoList.SetDeviceRegistryPropertyString(deviceData, setupapi.SPDRP_DEVICEDESC, deviceTypeName)
+	err = devInfo.SetDeviceRegistryPropertyString(devInfoData, setupapi.SPDRP_DEVICEDESC, deviceTypeName)
 	if err != nil {
 		err = fmt.Errorf("SetDeviceRegistryPropertyString(SPDRP_DEVICEDESC) failed: %v", err)
 		return
@@ -390,7 +390,7 @@ func (pool Pool) CreateInterface(ifname string, requestedGUID *windows.GUID) (wi
 	}
 
 	// Get network interface.
-	wintun, err = makeWintun(devInfoList, deviceData, pool)
+	wintun, err = makeWintun(devInfo, devInfoData, pool)
 	if err != nil {
 		err = fmt.Errorf("makeWintun failed: %v", err)
 		return
@@ -444,14 +444,14 @@ func (pool Pool) CreateInterface(ifname string, requestedGUID *windows.GUID) (wi
 // if the interface was not found. It returns a bool indicating whether
 // a reboot is required.
 func (wintun *Interface) DeleteInterface() (rebootRequired bool, err error) {
-	devInfoList, deviceData, err := wintun.deviceData()
+	devInfo, devInfoData, err := wintun.devInfoData()
 	if err == windows.ERROR_OBJECT_NOT_FOUND {
 		return false, nil
 	}
 	if err != nil {
 		return false, err
 	}
-	defer devInfoList.Close()
+	defer devInfo.Close()
 
 	// Remove the device.
 	removeDeviceParams := setupapi.RemoveDeviceParams{
@@ -460,18 +460,18 @@ func (wintun *Interface) DeleteInterface() (rebootRequired bool, err error) {
 	}
 
 	// Set class installer parameters for DIF_REMOVE.
-	err = devInfoList.SetClassInstallParams(deviceData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams)))
+	err = devInfo.SetClassInstallParams(devInfoData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams)))
 	if err != nil {
 		return false, fmt.Errorf("SetupDiSetClassInstallParams failed: %v", err)
 	}
 
 	// Call appropriate class installer.
-	err = devInfoList.CallClassInstaller(setupapi.DIF_REMOVE, deviceData)
+	err = devInfo.CallClassInstaller(setupapi.DIF_REMOVE, devInfoData)
 	if err != nil {
 		return false, fmt.Errorf("SetupDiCallClassInstaller failed: %v", err)
 	}
 
-	return checkReboot(devInfoList, deviceData), nil
+	return checkReboot(devInfo, devInfoData), nil
 }
 
 // DeleteMatchingInterfaces deletes all Wintun interfaces, which match
@@ -488,14 +488,14 @@ func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Interface) bool) 
 		windows.CloseHandle(mutex)
 	}()
 
-	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
+	devInfo, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
 	if err != nil {
 		return nil, false, []error{fmt.Errorf("SetupDiGetClassDevsEx(%v) failed: %v", deviceClassNetGUID, err.Error())}
 	}
-	defer devInfoList.Close()
+	defer devInfo.Close()
 
 	for i := 0; ; i++ {
-		deviceData, err := devInfoList.EnumDeviceInfo(i)
+		devInfoData, err := devInfo.EnumDeviceInfo(i)
 		if err != nil {
 			if err == windows.ERROR_NO_MORE_ITEMS {
 				break
@@ -504,7 +504,7 @@ func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Interface) bool) 
 		}
 
 		// Check the Hardware ID to make sure it's a real Wintun device first. This avoids doing slow operations on non-Wintun devices.
-		property, err := devInfoList.DeviceRegistryProperty(deviceData, setupapi.SPDRP_HARDWAREID)
+		property, err := devInfo.DeviceRegistryProperty(devInfoData, setupapi.SPDRP_HARDWAREID)
 		if err != nil {
 			continue
 		}
@@ -512,22 +512,22 @@ func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Interface) bool) 
 			continue
 		}
 
-		err = devInfoList.BuildDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER)
+		err = devInfo.BuildDriverInfoList(devInfoData, setupapi.SPDIT_COMPATDRIVER)
 		if err != nil {
 			continue
 		}
-		defer devInfoList.DestroyDriverInfoList(deviceData, setupapi.SPDIT_COMPATDRIVER)
+		defer devInfo.DestroyDriverInfoList(devInfoData, setupapi.SPDIT_COMPATDRIVER)
 
 		isWintun := false
 		for j := 0; ; j++ {
-			driverData, err := devInfoList.EnumDriverInfo(deviceData, setupapi.SPDIT_COMPATDRIVER, j)
+			driverData, err := devInfo.EnumDriverInfo(devInfoData, setupapi.SPDIT_COMPATDRIVER, j)
 			if err != nil {
 				if err == windows.ERROR_NO_MORE_ITEMS {
 					break
 				}
 				continue
 			}
-			driverDetailData, err := devInfoList.DriverInfoDetail(deviceData, driverData)
+			driverDetailData, err := devInfo.DriverInfoDetail(devInfoData, driverData)
 			if err != nil {
 				continue
 			}
@@ -540,7 +540,7 @@ func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Interface) bool) 
 			continue
 		}
 
-		isMember, err := pool.isMember(devInfoList, deviceData)
+		isMember, err := pool.isMember(devInfo, devInfoData)
 		if err != nil {
 			errors = append(errors, err)
 			continue
@@ -549,7 +549,7 @@ func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Interface) bool) 
 			continue
 		}
 
-		wintun, err := makeWintun(devInfoList, deviceData, pool)
+		wintun, err := makeWintun(devInfo, devInfoData, pool)
 		if err != nil {
 			errors = append(errors, fmt.Errorf("Unable to make Wintun interface object: %v", err))
 			continue
@@ -558,41 +558,41 @@ func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Interface) bool) 
 			continue
 		}
 
-		err = setQuietInstall(devInfoList, deviceData)
+		err = setQuietInstall(devInfo, devInfoData)
 		if err != nil {
 			errors = append(errors, err)
 			continue
 		}
 
-		inst := deviceData.DevInst
+		inst := devInfoData.DevInst
 		removeDeviceParams := setupapi.RemoveDeviceParams{
 			ClassInstallHeader: *setupapi.MakeClassInstallHeader(setupapi.DIF_REMOVE),
 			Scope:              setupapi.DI_REMOVEDEVICE_GLOBAL,
 		}
-		err = devInfoList.SetClassInstallParams(deviceData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams)))
+		err = devInfo.SetClassInstallParams(devInfoData, &removeDeviceParams.ClassInstallHeader, uint32(unsafe.Sizeof(removeDeviceParams)))
 		if err != nil {
 			errors = append(errors, err)
 			continue
 		}
-		err = devInfoList.CallClassInstaller(setupapi.DIF_REMOVE, deviceData)
+		err = devInfo.CallClassInstaller(setupapi.DIF_REMOVE, devInfoData)
 		if err != nil {
 			errors = append(errors, err)
 			continue
 		}
-		rebootRequired = rebootRequired || checkReboot(devInfoList, deviceData)
+		rebootRequired = rebootRequired || checkReboot(devInfo, devInfoData)
 		deviceInstancesDeleted = append(deviceInstancesDeleted, inst)
 	}
 	return
 }
 
 // isMember checks if SPDRP_DEVICEDESC or SPDRP_FRIENDLYNAME match device type name.
-func (pool Pool) isMember(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) (bool, error) {
-	deviceDescVal, err := deviceInfoSet.DeviceRegistryProperty(deviceInfoData, setupapi.SPDRP_DEVICEDESC)
+func (pool Pool) isMember(devInfo setupapi.DevInfo, devInfoData *setupapi.DevInfoData) (bool, error) {
+	deviceDescVal, err := devInfo.DeviceRegistryProperty(devInfoData, setupapi.SPDRP_DEVICEDESC)
 	if err != nil {
 		return false, fmt.Errorf("DeviceRegistryPropertyString(SPDRP_DEVICEDESC) failed: %v", err)
 	}
 	deviceDesc, _ := deviceDescVal.(string)
-	friendlyNameVal, err := deviceInfoSet.DeviceRegistryProperty(deviceInfoData, setupapi.SPDRP_FRIENDLYNAME)
+	friendlyNameVal, err := devInfo.DeviceRegistryProperty(devInfoData, setupapi.SPDRP_FRIENDLYNAME)
 	if err != nil {
 		return false, fmt.Errorf("DeviceRegistryPropertyString(SPDRP_FRIENDLYNAME) failed: %v", err)
 	}
@@ -603,8 +603,8 @@ func (pool Pool) isMember(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupa
 }
 
 // checkReboot checks device install parameters if a system reboot is required.
-func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) bool {
-	devInstallParams, err := deviceInfoSet.DeviceInstallParams(deviceInfoData)
+func checkReboot(devInfo setupapi.DevInfo, devInfoData *setupapi.DevInfoData) bool {
+	devInstallParams, err := devInfo.DeviceInstallParams(devInfoData)
 	if err != nil {
 		return false
 	}
@@ -613,14 +613,14 @@ func checkReboot(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInf
 }
 
 // setQuietInstall sets device install parameters for a quiet installation
-func setQuietInstall(deviceInfoSet setupapi.DevInfo, deviceInfoData *setupapi.DevInfoData) error {
-	devInstallParams, err := deviceInfoSet.DeviceInstallParams(deviceInfoData)
+func setQuietInstall(devInfo setupapi.DevInfo, devInfoData *setupapi.DevInfoData) error {
+	devInstallParams, err := devInfo.DeviceInstallParams(devInfoData)
 	if err != nil {
 		return err
 	}
 
 	devInstallParams.Flags |= setupapi.DI_QUIETINSTALL
-	return deviceInfoSet.SetDeviceInstallParams(deviceInfoData, devInstallParams)
+	return devInfo.SetDeviceInstallParams(devInfoData, devInstallParams)
 }
 
 // deviceTypeName returns pool-specific device type name.
@@ -739,18 +739,18 @@ func (wintun *Interface) tcpipInterfaceRegKeyName() (path string, err error) {
 	return fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\%s", paths[0]), nil
 }
 
-// deviceData returns TUN device info list handle and interface device info
+// devInfoData returns TUN device info list handle and interface device info
 // data. The device info list handle must be closed after use. In case the
 // device is not found, windows.ERROR_OBJECT_NOT_FOUND is returned.
-func (wintun *Interface) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, error) {
+func (wintun *Interface) devInfoData() (setupapi.DevInfo, *setupapi.DevInfoData, error) {
 	// Create a list of network devices.
-	devInfoList, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
+	devInfo, err := setupapi.SetupDiGetClassDevsEx(&deviceClassNetGUID, "", 0, setupapi.DIGCF_PRESENT, setupapi.DevInfo(0), "")
 	if err != nil {
 		return 0, nil, fmt.Errorf("SetupDiGetClassDevsEx(%v) failed: %v", deviceClassNetGUID, err.Error())
 	}
 
 	for index := 0; ; index++ {
-		deviceData, err := devInfoList.EnumDeviceInfo(index)
+		devInfoData, err := devInfo.EnumDeviceInfo(index)
 		if err != nil {
 			if err == windows.ERROR_NO_MORE_ITEMS {
 				break
@@ -760,22 +760,22 @@ func (wintun *Interface) deviceData() (setupapi.DevInfo, *setupapi.DevInfoData, 
 
 		// Get interface ID.
 		// TODO: Store some ID in the Wintun object such that this call isn't required.
-		wintun2, err := makeWintun(devInfoList, deviceData, wintun.pool)
+		wintun2, err := makeWintun(devInfo, devInfoData, wintun.pool)
 		if err != nil {
 			continue
 		}
 
 		if wintun.cfgInstanceID == wintun2.cfgInstanceID {
-			err = setQuietInstall(devInfoList, deviceData)
+			err = setQuietInstall(devInfo, devInfoData)
 			if err != nil {
-				devInfoList.Close()
+				devInfo.Close()
 				return 0, nil, fmt.Errorf("Setting quiet installation failed: %v", err)
 			}
-			return devInfoList, deviceData, nil
+			return devInfo, devInfoData, nil
 		}
 	}
 
-	devInfoList.Close()
+	devInfo.Close()
 	return 0, nil, windows.ERROR_OBJECT_NOT_FOUND
 }
 
