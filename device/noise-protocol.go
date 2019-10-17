@@ -315,8 +315,13 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	handshake.chainKey = chainKey
 	handshake.remoteIndex = msg.Sender
 	handshake.remoteEphemeral = msg.Ephemeral
-	handshake.lastTimestamp = timestamp
-	handshake.lastInitiationConsumption = time.Now()
+	if timestamp.After(handshake.lastTimestamp) {
+		handshake.lastTimestamp = timestamp
+	}
+	now := time.Now()
+	if now.After(handshake.lastInitiationConsumption) {
+		handshake.lastInitiationConsumption = now
+	}
 	handshake.state = HandshakeInitiationConsumed
 
 	handshake.mutex.Unlock()
