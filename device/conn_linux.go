@@ -145,7 +145,7 @@ func CreateBind(port uint16, device *Device) (*nativeBind, uint16, error) {
 
 	go bind.routineRouteListener(device)
 
-	// attempt ipv6 bind, update port if succesful
+	// attempt ipv6 bind, update port if successful
 
 	bind.sock6, newPort, err = create6(port)
 	if err != nil {
@@ -157,7 +157,7 @@ func CreateBind(port uint16, device *Device) (*nativeBind, uint16, error) {
 		port = newPort
 	}
 
-	// attempt ipv4 bind, update port if succesful
+	// attempt ipv4 bind, update port if successful
 
 	bind.sock4, newPort, err = create4(port)
 	if err != nil {
@@ -541,7 +541,7 @@ func send6(sock int, end *NativeEndpoint, buff []byte) error {
 
 func receive4(sock int, buff []byte, end *NativeEndpoint) (int, error) {
 
-	// contruct message header
+	// construct message header
 
 	var cmsg struct {
 		cmsghdr unix.Cmsghdr
@@ -573,7 +573,7 @@ func receive4(sock int, buff []byte, end *NativeEndpoint) (int, error) {
 
 func receive6(sock int, buff []byte, end *NativeEndpoint) (int, error) {
 
-	// contruct message header
+	// construct message header
 
 	var cmsg struct {
 		cmsghdr unix.Cmsghdr

@@ -36,7 +36,7 @@ func TestRatelimiter(t *testing.T) {
 	for i := 0; i < packetsBurstable; i++ {
 		Add(RatelimiterResult{
 			allowed: true,
-			text:    "inital burst",
+			text:    "initial burst",
 		})
 	}
 

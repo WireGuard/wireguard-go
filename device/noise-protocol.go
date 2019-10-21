@@ -39,13 +39,13 @@ const (
 )
 
 const (
-	MessageInitiationSize      = 148                                           // size of handshake initation message
+	MessageInitiationSize      = 148                                           // size of handshake initiation message
 	MessageResponseSize        = 92                                            // size of response message
 	MessageCookieReplySize     = 64                                            // size of cookie reply message
-	MessageTransportHeaderSize = 16                                            // size of data preceeding content in transport message
+	MessageTransportHeaderSize = 16                                            // size of data preceding content in transport message
 	MessageTransportSize       = MessageTransportHeaderSize + poly1305.TagSize // size of empty transport
 	MessageKeepaliveSize       = MessageTransportSize                          // size of keepalive
-	MessageHandshakeSize       = MessageInitiationSize                         // size of largest handshake releated message
+	MessageHandshakeSize       = MessageInitiationSize                         // size of largest handshake related message
 )
 
 const (
