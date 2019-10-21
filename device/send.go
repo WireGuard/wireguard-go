@@ -220,10 +220,7 @@ func (device *Device) SendHandshakeCookie(initiatingElem *QueueHandshakeElement)
 	writer := bytes.NewBuffer(buff[:0])
 	binary.Write(writer, binary.LittleEndian, reply)
 	device.net.bind.Send(writer.Bytes(), initiatingElem.endpoint)
-	if err != nil {
-		device.log.Error.Println("Failed to send cookie reply:", err)
-	}
-	return err
+	return nil
 }
 
 func (peer *Peer) keepKeyFreshSending() {
