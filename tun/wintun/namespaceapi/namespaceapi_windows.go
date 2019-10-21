@@ -40,7 +40,7 @@ func (bd *BoundaryDescriptor) AddSid(requiredSid *windows.SID) error {
 	return addSIDToBoundaryDescriptor((*windows.Handle)(bd), requiredSid)
 }
 
-// PrivateNamespace represents a private namespace. Duh?!
+// PrivateNamespace represents a private namespace.
 type PrivateNamespace windows.Handle
 
 // CreatePrivateNamespace creates a private namespace.
