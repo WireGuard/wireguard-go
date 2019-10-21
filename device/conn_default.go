@@ -21,8 +21,10 @@ import (
  */
 
 type nativeBind struct {
-	ipv4 *net.UDPConn
-	ipv6 *net.UDPConn
+	ipv4       *net.UDPConn
+	ipv6       *net.UDPConn
+	blackhole4 bool
+	blackhole6 bool
 }
 
 type NativeEndpoint net.UDPAddr
@@ -159,10 +161,16 @@ func (bind *nativeBind) Send(buff []byte, endpoint Endpoint) error {
 		if bind.ipv4 == nil {
 			return syscall.EAFNOSUPPORT
 		}
+		if bind.blackhole4 {
+			return nil
+		}
 		_, err = bind.ipv4.WriteToUDP(buff, (*net.UDPAddr)(nend))
 	} else {
 		if bind.ipv6 == nil {
 			return syscall.EAFNOSUPPORT
+		}
+		if bind.blackhole6 {
+			return nil
 		}
 		_, err = bind.ipv6.WriteToUDP(buff, (*net.UDPAddr)(nend))
 	}
