@@ -12,7 +12,7 @@ import (
 /* Specification constants */
 
 const (
-	RekeyAfterMessages      = (1 << 64) - (1 << 16) - 1
+	RekeyAfterMessages      = (1 << 60)
 	RejectAfterMessages     = (1 << 64) - (1 << 4) - 1
 	RekeyAfterTime          = time.Second * 120
 	RekeyAttemptTime        = time.Second * 90
