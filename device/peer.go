@@ -12,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.zx2c4.com/wireguard/conn"
 )
 
 const (
@@ -24,7 +26,7 @@ type Peer struct {
 	keypairs                    Keypairs
 	handshake                   Handshake
 	device                      *Device
-	endpoint                    Endpoint
+	endpoint                    conn.Endpoint
 	persistentKeepaliveInterval uint16
 
 	// This must be 64-bit aligned, so make sure the above members come out to even alignment and pad accordingly
@@ -291,7 +293,7 @@ func (peer *Peer) Stop() {
 
 var RoamingDisabled bool
 
-func (peer *Peer) SetEndpointFromPacket(endpoint Endpoint) {
+func (peer *Peer) SetEndpointFromPacket(endpoint conn.Endpoint) {
 	if RoamingDisabled {
 		return
 	}
