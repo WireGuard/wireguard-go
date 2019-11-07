@@ -5,7 +5,7 @@
  * Copyright (C) 2017-2019 WireGuard LLC. All Rights Reserved.
  */
 
-package device
+package conn
 
 import (
 	"net"
@@ -67,16 +67,13 @@ func (e *NativeEndpoint) SrcToString() string {
 }
 
 func listenNet(network string, port int) (*net.UDPConn, int, error) {
-
-	// listen
-
 	conn, err := net.ListenUDP(network, &net.UDPAddr{Port: port})
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// retrieve port
-
+	// Retrieve port.
+	// TODO(crawshaw): under what circumstances is this necessary?
 	laddr := conn.LocalAddr()
 	uaddr, err := net.ResolveUDPAddr(
 		laddr.Network(),
@@ -100,7 +97,7 @@ func extractErrno(err error) error {
 	return syscallErr.Err
 }
 
-func CreateBind(uport uint16, device *Device) (Bind, uint16, error) {
+func createBind(uport uint16) (Bind, uint16, error) {
 	var err error
 	var bind nativeBind
 
@@ -134,6 +131,8 @@ func (bind *nativeBind) Close() error {
 	}
 	return err2
 }
+
+func (bind *nativeBind) LastMark() uint32 { return 0 }
 
 func (bind *nativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
 	if bind.ipv4 == nil {

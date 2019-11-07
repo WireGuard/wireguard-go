@@ -17,12 +17,13 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
+	"golang.zx2c4.com/wireguard/conn"
 )
 
 type QueueHandshakeElement struct {
 	msgType  uint32
 	packet   []byte
-	endpoint Endpoint
+	endpoint conn.Endpoint
 	buffer   *[MaxMessageSize]byte
 }
 
@@ -33,7 +34,7 @@ type QueueInboundElement struct {
 	packet   []byte
 	counter  uint64
 	keypair  *Keypair
-	endpoint Endpoint
+	endpoint conn.Endpoint
 }
 
 func (elem *QueueInboundElement) Drop() {
@@ -90,7 +91,7 @@ func (peer *Peer) keepKeyFreshReceiving() {
  * Every time the bind is updated a new routine is started for
  * IPv4 and IPv6 (separately)
  */
-func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
+func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 
 	logDebug := device.log.Debug
 	defer func() {
@@ -108,7 +109,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind Bind) {
 	var (
 		err      error
 		size     int
-		endpoint Endpoint
+		endpoint conn.Endpoint
 	)
 
 	for {

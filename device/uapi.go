@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/ipc"
 )
 
@@ -306,7 +307,7 @@ func (device *Device) IpcSetOperation(socket *bufio.Reader) *IPCError {
 				err := func() error {
 					peer.Lock()
 					defer peer.Unlock()
-					endpoint, err := CreateEndpoint(value)
+					endpoint, err := conn.CreateEndpoint(value)
 					if err != nil {
 						return err
 					}
