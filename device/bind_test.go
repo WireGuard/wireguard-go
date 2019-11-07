@@ -5,11 +5,15 @@
 
 package device
 
-import "errors"
+import (
+	"errors"
+
+	"golang.zx2c4.com/wireguard/conn"
+)
 
 type DummyDatagram struct {
 	msg      []byte
-	endpoint Endpoint
+	endpoint conn.Endpoint
 	world    bool // better type
 }
 
@@ -25,7 +29,7 @@ func (b *DummyBind) SetMark(v uint32) error {
 	return nil
 }
 
-func (b *DummyBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
+func (b *DummyBind) ReceiveIPv6(buff []byte) (int, conn.Endpoint, error) {
 	datagram, ok := <-b.in6
 	if !ok {
 		return 0, nil, errors.New("closed")
@@ -34,7 +38,7 @@ func (b *DummyBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
 	return len(datagram.msg), datagram.endpoint, nil
 }
 
-func (b *DummyBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
+func (b *DummyBind) ReceiveIPv4(buff []byte) (int, conn.Endpoint, error) {
 	datagram, ok := <-b.in4
 	if !ok {
 		return 0, nil, errors.New("closed")
@@ -50,6 +54,6 @@ func (b *DummyBind) Close() error {
 	return nil
 }
 
-func (b *DummyBind) Send(buff []byte, end Endpoint) error {
+func (b *DummyBind) Send(buff []byte, end conn.Endpoint) error {
 	return nil
 }

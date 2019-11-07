@@ -5,7 +5,7 @@
  * Copyright (C) 2017-2019 WireGuard LLC. All Rights Reserved.
  */
 
-package device
+package conn
 
 import (
 	"runtime"
