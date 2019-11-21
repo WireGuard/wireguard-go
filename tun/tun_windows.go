@@ -35,11 +35,11 @@ type NativeTun struct {
 	wt        *wintun.Interface
 	handle    windows.Handle
 	close     bool
-	rings     wintun.RingDescriptor
 	events    chan Event
 	errors    chan error
 	forcedMTU int
 	rate      rateJuggler
+	rings     *wintun.RingDescriptor
 }
 
 const WintunPool = wintun.Pool("WireGuard")
@@ -93,13 +93,13 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu 
 		forcedMTU: forcedMTU,
 	}
 
-	err = tun.rings.Init()
+	tun.rings, err = wintun.NewRingDescriptor()
 	if err != nil {
 		tun.Close()
 		return nil, fmt.Errorf("Error creating events: %v", err)
 	}
 
-	tun.handle, err = tun.wt.Register(&tun.rings)
+	tun.handle, err = tun.wt.Register(tun.rings)
 	if err != nil {
 		tun.Close()
 		return nil, fmt.Errorf("Error registering rings: %v", err)

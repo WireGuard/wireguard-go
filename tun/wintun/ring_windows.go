@@ -6,6 +6,7 @@
 package wintun
 
 import (
+	"runtime"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -53,23 +54,42 @@ func PacketAlign(size uint32) uint32 {
 	return (size + (PacketAlignment - 1)) &^ (PacketAlignment - 1)
 }
 
-func (descriptor *RingDescriptor) Init() (err error) {
+func NewRingDescriptor() (descriptor *RingDescriptor, err error) {
+	descriptor = new(RingDescriptor)
+	allocatedRegion, err := windows.VirtualAlloc(0, unsafe.Sizeof(Ring{})*2, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err != nil {
+			descriptor.free()
+			descriptor = nil
+		}
+	}()
 	descriptor.Send.Size = uint32(unsafe.Sizeof(Ring{}))
-	descriptor.Send.Ring = &Ring{}
+	descriptor.Send.Ring = (*Ring)(unsafe.Pointer(allocatedRegion))
 	descriptor.Send.TailMoved, err = windows.CreateEvent(nil, 0, 0, nil)
 	if err != nil {
 		return
 	}
 
 	descriptor.Receive.Size = uint32(unsafe.Sizeof(Ring{}))
-	descriptor.Receive.Ring = &Ring{}
+	descriptor.Receive.Ring = (*Ring)(unsafe.Pointer(allocatedRegion + unsafe.Sizeof(Ring{})))
 	descriptor.Receive.TailMoved, err = windows.CreateEvent(nil, 0, 0, nil)
 	if err != nil {
 		windows.CloseHandle(descriptor.Send.TailMoved)
 		return
 	}
-
+	runtime.SetFinalizer(descriptor, func(d *RingDescriptor) { d.free() })
 	return
+}
+
+func (descriptor *RingDescriptor) free() {
+	if descriptor.Send.Ring != nil {
+		windows.VirtualFree(uintptr(unsafe.Pointer(descriptor.Send.Ring)), 0, windows.MEM_RELEASE)
+		descriptor.Send.Ring = nil
+		descriptor.Receive.Ring = nil
+	}
 }
 
 func (descriptor *RingDescriptor) Close() {
