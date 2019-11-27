@@ -43,6 +43,7 @@ type IPv6Source struct {
 }
 
 type NativeEndpoint struct {
+	sync.Mutex
 	dst  [unsafe.Sizeof(unix.SockaddrInet6{})]byte
 	src  [unsafe.Sizeof(IPv6Source{})]byte
 	isV6 bool
@@ -482,7 +483,9 @@ func send4(sock int, end *NativeEndpoint, buff []byte) error {
 		},
 	}
 
+	end.Lock()
 	_, err := unix.SendmsgN(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], end.dst4(), 0)
+	end.Unlock()
 
 	if err == nil {
 		return nil
@@ -493,7 +496,9 @@ func send4(sock int, end *NativeEndpoint, buff []byte) error {
 	if err == unix.EINVAL {
 		end.ClearSrc()
 		cmsg.pktinfo = unix.Inet4Pktinfo{}
+		end.Lock()
 		_, err = unix.SendmsgN(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], end.dst4(), 0)
+		end.Unlock()
 	}
 
 	return err
@@ -522,7 +527,9 @@ func send6(sock int, end *NativeEndpoint, buff []byte) error {
 		cmsg.pktinfo.Ifindex = 0
 	}
 
+	end.Lock()
 	_, err := unix.SendmsgN(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], end.dst6(), 0)
+	end.Unlock()
 
 	if err == nil {
 		return nil
@@ -533,7 +540,9 @@ func send6(sock int, end *NativeEndpoint, buff []byte) error {
 	if err == unix.EINVAL {
 		end.ClearSrc()
 		cmsg.pktinfo = unix.Inet6Pktinfo{}
+		end.Lock()
 		_, err = unix.SendmsgN(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], end.dst6(), 0)
+		end.Unlock()
 	}
 
 	return err
