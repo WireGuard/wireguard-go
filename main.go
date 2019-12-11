@@ -21,8 +21,7 @@ import (
 )
 
 const (
-	ExitSetupSuccess = 0
-	ExitSetupFailed  = 1
+	ExitSetupFailed = 1
 )
 
 const (
@@ -221,7 +220,10 @@ func main() {
 			logger.Error.Println("Failed to daemonize:", err)
 			os.Exit(ExitSetupFailed)
 		}
-		process.Release()
+		err = process.Release()
+		if err != nil {
+			logger.Error.Println("Failed to release process:", err)
+		}
 		return
 	}
 
