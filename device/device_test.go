@@ -209,8 +209,8 @@ func (t *chTun) MTU() (int, error)      { return DefaultMTU, nil }
 func (t *chTun) Name() (string, error)  { return "loopbackTun1", nil }
 func (t *chTun) Events() chan tun.Event { return t.c.events }
 func (t *chTun) Close() error {
-	t.Write(nil, -1)
-	return nil
+	_, err := t.Write(nil, -1)
+	return err
 }
 
 func assertNil(t *testing.T, err error) {
@@ -233,6 +233,9 @@ func randDevice(t *testing.T) *Device {
 	tun := newDummyTUN("dummy")
 	logger := NewLogger(LogLevelError, "")
 	device := NewDevice(tun, logger)
-	device.SetPrivateKey(sk)
+	err = device.SetPrivateKey(sk)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return device
 }

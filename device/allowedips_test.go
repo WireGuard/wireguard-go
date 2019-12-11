@@ -20,26 +20,6 @@ type testPairCommonBits struct {
 	match uint
 }
 
-type testPairTrieInsert struct {
-	key  []byte
-	cidr uint
-	peer *Peer
-}
-
-type testPairTrieLookup struct {
-	key  []byte
-	peer *Peer
-}
-
-func printTrie(t *testing.T, p *trieEntry) {
-	if p == nil {
-		return
-	}
-	t.Log(p)
-	printTrie(t, p.child[0])
-	printTrie(t, p.child[1])
-}
-
 func TestCommonBits(t *testing.T) {
 
 	tests := []testPairCommonBits{
