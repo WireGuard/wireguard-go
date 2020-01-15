@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/net/ipv6"
@@ -41,6 +42,22 @@ type NativeTun struct {
 }
 
 var sockaddrCtlSize uintptr = 32
+
+func retryInterfaceByIndex(index int) (iface *net.Interface, err error) {
+	for i := 0; i < 20; i++ {
+		iface, err = net.InterfaceByIndex(index)
+		if err != nil {
+			if opErr, ok := err.(*net.OpError); ok {
+				if syscallErr, ok := opErr.Err.(*os.SyscallError); ok && syscallErr.Err == syscall.ENOMEM {
+					time.Sleep(time.Duration(i) * time.Second / 3)
+					continue
+				}
+			}
+		}
+		return iface, err
+	}
+	return nil, err
+}
 
 func (tun *NativeTun) routineRouteListener(tunIfindex int) {
 	var (
@@ -74,7 +91,7 @@ func (tun *NativeTun) routineRouteListener(tunIfindex int) {
 			continue
 		}
 
-		iface, err := net.InterfaceByIndex(ifindex)
+		iface, err := retryInterfaceByIndex(ifindex)
 		if err != nil {
 			tun.errors <- err
 			return
