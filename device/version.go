@@ -1,3 +1,3 @@
 package device
 
-const WireGuardGoVersion = "0.0.20191012"
+const WireGuardGoVersion = "0.0.20200121"
