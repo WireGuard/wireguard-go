@@ -236,23 +236,14 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 
 	// do static-static DH pre-computations
 
-	rmKey := device.staticIdentity.privateKey.IsZero()
-
 	expiredPeers := make([]*Peer, 0, len(device.peers.keyMap))
-	for key, peer := range device.peers.keyMap {
+	for _, peer := range device.peers.keyMap {
 		handshake := &peer.handshake
-
-		if rmKey {
-			handshake.precomputedStaticStatic = [NoisePublicKeySize]byte{}
-		} else {
-			handshake.precomputedStaticStatic = device.staticIdentity.privateKey.sharedSecret(handshake.remoteStatic)
-		}
-
+		handshake.precomputedStaticStatic = device.staticIdentity.privateKey.sharedSecret(handshake.remoteStatic)
 		if isZero(handshake.precomputedStaticStatic[:]) {
-			unsafeRemovePeer(device, peer, key)
-		} else {
-			expiredPeers = append(expiredPeers, peer)
+			panic("an invalid peer public key made it into the configuration")
 		}
+		expiredPeers = append(expiredPeers, peer)
 	}
 
 	for _, peer := range lockedPeers {
