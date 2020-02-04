@@ -138,7 +138,7 @@ func (device *Device) IpcSetOperation(socket *bufio.Reader) *IPCError {
 			switch key {
 			case "private_key":
 				var sk NoisePrivateKey
-				err := sk.FromHex(value)
+				err := sk.FromMaybeZeroHex(value)
 				if err != nil {
 					logError.Println("Failed to set private_key:", err)
 					return &IPCError{ipc.IpcErrorInvalid}

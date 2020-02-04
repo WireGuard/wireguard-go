@@ -52,6 +52,15 @@ func (key *NoisePrivateKey) FromHex(src string) (err error) {
 	return
 }
 
+func (key *NoisePrivateKey) FromMaybeZeroHex(src string) (err error) {
+	err = loadExactHex(key[:], src)
+	if key.IsZero() {
+		return
+	}
+	key.clamp()
+	return
+}
+
 func (key NoisePrivateKey) ToHex() string {
 	return hex.EncodeToString(key[:])
 }
