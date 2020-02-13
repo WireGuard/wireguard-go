@@ -515,10 +515,18 @@ func (device *Device) RoutineEncryption() {
 			// pad content to multiple of 16
 
 			mtu := int(atomic.LoadInt32(&device.tun.mtu))
-			lastUnit := len(elem.packet) % mtu
-			paddedSize := (lastUnit + PaddingMultiple - 1) & ^(PaddingMultiple - 1)
-			if paddedSize > mtu {
-				paddedSize = mtu
+			var paddedSize int
+			if mtu == 0 {
+				paddedSize = (len(elem.packet) + PaddingMultiple - 1) & ^(PaddingMultiple - 1)
+			} else {
+				lastUnit := len(elem.packet)
+				if lastUnit > mtu {
+					lastUnit %= mtu
+				}
+				paddedSize := (lastUnit + PaddingMultiple - 1) & ^(PaddingMultiple - 1)
+				if paddedSize > mtu {
+					paddedSize = mtu
+				}
 			}
 			for i := len(elem.packet); i < paddedSize; i++ {
 				elem.packet = append(elem.packet, 0)
