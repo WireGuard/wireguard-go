@@ -1,8 +1,12 @@
+// +build !windows
+
 /* SPDX-License-Identifier: MIT
  *
  * Copyright (C) 2017-2019 WireGuard LLC. All Rights Reserved.
  */
 
+// Package rwcancel implements cancelable read/write operations on
+// a file descriptor.
 package rwcancel
 
 import (
