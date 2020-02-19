@@ -301,10 +301,15 @@ func (device *Device) RoutineReadFromTUN() {
 			peer = device.allowedips.LookupIPv6(dst)
 
 		default:
+			peer = device.allowedips.Any()
+			if peer != nil {
+				break
+			}
 			logDebug.Println("Received packet with unknown IP version")
 		}
 
 		if peer == nil {
+			logDebug.Print("Peer not found")
 			continue
 		}
 

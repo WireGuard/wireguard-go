@@ -1,4 +1,5 @@
 wireguard-go
 vendor
 .gopath
+.idea/
 ireallywantobuildon_linux.go

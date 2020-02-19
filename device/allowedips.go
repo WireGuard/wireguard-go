@@ -238,6 +238,37 @@ func (table *AllowedIPs) Insert(ip net.IP, cidr uint, peer *Peer) {
 	}
 }
 
+func (table *AllowedIPs) Any() *Peer {
+	table.mutex.RLock()
+	defer table.mutex.RUnlock()
+	matchAny := func(entry *trieEntry) bool {
+		for _, b := range entry.bits {
+			if b != 0 {
+				return false
+			}
+		}
+		return true
+	}
+	if p := findPeer(table.IPv4, matchAny); p != nil {
+		return p
+	}
+	return findPeer(table.IPv6, matchAny)
+}
+
+func findPeer(t *trieEntry, match func(*trieEntry) bool) *Peer {
+	if t == nil {
+		return nil
+	}
+	if match(t) && t.peer != nil {
+		return t.peer
+	}
+	result := findPeer(t.child[0], match)
+	if result != nil {
+		return result
+	}
+	return findPeer(t.child[1], match)
+}
+
 func (table *AllowedIPs) LookupIPv4(address []byte) *Peer {
 	table.mutex.RLock()
 	defer table.mutex.RUnlock()

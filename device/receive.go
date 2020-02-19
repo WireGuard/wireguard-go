@@ -624,10 +624,6 @@ func (peer *Peer) RoutineSequentialReceiver() {
 				)
 				continue
 			}
-
-		default:
-			logInfo.Println("Packet with invalid IP version from", peer)
-			continue
 		}
 
 		// write to tun device
