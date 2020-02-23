@@ -11,24 +11,6 @@ import (
 	"testing"
 )
 
-func TestCurveWrappers(t *testing.T) {
-	sk1, err := newPrivateKey()
-	assertNil(t, err)
-
-	sk2, err := newPrivateKey()
-	assertNil(t, err)
-
-	pk1 := sk1.publicKey()
-	pk2 := sk2.publicKey()
-
-	ss1 := sk1.sharedSecret(pk2)
-	ss2 := sk2.sharedSecret(pk1)
-
-	if ss1 != ss2 {
-		t.Fatal("Failed to compute shared secet")
-	}
-}
-
 func TestNoiseHandshake(t *testing.T) {
 	dev1 := randDevice(t)
 	dev2 := randDevice(t)
@@ -36,8 +18,14 @@ func TestNoiseHandshake(t *testing.T) {
 	defer dev1.Close()
 	defer dev2.Close()
 
-	peer1, _ := dev2.NewPeer(dev1.staticIdentity.privateKey.publicKey())
-	peer2, _ := dev1.NewPeer(dev2.staticIdentity.privateKey.publicKey())
+	peer1, err := dev2.NewPeer(dev1.staticIdentity.privateKey.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+	peer2, err := dev1.NewPeer(dev2.staticIdentity.privateKey.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	assertEqual(
 		t,
