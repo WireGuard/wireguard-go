@@ -12,7 +12,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"sync"
 	"syscall"
@@ -162,11 +161,6 @@ func (tun *NativeTun) routineNetlinkListener() {
 			}
 		}
 	}
-}
-
-func (tun *NativeTun) isUp() (bool, error) {
-	inter, err := net.InterfaceByName(tun.name)
-	return inter.Flags&net.FlagUp != 0, err
 }
 
 func getIFIndex(name string) (int32, error) {
