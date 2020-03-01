@@ -27,7 +27,11 @@ type Peer struct {
 	endpoint                    Endpoint
 	persistentKeepaliveInterval uint16
 
-	// This must be 64-bit aligned, so make sure the above members come out to even alignment and pad accordingly
+	// These fields are accessed with atomic operations, which must be
+	// 64-bit aligned even on 32-bit platforms. Go guarantees that an
+	// allocated struct will be 64-bit aligned. So we place
+	// atomically-accessed fields up front, so that they can share in
+	// this alignment before smaller fields throw it off.
 	stats struct {
 		txBytes           uint64 // bytes send to peer (endpoint)
 		rxBytes           uint64 // bytes received from peer
