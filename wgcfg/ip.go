@@ -2,6 +2,7 @@ package wgcfg
 
 import (
 	"fmt"
+	"math"
 	"net"
 )
 
@@ -106,12 +107,33 @@ func (r *CIDR) IPNet() *net.IPNet {
 	}
 	return &net.IPNet{IP: r.IP.IP(), Mask: net.CIDRMask(int(r.Mask), bits)}
 }
+
 func (r *CIDR) Contains(ip *IP) bool {
 	if r == nil || ip == nil {
 		return false
 	}
-	// TODO: this isn't hard, write a more efficient implementation.
-	return r.IPNet().Contains(ip.IP())
+	c := int8(r.Mask)
+	i := 0
+	if r.IP.Is4() {
+		i = 12
+		if ip.Is6() {
+			return false
+		}
+	}
+	for ; i < 16 && c > 0; i++ {
+		var x uint8
+		if c < 8 {
+			x = 8 - uint8(c)
+		}
+		m := uint8(math.MaxUint8) >> x << x
+		a := r.IP.Addr[i] & m
+		b := ip.Addr[i] & m
+		if a != b {
+			return false
+		}
+		c -= 8
+	}
+	return true
 }
 
 func (r CIDR) MarshalText() ([]byte, error) {
