@@ -609,9 +609,6 @@ func (peer *Peer) BeginSymmetricSession() error {
 
 func (peer *Peer) ReceivedWithKeypair(receivedKeypair *Keypair) bool {
 	keypairs := &peer.keypairs
-	if keypairs.next != receivedKeypair {
-		return false
-	}
 	keypairs.Lock()
 	defer keypairs.Unlock()
 	if keypairs.next != receivedKeypair {
