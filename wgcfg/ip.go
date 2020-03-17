@@ -16,9 +16,14 @@ type IP struct {
 
 func (ip IP) String() string { return net.IP(ip.Addr[:]).String() }
 
-func (ip *IP) IP() net.IP { return net.IP(ip.Addr[:]) }
-func (ip *IP) Is6() bool  { return !ip.Is4() }
-func (ip *IP) Is4() bool {
+// IP converts ip into a standard library net.IP.
+func (ip IP) IP() net.IP { return net.IP(ip.Addr[:]) }
+
+// Is6 reports whether ip is an IPv6 address.
+func (ip IP) Is6() bool { return !ip.Is4() }
+
+// Is4 reports whether ip is an IPv4 address.
+func (ip IP) Is4() bool {
 	return ip.Addr[0] == 0 && ip.Addr[1] == 0 &&
 		ip.Addr[2] == 0 && ip.Addr[3] == 0 &&
 		ip.Addr[4] == 0 && ip.Addr[5] == 0 &&
@@ -26,19 +31,20 @@ func (ip *IP) Is4() bool {
 		ip.Addr[8] == 0 && ip.Addr[9] == 0 &&
 		ip.Addr[10] == 0xff && ip.Addr[11] == 0xff
 }
-func (ip *IP) To4() []byte {
+
+// To4 returns either a 4 byte slice for an IPv4 address, or nil if
+// it's not IPv4.
+func (ip IP) To4() []byte {
 	if ip.Is4() {
 		return ip.Addr[12:16]
 	} else {
 		return nil
 	}
 }
-func (ip *IP) Equal(x *IP) bool {
-	if ip == nil || x == nil {
-		return false
-	}
-	// TODO: this isn't hard, write a more efficient implementation.
-	return ip.IP().Equal(x.IP())
+
+// Equal reports whether ip == x.
+func (ip IP) Equal(x IP) bool {
+	return ip == x
 }
 
 func (ip IP) MarshalText() ([]byte, error) {
@@ -46,11 +52,11 @@ func (ip IP) MarshalText() ([]byte, error) {
 }
 
 func (ip *IP) UnmarshalText(text []byte) error {
-	parsedIP := ParseIP(string(text))
-	if parsedIP == nil {
-		return fmt.Errorf("wgcfg.IP: UnmarshalText: bad IP address %q", string(text))
+	parsedIP, ok := ParseIP(string(text))
+	if !ok {
+		return fmt.Errorf("wgcfg.IP: UnmarshalText: bad IP address %q", text)
 	}
-	*ip = *parsedIP
+	*ip = parsedIP
 	return nil
 }
 
@@ -66,15 +72,14 @@ func IPv4(b0, b1, b2, b3 byte) (ip IP) {
 // ParseIP parses the string representation of an address into an IP.
 //
 // It accepts IPv4 notation such as "1.2.3.4" and IPv6 notation like ""::0".
-// If the string is not a valid IP address, ParseIP returns nil.
-func ParseIP(s string) *IP {
+// The ok result reports whether s was a valid IP and ip is valid.
+func ParseIP(s string) (ip IP, ok bool) {
 	netIP := net.ParseIP(s)
 	if netIP == nil {
-		return nil
+		return IP{}, false
 	}
-	ip := new(IP)
 	copy(ip.Addr[:], netIP.To16())
-	return ip
+	return ip, true
 }
 
 // CIDR is a compact IP address and subnet mask.
@@ -85,12 +90,12 @@ type CIDR struct {
 
 // ParseCIDR parses CIDR notation into a CIDR type.
 // Typical CIDR strings look like "192.168.1.0/24".
-func ParseCIDR(s string) (cidr *CIDR, err error) {
+func ParseCIDR(s string) (CIDR, error) {
 	netIP, netAddr, err := net.ParseCIDR(s)
 	if err != nil {
-		return nil, err
+		return CIDR{}, err
 	}
-	cidr = new(CIDR)
+	var cidr CIDR
 	copy(cidr.IP.Addr[:], netIP.To16())
 	ones, _ := netAddr.Mask.Size()
 	cidr.Mask = uint8(ones)
@@ -100,7 +105,7 @@ func ParseCIDR(s string) (cidr *CIDR, err error) {
 
 func (r CIDR) String() string { return r.IPNet().String() }
 
-func (r *CIDR) IPNet() *net.IPNet {
+func (r CIDR) IPNet() *net.IPNet {
 	bits := 128
 	if r.IP.Is4() {
 		bits = 32
@@ -108,10 +113,7 @@ func (r *CIDR) IPNet() *net.IPNet {
 	return &net.IPNet{IP: r.IP.IP(), Mask: net.CIDRMask(int(r.Mask), bits)}
 }
 
-func (r *CIDR) Contains(ip *IP) bool {
-	if r == nil || ip == nil {
-		return false
-	}
+func (r CIDR) Contains(ip IP) bool {
 	c := int8(r.Mask)
 	i := 0
 	if r.IP.Is4() {
@@ -145,6 +147,6 @@ func (r *CIDR) UnmarshalText(text []byte) error {
 	if err != nil {
 		return fmt.Errorf("wgcfg.CIDR: UnmarshalText: %v", err)
 	}
-	*r = *cidr
+	*r = cidr
 	return nil
 }

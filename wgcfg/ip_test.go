@@ -11,18 +11,24 @@ import (
 	"golang.zx2c4.com/wireguard/wgcfg"
 )
 
+func parseIP(t testing.TB, ipStr string) wgcfg.IP {
+	t.Helper()
+	ip, ok := wgcfg.ParseIP(ipStr)
+	if !ok {
+		t.Fatalf("failed to parse IP: %q", ipStr)
+	}
+	return ip
+}
+
 func TestCIDRContains(t *testing.T) {
 	t.Run("home router test", func(t *testing.T) {
 		r, err := wgcfg.ParseCIDR("192.168.0.0/24")
 		if err != nil {
 			t.Fatal(err)
 		}
-		ip := wgcfg.ParseIP("192.168.0.1")
-		if ip == nil {
-			t.Fatalf("address failed to parse")
-		}
+		ip := parseIP(t, "192.168.0.1")
 		if !r.Contains(ip) {
-			t.Fatalf("'%s' should contain '%s'", r, ip)
+			t.Fatalf("%q should contain %q", r, ip)
 		}
 	})
 
@@ -31,12 +37,9 @@ func TestCIDRContains(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ip := wgcfg.ParseIP("192.168.0.4")
-		if ip == nil {
-			t.Fatalf("address failed to parse")
-		}
+		ip := parseIP(t, "192.168.0.4")
 		if r.Contains(ip) {
-			t.Fatalf("'%s' should not contain '%s'", r, ip)
+			t.Fatalf("%q should not contain %q", r, ip)
 		}
 	})
 
@@ -45,12 +48,9 @@ func TestCIDRContains(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ip := wgcfg.ParseIP("2001:db8:85a3:0:0:8a2e:370:7334")
-		if ip == nil {
-			t.Fatalf("address failed to parse")
-		}
+		ip := parseIP(t, "2001:db8:85a3:0:0:8a2e:370:7334")
 		if r.Contains(ip) {
-			t.Fatalf("'%s' should not contain '%s'", r, ip)
+			t.Fatalf("%q should not contain %q", r, ip)
 		}
 	})
 
@@ -59,12 +59,9 @@ func TestCIDRContains(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ip := wgcfg.ParseIP("2001:db8:1234:0000:0000:0000:0000:0001")
-		if ip == nil {
-			t.Fatalf("ParseIP returned nil pointer")
-		}
+		ip := parseIP(t, "2001:db8:1234:0000:0000:0000:0000:0001")
 		if !r.Contains(ip) {
-			t.Fatalf("'%s' should not contain '%s'", r, ip)
+			t.Fatalf("%q should not contain %q", r, ip)
 		}
 	})
 
@@ -73,12 +70,9 @@ func TestCIDRContains(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ip := wgcfg.ParseIP("2001:db8:1234:0:190b:0:1982:4")
-		if ip == nil {
-			t.Fatalf("ParseIP returned nil pointer")
-		}
+		ip := parseIP(t, "2001:db8:1234:0:190b:0:1982:4")
 		if r.Contains(ip) {
-			t.Fatalf("'%s' should not contain '%s'", r, ip)
+			t.Fatalf("%q should not contain %q", r, ip)
 		}
 	})
 }
@@ -89,12 +83,9 @@ func BenchmarkCIDRContainsIPv4(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		ip := wgcfg.ParseIP("1.2.3.4")
-		if ip == nil {
-			b.Fatalf("ParseIP returned nil pointer")
-		}
-
+		ip := parseIP(b, "1.2.3.4")
 		b.ResetTimer()
+
 		for i := 0; i < b.N; i++ {
 			r.Contains(ip)
 		}
@@ -105,12 +96,9 @@ func BenchmarkCIDRContainsIPv4(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		ip := wgcfg.ParseIP("2001:db8:1234:0000:0000:0000:0000:0001")
-		if ip == nil {
-			b.Fatalf("ParseIP returned nil pointer")
-		}
-
+		ip := parseIP(b, "2001:db8:1234:0000:0000:0000:0000:0001")
 		b.ResetTimer()
+
 		for i := 0; i < b.N; i++ {
 			r.Contains(ip)
 		}
