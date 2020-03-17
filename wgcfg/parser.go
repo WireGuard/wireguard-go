@@ -219,7 +219,7 @@ func FromWgQuick(s string, name string) (*Config, error) {
 					if err != nil {
 						return nil, err
 					}
-					conf.Addresses = append(conf.Addresses, *a)
+					conf.Addresses = append(conf.Addresses, a)
 				}
 			case "dns":
 				addresses, err := splitList(val)
@@ -227,11 +227,11 @@ func FromWgQuick(s string, name string) (*Config, error) {
 					return nil, err
 				}
 				for _, address := range addresses {
-					a := ParseIP(address)
-					if a == nil {
+					a, ok := ParseIP(address)
+					if !ok {
 						return nil, &ParseError{"Invalid IP address", address}
 					}
-					conf.DNS = append(conf.DNS, *a)
+					conf.DNS = append(conf.DNS, a)
 				}
 			default:
 				return nil, &ParseError{"Invalid key for [Interface] section", key}
@@ -260,7 +260,7 @@ func FromWgQuick(s string, name string) (*Config, error) {
 					if err != nil {
 						return nil, err
 					}
-					peer.AllowedIPs = append(peer.AllowedIPs, *a)
+					peer.AllowedIPs = append(peer.AllowedIPs, a)
 				}
 			case "persistentkeepalive":
 				p, err := parsePersistentKeepalive(val)
@@ -373,7 +373,7 @@ func Broken_FromUAPI(s string, existingConfig *Config) (*Config, error) {
 				if err != nil {
 					return nil, err
 				}
-				peer.AllowedIPs = append(peer.AllowedIPs, *a)
+				peer.AllowedIPs = append(peer.AllowedIPs, a)
 			case "persistent_keepalive_interval":
 				p, err := parsePersistentKeepalive(val)
 				if err != nil {
