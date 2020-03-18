@@ -240,9 +240,6 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 	for _, peer := range device.peers.keyMap {
 		handshake := &peer.handshake
 		handshake.precomputedStaticStatic = device.staticIdentity.privateKey.sharedSecret(handshake.remoteStatic)
-		if isZero(handshake.precomputedStaticStatic[:]) {
-			panic("an invalid peer public key made it into the configuration")
-		}
 		expiredPeers = append(expiredPeers, peer)
 	}
 

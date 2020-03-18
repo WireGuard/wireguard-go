@@ -108,7 +108,6 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
 	handshake.precomputedStaticStatic = device.staticIdentity.privateKey.sharedSecret(pk)
-	ssIsZero := isZero(handshake.precomputedStaticStatic[:])
 	handshake.remoteStatic = pk
 	handshake.mutex.Unlock()
 
@@ -116,13 +115,9 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 
 	peer.endpoint = nil
 
-	// conditionally add
+	// add
 
-	if !ssIsZero {
-		device.peers.keyMap[pk] = peer
-	} else {
-		return nil, nil
-	}
+	device.peers.keyMap[pk] = peer
 
 	// start peer
 
