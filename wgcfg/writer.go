@@ -6,7 +6,6 @@
 package wgcfg
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -46,9 +45,8 @@ func (conf *Config) ToUAPI() (string, error) {
 				}
 				var ip net.IP
 				for _, iterip := range ips {
-					iterip = iterip.To4()
-					if iterip != nil {
-						ip = iterip
+					if ip4 := iterip.To4(); ip4 != nil {
+						ip = ip4
 						break
 					}
 					if ip == nil {
@@ -56,7 +54,7 @@ func (conf *Config) ToUAPI() (string, error) {
 					}
 				}
 				if ip == nil {
-					return "", errors.New("Unable to resolve IP address of endpoint")
+					return "", fmt.Errorf("unable to resolve IP address of endpoint %q (%v)", ep.Host, ips)
 				}
 				resolvedEndpoint := Endpoint{ip.String(), ep.Port}
 				reps = append(reps, resolvedEndpoint.String())
