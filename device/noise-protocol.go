@@ -154,6 +154,7 @@ func init() {
 }
 
 func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, error) {
+	var errZeroECDHResult = errors.New("ECDH returned all zeros")
 
 	device.staticIdentity.RLock()
 	defer device.staticIdentity.RUnlock()
@@ -162,25 +163,11 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 	handshake.mutex.Lock()
 	defer handshake.mutex.Unlock()
 
-	if isZero(handshake.precomputedStaticStatic[:]) {
-		return nil, errors.New("static shared secret is zero")
-	}
-
 	// create ephemeral key
-
 	var err error
 	handshake.hash = InitialHash
 	handshake.chainKey = InitialChainKey
 	handshake.localEphemeral, err = newPrivateKey()
-	if err != nil {
-		return nil, err
-	}
-
-	// assign index
-
-	device.indexTable.Delete(handshake.localIndex)
-	handshake.localIndex, err = device.indexTable.NewIndexForHandshake(peer, handshake)
-
 	if err != nil {
 		return nil, err
 	}
@@ -190,42 +177,48 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 	msg := MessageInitiation{
 		Type:      MessageInitiationType,
 		Ephemeral: handshake.localEphemeral.publicKey(),
-		Sender:    handshake.localIndex,
 	}
 
 	handshake.mixKey(msg.Ephemeral[:])
 	handshake.mixHash(msg.Ephemeral[:])
 
 	// encrypt static key
-
-	func() {
-		var key [chacha20poly1305.KeySize]byte
-		ss := handshake.localEphemeral.sharedSecret(handshake.remoteStatic)
-		KDF2(
-			&handshake.chainKey,
-			&key,
-			handshake.chainKey[:],
-			ss[:],
-		)
-		aead, _ := chacha20poly1305.New(key[:])
-		aead.Seal(msg.Static[:0], ZeroNonce[:], device.staticIdentity.publicKey[:], handshake.hash[:])
-	}()
+	ss := handshake.localEphemeral.sharedSecret(handshake.remoteStatic)
+	if isZero(ss[:]) {
+		return nil, errZeroECDHResult
+	}
+	var key [chacha20poly1305.KeySize]byte
+	KDF2(
+		&handshake.chainKey,
+		&key,
+		handshake.chainKey[:],
+		ss[:],
+	)
+	aead, _ := chacha20poly1305.New(key[:])
+	aead.Seal(msg.Static[:0], ZeroNonce[:], device.staticIdentity.publicKey[:], handshake.hash[:])
 	handshake.mixHash(msg.Static[:])
 
 	// encrypt timestamp
-
+	if isZero(handshake.precomputedStaticStatic[:]) {
+		return nil, errZeroECDHResult
+	}
+	KDF2(
+		&handshake.chainKey,
+		&key,
+		handshake.chainKey[:],
+		handshake.precomputedStaticStatic[:],
+	)
 	timestamp := tai64n.Now()
-	func() {
-		var key [chacha20poly1305.KeySize]byte
-		KDF2(
-			&handshake.chainKey,
-			&key,
-			handshake.chainKey[:],
-			handshake.precomputedStaticStatic[:],
-		)
-		aead, _ := chacha20poly1305.New(key[:])
-		aead.Seal(msg.Timestamp[:0], ZeroNonce[:], timestamp[:], handshake.hash[:])
-	}()
+	aead, _ = chacha20poly1305.New(key[:])
+	aead.Seal(msg.Timestamp[:0], ZeroNonce[:], timestamp[:], handshake.hash[:])
+
+	// assign index
+	device.indexTable.Delete(handshake.localIndex)
+	msg.Sender, err = device.indexTable.NewIndexForHandshake(peer, handshake)
+	if err != nil {
+		return nil, err
+	}
+	handshake.localIndex = msg.Sender
 
 	handshake.mixHash(msg.Timestamp[:])
 	handshake.state = HandshakeInitiationCreated
@@ -250,16 +243,16 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	mixKey(&chainKey, &InitialChainKey, msg.Ephemeral[:])
 
 	// decrypt static key
-
 	var err error
 	var peerPK NoisePublicKey
-	func() {
-		var key [chacha20poly1305.KeySize]byte
-		ss := device.staticIdentity.privateKey.sharedSecret(msg.Ephemeral)
-		KDF2(&chainKey, &key, chainKey[:], ss[:])
-		aead, _ := chacha20poly1305.New(key[:])
-		_, err = aead.Open(peerPK[:0], ZeroNonce[:], msg.Static[:], hash[:])
-	}()
+	var key [chacha20poly1305.KeySize]byte
+	ss := device.staticIdentity.privateKey.sharedSecret(msg.Ephemeral)
+	if isZero(ss[:]) {
+		return nil
+	}
+	KDF2(&chainKey, &key, chainKey[:], ss[:])
+	aead, _ := chacha20poly1305.New(key[:])
+	_, err = aead.Open(peerPK[:0], ZeroNonce[:], msg.Static[:], hash[:])
 	if err != nil {
 		return nil
 	}
@@ -273,23 +266,24 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	}
 
 	handshake := &peer.handshake
-	if isZero(handshake.precomputedStaticStatic[:]) {
-		return nil
-	}
 
 	// verify identity
 
 	var timestamp tai64n.Timestamp
-	var key [chacha20poly1305.KeySize]byte
 
 	handshake.mutex.RLock()
+
+	if isZero(handshake.precomputedStaticStatic[:]) {
+		handshake.mutex.RUnlock()
+		return nil
+	}
 	KDF2(
 		&chainKey,
 		&key,
 		chainKey[:],
 		handshake.precomputedStaticStatic[:],
 	)
-	aead, _ := chacha20poly1305.New(key[:])
+	aead, _ = chacha20poly1305.New(key[:])
 	_, err = aead.Open(timestamp[:0], ZeroNonce[:], msg.Timestamp[:], hash[:])
 	if err != nil {
 		handshake.mutex.RUnlock()

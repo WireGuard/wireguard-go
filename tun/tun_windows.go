@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -40,6 +41,7 @@ type NativeTun struct {
 	forcedMTU int
 	rate      rateJuggler
 	rings     *wintun.RingDescriptor
+	writeLock sync.Mutex
 }
 
 const WintunPool = wintun.Pool("WireGuard")
@@ -218,6 +220,9 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 	packetSize := uint32(len(buff) - offset)
 	tun.rate.update(uint64(packetSize))
 	alignedPacketSize := wintun.PacketAlign(uint32(unsafe.Sizeof(wintun.PacketHeader{})) + packetSize)
+
+	tun.writeLock.Lock()
+	defer tun.writeLock.Unlock()
 
 	buffHead := atomic.LoadUint32(&tun.rings.Receive.Ring.Head)
 	if buffHead >= wintun.PacketCapacity {

@@ -7,7 +7,7 @@
  * This implements userspace semantics of "sticky sockets", modeled after
  * WireGuard's kernelspace implementation. This is more or less a straight port
  * of the sticky-sockets.c example code:
- * https://git.zx2c4.com/WireGuard/tree/contrib/examples/sticky-sockets/sticky-sockets.c
+ * https://git.zx2c4.com/wireguard-tools/tree/contrib/sticky-sockets/sticky-sockets.c
  *
  * Currently there is no way to achieve this within the net package:
  * See e.g. https://github.com/golang/go/issues/17930
@@ -118,7 +118,7 @@ func createNetlinkRouteSocket() (int, error) {
 	}
 	saddr := &unix.SockaddrNetlink{
 		Family: unix.AF_NETLINK,
-		Groups: uint32(1 << (unix.RTNLGRP_IPV4_ROUTE - 1)),
+		Groups: unix.RTMGRP_IPV4_ROUTE,
 	}
 	err = unix.Bind(sock, saddr)
 	if err != nil {
