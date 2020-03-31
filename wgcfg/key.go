@@ -229,8 +229,7 @@ func ParseSymmetricHexKey(s string) (SymmetricKey, error) {
 	return key, nil
 }
 
-// SymmetricKey is a chacha20poly1305 key.
-// It is used by WireGuard to represent pre-shared symmetric keys.
+// SymmetricKey is a 32-byte value used as a pre-shared key.
 type SymmetricKey [chacha20poly1305.KeySize]byte
 
 func (k SymmetricKey) Base64() string             { return base64.StdEncoding.EncodeToString(k[:]) }
