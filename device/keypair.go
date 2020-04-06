@@ -8,7 +8,9 @@ package device
 import (
 	"crypto/cipher"
 	"sync"
+	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"golang.zx2c4.com/wireguard/replay"
 )
@@ -35,7 +37,15 @@ type Keypairs struct {
 	sync.RWMutex
 	current  *Keypair
 	previous *Keypair
-	next     *Keypair
+	next     unsafe.Pointer // *Keypair, access via LoadNext/StoreNext
+}
+
+func (kp *Keypairs) StoreNext(next *Keypair) {
+	atomic.StorePointer(&kp.next, (unsafe.Pointer)(next))
+}
+
+func (kp *Keypairs) LoadNext() *Keypair {
+	return (*Keypair)(atomic.LoadPointer(&kp.next))
 }
 
 func (kp *Keypairs) Current() *Keypair {

@@ -113,7 +113,7 @@ func TestNoiseHandshake(t *testing.T) {
 		t.Fatal("failed to derive keypair for peer 2", err)
 	}
 
-	key1 := peer1.keypairs.next
+	key1 := peer1.keypairs.LoadNext()
 	key2 := peer2.keypairs.current
 
 	// encrypting / decryption test

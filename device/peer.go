@@ -226,10 +226,10 @@ func (peer *Peer) ZeroAndFlushAll() {
 	keypairs.Lock()
 	device.DeleteKeypair(keypairs.previous)
 	device.DeleteKeypair(keypairs.current)
-	device.DeleteKeypair(keypairs.next)
+	device.DeleteKeypair(keypairs.LoadNext())
 	keypairs.previous = nil
 	keypairs.current = nil
-	keypairs.next = nil
+	keypairs.StoreNext(nil)
 	keypairs.Unlock()
 
 	// clear handshake state
@@ -257,7 +257,7 @@ func (peer *Peer) ExpireCurrentKeypairs() {
 		keypairs.current.sendNonce = RejectAfterMessages
 	}
 	if keypairs.next != nil {
-		keypairs.next.sendNonce = RejectAfterMessages
+		keypairs.LoadNext().sendNonce = RejectAfterMessages
 	}
 	keypairs.Unlock()
 }

@@ -14,6 +14,7 @@ import (
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/poly1305"
+
 	"golang.zx2c4.com/wireguard/tai64n"
 )
 
@@ -583,12 +584,12 @@ func (peer *Peer) BeginSymmetricSession() error {
 	defer keypairs.Unlock()
 
 	previous := keypairs.previous
-	next := keypairs.next
+	next := keypairs.LoadNext()
 	current := keypairs.current
 
 	if isInitiator {
 		if next != nil {
-			keypairs.next = nil
+			keypairs.StoreNext(nil)
 			keypairs.previous = next
 			device.DeleteKeypair(current)
 		} else {
@@ -597,7 +598,7 @@ func (peer *Peer) BeginSymmetricSession() error {
 		device.DeleteKeypair(previous)
 		keypairs.current = keypair
 	} else {
-		keypairs.next = keypair
+		keypairs.StoreNext(keypair)
 		device.DeleteKeypair(next)
 		keypairs.previous = nil
 		device.DeleteKeypair(previous)
@@ -608,15 +609,19 @@ func (peer *Peer) BeginSymmetricSession() error {
 
 func (peer *Peer) ReceivedWithKeypair(receivedKeypair *Keypair) bool {
 	keypairs := &peer.keypairs
+
+	if keypairs.LoadNext() != receivedKeypair {
+		return false
+	}
 	keypairs.Lock()
 	defer keypairs.Unlock()
-	if keypairs.next != receivedKeypair {
+	if keypairs.LoadNext() != receivedKeypair {
 		return false
 	}
 	old := keypairs.previous
 	keypairs.previous = keypairs.current
 	peer.device.DeleteKeypair(old)
-	keypairs.current = keypairs.next
-	keypairs.next = nil
+	keypairs.current = keypairs.LoadNext()
+	keypairs.StoreNext(nil)
 	return true
 }
