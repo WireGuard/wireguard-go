@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"golang.zx2c4.com/wireguard/tun/tuntest"
-	"golang.zx2c4.com/wireguard/wgcfg"
 )
 
 func TestTwoDevicePing(t *testing.T) {
@@ -91,7 +90,7 @@ func assertEqual(t *testing.T, a, b []byte) {
 }
 
 func randDevice(t *testing.T) *Device {
-	sk, err := wgcfg.NewPrivateKey()
+	sk, err := newPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}

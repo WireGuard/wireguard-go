@@ -7,8 +7,6 @@ package device
 
 import (
 	"testing"
-
-	"golang.zx2c4.com/wireguard/wgcfg"
 )
 
 func TestCookieMAC1(t *testing.T) {
@@ -20,11 +18,11 @@ func TestCookieMAC1(t *testing.T) {
 		checker   CookieChecker
 	)
 
-	sk, err := wgcfg.NewPrivateKey()
+	sk, err := newPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	pk := sk.Public()
+	pk := sk.publicKey()
 
 	generator.Init(pk)
 	checker.Init(pk)

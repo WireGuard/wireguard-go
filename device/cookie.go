@@ -13,7 +13,6 @@ import (
 
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20poly1305"
-	"golang.zx2c4.com/wireguard/wgcfg"
 )
 
 type CookieChecker struct {
@@ -42,7 +41,7 @@ type CookieGenerator struct {
 	}
 }
 
-func (st *CookieChecker) Init(pk wgcfg.Key) {
+func (st *CookieChecker) Init(pk NoisePublicKey) {
 	st.Lock()
 	defer st.Unlock()
 
@@ -172,7 +171,7 @@ func (st *CookieChecker) CreateReply(
 	return reply, nil
 }
 
-func (st *CookieGenerator) Init(pk wgcfg.Key) {
+func (st *CookieGenerator) Init(pk NoisePublicKey) {
 	st.Lock()
 	defer st.Unlock()
 

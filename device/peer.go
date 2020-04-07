@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"golang.zx2c4.com/wireguard/conn"
-	"golang.zx2c4.com/wireguard/wgcfg"
 )
 
 const (
@@ -77,8 +76,7 @@ type Peer struct {
 	cookieGenerator CookieGenerator
 }
 
-func (device *Device) NewPeer(pk wgcfg.Key) (*Peer, error) {
-
+func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	if device.isClosed.Get() {
 		return nil, errors.New("device closed")
 	}
@@ -118,7 +116,7 @@ func (device *Device) NewPeer(pk wgcfg.Key) (*Peer, error) {
 
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
-	handshake.precomputedStaticStatic = device.staticIdentity.privateKey.SharedSecret(pk)
+	handshake.precomputedStaticStatic = device.staticIdentity.privateKey.sharedSecret(pk)
 	handshake.remoteStatic = pk
 	handshake.mutex.Unlock()
 
