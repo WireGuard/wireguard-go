@@ -21,6 +21,14 @@ const (
 )
 
 type Peer struct {
+	// Mostly protects endpoint, but is generally taken whenever we modify peer
+	sync.RWMutex
+	keypairs                    Keypairs
+	handshake                   Handshake
+	device                      *Device
+	endpoint                    conn.Endpoint
+	persistentKeepaliveInterval uint16
+
 	// These fields are accessed with atomic operations, which must be
 	// 64-bit aligned even on 32-bit platforms. Go guarantees that an
 	// allocated struct will be 64-bit aligned. So we place
@@ -34,14 +42,6 @@ type Peer struct {
 	// This field is only 32 bits wide, but is still aligned to 64
 	// bits. Don't place other atomic fields after this one.
 	isRunning AtomicBool
-
-	// Mostly protects endpoint, but is generally taken whenever we modify peer
-	sync.RWMutex
-	keypairs                    Keypairs
-	handshake                   Handshake
-	device                      *Device
-	endpoint                    conn.Endpoint
-	persistentKeepaliveInterval uint16
 
 	timers struct {
 		retransmitHandshake     *Timer
