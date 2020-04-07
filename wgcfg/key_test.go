@@ -6,10 +6,11 @@ import (
 )
 
 func TestKeyBasics(t *testing.T) {
-	k1, err := NewPresharedKey()
+	pk1, err := NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
+	k1 := pk1.Public()
 
 	b, err := k1.MarshalJSON()
 	if err != nil {
@@ -18,7 +19,7 @@ func TestKeyBasics(t *testing.T) {
 
 	t.Run("JSON round-trip", func(t *testing.T) {
 		// should preserve the keys
-		k2 := new(Key)
+		k2 := new(PublicKey)
 		if err := k2.UnmarshalJSON(b); err != nil {
 			t.Fatal(err)
 		}
@@ -39,10 +40,11 @@ func TestKeyBasics(t *testing.T) {
 
 	t.Run("second key", func(t *testing.T) {
 		// A second call to NewPresharedKey should make a new key.
-		k3, err := NewPresharedKey()
+		pk3, err := NewPrivateKey()
 		if err != nil {
 			t.Fatal(err)
 		}
+		k3 := pk3.Public()
 		if bytes.Equal(k1[:], k3[:]) {
 			t.Fatalf("k1 %v == k3 %v", k1[:], k3[:])
 		}
@@ -52,6 +54,7 @@ func TestKeyBasics(t *testing.T) {
 		}
 	})
 }
+
 func TestPrivateKeyBasics(t *testing.T) {
 	pri, err := NewPrivateKey()
 	if err != nil {
@@ -81,7 +84,7 @@ func TestPrivateKeyBasics(t *testing.T) {
 	})
 
 	t.Run("JSON incompatible with Key", func(t *testing.T) {
-		k2 := new(Key)
+		k2 := new(PublicKey)
 		if err := k2.UnmarshalJSON(b); err == nil {
 			t.Fatalf("successfully decoded private key as key")
 		}
