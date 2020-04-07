@@ -23,7 +23,7 @@ type Config struct {
 }
 
 type Peer struct {
-	PublicKey           Key
+	PublicKey           PublicKey
 	PresharedKey        SymmetricKey
 	AllowedIPs          []CIDR
 	Endpoints           []Endpoint

@@ -100,7 +100,7 @@ func parsePersistentKeepalive(s string) (uint16, error) {
 	return uint16(m), nil
 }
 
-func parseKeyHex(s string) (*Key, error) {
+func parseKeyHex(s string) (*PublicKey, error) {
 	k, err := hex.DecodeString(s)
 	if err != nil {
 		return nil, &ParseError{"Invalid key: " + err.Error(), s}
@@ -108,7 +108,7 @@ func parseKeyHex(s string) (*Key, error) {
 	if len(k) != KeySize {
 		return nil, &ParseError{"Keys must decode to exactly 32 bytes", s}
 	}
-	var key Key
+	var key PublicKey
 	copy(key[:], k)
 	return &key, nil
 }
