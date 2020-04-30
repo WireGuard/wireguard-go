@@ -423,7 +423,7 @@ func (device *Device) IpcHandle(socket net.Conn) {
 	switch op {
 	case "set=1\n":
 		err = device.IpcSetOperation(buffered.Reader)
-		if !errors.As(err, &status) {
+		if errors.As(err, &status) {
 			// should never happen
 			device.log.Error.Println("Invalid UAPI error:", err)
 			status = &IPCError{1}
@@ -431,7 +431,7 @@ func (device *Device) IpcHandle(socket net.Conn) {
 
 	case "get=1\n":
 		err = device.IpcGetOperation(buffered.Writer)
-		if !errors.As(err, &status) {
+		if errors.As(err, &status) {
 			// should never happen
 			device.log.Error.Println("Invalid UAPI error:", err)
 			status = &IPCError{1}
