@@ -67,31 +67,6 @@ func (k PublicKey) IsZero() bool {
 	return subtle.ConstantTimeCompare(zeros[:], k[:]) == 1
 }
 
-func (k *PublicKey) MarshalJSON() ([]byte, error) {
-	if k == nil {
-		return []byte("null"), nil
-	}
-	buf := new(bytes.Buffer)
-	fmt.Fprintf(buf, `"%x"`, k[:])
-	return buf.Bytes(), nil
-}
-
-func (k *PublicKey) UnmarshalJSON(b []byte) error {
-	if k == nil {
-		return errors.New("wgcfg.PublicKey: UnmarshalJSON on nil pointer")
-	}
-	if len(b) < 3 || b[0] != '"' || b[len(b)-1] != '"' {
-		return errors.New("wgcfg.PublicKey: UnmarshalJSON not given a string")
-	}
-	b = b[1 : len(b)-1]
-	key, err := ParseHexKey(string(b))
-	if err != nil {
-		return fmt.Errorf("wgcfg.PublicKey: UnmarshalJSON: %v", err)
-	}
-	copy(k[:], key[:])
-	return nil
-}
-
 // PrivateKey is curve25519 key.
 // It is used by WireGuard to represent private keys.
 type PrivateKey [KeySize]byte
