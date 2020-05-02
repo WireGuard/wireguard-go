@@ -41,18 +41,16 @@ func warning() {
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, "WARNING WARNING WARNING WARNING WARNING WARNING WARNING")
-	fmt.Fprintln(os.Stderr, "W                                                     G")
-	fmt.Fprintln(os.Stderr, "W   You are running this software on a Linux kernel,  G")
-	fmt.Fprintln(os.Stderr, "W   which is probably unnecessary and misguided. This G")
-	fmt.Fprintln(os.Stderr, "W   is because the Linux kernel has built-in first    G")
-	fmt.Fprintln(os.Stderr, "W   class support for WireGuard, and this support is  G")
-	fmt.Fprintln(os.Stderr, "W   much more refined than this slower userspace      G")
-	fmt.Fprintln(os.Stderr, "W   implementation. For more information on           G")
-	fmt.Fprintln(os.Stderr, "W   installing the kernel module, please visit:       G")
-	fmt.Fprintln(os.Stderr, "W           https://www.wireguard.com/install         G")
-	fmt.Fprintln(os.Stderr, "W                                                     G")
-	fmt.Fprintln(os.Stderr, "WARNING WARNING WARNING WARNING WARNING WARNING WARNING")
+	fmt.Fprintln(os.Stderr, "┌───────────────────────────────────────────────────┐")
+	fmt.Fprintln(os.Stderr, "│                                                   │")
+	fmt.Fprintln(os.Stderr, "│   Running this software on Linux is unnecessary,  │")
+	fmt.Fprintln(os.Stderr, "│   because the Linux kernel has built-in first     │")
+	fmt.Fprintln(os.Stderr, "│   class support for WireGuard, which will be      │")
+	fmt.Fprintln(os.Stderr, "│   faster, slicker, and better integrated. For     │")
+	fmt.Fprintln(os.Stderr, "│   information on installing the kernel module,    │")
+	fmt.Fprintln(os.Stderr, "│   please visit: <https://wireguard.com/install>.  │")
+	fmt.Fprintln(os.Stderr, "│                                                   │")
+	fmt.Fprintln(os.Stderr, "└───────────────────────────────────────────────────┘")
 }
 
 func main() {
