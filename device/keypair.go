@@ -8,7 +8,9 @@ package device
 import (
 	"crypto/cipher"
 	"sync"
+	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"golang.zx2c4.com/wireguard/replay"
 )
@@ -36,6 +38,14 @@ type Keypairs struct {
 	current  *Keypair
 	previous *Keypair
 	next     *Keypair
+}
+
+func (kp *Keypairs) storeNext(next *Keypair) {
+	atomic.StorePointer((*unsafe.Pointer)((unsafe.Pointer)(&kp.next)), (unsafe.Pointer)(next))
+}
+
+func (kp *Keypairs) loadNext() *Keypair {
+	return (*Keypair)(atomic.LoadPointer((*unsafe.Pointer)((unsafe.Pointer)(&kp.next))))
 }
 
 func (kp *Keypairs) Current() *Keypair {
