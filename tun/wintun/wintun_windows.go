@@ -136,7 +136,7 @@ func (pool Pool) GetInterface(ifname string) (*Interface, error) {
 		if err != nil {
 			continue
 		}
-		if hwids, ok := property.([]string); ok && len(hwids) > 0 && hwids[0] != hardwareID {
+		if !isOurHardwareID(property) {
 			continue
 		}
 
@@ -508,7 +508,7 @@ func (pool Pool) DeleteMatchingInterfaces(matches func(wintun *Interface) bool) 
 		if err != nil {
 			continue
 		}
-		if hwids, ok := property.([]string); ok && len(hwids) > 0 && hwids[0] != hardwareID {
+		if !isOurHardwareID(property) {
 			continue
 		}
 
@@ -800,4 +800,21 @@ func (wintun *Interface) GUID() windows.GUID {
 // LUID returns the LUID of the interface.
 func (wintun *Interface) LUID() uint64 {
 	return ((uint64(wintun.luidIndex) & ((1 << 24) - 1)) << 24) | ((uint64(wintun.ifType) & ((1 << 16) - 1)) << 48)
+}
+
+func isOurHardwareID(property interface{}) bool {
+	hwidLC := strings.ToLower(hardwareID)
+
+	if hwids, ok := property.([]string); ok && len(hwids) > 0 {
+		for i := range hwids {
+			if strings.ToLower(hwids[i]) == hwidLC {
+				return true
+			}
+		}
+	}
+	if hwid, ok := property.(string); ok && strings.ToLower(hwid) == hwidLC {
+		return true
+	}
+
+	return false
 }
