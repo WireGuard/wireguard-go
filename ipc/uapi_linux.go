@@ -148,8 +148,7 @@ func UAPIOpen(name string) (*os.File, error) {
 
 	// check if path exist
 
-	err := os.MkdirAll(socketDirectory, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err := os.MkdirAll(socketDirectory, 0755); err != nil {
 		return nil, err
 	}
 
