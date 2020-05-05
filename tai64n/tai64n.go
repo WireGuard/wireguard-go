@@ -17,14 +17,17 @@ const whitenerMask = uint32(0x1000000 - 1)
 
 type Timestamp [TimestampSize]byte
 
-func Now() Timestamp {
+func stamp(t time.Time) Timestamp {
 	var tai64n Timestamp
-	now := time.Now()
-	secs := base + uint64(now.Unix())
-	nano := uint32(now.Nanosecond()) &^ whitenerMask
+	secs := base + uint64(t.Unix())
+	nano := uint32(t.Nanosecond()) &^ whitenerMask
 	binary.BigEndian.PutUint64(tai64n[:], secs)
 	binary.BigEndian.PutUint32(tai64n[8:], nano)
 	return tai64n
+}
+
+func Now() Timestamp {
+	return stamp(time.Now())
 }
 
 func (t1 Timestamp) After(t2 Timestamp) bool {
