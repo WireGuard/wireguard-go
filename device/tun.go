@@ -15,11 +15,8 @@ const DefaultMTU = 1420
 
 func (device *Device) RoutineTUNEventReader() {
 	setUp := false
-	logDebug := device.log.Debug
-	logInfo := device.log.Info
-	logError := device.log.Error
 
-	logDebug.Println("Routine: event worker - started")
+	device.log.Debug("Routine: event worker - started")
 	device.state.starting.Done()
 
 	for event := range device.tun.device.Events() {
@@ -27,30 +24,30 @@ func (device *Device) RoutineTUNEventReader() {
 			mtu, err := device.tun.device.MTU()
 			old := atomic.LoadInt32(&device.tun.mtu)
 			if err != nil {
-				logError.Println("Failed to load updated MTU of device:", err)
+				device.log.Error("Failed to load updated MTU of device:", err)
 			} else if int(old) != mtu {
 				if mtu+MessageTransportSize > MaxMessageSize {
-					logInfo.Println("MTU updated:", mtu, "(too large)")
+					device.log.Info("MTU updated:", mtu, "(too large)")
 				} else {
-					logInfo.Println("MTU updated:", mtu)
+					device.log.Info("MTU updated:", mtu)
 				}
 				atomic.StoreInt32(&device.tun.mtu, int32(mtu))
 			}
 		}
 
 		if event&tun.EventUp != 0 && !setUp {
-			logInfo.Println("Interface set up")
+			device.log.Info("Interface set up")
 			setUp = true
 			device.Up()
 		}
 
 		if event&tun.EventDown != 0 && setUp {
-			logInfo.Println("Interface set down")
+			device.log.Info("Interface set down")
 			setUp = false
 			device.Down()
 		}
 	}
 
-	logDebug.Println("Routine: event worker - stopped")
+	device.log.Debug("Routine: event worker - stopped")
 	device.state.stopping.Done()
 }

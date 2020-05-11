@@ -183,7 +183,7 @@ func (peer *Peer) Start() {
 	}
 
 	device := peer.device
-	device.log.Debug.Println(peer, "- Starting...")
+	device.log.Debug(peer, "- Starting...")
 
 	// reset routine state
 
@@ -272,7 +272,7 @@ func (peer *Peer) Stop() {
 	peer.routines.Lock()
 	defer peer.routines.Unlock()
 
-	peer.device.log.Debug.Println(peer, "- Stopping...")
+	peer.device.log.Debug(peer, "- Stopping...")
 
 	peer.timersStop()
 

@@ -22,7 +22,7 @@ import (
 type Device struct {
 	isUp     AtomicBool // device is (going) up
 	isClosed AtomicBool // device is closed? (acting as guard)
-	log      *Logger
+	log      Logger
 
 	// synchronized resources (locks acquired in order)
 
@@ -133,7 +133,7 @@ func deviceUpdateState(device *Device) {
 	switch newIsUp {
 	case true:
 		if err := device.BindUpdate(); err != nil {
-			device.log.Error.Printf("Unable to update bind: %v\n", err)
+			device.log.Error("Unable to update bind: %v\n", err)
 			device.isUp.Set(false)
 			break
 		}
@@ -253,7 +253,7 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 	return nil
 }
 
-func NewDevice(tunDevice tun.Device, logger *Logger) *Device {
+func NewDevice(tunDevice tun.Device, logger Logger) *Device {
 	device := new(Device)
 
 	device.isUp.Set(false)
@@ -264,7 +264,7 @@ func NewDevice(tunDevice tun.Device, logger *Logger) *Device {
 	device.tun.device = tunDevice
 	mtu, err := device.tun.device.MTU()
 	if err != nil {
-		logger.Error.Println("Trouble determining MTU, assuming default:", err)
+		device.log.Error("Trouble determining MTU, assuming default:", err)
 		mtu = DefaultMTU
 	}
 	device.tun.mtu = int32(mtu)
@@ -372,7 +372,7 @@ func (device *Device) Close() {
 
 	device.state.starting.Wait()
 
-	device.log.Info.Println("Device closing")
+	device.log.Info("Device closing")
 	device.state.changing.Set(true)
 	device.state.Lock()
 	defer device.state.Unlock()
@@ -392,7 +392,7 @@ func (device *Device) Close() {
 	device.rate.limiter.Close()
 
 	device.state.changing.Set(false)
-	device.log.Info.Println("Interface closed")
+	device.log.Info("Interface closed")
 }
 
 func (device *Device) Wait() chan struct{} {
@@ -527,7 +527,7 @@ func (device *Device) BindUpdate() error {
 		go device.RoutineReceiveIncoming(ipv6.Version, netc.bind)
 		device.net.starting.Wait()
 
-		device.log.Debug.Println("UDP bind has been updated")
+		device.log.Debug("UDP bind has been updated")
 	}
 
 	return nil
