@@ -25,4 +25,7 @@ install: wireguard-go
 clean:
 	rm -f wireguard-go
 
+test:
+	go test ./...
+
 .PHONY: all clean install generate-version-and-build
