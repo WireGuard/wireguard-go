@@ -73,7 +73,6 @@ func listenNet(network string, port int) (*net.UDPConn, int, error) {
 	}
 
 	// Retrieve port.
-	// TODO(crawshaw): under what circumstances is this necessary?
 	laddr := conn.LocalAddr()
 	uaddr, err := net.ResolveUDPAddr(
 		laddr.Network(),
