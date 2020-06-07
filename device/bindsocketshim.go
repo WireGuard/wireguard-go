@@ -34,3 +34,27 @@ func (device *Device) BindSocketToInterface6(interfaceIndex uint32, blackhole bo
 	}
 	return nil
 }
+
+// TODO(crawshaw): this method is a compatibility shim. Replace with direct use of conn.
+func (device *Device) PeekLookAtSocketFd4() (fd int, err error) {
+	if device.net.bind == nil {
+		return -1, errors.New("Bind is not yet initialized")
+	}
+
+	if iface, ok := device.net.bind.(conn.PeekLookAtSocketFd); ok {
+		return iface.PeekLookAtSocketFd4()
+	}
+	return -1, errors.New("unimplemented")
+}
+
+// TODO(crawshaw): this method is a compatibility shim. Replace with direct use of conn.
+func (device *Device) PeekLookAtSocketFd6() (fd int, err error) {
+	if device.net.bind == nil {
+		return -1, errors.New("Bind is not yet initialized")
+	}
+
+	if iface, ok := device.net.bind.(conn.PeekLookAtSocketFd); ok {
+		return iface.PeekLookAtSocketFd6()
+	}
+	return -1, errors.New("unimplemented")
+}

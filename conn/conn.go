@@ -57,6 +57,13 @@ type BindSocketToInterface interface {
 	BindSocketToInterface6(interfaceIndex uint32, blackhole bool) error
 }
 
+// PeekLookAtSocketFd is implemented by Bind objects that support having their
+// file descriptor peeked at.
+type PeekLookAtSocketFd interface {
+	PeekLookAtSocketFd4() (fd int, err error)
+	PeekLookAtSocketFd6() (fd int, err error)
+}
+
 // An Endpoint maintains the source/destination caching for a peer.
 //
 //	dst : the remote address of a peer ("endpoint" in uapi terminology)
