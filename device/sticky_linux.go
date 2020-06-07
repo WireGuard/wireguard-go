@@ -1,3 +1,5 @@
+// +build !android
+
 /* SPDX-License-Identifier: MIT
  *
  * Copyright (C) 2017-2020 WireGuard LLC. All Rights Reserved.
