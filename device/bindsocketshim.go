@@ -17,8 +17,8 @@ func (device *Device) BindSocketToInterface4(interfaceIndex uint32, blackhole bo
 		return errors.New("Bind is not yet initialized")
 	}
 
-	if iface, ok := device.net.bind.(conn.BindToInterface); ok {
-		return iface.BindToInterface4(interfaceIndex, blackhole)
+	if iface, ok := device.net.bind.(conn.BindSocketToInterface); ok {
+		return iface.BindSocketToInterface4(interfaceIndex, blackhole)
 	}
 	return nil
 }
@@ -29,8 +29,8 @@ func (device *Device) BindSocketToInterface6(interfaceIndex uint32, blackhole bo
 		return errors.New("Bind is not yet initialized")
 	}
 
-	if iface, ok := device.net.bind.(conn.BindToInterface); ok {
-		return iface.BindToInterface6(interfaceIndex, blackhole)
+	if iface, ok := device.net.bind.(conn.BindSocketToInterface); ok {
+		return iface.BindSocketToInterface6(interfaceIndex, blackhole)
 	}
 	return nil
 }

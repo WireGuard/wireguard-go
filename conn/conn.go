@@ -50,11 +50,11 @@ func CreateBind(port uint16) (b Bind, actualPort uint16, err error) {
 	return createBind(port)
 }
 
-// BindToInterface is implemented by Bind objects that support being
+// BindSocketToInterface is implemented by Bind objects that support being
 // tied to a single network interface.
-type BindToInterface interface {
-	BindToInterface4(interfaceIndex uint32, blackhole bool) error
-	BindToInterface6(interfaceIndex uint32, blackhole bool) error
+type BindSocketToInterface interface {
+	BindSocketToInterface4(interfaceIndex uint32, blackhole bool) error
+	BindSocketToInterface6(interfaceIndex uint32, blackhole bool) error
 }
 
 // An Endpoint maintains the source/destination caching for a peer.
