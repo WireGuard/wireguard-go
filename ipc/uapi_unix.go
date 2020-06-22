@@ -23,6 +23,8 @@ const (
 	IpcErrorPortInUse = -int64(unix.EADDRINUSE)
 )
 
+// socketDirectory is variable because it is modified by a linker
+// flag in wireguard-android.
 var socketDirectory = "/var/run/wireguard"
 
 func sockPath(iface string) string {
