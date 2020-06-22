@@ -430,6 +430,12 @@ func unsafeCloseBind(device *Device) error {
 	return err
 }
 
+func (device *Device) Bind() conn.Bind {
+	device.net.Lock()
+	defer device.net.Unlock()
+	return device.net.bind
+}
+
 func (device *Device) BindSetMark(mark uint32) error {
 
 	device.net.Lock()
