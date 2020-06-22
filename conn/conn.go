@@ -13,6 +13,9 @@ import (
 )
 
 // A Bind listens on a port for both IPv6 and IPv4 UDP traffic.
+//
+// A Bind interface may also be a PeekLookAtSocketFd or BindSocketToInterface,
+// depending on the platform-specific implementation.
 type Bind interface {
 	// LastMark reports the last mark set for this Bind.
 	LastMark() uint32
@@ -51,14 +54,14 @@ func CreateBind(port uint16) (b Bind, actualPort uint16, err error) {
 }
 
 // BindSocketToInterface is implemented by Bind objects that support being
-// tied to a single network interface.
+// tied to a single network interface. Used by wireguard-windows.
 type BindSocketToInterface interface {
 	BindSocketToInterface4(interfaceIndex uint32, blackhole bool) error
 	BindSocketToInterface6(interfaceIndex uint32, blackhole bool) error
 }
 
 // PeekLookAtSocketFd is implemented by Bind objects that support having their
-// file descriptor peeked at.
+// file descriptor peeked at. Used by wireguard-android.
 type PeekLookAtSocketFd interface {
 	PeekLookAtSocketFd4() (fd int, err error)
 	PeekLookAtSocketFd6() (fd int, err error)
