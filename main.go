@@ -20,15 +20,12 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-const (
-	ExitSetupSuccess = 0
-	ExitSetupFailed  = 1
-)
+const exitCodeSetupFailed = 1
 
 const (
-	ENV_WG_TUN_FD             = "WG_TUN_FD"
-	ENV_WG_UAPI_FD            = "WG_UAPI_FD"
-	ENV_WG_PROCESS_FOREGROUND = "WG_PROCESS_FOREGROUND"
+	envWgTunFd             = "WG_TUN_FD"
+	envWgUapiFd            = "WG_UAPI_FD"
+	envWgProcessForeground = "WG_PROCESS_FOREGROUND"
 )
 
 func printUsage() {
@@ -37,20 +34,20 @@ func printUsage() {
 }
 
 func warning() {
-	if runtime.GOOS != "linux" || os.Getenv(ENV_WG_PROCESS_FOREGROUND) == "1" {
+	if runtime.GOOS != "linux" || os.Getenv(envWgProcessForeground) == "1" {
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, "┌───────────────────────────────────────────────────┐")
-	fmt.Fprintln(os.Stderr, "│                                                   │")
-	fmt.Fprintln(os.Stderr, "│   Running this software on Linux is unnecessary,  │")
-	fmt.Fprintln(os.Stderr, "│   because the Linux kernel has built-in first     │")
-	fmt.Fprintln(os.Stderr, "│   class support for WireGuard, which will be      │")
-	fmt.Fprintln(os.Stderr, "│   faster, slicker, and better integrated. For     │")
-	fmt.Fprintln(os.Stderr, "│   information on installing the kernel module,    │")
-	fmt.Fprintln(os.Stderr, "│   please visit: <https://wireguard.com/install>.  │")
-	fmt.Fprintln(os.Stderr, "│                                                   │")
-	fmt.Fprintln(os.Stderr, "└───────────────────────────────────────────────────┘")
+	_, _ = fmt.Fprintln(os.Stderr, "┌───────────────────────────────────────────────────┐")
+	_, _ = fmt.Fprintln(os.Stderr, "│                                                   │")
+	_, _ = fmt.Fprintln(os.Stderr, "│   Running this software on Linux is unnecessary,  │")
+	_, _ = fmt.Fprintln(os.Stderr, "│   because the Linux kernel has built-in first     │")
+	_, _ = fmt.Fprintln(os.Stderr, "│   class support for WireGuard, which will be      │")
+	_, _ = fmt.Fprintln(os.Stderr, "│   faster, slicker, and better integrated. For     │")
+	_, _ = fmt.Fprintln(os.Stderr, "│   information on installing the kernel module,    │")
+	_, _ = fmt.Fprintln(os.Stderr, "│   please visit: <https://wireguard.com/install>.  │")
+	_, _ = fmt.Fprintln(os.Stderr, "│                                                   │")
+	_, _ = fmt.Fprintln(os.Stderr, "└───────────────────────────────────────────────────┘")
 }
 
 func main() {
@@ -88,7 +85,7 @@ func main() {
 	}
 
 	if !foreground {
-		foreground = os.Getenv(ENV_WG_PROCESS_FOREGROUND) == "1"
+		foreground = os.Getenv(envWgProcessForeground) == "1"
 	}
 
 	// get log level (default: info)
@@ -109,8 +106,8 @@ func main() {
 
 	// open TUN device (or use supplied fd)
 
-	tun, err := func() (tun.Device, error) {
-		tunFdStr := os.Getenv(ENV_WG_TUN_FD)
+	tunDevice, err := func() (tun.Device, error) {
+		tunFdStr := os.Getenv(envWgTunFd)
 		if tunFdStr == "" {
 			return tun.CreateTUN(interfaceName, device.DefaultMTU)
 		}
@@ -132,7 +129,7 @@ func main() {
 	}()
 
 	if err == nil {
-		realInterfaceName, err2 := tun.Name()
+		realInterfaceName, err2 := tunDevice.Name()
 		if err2 == nil {
 			interfaceName = realInterfaceName
 		}
@@ -149,13 +146,13 @@ func main() {
 
 	if err != nil {
 		logger.Error.Println("Failed to create TUN device:", err)
-		os.Exit(ExitSetupFailed)
+		os.Exit(exitCodeSetupFailed)
 	}
 
 	// open UAPI file (or use supplied fd)
 
 	fileUAPI, err := func() (*os.File, error) {
-		uapiFdStr := os.Getenv(ENV_WG_UAPI_FD)
+		uapiFdStr := os.Getenv(envWgUapiFd)
 		if uapiFdStr == "" {
 			return ipc.UAPIOpen(interfaceName)
 		}
@@ -172,16 +169,16 @@ func main() {
 
 	if err != nil {
 		logger.Error.Println("UAPI listen error:", err)
-		os.Exit(ExitSetupFailed)
+		os.Exit(exitCodeSetupFailed)
 		return
 	}
 	// daemonize the process
 
 	if !foreground {
 		env := os.Environ()
-		env = append(env, fmt.Sprintf("%s=3", ENV_WG_TUN_FD))
-		env = append(env, fmt.Sprintf("%s=4", ENV_WG_UAPI_FD))
-		env = append(env, fmt.Sprintf("%s=1", ENV_WG_PROCESS_FOREGROUND))
+		env = append(env, fmt.Sprintf("%s=3", envWgTunFd))
+		env = append(env, fmt.Sprintf("%s=4", envWgUapiFd))
+		env = append(env, fmt.Sprintf("%s=1", envWgProcessForeground))
 		files := [3]*os.File{}
 		if os.Getenv("LOG_LEVEL") != "" && logLevel != device.LogLevelSilent {
 			files[0], _ = os.Open(os.DevNull)
@@ -197,7 +194,7 @@ func main() {
 				files[0], // stdin
 				files[1], // stdout
 				files[2], // stderr
-				tun.File(),
+				tunDevice.File(),
 				fileUAPI,
 			},
 			Dir: ".",
@@ -207,7 +204,7 @@ func main() {
 		path, err := os.Executable()
 		if err != nil {
 			logger.Error.Println("Failed to determine executable:", err)
-			os.Exit(ExitSetupFailed)
+			os.Exit(exitCodeSetupFailed)
 		}
 
 		process, err := os.StartProcess(
@@ -217,13 +214,19 @@ func main() {
 		)
 		if err != nil {
 			logger.Error.Println("Failed to daemonize:", err)
-			os.Exit(ExitSetupFailed)
+			os.Exit(exitCodeSetupFailed)
 		}
-		process.Release()
+
+		err = process.Release()
+
+		if err != nil {
+			logger.Error.Println("Failed to release process:", err)
+		}
+
 		return
 	}
 
-	device := device.NewDevice(tun, logger)
+	dev := device.NewDevice(tunDevice, logger)
 
 	logger.Info.Println("Device started")
 
@@ -233,7 +236,7 @@ func main() {
 	uapi, err := ipc.UAPIListen(interfaceName, fileUAPI)
 	if err != nil {
 		logger.Error.Println("Failed to listen on uapi socket:", err)
-		os.Exit(ExitSetupFailed)
+		os.Exit(exitCodeSetupFailed)
 	}
 
 	go func() {
@@ -243,7 +246,7 @@ func main() {
 				errs <- err
 				return
 			}
-			go device.IpcHandle(conn)
+			go dev.IpcHandle(conn)
 		}
 	}()
 
@@ -257,13 +260,18 @@ func main() {
 	select {
 	case <-term:
 	case <-errs:
-	case <-device.Wait():
+	case <-dev.Wait():
 	}
 
 	// clean up
 
-	uapi.Close()
-	device.Close()
+	err = uapi.Close()
+
+	if err != nil {
+		logger.Info.Println("Failed to close UAPI listener", err)
+	}
+
+	dev.Close()
 
 	logger.Info.Println("Shutting down")
 }
