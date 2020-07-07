@@ -206,7 +206,7 @@ func createNetlinkRouteSocket() (int, error) {
 	}
 	saddr := &unix.SockaddrNetlink{
 		Family: unix.AF_NETLINK,
-		Groups: uint32(1 << (unix.RTNLGRP_IPV4_ROUTE - 1)),
+		Groups: unix.RTMGRP_IPV4_ROUTE,
 	}
 	err = unix.Bind(sock, saddr)
 	if err != nil {
