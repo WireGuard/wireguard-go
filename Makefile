@@ -22,7 +22,10 @@ wireguard-go: $(wildcard *.go) $(wildcard */*.go)
 install: wireguard-go
 	@install -v -d "$(DESTDIR)$(BINDIR)" && install -v -m 0755 "$<" "$(DESTDIR)$(BINDIR)/wireguard-go"
 
+test:
+	go test -v ./...
+
 clean:
 	rm -f wireguard-go
 
-.PHONY: all clean install generate-version-and-build
+.PHONY: all clean test install generate-version-and-build
