@@ -112,20 +112,22 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 		endpoint conn.Endpoint
 	)
 
+	receive := bind.ReceiveIPv4
+
+	switch IP {
+	case ipv4.Version:
+		receive = bind.ReceiveIPv4
+	case ipv6.Version:
+		receive = bind.ReceiveIPv6
+	default:
+		panic("invalid IP version")
+	}
+
 	for {
 
 		// read next datagram
 
-		switch IP {
-		case ipv4.Version:
-			size, endpoint, err = bind.ReceiveIPv4(buffer[:])
-		case ipv6.Version:
-			size, endpoint, err = bind.ReceiveIPv6(buffer[:])
-		default:
-			panic("invalid IP version")
-		}
-
-		if err != nil {
+		if size, endpoint, err = receive(buffer[:]); err != nil {
 			device.PutMessageBuffer(buffer)
 			return
 		}
