@@ -50,12 +50,13 @@ func genICMPv4(payload []byte, dst, src net.IP) []byte {
 		ipv4TotalLenOffset   = 2
 		ipv4ChecksumOffset   = 10
 		ttl                  = 65
+		headerSize           = ipv4Size + icmpv4Size
 	)
 
-	hdr := make([]byte, ipv4Size+icmpv4Size)
+	pkt := make([]byte, headerSize+len(payload))
 
-	ip := hdr[0:ipv4Size]
-	icmpv4 := hdr[ipv4Size : ipv4Size+icmpv4Size]
+	ip := pkt[0:ipv4Size]
+	icmpv4 := pkt[ipv4Size : ipv4Size+icmpv4Size]
 
 	// https://tools.ietf.org/html/rfc792
 	icmpv4[0] = icmpv4Echo // type
@@ -64,7 +65,7 @@ func genICMPv4(payload []byte, dst, src net.IP) []byte {
 	binary.BigEndian.PutUint16(icmpv4[icmpv4ChecksumOffset:], chksum)
 
 	// https://tools.ietf.org/html/rfc760 section 3.1
-	length := uint16(len(hdr) + len(payload))
+	length := uint16(len(pkt))
 	ip[0] = (4 << 4) | (ipv4Size / 4)
 	binary.BigEndian.PutUint16(ip[ipv4TotalLenOffset:], length)
 	ip[8] = ttl
@@ -74,10 +75,8 @@ func genICMPv4(payload []byte, dst, src net.IP) []byte {
 	chksum = ^checksum(ip[:], 0)
 	binary.BigEndian.PutUint16(ip[ipv4ChecksumOffset:], chksum)
 
-	var v []byte
-	v = append(v, hdr...)
-	v = append(v, payload...)
-	return []byte(v)
+	copy(pkt[headerSize:], payload)
+	return pkt
 }
 
 // TODO(crawshaw): find a reusable home for this. package devicetest?
