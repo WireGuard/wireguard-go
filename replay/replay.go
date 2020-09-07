@@ -26,7 +26,7 @@ const (
 )
 
 const (
-	BacktrackWords = CounterBitsTotal / _WordSize
+	BacktrackWords = CounterBitsTotal / 8 / _WordSize
 )
 
 func minUint64(a uint64, b uint64) uint64 {
