@@ -17,24 +17,24 @@ const (
 	bitMask     = blockBits - 1
 )
 
-// A ReplayFilter rejects replayed messages by checking if message counter value is
+// A Filter rejects replayed messages by checking if message counter value is
 // within a sliding window of previously received messages.
-// The zero value for ReplayFilter is an empty filter ready to use.
+// The zero value for Filter is an empty filter ready to use.
 // Filters are unsafe for concurrent use.
-type ReplayFilter struct {
+type Filter struct {
 	last uint64
 	ring [ringBlocks]block
 }
 
-// Init resets the filter to empty state.
-func (f *ReplayFilter) Init() {
+// Reset resets the filter to empty state.
+func (f *Filter) Reset() {
 	f.last = 0
 	f.ring[0] = 0
 }
 
 // ValidateCounter checks if the counter should be accepted.
 // Overlimit counters (>= limit) are always rejected.
-func (f *ReplayFilter) ValidateCounter(counter uint64, limit uint64) bool {
+func (f *Filter) ValidateCounter(counter uint64, limit uint64) bool {
 	if counter >= limit {
 		return false
 	}

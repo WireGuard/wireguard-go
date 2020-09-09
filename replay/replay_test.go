@@ -14,10 +14,10 @@ import (
  *
  */
 
-const RejectAfterMessages = (1 << 64) - (1 << 4) - 1
+const RejectAfterMessages = 1<<64 - 1<<13 - 1
 
 func TestReplay(t *testing.T) {
-	var filter ReplayFilter
+	var filter Filter
 
 	const T_LIM = windowSize + 1
 
@@ -29,7 +29,7 @@ func TestReplay(t *testing.T) {
 		}
 	}
 
-	filter.Init()
+	filter.Reset()
 
 	T(0, true)                      /*  1 */
 	T(1, true)                      /*  2 */
@@ -67,7 +67,7 @@ func TestReplay(t *testing.T) {
 	T(0, false)                     /* 34 */
 
 	t.Log("Bulk test 1")
-	filter.Init()
+	filter.Reset()
 	testNumber = 0
 	for i := uint64(1); i <= windowSize; i++ {
 		T(i, true)
@@ -76,7 +76,7 @@ func TestReplay(t *testing.T) {
 	T(0, false)
 
 	t.Log("Bulk test 2")
-	filter.Init()
+	filter.Reset()
 	testNumber = 0
 	for i := uint64(2); i <= windowSize+1; i++ {
 		T(i, true)
@@ -85,14 +85,14 @@ func TestReplay(t *testing.T) {
 	T(0, false)
 
 	t.Log("Bulk test 3")
-	filter.Init()
+	filter.Reset()
 	testNumber = 0
 	for i := uint64(windowSize + 1); i > 0; i-- {
 		T(i, true)
 	}
 
 	t.Log("Bulk test 4")
-	filter.Init()
+	filter.Reset()
 	testNumber = 0
 	for i := uint64(windowSize + 2); i > 1; i-- {
 		T(i, true)
@@ -100,7 +100,7 @@ func TestReplay(t *testing.T) {
 	T(0, false)
 
 	t.Log("Bulk test 5")
-	filter.Init()
+	filter.Reset()
 	testNumber = 0
 	for i := uint64(windowSize); i > 0; i-- {
 		T(i, true)
@@ -109,7 +109,7 @@ func TestReplay(t *testing.T) {
 	T(0, false)
 
 	t.Log("Bulk test 6")
-	filter.Init()
+	filter.Reset()
 	testNumber = 0
 	for i := uint64(windowSize); i > 0; i-- {
 		T(i, true)

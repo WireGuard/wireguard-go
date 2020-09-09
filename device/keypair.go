@@ -26,7 +26,7 @@ type Keypair struct {
 	sendNonce    uint64
 	send         cipher.AEAD
 	receive      cipher.AEAD
-	replayFilter replay.ReplayFilter
+	replayFilter replay.Filter
 	isInitiator  bool
 	created      time.Time
 	localIndex   uint32
