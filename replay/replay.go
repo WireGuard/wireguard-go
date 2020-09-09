@@ -3,81 +3,60 @@
  * Copyright (C) 2017-2020 WireGuard LLC. All Rights Reserved.
  */
 
+// Package replay implements an efficient anti-replay algorithm as specified in RFC 6479.
 package replay
 
-/* Implementation of RFC6479
- * https://tools.ietf.org/html/rfc6479
- *
- * The implementation is not safe for concurrent use!
- */
+type block uint64
 
 const (
-	// See: https://golang.org/src/math/big/arith.go
-	_Wordm       = ^uintptr(0)
-	_WordLogSize = _Wordm>>8&1 + _Wordm>>16&1 + _Wordm>>32&1
-	_WordSize    = 1 << _WordLogSize
+	blockBitLog = 6                // 1<<6 == 64 bits
+	blockBits   = 1 << blockBitLog // must be power of 2
+	ringBlocks  = 1 << 7           // must be power of 2
+	windowSize  = (ringBlocks - 1) * blockBits
+	blockMask   = ringBlocks - 1
+	bitMask     = blockBits - 1
 )
 
-const (
-	CounterRedundantBitsLog = _WordLogSize + 3
-	CounterRedundantBits    = _WordSize * 8
-	CounterBitsTotal        = 8192
-	CounterWindowSize       = uint64(CounterBitsTotal - CounterRedundantBits)
-)
-
-const (
-	BacktrackWords = CounterBitsTotal / 8 / _WordSize
-)
-
-func minUint64(a uint64, b uint64) uint64 {
-	if a > b {
-		return b
-	}
-	return a
-}
-
+// A ReplayFilter rejects replayed messages by checking if message counter value is
+// within a sliding window of previously received messages.
+// The zero value for ReplayFilter is an empty filter ready to use.
+// Filters are unsafe for concurrent use.
 type ReplayFilter struct {
-	counter   uint64
-	backtrack [BacktrackWords]uintptr
+	last uint64
+	ring [ringBlocks]block
 }
 
-func (filter *ReplayFilter) Init() {
-	filter.counter = 0
-	filter.backtrack[0] = 0
+// Init resets the filter to empty state.
+func (f *ReplayFilter) Init() {
+	f.last = 0
+	f.ring[0] = 0
 }
 
-func (filter *ReplayFilter) ValidateCounter(counter uint64, limit uint64) bool {
+// ValidateCounter checks if the counter should be accepted.
+// Overlimit counters (>= limit) are always rejected.
+func (f *ReplayFilter) ValidateCounter(counter uint64, limit uint64) bool {
 	if counter >= limit {
 		return false
 	}
-
-	indexWord := counter >> CounterRedundantBitsLog
-
-	if counter > filter.counter {
-
-		// move window forward
-
-		current := filter.counter >> CounterRedundantBitsLog
-		diff := minUint64(indexWord-current, BacktrackWords)
-		for i := uint64(1); i <= diff; i++ {
-			filter.backtrack[(current+i)%BacktrackWords] = 0
+	indexBlock := counter >> blockBitLog
+	if counter > f.last { // move window forward
+		current := f.last >> blockBitLog
+		diff := indexBlock - current
+		if diff > ringBlocks {
+			diff = ringBlocks // cap diff to clear the whole ring
 		}
-		filter.counter = counter
-
-	} else if filter.counter-counter > CounterWindowSize {
-
-		// behind current window
-
+		for i := current + 1; i <= current+diff; i++ {
+			f.ring[i&blockMask] = 0
+		}
+		f.last = counter
+	} else if f.last-counter > windowSize { // behind current window
 		return false
 	}
-
-	indexWord %= BacktrackWords
-	indexBit := counter & uint64(CounterRedundantBits-1)
-
 	// check and set bit
-
-	oldValue := filter.backtrack[indexWord]
-	newValue := oldValue | (1 << indexBit)
-	filter.backtrack[indexWord] = newValue
-	return oldValue != newValue
+	indexBlock &= blockMask
+	indexBit := counter & bitMask
+	old := f.ring[indexBlock]
+	new := old | 1<<indexBit
+	f.ring[indexBlock] = new
+	return old != new
 }
