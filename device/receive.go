@@ -633,14 +633,14 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 		offset := MessageTransportOffsetContent
 		_, err := device.tun.device.Write(elem.buffer[:offset+len(elem.packet)], offset)
+		if err != nil && !device.isClosed.Get() {
+			logError.Println("Failed to write packet to TUN device:", err)
+		}
 		if len(peer.queue.inbound) == 0 {
-			err = device.tun.device.Flush()
+			err := device.tun.device.Flush()
 			if err != nil {
 				peer.device.log.Error.Printf("Unable to flush packets: %v", err)
 			}
-		}
-		if err != nil && !device.isClosed.Get() {
-			logError.Println("Failed to write packet to TUN device:", err)
 		}
 	}
 }
