@@ -28,6 +28,7 @@ type Peer struct {
 	device                      *Device
 	endpoint                    conn.Endpoint
 	persistentKeepaliveInterval uint16
+	disableRoaming              bool
 
 	// These fields are accessed with atomic operations, which must be
 	// 64-bit aligned even on 32-bit platforms. Go guarantees that an
@@ -290,10 +291,9 @@ func (peer *Peer) Stop() {
 	peer.ZeroAndFlushAll()
 }
 
-var RoamingDisabled bool
 
 func (peer *Peer) SetEndpointFromPacket(endpoint conn.Endpoint) {
-	if RoamingDisabled {
+	if peer.disableRoaming {
 		return
 	}
 	peer.Lock()
