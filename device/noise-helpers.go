@@ -97,6 +97,10 @@ func (sk *NoisePrivateKey) publicKey() (pk NoisePublicKey) {
 func (sk *NoisePrivateKey) sharedSecret(pk NoisePublicKey) (ss [NoisePublicKeySize]byte) {
 	apk := (*[NoisePublicKeySize]byte)(&pk)
 	ask := (*[NoisePrivateKeySize]byte)(sk)
-	curve25519.ScalarMult(&ss, ask, apk)
+	p, err := curve25519.X25519(ask[:], apk[:])
+	if err != nil {
+		panic(err)
+	}
+	copy(ss[:], p)
 	return ss
 }
