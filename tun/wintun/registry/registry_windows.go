@@ -183,7 +183,7 @@ func toString(buf []byte, valueType uint32, err error) (string, error) {
 		if len(buf) == 0 {
 			return "", nil
 		}
-		value = windows.UTF16ToString((*[(1 << 30) - 1]uint16)(unsafe.Pointer(&buf[0]))[:len(buf)/2])
+		value = windows.UTF16PtrToString((*uint16)(unsafe.Pointer(&buf[0])))
 
 	default:
 		return "", registry.ErrUnexpectedType
