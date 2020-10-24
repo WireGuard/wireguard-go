@@ -45,7 +45,6 @@ var (
 	procWintunGetAdapterLUID          = modwintun.NewProc("WintunGetAdapterLUID")
 	procWintunGetAdapterName          = modwintun.NewProc("WintunGetAdapterName")
 	procWintunGetRunningDriverVersion = modwintun.NewProc("WintunGetRunningDriverVersion")
-	procWintunOpenAdapterDeviceObject = modwintun.NewProc("WintunOpenAdapterDeviceObject")
 	procWintunSetAdapterName          = modwintun.NewProc("WintunSetAdapterName")
 	procWintunSetLogger               = modwintun.NewProc("WintunSetLogger")
 )
@@ -205,16 +204,6 @@ func RunningVersion() (version uint32, err error) {
 	r0, _, e1 := syscall.Syscall(procWintunGetRunningDriverVersion.Addr(), 0, 0, 0, 0)
 	version = uint32(r0)
 	if version == 0 {
-		err = e1
-	}
-	return
-}
-
-// handle returns a handle to the adapter device object. Release handle with windows.CloseHandle
-func (wintun *Adapter) OpenAdapterDeviceObject() (handle windows.Handle, err error) {
-	r0, _, e1 := syscall.Syscall(procWintunOpenAdapterDeviceObject.Addr(), 1, uintptr(wintun.handle), 0, 0)
-	handle = windows.Handle(r0)
-	if handle == windows.InvalidHandle {
 		err = e1
 	}
 	return
