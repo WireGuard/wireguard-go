@@ -230,27 +230,19 @@ func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 }
 
 func (tun *NativeTun) Name() (string, error) {
-	var ifName struct {
-		name [16]byte
-	}
-	ifNameSize := uintptr(16)
-
-	var errno syscall.Errno
+	var err error
 	tun.operateOnFd(func(fd uintptr) {
-		_, _, errno = unix.Syscall6(
-			unix.SYS_GETSOCKOPT,
-			fd,
+		tun.name, err = unix.GetsockoptString(
+			int(fd),
 			2, /* #define SYSPROTO_CONTROL 2 */
 			2, /* #define UTUN_OPT_IFNAME 2 */
-			uintptr(unsafe.Pointer(&ifName)),
-			uintptr(unsafe.Pointer(&ifNameSize)), 0)
+		)
 	})
 
-	if errno != 0 {
-		return "", fmt.Errorf("SYS_GETSOCKOPT: %v", errno)
+	if err != nil {
+		return "", fmt.Errorf("GetSockoptString: %w", err)
 	}
 
-	tun.name = string(ifName.name[:ifNameSize-1])
 	return tun.name, nil
 }
 
