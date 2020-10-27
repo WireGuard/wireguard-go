@@ -298,11 +298,6 @@ func (tun *NativeTun) Close() error {
 }
 
 func (tun *NativeTun) setMTU(n int) error {
-
-	// open datagram socket
-
-	var fd int
-
 	fd, err := unix.Socket(
 		unix.AF_INET,
 		unix.SOCK_DGRAM,
@@ -315,29 +310,18 @@ func (tun *NativeTun) setMTU(n int) error {
 
 	defer unix.Close(fd)
 
-	// do ioctl call
-
-	var ifr [32]byte
-	copy(ifr[:], tun.name)
-	*(*uint32)(unsafe.Pointer(&ifr[unix.IFNAMSIZ])) = uint32(n)
-	_, _, errno := unix.Syscall(
-		unix.SYS_IOCTL,
-		uintptr(fd),
-		uintptr(unix.SIOCSIFMTU),
-		uintptr(unsafe.Pointer(&ifr[0])),
-	)
-
-	if errno != 0 {
-		return fmt.Errorf("failed to set MTU on %s", tun.name)
+	var ifr unix.IfreqMTU
+	copy(ifr.Name[:], tun.name)
+	ifr.MTU = int32(n)
+	err = unix.IoctlSetIfreqMTU(fd, &ifr)
+	if err != nil {
+		return fmt.Errorf("failed to set MTU on %s: %w", tun.name, err)
 	}
 
 	return nil
 }
 
 func (tun *NativeTun) MTU() (int, error) {
-
-	// open datagram socket
-
 	fd, err := unix.Socket(
 		unix.AF_INET,
 		unix.SOCK_DGRAM,
@@ -350,19 +334,10 @@ func (tun *NativeTun) MTU() (int, error) {
 
 	defer unix.Close(fd)
 
-	// do ioctl call
-
-	var ifr [64]byte
-	copy(ifr[:], tun.name)
-	_, _, errno := unix.Syscall(
-		unix.SYS_IOCTL,
-		uintptr(fd),
-		uintptr(unix.SIOCGIFMTU),
-		uintptr(unsafe.Pointer(&ifr[0])),
-	)
-	if errno != 0 {
-		return 0, fmt.Errorf("failed to get MTU on %s", tun.name)
+	ifr, err := unix.IoctlGetIfreqMTU(fd, tun.name)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get MTU on %s: %w", tun.name, err)
 	}
 
-	return int(*(*int32)(unsafe.Pointer(&ifr[16]))), nil
+	return int(ifr.MTU), nil
 }
