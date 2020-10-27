@@ -20,16 +20,6 @@ import (
 
 const utunControlName = "com.apple.net.utun_control"
 
-// sockaddr_ctl specifeid in /usr/include/sys/kern_control.h
-type sockaddrCtl struct {
-	scLen      uint8
-	scFamily   uint8
-	ssSysaddr  uint16
-	scID       uint32
-	scUnit     uint32
-	scReserved [5]uint32
-}
-
 type NativeTun struct {
 	name        string
 	tunFile     *os.File
@@ -37,8 +27,6 @@ type NativeTun struct {
 	errors      chan error
 	routeSocket int
 }
-
-var sockaddrCtlSize uintptr = 32
 
 func retryInterfaceByIndex(index int) (iface *net.Interface, err error) {
 	for i := 0; i < 20; i++ {
@@ -134,25 +122,14 @@ func CreateTUN(name string, mtu int) (Device, error) {
 		return nil, fmt.Errorf("IoctlGetCtlInfo: %w", err)
 	}
 
-	sc := sockaddrCtl{
-		scLen:     uint8(sockaddrCtlSize),
-		scFamily:  unix.AF_SYSTEM,
-		ssSysaddr: 2,
-		scID:      ctlInfo.Id,
-		scUnit:    uint32(ifIndex) + 1,
+	sc := &unix.SockaddrCtl{
+		ID:   ctlInfo.Id,
+		Unit: uint32(ifIndex) + 1,
 	}
 
-	scPointer := unsafe.Pointer(&sc)
-
-	_, _, errno = unix.RawSyscall(
-		unix.SYS_CONNECT,
-		uintptr(fd),
-		uintptr(scPointer),
-		uintptr(sockaddrCtlSize),
-	)
-
-	if errno != 0 {
-		return nil, fmt.Errorf("SYS_CONNECT: %v", errno)
+	err = unix.Connect(fd, sc)
+	if err != nil {
+		return nil, err
 	}
 
 	err = syscall.SetNonblock(fd, true)
