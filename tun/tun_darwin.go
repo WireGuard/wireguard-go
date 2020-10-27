@@ -20,9 +20,6 @@ import (
 
 const utunControlName = "com.apple.net.utun_control"
 
-// _CTLIOCGINFO value derived from /usr/include/sys/{kern_control,ioccom}.h
-const _CTLIOCGINFO = (0x40000000 | 0x80000000) | ((100 & 0x1fff) << 16) | uint32(byte('N'))<<8 | 3
-
 // sockaddr_ctl specifeid in /usr/include/sys/kern_control.h
 type sockaddrCtl struct {
 	scLen      uint8
@@ -130,29 +127,18 @@ func CreateTUN(name string, mtu int) (Device, error) {
 		return nil, err
 	}
 
-	var ctlInfo = &struct {
-		ctlID   uint32
-		ctlName [96]byte
-	}{}
-
-	copy(ctlInfo.ctlName[:], []byte(utunControlName))
-
-	_, _, errno := unix.Syscall(
-		unix.SYS_IOCTL,
-		uintptr(fd),
-		uintptr(_CTLIOCGINFO),
-		uintptr(unsafe.Pointer(ctlInfo)),
-	)
-
-	if errno != 0 {
-		return nil, fmt.Errorf("_CTLIOCGINFO: %v", errno)
+	ctlInfo := &unix.CtlInfo{}
+	copy(ctlInfo.Name[:], []byte(utunControlName))
+	err = unix.IoctlCtlInfo(fd, ctlInfo)
+	if err != nil {
+		return nil, fmt.Errorf("IoctlGetCtlInfo: %w", err)
 	}
 
 	sc := sockaddrCtl{
 		scLen:     uint8(sockaddrCtlSize),
 		scFamily:  unix.AF_SYSTEM,
 		ssSysaddr: 2,
-		scID:      ctlInfo.ctlID,
+		scID:      ctlInfo.Id,
 		scUnit:    uint32(ifIndex) + 1,
 	}
 
