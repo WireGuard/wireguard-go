@@ -291,7 +291,6 @@ func (peer *Peer) Stop() {
 	peer.ZeroAndFlushAll()
 }
 
-
 func (peer *Peer) SetEndpointFromPacket(endpoint conn.Endpoint) {
 	if peer.disableRoaming {
 		return
