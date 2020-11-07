@@ -287,7 +287,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	if errno != 0 {
 		tunFile.Close()
 		tunDestroy(assignedName)
-		return nil, fmt.Errorf("Unable to put into IFHEAD mode: %v", errno)
+		return nil, fmt.Errorf("Unable to put into IFHEAD mode: %w", errno)
 	}
 
 	// Open control sockets
@@ -328,7 +328,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	if errno != 0 {
 		tunFile.Close()
 		tunDestroy(assignedName)
-		return nil, fmt.Errorf("Unable to get nd6 flags for %s: %v", assignedName, errno)
+		return nil, fmt.Errorf("Unable to get nd6 flags for %s: %w", assignedName, errno)
 	}
 	ndireq.Flags = ndireq.Flags &^ ND6_IFF_AUTO_LINKLOCAL
 	ndireq.Flags = ndireq.Flags | ND6_IFF_NO_DAD
@@ -341,7 +341,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	if errno != 0 {
 		tunFile.Close()
 		tunDestroy(assignedName)
-		return nil, fmt.Errorf("Unable to set nd6 flags for %s: %v", assignedName, errno)
+		return nil, fmt.Errorf("Unable to set nd6 flags for %s: %w", assignedName, errno)
 	}
 
 	// Rename the interface
@@ -359,7 +359,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	if errno != 0 {
 		tunFile.Close()
 		tunDestroy(assignedName)
-		return nil, fmt.Errorf("Failed to rename %s to %s: %v", assignedName, name, errno)
+		return nil, fmt.Errorf("Failed to rename %s to %s: %w", assignedName, name, errno)
 	}
 
 	return CreateTUNFromFile(tunFile, mtu)

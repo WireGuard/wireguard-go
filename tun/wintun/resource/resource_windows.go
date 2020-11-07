@@ -74,17 +74,17 @@ func FindByName(module windows.Handle, name string, resType *uint16) (resInfo wi
 func Load(module, resInfo windows.Handle) (data []byte, err error) {
 	size, err := sizeofResource(module, resInfo)
 	if err != nil {
-		err = fmt.Errorf("Unable to size resource: %v", err)
+		err = fmt.Errorf("Unable to size resource: %w", err)
 		return
 	}
 	resData, err := loadResource(module, resInfo)
 	if err != nil {
-		err = fmt.Errorf("Unable to load resource: %v", err)
+		err = fmt.Errorf("Unable to load resource: %w", err)
 		return
 	}
 	ptr, err := lockResource(resData)
 	if err != nil {
-		err = fmt.Errorf("Unable to lock resource: %v", err)
+		err = fmt.Errorf("Unable to lock resource: %w", err)
 		return
 	}
 	unsafeSlice(unsafe.Pointer(&data), unsafe.Pointer(ptr), int(size))

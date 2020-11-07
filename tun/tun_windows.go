@@ -49,7 +49,7 @@ func init() {
 	var err error
 	WintunPool, err = wintun.MakePool("WireGuard")
 	if err != nil {
-		panic(fmt.Errorf("Failed to make pool: %v", err))
+		panic(fmt.Errorf("Failed to make pool: %w", err))
 	}
 }
 
@@ -81,12 +81,12 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu 
 		// If so, we delete it, in case it has weird residual configuration.
 		_, err = wt.Delete(true)
 		if err != nil {
-			return nil, fmt.Errorf("Error deleting already existing interface: %v", err)
+			return nil, fmt.Errorf("Error deleting already existing interface: %w", err)
 		}
 	}
 	wt, _, err = WintunPool.CreateAdapter(ifname, requestedGUID)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating interface: %v", err)
+		return nil, fmt.Errorf("Error creating interface: %w", err)
 	}
 
 	forcedMTU := 1420
@@ -106,7 +106,7 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu 
 	if err != nil {
 		_, err = tun.wt.Delete(false)
 		close(tun.events)
-		return nil, fmt.Errorf("Error starting session: %v", err)
+		return nil, fmt.Errorf("Error starting session: %w", err)
 	}
 	tun.readWait = tun.session.ReadWaitEvent()
 	return tun, nil
@@ -179,7 +179,7 @@ retry:
 		case windows.ERROR_INVALID_DATA:
 			return 0, errors.New("Send ring corrupt")
 		}
-		return 0, fmt.Errorf("Read failed: %v", err)
+		return 0, fmt.Errorf("Read failed: %w", err)
 	}
 }
 
@@ -207,7 +207,7 @@ func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
 	case windows.ERROR_BUFFER_OVERFLOW:
 		return 0, nil // Dropping when ring is full.
 	}
-	return 0, fmt.Errorf("Write failed: %v", err)
+	return 0, fmt.Errorf("Write failed: %w", err)
 }
 
 // LUID returns Windows interface instance ID.

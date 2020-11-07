@@ -39,15 +39,15 @@ func (d *lazyDLL) Load() error {
 	const ourModule windows.Handle = 0
 	resInfo, err := resource.FindByName(ourModule, d.Name, resource.RT_RCDATA)
 	if err != nil {
-		return fmt.Errorf("Unable to find \"%v\" RCDATA resource: %v", d.Name, err)
+		return fmt.Errorf("Unable to find \"%v\" RCDATA resource: %w", d.Name, err)
 	}
 	data, err := resource.Load(ourModule, resInfo)
 	if err != nil {
-		return fmt.Errorf("Unable to load resource: %v", err)
+		return fmt.Errorf("Unable to load resource: %w", err)
 	}
 	module, err := memmod.LoadLibrary(data)
 	if err != nil {
-		return fmt.Errorf("Unable to load library: %v", err)
+		return fmt.Errorf("Unable to load library: %w", err)
 	}
 
 	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&d.module)), unsafe.Pointer(module))
@@ -77,11 +77,11 @@ func (p *lazyProc) Find() error {
 
 	err := p.dll.Load()
 	if err != nil {
-		return fmt.Errorf("Error loading %v DLL: %v", p.dll.Name, err)
+		return fmt.Errorf("Error loading %v DLL: %w", p.dll.Name, err)
 	}
 	addr, err := p.dll.module.ProcAddressByName(p.Name)
 	if err != nil {
-		return fmt.Errorf("Error getting %v address: %v", p.Name, err)
+		return fmt.Errorf("Error getting %v address: %w", p.Name, err)
 	}
 
 	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&p.addr)), unsafe.Pointer(addr))

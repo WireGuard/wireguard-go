@@ -29,7 +29,7 @@ func (module *Module) check4GBBoundaries(alignedImageSize uintptr) (err error) {
 			windows.MEM_RESERVE|windows.MEM_COMMIT,
 			windows.PAGE_READWRITE)
 		if err != nil {
-			return fmt.Errorf("Error allocating memory block: %v", err)
+			return fmt.Errorf("Error allocating memory block: %w", err)
 		}
 	}
 	return

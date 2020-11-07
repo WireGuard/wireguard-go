@@ -55,7 +55,7 @@ func (module *Module) copySections(address uintptr, size uintptr, old_headers *I
 				windows.MEM_COMMIT,
 				windows.PAGE_READWRITE)
 			if err != nil {
-				return fmt.Errorf("Error allocating section: %v", err)
+				return fmt.Errorf("Error allocating section: %w", err)
 			}
 
 			// Always use position from file to support alignments smaller than page size (allocation above will align to page size).
@@ -80,7 +80,7 @@ func (module *Module) copySections(address uintptr, size uintptr, old_headers *I
 			windows.MEM_COMMIT,
 			windows.PAGE_READWRITE)
 		if err != nil {
-			return fmt.Errorf("Error allocating memory block: %v", err)
+			return fmt.Errorf("Error allocating memory block: %w", err)
 		}
 
 		// Always use position from file to support alignments smaller than page size (allocation above will align to page size).
@@ -153,7 +153,7 @@ func (module *Module) finalizeSection(sectionData *sectionFinalizeData) error {
 	var oldProtect uint32
 	err := windows.VirtualProtect(sectionData.address, sectionData.size, protect, &oldProtect)
 	if err != nil {
-		return fmt.Errorf("Error protecting memory page: %v", err)
+		return fmt.Errorf("Error protecting memory page: %w", err)
 	}
 
 	return nil
@@ -188,7 +188,7 @@ func (module *Module) finalizeSections() error {
 
 		err := module.finalizeSection(&sectionData)
 		if err != nil {
-			return fmt.Errorf("Error finalizing section: %v", err)
+			return fmt.Errorf("Error finalizing section: %w", err)
 		}
 		sectionData.address = sectionAddress
 		sectionData.alignedAddress = alignedAddress
@@ -198,7 +198,7 @@ func (module *Module) finalizeSections() error {
 	sectionData.last = true
 	err := module.finalizeSection(&sectionData)
 	if err != nil {
-		return fmt.Errorf("Error finalizing section: %v", err)
+		return fmt.Errorf("Error finalizing section: %w", err)
 	}
 	return nil
 }
@@ -294,7 +294,7 @@ func (module *Module) performBaseRelocation(delta uintptr) (relocated bool, err 
 				}
 
 			default:
-				return false, fmt.Errorf("Unsupported relocation: %v", relType)
+				return false, fmt.Errorf("Unsupported relocation: %w", relType)
 			}
 		}
 
@@ -315,7 +315,7 @@ func (module *Module) buildImportTable() error {
 	for !isBadReadPtr(uintptr(unsafe.Pointer(importDesc)), unsafe.Sizeof(*importDesc)) && importDesc.Name != 0 {
 		handle, err := loadLibraryA((*byte)(a2p(module.codeBase + uintptr(importDesc.Name))))
 		if err != nil {
-			return fmt.Errorf("Error loading module: %v", err)
+			return fmt.Errorf("Error loading module: %w", err)
 		}
 		var thunkRef, funcRef *uintptr
 		if importDesc.OriginalFirstThunk() != 0 {
@@ -335,7 +335,7 @@ func (module *Module) buildImportTable() error {
 			}
 			if err != nil {
 				windows.FreeLibrary(handle)
-				return fmt.Errorf("Error getting function address: %v", err)
+				return fmt.Errorf("Error getting function address: %w", err)
 			}
 			thunkRef = (*uintptr)(a2p(uintptr(unsafe.Pointer(thunkRef)) + unsafe.Sizeof(*thunkRef)))
 			funcRef = (*uintptr)(a2p(uintptr(unsafe.Pointer(funcRef)) + unsafe.Sizeof(*funcRef)))
@@ -435,13 +435,13 @@ func LoadLibrary(data []byte) (module *Module, err error) {
 			windows.MEM_RESERVE|windows.MEM_COMMIT,
 			windows.PAGE_READWRITE)
 		if err != nil {
-			err = fmt.Errorf("Error allocating code: %v", err)
+			err = fmt.Errorf("Error allocating code: %w", err)
 			return
 		}
 	}
 	err = module.check4GBBoundaries(alignedImageSize)
 	if err != nil {
-		err = fmt.Errorf("Error reallocating code: %v", err)
+		err = fmt.Errorf("Error reallocating code: %w", err)
 		return
 	}
 
@@ -455,7 +455,7 @@ func LoadLibrary(data []byte) (module *Module, err error) {
 		windows.MEM_COMMIT,
 		windows.PAGE_READWRITE)
 	if err != nil {
-		err = fmt.Errorf("Error allocating headers: %v", err)
+		err = fmt.Errorf("Error allocating headers: %w", err)
 		return
 	}
 	// Copy PE header to code.
@@ -468,7 +468,7 @@ func LoadLibrary(data []byte) (module *Module, err error) {
 	// Copy sections from DLL file block to new memory location.
 	err = module.copySections(addr, size, oldHeader)
 	if err != nil {
-		err = fmt.Errorf("Error copying sections: %v", err)
+		err = fmt.Errorf("Error copying sections: %w", err)
 		return
 	}
 
@@ -477,7 +477,7 @@ func LoadLibrary(data []byte) (module *Module, err error) {
 	if locationDelta != 0 {
 		module.isRelocated, err = module.performBaseRelocation(locationDelta)
 		if err != nil {
-			err = fmt.Errorf("Error relocating module: %v", err)
+			err = fmt.Errorf("Error relocating module: %w", err)
 			return
 		}
 	} else {
@@ -487,14 +487,14 @@ func LoadLibrary(data []byte) (module *Module, err error) {
 	// Load required dlls and adjust function table of imports.
 	err = module.buildImportTable()
 	if err != nil {
-		err = fmt.Errorf("Error building import table: %v", err)
+		err = fmt.Errorf("Error building import table: %w", err)
 		return
 	}
 
 	// Mark memory pages depending on section headers and release sections that are marked as "discardable".
 	err = module.finalizeSections()
 	if err != nil {
-		err = fmt.Errorf("Error finalizing sections: %v", err)
+		err = fmt.Errorf("Error finalizing sections: %w", err)
 		return
 	}
 
