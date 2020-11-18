@@ -107,6 +107,8 @@ func addToOutboundAndEncryptionQueues(outboundQueue chan *QueueOutboundElement, 
 /* Queues a keepalive if no packets are queued for peer
  */
 func (peer *Peer) SendKeepalive() bool {
+	peer.queue.RLock()
+	defer peer.queue.RUnlock()
 	if len(peer.queue.nonce) != 0 || peer.queue.packetInNonceQueueIsAwaitingKey.Get() || !peer.isRunning.Get() {
 		return false
 	}
@@ -310,6 +312,7 @@ func (device *Device) RoutineReadFromTUN() {
 
 		// insert into nonce/pre-handshake queue
 
+		peer.queue.RLock()
 		if peer.isRunning.Get() {
 			if peer.queue.packetInNonceQueueIsAwaitingKey.Get() {
 				peer.SendHandshakeInitiation(false)
@@ -317,6 +320,7 @@ func (device *Device) RoutineReadFromTUN() {
 			addToNonceQueue(peer.queue.nonce, elem, device)
 			elem = nil
 		}
+		peer.queue.RUnlock()
 	}
 }
 

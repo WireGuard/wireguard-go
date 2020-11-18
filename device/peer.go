@@ -58,6 +58,7 @@ type Peer struct {
 	}
 
 	queue struct {
+		sync.RWMutex
 		nonce                           chan *QueueOutboundElement // nonce / pre-handshake queue
 		outbound                        chan *QueueOutboundElement // sequential ordering of work
 		inbound                         chan *QueueInboundElement  // sequential ordering of work
@@ -195,10 +196,11 @@ func (peer *Peer) Start() {
 	peer.routines.stopping.Add(PeerRoutineNumber)
 
 	// prepare queues
-
+	peer.queue.Lock()
 	peer.queue.nonce = make(chan *QueueOutboundElement, QueueOutboundSize)
 	peer.queue.outbound = make(chan *QueueOutboundElement, QueueOutboundSize)
 	peer.queue.inbound = make(chan *QueueInboundElement, QueueInboundSize)
+	peer.queue.Unlock()
 
 	peer.timersInit()
 	peer.handshake.lastSentHandshake = time.Now().Add(-(RekeyTimeout + time.Second))
@@ -284,9 +286,11 @@ func (peer *Peer) Stop() {
 
 	// close queues
 
+	peer.queue.Lock()
 	close(peer.queue.nonce)
 	close(peer.queue.outbound)
 	close(peer.queue.inbound)
+	peer.queue.Unlock()
 
 	peer.ZeroAndFlushAll()
 }
