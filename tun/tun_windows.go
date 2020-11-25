@@ -8,6 +8,7 @@ package tun
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"sync/atomic"
 	"time"
@@ -84,9 +85,12 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu 
 			return nil, fmt.Errorf("Error deleting already existing interface: %w", err)
 		}
 	}
-	wt, _, err = WintunPool.CreateAdapter(ifname, requestedGUID)
+	wt, rebootRequired, err := WintunPool.CreateAdapter(ifname, requestedGUID)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating interface: %w", err)
+	}
+	if rebootRequired {
+		log.Println("Windows indicated a reboot is required.")
 	}
 
 	forcedMTU := 1420
