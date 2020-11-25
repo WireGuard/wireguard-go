@@ -104,7 +104,7 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu 
 
 	tun.session, err = wt.StartSession(0x800000) // Ring capacity, 8 MiB
 	if err != nil {
-		_, err = tun.wt.Delete(false)
+		tun.wt.Delete(false)
 		close(tun.events)
 		return nil, fmt.Errorf("Error starting session: %w", err)
 	}
