@@ -324,8 +324,6 @@ const (
 	DLL_PROCESS_DETACH = 0
 )
 
-//sys	loadLibraryA(libFileName *byte) (module windows.Handle, err error) = kernel32.LoadLibraryA
-//sys	getProcAddress(module windows.Handle, procName *byte) (addr uintptr, err error) = kernel32.GetProcAddress
 //sys	isBadReadPtr(addr uintptr, ucb uintptr) (ret bool) = kernel32.IsBadReadPtr
 
 type SYSTEM_INFO struct {

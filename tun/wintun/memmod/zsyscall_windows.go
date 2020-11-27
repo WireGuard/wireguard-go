@@ -40,31 +40,11 @@ func errnoErr(e syscall.Errno) error {
 var (
 	modkernel32 = windows.NewLazySystemDLL("kernel32.dll")
 
-	procGetProcAddress = modkernel32.NewProc("GetProcAddress")
-	procIsBadReadPtr   = modkernel32.NewProc("IsBadReadPtr")
-	procLoadLibraryA   = modkernel32.NewProc("LoadLibraryA")
+	procIsBadReadPtr = modkernel32.NewProc("IsBadReadPtr")
 )
-
-func getProcAddress(module windows.Handle, procName *byte) (addr uintptr, err error) {
-	r0, _, e1 := syscall.Syscall(procGetProcAddress.Addr(), 2, uintptr(module), uintptr(unsafe.Pointer(procName)), 0)
-	addr = uintptr(r0)
-	if addr == 0 {
-		err = errnoErr(e1)
-	}
-	return
-}
 
 func isBadReadPtr(addr uintptr, ucb uintptr) (ret bool) {
 	r0, _, _ := syscall.Syscall(procIsBadReadPtr.Addr(), 2, uintptr(addr), uintptr(ucb), 0)
 	ret = r0 != 0
-	return
-}
-
-func loadLibraryA(libFileName *byte) (module windows.Handle, err error) {
-	r0, _, e1 := syscall.Syscall(procLoadLibraryA.Addr(), 1, uintptr(unsafe.Pointer(libFileName)), 0, 0)
-	module = windows.Handle(r0)
-	if module == 0 {
-		err = errnoErr(e1)
-	}
 	return
 }

@@ -313,7 +313,7 @@ func (module *Module) buildImportTable() error {
 	module.modules = make([]windows.Handle, 0, 16)
 	importDesc := (*IMAGE_IMPORT_DESCRIPTOR)(a2p(module.codeBase + uintptr(directory.VirtualAddress)))
 	for !isBadReadPtr(uintptr(unsafe.Pointer(importDesc)), unsafe.Sizeof(*importDesc)) && importDesc.Name != 0 {
-		handle, err := loadLibraryA((*byte)(a2p(module.codeBase + uintptr(importDesc.Name))))
+		handle, err := windows.LoadLibraryEx(windows.BytePtrToString((*byte)(a2p(module.codeBase + uintptr(importDesc.Name)))), 0, windows.LOAD_LIBRARY_SEARCH_SYSTEM32)
 		if err != nil {
 			return fmt.Errorf("Error loading module: %w", err)
 		}
@@ -328,10 +328,10 @@ func (module *Module) buildImportTable() error {
 		}
 		for *thunkRef != 0 {
 			if IMAGE_SNAP_BY_ORDINAL(*thunkRef) {
-				*funcRef, err = getProcAddress(handle, (*byte)(a2p(IMAGE_ORDINAL(*thunkRef))))
+				*funcRef, err = windows.GetProcAddressByOrdinal(handle, IMAGE_ORDINAL(*thunkRef))
 			} else {
 				thunkData := (*IMAGE_IMPORT_BY_NAME)(a2p(module.codeBase + *thunkRef))
-				*funcRef, err = getProcAddress(handle, &thunkData.Name[0])
+				*funcRef, err = windows.GetProcAddress(handle, windows.BytePtrToString(&thunkData.Name[0]))
 			}
 			if err != nil {
 				windows.FreeLibrary(handle)
