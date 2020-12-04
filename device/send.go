@@ -365,8 +365,8 @@ func (peer *Peer) RoutineNonce() {
 	peer.routines.starting.Done()
 	logDebug.Println(peer, "- Routine: nonce worker - started")
 
+NextPacket:
 	for {
-	NextPacket:
 		peer.queue.packetInNonceQueueIsAwaitingKey.Set(false)
 
 		select {
@@ -375,7 +375,7 @@ func (peer *Peer) RoutineNonce() {
 
 		case <-peer.signals.flushNonceQueue:
 			flush()
-			goto NextPacket
+			continue NextPacket
 
 		case elem, ok := <-peer.queue.nonce:
 
@@ -418,7 +418,7 @@ func (peer *Peer) RoutineNonce() {
 					device.PutMessageBuffer(elem.buffer)
 					device.PutOutboundElement(elem)
 					flush()
-					goto NextPacket
+					continue NextPacket
 
 				case <-peer.routines.stop:
 					device.PutMessageBuffer(elem.buffer)
@@ -439,7 +439,7 @@ func (peer *Peer) RoutineNonce() {
 				atomic.StoreUint64(&keypair.sendNonce, RejectAfterMessages)
 				device.PutMessageBuffer(elem.buffer)
 				device.PutOutboundElement(elem)
-				goto NextPacket
+				continue NextPacket
 			}
 
 			elem.keypair = keypair
