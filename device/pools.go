@@ -65,6 +65,7 @@ func (device *Device) GetInboundElement() *QueueInboundElement {
 }
 
 func (device *Device) PutInboundElement(msg *QueueInboundElement) {
+	msg.clearPointers()
 	if PreallocatedBuffersPerPool == 0 {
 		device.pool.inboundElementPool.Put(msg)
 	} else {
@@ -81,6 +82,7 @@ func (device *Device) GetOutboundElement() *QueueOutboundElement {
 }
 
 func (device *Device) PutOutboundElement(msg *QueueOutboundElement) {
+	msg.clearPointers()
 	if PreallocatedBuffersPerPool == 0 {
 		device.pool.outboundElementPool.Put(msg)
 	} else {

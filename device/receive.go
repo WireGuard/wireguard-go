@@ -37,6 +37,17 @@ type QueueInboundElement struct {
 	endpoint conn.Endpoint
 }
 
+// clearPointers clears elem fields that contain pointers.
+// This makes the garbage collector's life easier and
+// avoids accidentally keeping other objects around unnecessarily.
+// It also reduces the possible collateral damage from use-after-free bugs.
+func (elem *QueueInboundElement) clearPointers() {
+	elem.buffer = nil
+	elem.packet = nil
+	elem.keypair = nil
+	elem.endpoint = nil
+}
+
 func (elem *QueueInboundElement) Drop() {
 	atomic.StoreInt32(&elem.dropped, AtomicTrue)
 }

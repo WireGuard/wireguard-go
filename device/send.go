@@ -58,9 +58,19 @@ func (device *Device) NewOutboundElement() *QueueOutboundElement {
 	elem.buffer = device.GetMessageBuffer()
 	elem.Mutex = sync.Mutex{}
 	elem.nonce = 0
+	// keypair and peer were cleared (if necessary) by clearPointers.
+	return elem
+}
+
+// clearPointers clears elem fields that contain pointers.
+// This makes the garbage collector's life easier and
+// avoids accidentally keeping other objects around unnecessarily.
+// It also reduces the possible collateral damage from use-after-free bugs.
+func (elem *QueueOutboundElement) clearPointers() {
+	elem.buffer = nil
+	elem.packet = nil
 	elem.keypair = nil
 	elem.peer = nil
-	return elem
 }
 
 func (elem *QueueOutboundElement) Drop() {
