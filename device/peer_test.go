@@ -26,7 +26,7 @@ func checkAlignment(t *testing.T, name string, offset uintptr) {
 func TestPeerAlignment(t *testing.T) {
 	var p Peer
 
-	typ := reflect.TypeOf(p)
+	typ := reflect.TypeOf(&p).Elem()
 	t.Logf("Peer type size: %d, with fields:", typ.Size())
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
