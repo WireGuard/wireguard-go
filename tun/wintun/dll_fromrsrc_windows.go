@@ -23,6 +23,7 @@ type lazyDLL struct {
 	Name   string
 	mu     sync.Mutex
 	module *memmod.Module
+	onLoad func(d *lazyDLL)
 }
 
 func (d *lazyDLL) Load() error {
@@ -50,6 +51,9 @@ func (d *lazyDLL) Load() error {
 	}
 
 	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&d.module)), unsafe.Pointer(module))
+	if d.onLoad != nil {
+		d.onLoad(d)
+	}
 	return nil
 }
 

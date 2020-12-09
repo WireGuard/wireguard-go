@@ -34,7 +34,7 @@ type Adapter struct {
 }
 
 var (
-	modwintun = newLazyDLL("wintun.dll")
+	modwintun = newLazyDLL("wintun.dll", setupLogger)
 
 	procWintunCreateAdapter           = modwintun.NewProc("WintunCreateAdapter")
 	procWintunDeleteAdapter           = modwintun.NewProc("WintunDeleteAdapter")
@@ -46,11 +46,10 @@ var (
 	procWintunGetAdapterName          = modwintun.NewProc("WintunGetAdapterName")
 	procWintunGetRunningDriverVersion = modwintun.NewProc("WintunGetRunningDriverVersion")
 	procWintunSetAdapterName          = modwintun.NewProc("WintunSetAdapterName")
-	procWintunSetLogger               = modwintun.NewProc("WintunSetLogger")
 )
 
-func init() {
-	syscall.Syscall(procWintunSetLogger.Addr(), 1, windows.NewCallback(func(level loggerLevel, msg *uint16) int {
+func setupLogger(dll *lazyDLL) {
+	syscall.Syscall(dll.NewProc("WintunSetLogger").Addr(), 1, windows.NewCallback(func(level loggerLevel, msg *uint16) int {
 		log.Println("[Wintun]", windows.UTF16PtrToString(msg))
 		return 0
 	}), 0, 0)
