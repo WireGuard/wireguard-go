@@ -30,12 +30,12 @@ type Packet struct {
 }
 
 var (
-	procWintunAllocateSendPacket   = modwintun.NewProc("WintunAllocateSendPacket").Addr()
+	procWintunAllocateSendPacket   = modwintun.NewProc("WintunAllocateSendPacket")
 	procWintunEndSession           = modwintun.NewProc("WintunEndSession")
 	procWintunGetReadWaitEvent     = modwintun.NewProc("WintunGetReadWaitEvent")
-	procWintunReceivePacket        = modwintun.NewProc("WintunReceivePacket").Addr()
-	procWintunReleaseReceivePacket = modwintun.NewProc("WintunReleaseReceivePacket").Addr()
-	procWintunSendPacket           = modwintun.NewProc("WintunSendPacket").Addr()
+	procWintunReceivePacket        = modwintun.NewProc("WintunReceivePacket")
+	procWintunReleaseReceivePacket = modwintun.NewProc("WintunReleaseReceivePacket")
+	procWintunSendPacket           = modwintun.NewProc("WintunSendPacket")
 	procWintunStartSession         = modwintun.NewProc("WintunStartSession")
 )
 
@@ -62,7 +62,7 @@ func (session Session) ReadWaitEvent() (handle windows.Handle) {
 
 func (session Session) ReceivePacket() (packet []byte, err error) {
 	var packetSize uint32
-	r0, _, e1 := syscall.Syscall(procWintunReceivePacket, 2, session.handle, uintptr(unsafe.Pointer(&packetSize)), 0)
+	r0, _, e1 := syscall.Syscall(procWintunReceivePacket.Addr(), 2, session.handle, uintptr(unsafe.Pointer(&packetSize)), 0)
 	if r0 == 0 {
 		err = e1
 		return
@@ -72,11 +72,11 @@ func (session Session) ReceivePacket() (packet []byte, err error) {
 }
 
 func (session Session) ReleaseReceivePacket(packet []byte) {
-	syscall.Syscall(procWintunReleaseReceivePacket, 2, session.handle, uintptr(unsafe.Pointer(&packet[0])), 0)
+	syscall.Syscall(procWintunReleaseReceivePacket.Addr(), 2, session.handle, uintptr(unsafe.Pointer(&packet[0])), 0)
 }
 
 func (session Session) AllocateSendPacket(packetSize int) (packet []byte, err error) {
-	r0, _, e1 := syscall.Syscall(procWintunAllocateSendPacket, 2, session.handle, uintptr(packetSize), 0)
+	r0, _, e1 := syscall.Syscall(procWintunAllocateSendPacket.Addr(), 2, session.handle, uintptr(packetSize), 0)
 	if r0 == 0 {
 		err = e1
 		return
@@ -86,7 +86,7 @@ func (session Session) AllocateSendPacket(packetSize int) (packet []byte, err er
 }
 
 func (session Session) SendPacket(packet []byte) {
-	syscall.Syscall(procWintunSendPacket, 2, session.handle, uintptr(unsafe.Pointer(&packet[0])), 0)
+	syscall.Syscall(procWintunSendPacket.Addr(), 2, session.handle, uintptr(unsafe.Pointer(&packet[0])), 0)
 }
 
 // unsafeSlice updates the slice slicePtr to be a slice

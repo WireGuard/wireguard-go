@@ -12,8 +12,8 @@ import (
 	"unsafe"
 )
 
-func newLazyDLL(name string) *lazyDLL {
-	return &lazyDLL{Name: name}
+func newLazyDLL(name string, onLoad func(d *lazyDLL)) *lazyDLL {
+	return &lazyDLL{Name: name, onLoad: onLoad}
 }
 
 func (d *lazyDLL) NewProc(name string) *lazyProc {
