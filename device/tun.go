@@ -20,7 +20,6 @@ func (device *Device) RoutineTUNEventReader() {
 	logError := device.log.Error
 
 	logDebug.Println("Routine: event worker - started")
-	device.state.starting.Done()
 
 	for event := range device.tun.device.Events() {
 		if event&tun.EventMTUUpdate != 0 {

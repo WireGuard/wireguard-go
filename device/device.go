@@ -27,7 +27,6 @@ type Device struct {
 	// synchronized resources (locks acquired in order)
 
 	state struct {
-		starting sync.WaitGroup
 		stopping sync.WaitGroup
 		sync.Mutex
 		changing AtomicBool
@@ -35,7 +34,6 @@ type Device struct {
 	}
 
 	net struct {
-		starting sync.WaitGroup
 		stopping sync.WaitGroup
 		sync.RWMutex
 		bind          conn.Bind // bind interface
@@ -297,22 +295,17 @@ func NewDevice(tunDevice tun.Device, logger *Logger) *Device {
 	// start workers
 
 	cpus := runtime.NumCPU()
-	device.state.starting.Wait()
 	device.state.stopping.Wait()
 	for i := 0; i < cpus; i += 1 {
-		device.state.starting.Add(3)
 		device.state.stopping.Add(3)
 		go device.RoutineEncryption()
 		go device.RoutineDecryption()
 		go device.RoutineHandshake()
 	}
 
-	device.state.starting.Add(2)
 	device.state.stopping.Add(2)
 	go device.RoutineReadFromTUN()
 	go device.RoutineTUNEventReader()
-
-	device.state.starting.Wait()
 
 	return device
 }
@@ -369,8 +362,6 @@ func (device *Device) Close() {
 	if device.isClosed.Swap(true) {
 		return
 	}
-
-	device.state.starting.Wait()
 
 	device.log.Info.Println("Device closing")
 	device.state.changing.Set(true)
@@ -527,11 +518,9 @@ func (device *Device) BindUpdate() error {
 
 		// start receiving routines
 
-		device.net.starting.Add(2)
 		device.net.stopping.Add(2)
 		go device.RoutineReceiveIncoming(ipv4.Version, netc.bind)
 		go device.RoutineReceiveIncoming(ipv6.Version, netc.bind)
-		device.net.starting.Wait()
 
 		device.log.Debug.Println("UDP bind has been updated")
 	}

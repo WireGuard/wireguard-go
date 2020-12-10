@@ -111,7 +111,6 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 	}()
 
 	logDebug.Println("Routine: receive incoming IPv" + strconv.Itoa(IP) + " - started")
-	device.net.starting.Done()
 
 	// receive datagrams until conn is closed
 
@@ -246,7 +245,6 @@ func (device *Device) RoutineDecryption() {
 		device.state.stopping.Done()
 	}()
 	logDebug.Println("Routine: decryption worker - started")
-	device.state.starting.Done()
 
 	for {
 		select {
@@ -321,7 +319,6 @@ func (device *Device) RoutineHandshake() {
 	}()
 
 	logDebug.Println("Routine: handshake worker - started")
-	device.state.starting.Done()
 
 	for {
 		if elem.buffer != nil {
@@ -520,8 +517,6 @@ func (peer *Peer) RoutineSequentialReceiver() {
 	}()
 
 	logDebug.Println(peer, "- Routine: sequential receiver - started")
-
-	peer.routines.starting.Done()
 
 	for {
 		if elem != nil {
