@@ -66,8 +66,7 @@ type Peer struct {
 	}
 
 	routines struct {
-		sync.Mutex                // held when stopping / starting routines
-		starting   sync.WaitGroup // routines pending start
+		sync.Mutex                // held when stopping routines
 		stopping   sync.WaitGroup // routines pending stop
 		stop       chan struct{}  // size 0, stop all go routines in peer
 	}
@@ -189,10 +188,8 @@ func (peer *Peer) Start() {
 
 	// reset routine state
 
-	peer.routines.starting.Wait()
 	peer.routines.stopping.Wait()
 	peer.routines.stop = make(chan struct{})
-	peer.routines.starting.Add(PeerRoutineNumber)
 	peer.routines.stopping.Add(PeerRoutineNumber)
 
 	// prepare queues
@@ -213,7 +210,6 @@ func (peer *Peer) Start() {
 	go peer.RoutineSequentialSender()
 	go peer.RoutineSequentialReceiver()
 
-	peer.routines.starting.Wait()
 	peer.isRunning.Set(true)
 }
 
@@ -269,8 +265,6 @@ func (peer *Peer) Stop() {
 	if !peer.isRunning.Swap(false) {
 		return
 	}
-
-	peer.routines.starting.Wait()
 
 	peer.routines.Lock()
 	defer peer.routines.Unlock()

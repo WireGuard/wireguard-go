@@ -262,7 +262,6 @@ func (device *Device) RoutineReadFromTUN() {
 	}()
 
 	logDebug.Println("Routine: TUN reader - started")
-	device.state.starting.Done()
 
 	var elem *QueueOutboundElement
 
@@ -372,7 +371,6 @@ func (peer *Peer) RoutineNonce() {
 		peer.routines.stopping.Done()
 	}()
 
-	peer.routines.starting.Done()
 	logDebug.Println(peer, "- Routine: nonce worker - started")
 
 NextPacket:
@@ -507,7 +505,6 @@ func (device *Device) RoutineEncryption() {
 	}()
 
 	logDebug.Println("Routine: encryption worker - started")
-	device.state.starting.Done()
 
 	for {
 
@@ -595,8 +592,6 @@ func (peer *Peer) RoutineSequentialSender() {
 	}()
 
 	logDebug.Println(peer, "- Routine: sequential sender - started")
-
-	peer.routines.starting.Done()
 
 	for {
 		select {
