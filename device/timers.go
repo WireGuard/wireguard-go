@@ -138,7 +138,7 @@ func expiredZeroKeyMaterial(peer *Peer) {
 }
 
 func expiredPersistentKeepalive(peer *Peer) {
-	if peer.persistentKeepaliveInterval > 0 {
+	if atomic.LoadUint32(&peer.persistentKeepaliveInterval) > 0 {
 		peer.SendKeepalive()
 	}
 }
@@ -201,8 +201,9 @@ func (peer *Peer) timersSessionDerived() {
 
 /* Should be called before a packet with authentication -- keepalive, data, or handshake -- is sent, or after one is received. */
 func (peer *Peer) timersAnyAuthenticatedPacketTraversal() {
-	if peer.persistentKeepaliveInterval > 0 && peer.timersActive() {
-		peer.timers.persistentKeepalive.Mod(time.Duration(peer.persistentKeepaliveInterval) * time.Second)
+	keepalive := atomic.LoadUint32(&peer.persistentKeepaliveInterval)
+	if keepalive > 0 && peer.timersActive() {
+		peer.timers.persistentKeepalive.Mod(time.Duration(keepalive) * time.Second)
 	}
 }
 

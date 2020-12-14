@@ -27,7 +27,7 @@ type Peer struct {
 	handshake                   Handshake
 	device                      *Device
 	endpoint                    conn.Endpoint
-	persistentKeepaliveInterval uint16
+	persistentKeepaliveInterval uint32 // accessed atomically
 	disableRoaming              bool
 
 	// These fields are accessed with atomic operations, which must be
