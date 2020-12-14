@@ -215,7 +215,20 @@ func TestConcurrencySafety(t *testing.T) {
 	}()
 	warmup.Wait()
 
-	// coming soon: more things here...
+	// Change persistent_keepalive_interval concurrently with tunnel use.
+	t.Run("persistentKeepaliveInterval", func(t *testing.T) {
+		cfg := uapiCfg(
+			"public_key", "f70dbb6b1b92a1dde1c783b297016af3f572fef13b0abb16a2623d89a58e9725",
+			"persistent_keepalive_interval", "1",
+		)
+		for i := 0; i < 1000; i++ {
+			cfg.Seek(0, io.SeekStart)
+			err := pair[0].dev.IpcSetOperation(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
 
 	close(done)
 }
