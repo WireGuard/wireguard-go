@@ -107,8 +107,8 @@ func (device *Device) IpcGetOperation(socket *bufio.Writer) error {
 	return nil
 }
 
-func (device *Device) IpcSetOperation(socket *bufio.Reader) error {
-	scanner := bufio.NewScanner(socket)
+func (device *Device) IpcSetOperation(r io.Reader) error {
+	scanner := bufio.NewScanner(r)
 	logError := device.log.Error
 	logDebug := device.log.Debug
 
