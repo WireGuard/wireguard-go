@@ -6,11 +6,10 @@
 package device
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"net"
-	"strings"
 	"testing"
 	"time"
 
@@ -26,39 +25,57 @@ func getFreePort(t *testing.T) string {
 	return fmt.Sprintf("%d", l.LocalAddr().(*net.UDPAddr).Port)
 }
 
+// uapiCfg returns a reader that contains cfg formatted use with IpcSetOperation.
+// cfg is a series of alternating key/value strings.
+// uapiCfg exists because editors and humans like to insert
+// whitespace into configs, which can cause failures, some of which are silent.
+// For example, a leading blank newline causes the remainder
+// of the config to be silently ignored.
+func uapiCfg(cfg ...string) io.ReadSeeker {
+	if len(cfg)%2 != 0 {
+		panic("odd number of args to uapiReader")
+	}
+	buf := new(bytes.Buffer)
+	for i, s := range cfg {
+		buf.WriteString(s)
+		sep := byte('\n')
+		if i%2 == 0 {
+			sep = '='
+		}
+		buf.WriteByte(sep)
+	}
+	return bytes.NewReader(buf.Bytes())
+}
+
 // genConfigs generates a pair of configs that connect to each other.
 // The configs use distinct, probably-usable ports.
-func genConfigs(t *testing.T) (cfgs [2]*bufio.Reader) {
-	const (
-		cfg1 = `private_key=481eb0d8113a4a5da532d2c3e9c14b53c8454b34ab109676f6b58c2245e37b58
-listen_port={{PORT1}}
-replace_peers=true
-public_key=f70dbb6b1b92a1dde1c783b297016af3f572fef13b0abb16a2623d89a58e9725
-protocol_version=1
-replace_allowed_ips=true
-allowed_ip=1.0.0.2/32
-endpoint=127.0.0.1:{{PORT2}}`
-
-		cfg2 = `private_key=98c7989b1661a0d64fd6af3502000f87716b7c4bbcf00d04fc6073aa7b539768
-listen_port={{PORT2}}
-replace_peers=true
-public_key=49e80929259cebdda4f322d6d2b1a6fad819d603acd26fd5d845e7a123036427
-protocol_version=1
-replace_allowed_ips=true
-allowed_ip=1.0.0.1/32
-endpoint=127.0.0.1:{{PORT1}}`
-	)
-
+func genConfigs(t *testing.T) (cfgs [2]io.Reader) {
 	var port1, port2 string
 	for port1 == port2 {
 		port1 = getFreePort(t)
 		port2 = getFreePort(t)
 	}
-	for i, cfg := range []string{cfg1, cfg2} {
-		cfg = strings.ReplaceAll(cfg, "{{PORT1}}", port1)
-		cfg = strings.ReplaceAll(cfg, "{{PORT2}}", port2)
-		cfgs[i] = bufio.NewReader(strings.NewReader(cfg))
-	}
+
+	cfgs[0] = uapiCfg(
+		"private_key", "481eb0d8113a4a5da532d2c3e9c14b53c8454b34ab109676f6b58c2245e37b58",
+		"listen_port", port1,
+		"replace_peers", "true",
+		"public_key", "f70dbb6b1b92a1dde1c783b297016af3f572fef13b0abb16a2623d89a58e9725",
+		"protocol_version", "1",
+		"replace_allowed_ips", "true",
+		"allowed_ip", "1.0.0.2/32",
+		"endpoint", "127.0.0.1:"+port2,
+	)
+	cfgs[1] = uapiCfg(
+		"private_key", "98c7989b1661a0d64fd6af3502000f87716b7c4bbcf00d04fc6073aa7b539768",
+		"listen_port", port2,
+		"replace_peers", "true",
+		"public_key", "49e80929259cebdda4f322d6d2b1a6fad819d603acd26fd5d845e7a123036427",
+		"protocol_version", "1",
+		"replace_allowed_ips", "true",
+		"allowed_ip", "1.0.0.1/32",
+		"endpoint", "127.0.0.1:"+port1,
+	)
 	return
 }
 
