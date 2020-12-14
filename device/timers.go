@@ -29,18 +29,17 @@ func (peer *Peer) NewTimer(expirationFunction func(*Peer)) *Timer {
 	timer := &Timer{}
 	timer.Timer = time.AfterFunc(time.Hour, func() {
 		timer.runningLock.Lock()
+		defer timer.runningLock.Unlock()
 
 		timer.modifyingLock.Lock()
 		if !timer.isPending {
 			timer.modifyingLock.Unlock()
-			timer.runningLock.Unlock()
 			return
 		}
 		timer.isPending = false
 		timer.modifyingLock.Unlock()
 
 		expirationFunction(peer)
-		timer.runningLock.Unlock()
 	})
 	timer.Stop()
 	return timer
