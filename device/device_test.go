@@ -112,7 +112,7 @@ func TestTwoDevicePing(t *testing.T) {
 			if !bytes.Equal(msg2to1, msgRecv) {
 				t.Error("ping did not transit correctly")
 			}
-		case <-time.After(300 * time.Millisecond):
+		case <-time.After(5 * time.Second):
 			t.Error("ping did not transit")
 		}
 	})
@@ -125,7 +125,7 @@ func TestTwoDevicePing(t *testing.T) {
 			if !bytes.Equal(msg1to2, msgRecv) {
 				t.Error("return ping did not transit correctly")
 			}
-		case <-time.After(300 * time.Millisecond):
+		case <-time.After(5 * time.Second):
 			t.Error("return ping did not transit")
 		}
 	})
