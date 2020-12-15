@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	PeerRoutineNumber = 3
+	PeerRoutineNumber = 2
 )
 
 type Peer struct {
@@ -287,7 +287,6 @@ func (peer *Peer) Stop() {
 
 	peer.queue.Lock()
 	close(peer.queue.nonce)
-	close(peer.queue.outbound)
 	close(peer.queue.inbound)
 	peer.queue.Unlock()
 
