@@ -403,7 +403,7 @@ NextPacket:
 				// check validity of newest key pair
 
 				keypair = peer.keypairs.Current()
-				if keypair != nil && keypair.sendNonce < RejectAfterMessages {
+				if keypair != nil && atomic.LoadUint64(&keypair.sendNonce) < RejectAfterMessages {
 					if time.Since(keypair.created) < RejectAfterTime {
 						break
 					}

@@ -23,7 +23,7 @@ import (
  */
 
 type Keypair struct {
-	sendNonce    uint64
+	sendNonce    uint64 // accessed atomically
 	send         cipher.AEAD
 	receive      cipher.AEAD
 	replayFilter replay.Filter

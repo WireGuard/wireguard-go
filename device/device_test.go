@@ -215,6 +215,14 @@ func TestConcurrencySafety(t *testing.T) {
 	}()
 	warmup.Wait()
 
+	applyCfg := func(cfg io.ReadSeeker) {
+		cfg.Seek(0, io.SeekStart)
+		err := pair[0].dev.IpcSetOperation(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	// Change persistent_keepalive_interval concurrently with tunnel use.
 	t.Run("persistentKeepaliveInterval", func(t *testing.T) {
 		cfg := uapiCfg(
@@ -222,11 +230,24 @@ func TestConcurrencySafety(t *testing.T) {
 			"persistent_keepalive_interval", "1",
 		)
 		for i := 0; i < 1000; i++ {
-			cfg.Seek(0, io.SeekStart)
-			err := pair[0].dev.IpcSetOperation(cfg)
-			if err != nil {
-				t.Fatal(err)
-			}
+			applyCfg(cfg)
+		}
+	})
+
+	// Change private keys concurrently with tunnel use.
+	t.Run("privateKey", func(t *testing.T) {
+		bad := uapiCfg("private_key", "7777777777777777777777777777777777777777777777777777777777777777")
+		good := uapiCfg("private_key", "481eb0d8113a4a5da532d2c3e9c14b53c8454b34ab109676f6b58c2245e37b58")
+		// Set iters to a large number like 1000 to flush out data races quickly.
+		// Don't leave it large. That can cause logical races
+		// in which the handshake is interleaved with key changes
+		// such that the private key appears to be unchanging but
+		// other state gets reset, which can cause handshake failures like
+		// "Received packet with invalid mac1".
+		const iters = 1
+		for i := 0; i < iters; i++ {
+			applyCfg(bad)
+			applyCfg(good)
 		}
 	})
 
