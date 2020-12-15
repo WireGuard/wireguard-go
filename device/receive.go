@@ -268,22 +268,12 @@ func (device *Device) RoutineDecryption() {
 			counter := elem.packet[MessageTransportOffsetCounter:MessageTransportOffsetContent]
 			content := elem.packet[MessageTransportOffsetContent:]
 
-			// expand nonce
-
-			nonce[0x4] = counter[0x0]
-			nonce[0x5] = counter[0x1]
-			nonce[0x6] = counter[0x2]
-			nonce[0x7] = counter[0x3]
-
-			nonce[0x8] = counter[0x4]
-			nonce[0x9] = counter[0x5]
-			nonce[0xa] = counter[0x6]
-			nonce[0xb] = counter[0x7]
-
 			// decrypt and release to consumer
 
 			var err error
 			elem.counter = binary.LittleEndian.Uint64(counter)
+			// copy counter to nonce
+			binary.LittleEndian.PutUint64(nonce[0x4:0xc], elem.counter)
 			elem.packet, err = elem.keypair.receive.Open(
 				content[:0],
 				nonce[:],
