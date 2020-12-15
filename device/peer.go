@@ -249,16 +249,17 @@ func (peer *Peer) ExpireCurrentKeypairs() {
 	handshake.mutex.Lock()
 	peer.device.indexTable.Delete(handshake.localIndex)
 	handshake.Clear()
-	handshake.mutex.Unlock()
 	peer.handshake.lastSentHandshake = time.Now().Add(-(RekeyTimeout + time.Second))
+	handshake.mutex.Unlock()
 
 	keypairs := &peer.keypairs
 	keypairs.Lock()
 	if keypairs.current != nil {
-		keypairs.current.sendNonce = RejectAfterMessages
+		atomic.StoreUint64(&keypairs.current.sendNonce, RejectAfterMessages)
 	}
 	if keypairs.next != nil {
-		keypairs.loadNext().sendNonce = RejectAfterMessages
+		next := keypairs.loadNext()
+		atomic.StoreUint64(&next.sendNonce, RejectAfterMessages)
 	}
 	keypairs.Unlock()
 }

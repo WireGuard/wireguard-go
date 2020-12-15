@@ -566,7 +566,6 @@ func (peer *Peer) BeginSymmetricSession() error {
 	setZero(recvKey[:])
 
 	keypair.created = time.Now()
-	keypair.sendNonce = 0
 	keypair.replayFilter.Reset()
 	keypair.isInitiator = isInitiator
 	keypair.localIndex = peer.handshake.localIndex
