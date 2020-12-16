@@ -49,8 +49,9 @@ type Device struct {
 	}
 
 	peers struct {
-		sync.RWMutex
-		keyMap map[NoisePublicKey]*Peer
+		empty        AtomicBool // empty reports whether len(keyMap) == 0
+		sync.RWMutex            // protects keyMap
+		keyMap       map[NoisePublicKey]*Peer
 	}
 
 	// unprotected / "self-synchronising resources"
@@ -129,6 +130,7 @@ func unsafeRemovePeer(device *Device, peer *Peer, key NoisePublicKey) {
 	// remove from peer map
 
 	delete(device.peers.keyMap, key)
+	device.peers.empty.Set(len(device.peers.keyMap) == 0)
 }
 
 func deviceUpdateState(device *Device) {
