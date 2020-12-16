@@ -56,26 +56,26 @@ func (elem *QueueInboundElement) IsDropped() bool {
 	return atomic.LoadInt32(&elem.dropped) == AtomicTrue
 }
 
-func (device *Device) addToInboundAndDecryptionQueues(inboundQueue chan *QueueInboundElement, decryptionQueue chan *QueueInboundElement, element *QueueInboundElement) bool {
+func (device *Device) addToInboundAndDecryptionQueues(inboundQueue chan *QueueInboundElement, decryptionQueue chan *QueueInboundElement, elem *QueueInboundElement) bool {
 	select {
-	case inboundQueue <- element:
+	case inboundQueue <- elem:
 		select {
-		case decryptionQueue <- element:
+		case decryptionQueue <- elem:
 			return true
 		default:
-			element.Drop()
-			element.Unlock()
+			elem.Drop()
+			elem.Unlock()
 			return false
 		}
 	default:
-		device.PutInboundElement(element)
+		device.PutInboundElement(elem)
 		return false
 	}
 }
 
-func (device *Device) addToHandshakeQueue(queue chan QueueHandshakeElement, element QueueHandshakeElement) bool {
+func (device *Device) addToHandshakeQueue(queue chan QueueHandshakeElement, elem QueueHandshakeElement) bool {
 	select {
-	case queue <- element:
+	case queue <- elem:
 		return true
 	default:
 		return false

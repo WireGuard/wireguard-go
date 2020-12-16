@@ -81,10 +81,10 @@ func (elem *QueueOutboundElement) IsDropped() bool {
 	return atomic.LoadInt32(&elem.dropped) == AtomicTrue
 }
 
-func addToNonceQueue(queue chan *QueueOutboundElement, element *QueueOutboundElement, device *Device) {
+func addToNonceQueue(queue chan *QueueOutboundElement, elem *QueueOutboundElement, device *Device) {
 	for {
 		select {
-		case queue <- element:
+		case queue <- elem:
 			return
 		default:
 			select {
@@ -97,20 +97,20 @@ func addToNonceQueue(queue chan *QueueOutboundElement, element *QueueOutboundEle
 	}
 }
 
-func addToOutboundAndEncryptionQueues(outboundQueue chan *QueueOutboundElement, encryptionQueue chan *QueueOutboundElement, element *QueueOutboundElement) {
+func addToOutboundAndEncryptionQueues(outboundQueue chan *QueueOutboundElement, encryptionQueue chan *QueueOutboundElement, elem *QueueOutboundElement) {
 	select {
-	case outboundQueue <- element:
+	case outboundQueue <- elem:
 		select {
-		case encryptionQueue <- element:
+		case encryptionQueue <- elem:
 			return
 		default:
-			element.Drop()
-			element.peer.device.PutMessageBuffer(element.buffer)
-			element.Unlock()
+			elem.Drop()
+			elem.peer.device.PutMessageBuffer(elem.buffer)
+			elem.Unlock()
 		}
 	default:
-		element.peer.device.PutMessageBuffer(element.buffer)
-		element.peer.device.PutOutboundElement(element)
+		elem.peer.device.PutMessageBuffer(elem.buffer)
+		elem.peer.device.PutOutboundElement(elem)
 	}
 }
 
