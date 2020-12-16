@@ -64,12 +64,12 @@ func (device *Device) GetInboundElement() *QueueInboundElement {
 	}
 }
 
-func (device *Device) PutInboundElement(msg *QueueInboundElement) {
-	msg.clearPointers()
+func (device *Device) PutInboundElement(elem *QueueInboundElement) {
+	elem.clearPointers()
 	if PreallocatedBuffersPerPool == 0 {
-		device.pool.inboundElementPool.Put(msg)
+		device.pool.inboundElementPool.Put(elem)
 	} else {
-		device.pool.inboundElementReuseChan <- msg
+		device.pool.inboundElementReuseChan <- elem
 	}
 }
 
@@ -81,11 +81,11 @@ func (device *Device) GetOutboundElement() *QueueOutboundElement {
 	}
 }
 
-func (device *Device) PutOutboundElement(msg *QueueOutboundElement) {
-	msg.clearPointers()
+func (device *Device) PutOutboundElement(elem *QueueOutboundElement) {
+	elem.clearPointers()
 	if PreallocatedBuffersPerPool == 0 {
-		device.pool.outboundElementPool.Put(msg)
+		device.pool.outboundElementPool.Put(elem)
 	} else {
-		device.pool.outboundElementReuseChan <- msg
+		device.pool.outboundElementReuseChan <- elem
 	}
 }
