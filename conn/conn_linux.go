@@ -328,15 +328,6 @@ func create4(port uint16) (int, uint16, error) {
 	if err := func() error {
 		if err := unix.SetsockoptInt(
 			fd,
-			unix.SOL_SOCKET,
-			unix.SO_REUSEADDR,
-			1,
-		); err != nil {
-			return err
-		}
-
-		if err := unix.SetsockoptInt(
-			fd,
 			unix.IPPROTO_IP,
 			unix.IP_PKTINFO,
 			1,
@@ -379,16 +370,6 @@ func create6(port uint16) (int, uint16, error) {
 	}
 
 	if err := func() error {
-
-		if err := unix.SetsockoptInt(
-			fd,
-			unix.SOL_SOCKET,
-			unix.SO_REUSEADDR,
-			1,
-		); err != nil {
-			return err
-		}
-
 		if err := unix.SetsockoptInt(
 			fd,
 			unix.IPPROTO_IPV6,
