@@ -158,7 +158,7 @@ func deviceUpdateState(device *Device) {
 	switch newIsUp {
 	case true:
 		if err := device.BindUpdate(); err != nil {
-			device.log.Error.Printf("Unable to update bind: %v\n", err)
+			device.log.Error.Println("Unable to update bind:", err)
 			device.isUp.Set(false)
 			break
 		}
