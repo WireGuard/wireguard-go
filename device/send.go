@@ -174,7 +174,7 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 
 	err = peer.SendBuffer(packet)
 	if err != nil {
-		peer.device.log.Error.Println(peer, "- Failed to send handshake initiation", err)
+		peer.device.log.Error.Println(peer, "- Failed to send handshake initiation:", err)
 	}
 	peer.timersHandshakeInitiated()
 
@@ -212,7 +212,7 @@ func (peer *Peer) SendHandshakeResponse() error {
 
 	err = peer.SendBuffer(packet)
 	if err != nil {
-		peer.device.log.Error.Println(peer, "- Failed to send handshake response", err)
+		peer.device.log.Error.Println(peer, "- Failed to send handshake response:", err)
 	}
 	return err
 }
