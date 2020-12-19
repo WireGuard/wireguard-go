@@ -352,9 +352,6 @@ func (peer *Peer) RoutineNonce() {
 	device := peer.device
 	logDebug := device.log.Debug
 
-	// We write to the encryption queue; keep it alive until we are done.
-	device.queue.encryption.wg.Add(1)
-
 	flush := func() {
 		for {
 			select {

@@ -213,6 +213,8 @@ func (peer *Peer) Start() {
 
 	// wait for routines to start
 
+	// RoutineNonce writes to the encryption queue; keep it alive until we are done.
+	device.queue.encryption.wg.Add(1)
 	go peer.RoutineNonce()
 	go peer.RoutineSequentialSender()
 	go peer.RoutineSequentialReceiver()
