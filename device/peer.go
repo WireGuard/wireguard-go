@@ -28,7 +28,6 @@ type Peer struct {
 	device                      *Device
 	endpoint                    conn.Endpoint
 	persistentKeepaliveInterval uint32 // accessed atomically
-	disableRoaming              bool
 
 	// These fields are accessed with atomic operations, which must be
 	// 64-bit aligned even on 32-bit platforms. Go guarantees that an
@@ -40,6 +39,8 @@ type Peer struct {
 		rxBytes           uint64 // bytes received from peer
 		lastHandshakeNano int64  // nano seconds since epoch
 	}
+
+	disableRoaming bool
 
 	timers struct {
 		retransmitHandshake     *Timer
