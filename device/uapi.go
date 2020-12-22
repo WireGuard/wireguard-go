@@ -58,8 +58,8 @@ func (device *Device) IpcGetOperation(w io.StringWriter) error {
 			send("private_key=" + device.staticIdentity.privateKey.ToHex())
 		}
 
-		if device.net.port != 0 {
-			send(fmt.Sprintf("listen_port=%d", device.net.port))
+		if port := device.ListenPort(); port != 0 {
+			send(fmt.Sprintf("listen_port=%d", port))
 		}
 
 		if device.net.fwmark != 0 {
@@ -162,12 +162,7 @@ func (device *Device) IpcSetOperation(r io.Reader) error {
 				// update port and rebind
 
 				logDebug.Println("UAPI: Updating listen port")
-
-				device.net.Lock()
-				device.net.port = uint16(port)
-				device.net.Unlock()
-
-				if err := device.BindUpdate(); err != nil {
+				if err := device.SetListenPort(uint16(port)); err != nil {
 					logError.Println("Failed to set listen_port:", err)
 					return &IPCError{ipc.IpcErrorPortInUse}
 				}

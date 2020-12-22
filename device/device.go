@@ -90,6 +90,23 @@ type Device struct {
 	}
 }
 
+// ListenPort returns the port that device is listening on.
+// It returns 0 if the device is not listening on any ports.
+func (device *Device) ListenPort() uint16 {
+	device.net.Lock()
+	defer device.net.Unlock()
+	return device.net.port
+}
+
+// SetListenPort sets the port that the device is listening on.
+// The new port is bound immediately.
+func (device *Device) SetListenPort(port uint16) error {
+	device.net.Lock()
+	defer device.net.Unlock()
+	device.net.port = port
+	return device.bindUpdateLocked()
+}
+
 // An encryptionQueue is a channel of QueueOutboundElements awaiting encryption.
 // An encryptionQueue is ref-counted using its wg field.
 // An encryptionQueue created with newEncryptionQueue has one reference.
@@ -490,9 +507,12 @@ func (device *Device) BindSetMark(mark uint32) error {
 }
 
 func (device *Device) BindUpdate() error {
-
 	device.net.Lock()
 	defer device.net.Unlock()
+	return device.bindUpdateLocked()
+}
+
+func (device *Device) bindUpdateLocked() error {
 
 	// close existing sockets
 
