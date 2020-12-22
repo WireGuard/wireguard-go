@@ -199,6 +199,8 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 				if device.addToInboundAndDecryptionQueues(peer.queue.inbound, device.queue.decryption, elem) {
 					buffer = device.GetMessageBuffer()
 				}
+			} else {
+				device.PutInboundElement(elem)
 			}
 			peer.queue.RUnlock()
 
