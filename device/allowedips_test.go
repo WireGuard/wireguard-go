@@ -70,11 +70,11 @@ func benchmarkTrie(peerNumber int, addressNumber int, addressLength int, b *test
 
 	const AddressLength = 4
 
-	for n := 0; n < peerNumber; n += 1 {
+	for n := 0; n < peerNumber; n++ {
 		peers = append(peers, &Peer{})
 	}
 
-	for n := 0; n < addressNumber; n += 1 {
+	for n := 0; n < addressNumber; n++ {
 		var addr [AddressLength]byte
 		rand.Read(addr[:])
 		cidr := uint(rand.Uint32() % (AddressLength * 8))
@@ -82,7 +82,7 @@ func benchmarkTrie(peerNumber int, addressNumber int, addressLength int, b *test
 		trie = trie.insert(addr[:], cidr, peers[index])
 	}
 
-	for n := 0; n < b.N; n += 1 {
+	for n := 0; n < b.N; n++ {
 		var addr [AddressLength]byte
 		rand.Read(addr[:])
 		trie.lookup(addr[:])

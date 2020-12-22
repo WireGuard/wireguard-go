@@ -73,11 +73,11 @@ func TestTrieRandomIPv4(t *testing.T) {
 
 	const AddressLength = 4
 
-	for n := 0; n < NumberOfPeers; n += 1 {
+	for n := 0; n < NumberOfPeers; n++ {
 		peers = append(peers, &Peer{})
 	}
 
-	for n := 0; n < NumberOfAddresses; n += 1 {
+	for n := 0; n < NumberOfAddresses; n++ {
 		var addr [AddressLength]byte
 		rand.Read(addr[:])
 		cidr := uint(rand.Uint32() % (AddressLength * 8))
@@ -86,7 +86,7 @@ func TestTrieRandomIPv4(t *testing.T) {
 		slow = slow.Insert(addr[:], cidr, peers[index])
 	}
 
-	for n := 0; n < NumberOfTests; n += 1 {
+	for n := 0; n < NumberOfTests; n++ {
 		var addr [AddressLength]byte
 		rand.Read(addr[:])
 		peer1 := slow.Lookup(addr[:])
@@ -106,11 +106,11 @@ func TestTrieRandomIPv6(t *testing.T) {
 
 	const AddressLength = 16
 
-	for n := 0; n < NumberOfPeers; n += 1 {
+	for n := 0; n < NumberOfPeers; n++ {
 		peers = append(peers, &Peer{})
 	}
 
-	for n := 0; n < NumberOfAddresses; n += 1 {
+	for n := 0; n < NumberOfAddresses; n++ {
 		var addr [AddressLength]byte
 		rand.Read(addr[:])
 		cidr := uint(rand.Uint32() % (AddressLength * 8))
@@ -119,7 +119,7 @@ func TestTrieRandomIPv6(t *testing.T) {
 		slow = slow.Insert(addr[:], cidr, peers[index])
 	}
 
-	for n := 0; n < NumberOfTests; n += 1 {
+	for n := 0; n < NumberOfTests; n++ {
 		var addr [AddressLength]byte
 		rand.Read(addr[:])
 		peer1 := slow.Lookup(addr[:])

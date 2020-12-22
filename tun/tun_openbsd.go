@@ -124,7 +124,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	if ifIndex != -1 {
 		tunfile, err = os.OpenFile(fmt.Sprintf("/dev/tun%d", ifIndex), unix.O_RDWR, 0)
 	} else {
-		for ifIndex = 0; ifIndex < 256; ifIndex += 1 {
+		for ifIndex = 0; ifIndex < 256; ifIndex++ {
 			tunfile, err = os.OpenFile(fmt.Sprintf("/dev/tun%d", ifIndex), unix.O_RDWR, 0)
 			if err == nil || !errorIsEBUSY(err) {
 				break

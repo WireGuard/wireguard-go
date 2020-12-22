@@ -26,15 +26,15 @@ func (device *Device) PopulatePools() {
 		}
 	} else {
 		device.pool.messageBufferReuseChan = make(chan *[MaxMessageSize]byte, PreallocatedBuffersPerPool)
-		for i := 0; i < PreallocatedBuffersPerPool; i += 1 {
+		for i := 0; i < PreallocatedBuffersPerPool; i++ {
 			device.pool.messageBufferReuseChan <- new([MaxMessageSize]byte)
 		}
 		device.pool.inboundElementReuseChan = make(chan *QueueInboundElement, PreallocatedBuffersPerPool)
-		for i := 0; i < PreallocatedBuffersPerPool; i += 1 {
+		for i := 0; i < PreallocatedBuffersPerPool; i++ {
 			device.pool.inboundElementReuseChan <- new(QueueInboundElement)
 		}
 		device.pool.outboundElementReuseChan = make(chan *QueueOutboundElement, PreallocatedBuffersPerPool)
-		for i := 0; i < PreallocatedBuffersPerPool; i += 1 {
+		for i := 0; i < PreallocatedBuffersPerPool; i++ {
 			device.pool.outboundElementReuseChan <- new(QueueOutboundElement)
 		}
 	}
