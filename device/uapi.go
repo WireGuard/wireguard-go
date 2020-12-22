@@ -7,6 +7,7 @@ package device
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -32,7 +33,7 @@ func (s IPCError) ErrorCode() int64 {
 	return s.int64
 }
 
-func (device *Device) IpcGetOperation(socket *bufio.Writer) error {
+func (device *Device) IpcGetOperation(w io.StringWriter) error {
 	lines := make([]string, 0, 100)
 	send := func(line string) {
 		lines = append(lines, line)
@@ -98,7 +99,7 @@ func (device *Device) IpcGetOperation(socket *bufio.Writer) error {
 	// send lines (does not require resource locks)
 
 	for _, line := range lines {
-		_, err := socket.WriteString(line + "\n")
+		_, err := w.WriteString(line + "\n")
 		if err != nil {
 			return &IPCError{ipc.IpcErrorIO}
 		}
@@ -394,6 +395,24 @@ func (device *Device) IpcSetOperation(r io.Reader) error {
 	}
 
 	return nil
+}
+
+
+
+func (device *Device) IpcGet() (string, error) {
+	buf := new(bytes.Buffer)
+	writer := bufio.NewWriter(buf)
+	if err := device.IpcGetOperation(writer); err != nil {
+		return "", err
+	}
+	if err := writer.Flush(); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func (device *Device) IpcSet(uapiConf string) error {
+	return device.IpcSetOperation(bufio.NewReader(strings.NewReader(uapiConf)))
 }
 
 func (device *Device) IpcHandle(socket net.Conn) {
