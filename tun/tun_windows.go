@@ -44,15 +44,8 @@ type NativeTun struct {
 	readWait  windows.Handle
 }
 
-var WintunPool *wintun.Pool
-
-func init() {
-	var err error
-	WintunPool, err = wintun.MakePool("WireGuard")
-	if err != nil {
-		panic(fmt.Errorf("Failed to make pool: %w", err))
-	}
-}
+var WintunPool, _ = wintun.MakePool("WireGuard")
+var WintunStaticRequestedGUID *windows.GUID
 
 //go:linkname procyield runtime.procyield
 func procyield(cycles uint32)
@@ -65,7 +58,7 @@ func nanotime() int64
 // interface with the same name exist, it is reused.
 //
 func CreateTUN(ifname string, mtu int) (Device, error) {
-	return CreateTUNWithRequestedGUID(ifname, nil, mtu)
+	return CreateTUNWithRequestedGUID(ifname, WintunStaticRequestedGUID, mtu)
 }
 
 //
