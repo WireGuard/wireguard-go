@@ -18,10 +18,10 @@ import (
 	"golang.zx2c4.com/wireguard/tun/tuntest"
 )
 
-func getFreePort(t *testing.T) string {
+func getFreePort(tb testing.TB) string {
 	l, err := net.ListenPacket("udp", "localhost:0")
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	defer l.Close()
 	return fmt.Sprintf("%d", l.LocalAddr().(*net.UDPAddr).Port)
@@ -51,11 +51,11 @@ func uapiCfg(cfg ...string) io.ReadSeeker {
 
 // genConfigs generates a pair of configs that connect to each other.
 // The configs use distinct, probably-usable ports.
-func genConfigs(t *testing.T) (cfgs [2]io.Reader) {
+func genConfigs(tb testing.TB) (cfgs [2]io.Reader) {
 	var port1, port2 string
 	for port1 == port2 {
-		port1 = getFreePort(t)
-		port2 = getFreePort(t)
+		port1 = getFreePort(tb)
+		port2 = getFreePort(tb)
 	}
 
 	cfgs[0] = uapiCfg(
@@ -98,8 +98,8 @@ const (
 	Pong SendDirection = false
 )
 
-func (pair *testPair) Send(t *testing.T, ping SendDirection, done chan struct{}) {
-	t.Helper()
+func (pair *testPair) Send(tb testing.TB, ping SendDirection, done chan struct{}) {
+	tb.Helper()
 	p0, p1 := pair[0], pair[1]
 	if !ping {
 		// pong is the new ping
@@ -127,16 +127,16 @@ func (pair *testPair) Send(t *testing.T, ping SendDirection, done chan struct{})
 		default:
 		}
 		// Real error.
-		t.Error(err)
+		tb.Error(err)
 	}
 }
 
 // genTestPair creates a testPair.
-func genTestPair(t *testing.T) (pair testPair) {
+func genTestPair(tb testing.TB) (pair testPair) {
 	const maxAttempts = 10
 NextAttempt:
 	for i := 0; i < maxAttempts; i++ {
-		cfg := genConfigs(t)
+		cfg := genConfigs(tb)
 		// Bring up a ChannelTun for each config.
 		for i := range pair {
 			p := &pair[i]
@@ -156,23 +156,23 @@ NextAttempt:
 				// Try again from the beginning.
 				// If there's something permanent wrong,
 				// we'll see that when we run out of attempts.
-				t.Logf("failed to configure device %d: %v", i, err)
+				tb.Logf("failed to configure device %d: %v", i, err)
 				continue NextAttempt
 			}
 			// The device might still not be up, e.g. due to an error
 			// in RoutineTUNEventReader's call to dev.Up that got swallowed.
 			// Assume it's due to a transient error (port in use), and retry.
 			if !p.dev.isUp.Get() {
-				t.Logf("device %d did not come up, trying again", i)
+				tb.Logf("device %d did not come up, trying again", i)
 				continue NextAttempt
 			}
 			// The device is up. Close it when the test completes.
-			t.Cleanup(p.dev.Close)
+			tb.Cleanup(p.dev.Close)
 		}
 		return // success
 	}
 
-	t.Fatalf("genChannelTUNs: failed %d times", maxAttempts)
+	tb.Fatalf("genChannelTUNs: failed %d times", maxAttempts)
 	return
 }
 
