@@ -12,6 +12,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -280,4 +281,62 @@ func randDevice(t *testing.T) *Device {
 	device := NewDevice(tun, logger)
 	device.SetPrivateKey(sk)
 	return device
+}
+
+func BenchmarkLatency(b *testing.B) {
+	pair := genTestPair(b)
+
+	// Establish a connection.
+	pair.Send(b, Ping, nil)
+	pair.Send(b, Pong, nil)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pair.Send(b, Ping, nil)
+		pair.Send(b, Pong, nil)
+	}
+}
+
+func BenchmarkThroughput(b *testing.B) {
+	pair := genTestPair(b)
+
+	// Establish a connection.
+	pair.Send(b, Ping, nil)
+	pair.Send(b, Pong, nil)
+
+	// Measure how long it takes to receive b.N packets,
+	// starting when we receive the first packet.
+	var recv uint64
+	var elapsed time.Duration
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		var start time.Time
+		for {
+			<-pair[0].tun.Inbound
+			new := atomic.AddUint64(&recv, 1)
+			if new == 1 {
+				start = time.Now()
+			}
+			// Careful! Don't change this to else if; b.N can be equal to 1.
+			if new == uint64(b.N) {
+				elapsed = time.Since(start)
+				return
+			}
+		}
+	}()
+
+	// Send packets as fast as we can until we've received enough.
+	ping := tuntest.Ping(pair[0].ip, pair[1].ip)
+	pingc := pair[1].tun.Outbound
+	var sent uint64
+	for atomic.LoadUint64(&recv) != uint64(b.N) {
+		sent++
+		pingc <- ping
+	}
+	wg.Wait()
+
+	b.ReportMetric(float64(elapsed)/float64(b.N), "ns/op")
+	b.ReportMetric(1-float64(b.N)/float64(sent), "packet-loss")
 }
