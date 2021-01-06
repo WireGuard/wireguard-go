@@ -146,7 +146,11 @@ NextAttempt:
 			} else {
 				p.ip = net.ParseIP("1.0.0.2")
 			}
-			p.dev = NewDevice(p.tun.TUN(), NewLogger(LogLevelDebug, fmt.Sprintf("dev%d: ", i)))
+			level := LogLevelDebug
+			if _, ok := tb.(*testing.B); ok && !testing.Verbose() {
+				level = LogLevelError
+			}
+			p.dev = NewDevice(p.tun.TUN(), NewLogger(level, fmt.Sprintf("dev%d: ", i)))
 			p.dev.Up()
 			if err := p.dev.IpcSetOperation(cfg[i]); err != nil {
 				// genConfigs attempted to pick ports that were free.
