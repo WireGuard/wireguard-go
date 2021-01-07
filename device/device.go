@@ -371,7 +371,10 @@ func (device *Device) FlushPacketQueues() {
 		select {
 		case elem, ok := <-device.queue.decryption:
 			if ok {
-				elem.Drop()
+				if !elem.IsDropped() {
+					elem.Drop()
+					device.PutMessageBuffer(elem.buffer)
+				}
 			}
 		case <-device.queue.handshake:
 		default:

@@ -251,7 +251,20 @@ func (device *Device) RoutineDecryption() {
 	for {
 		select {
 		case <-device.signals.stop:
-			return
+			for {
+				select {
+				case elem, ok := <-device.queue.decryption:
+					if ok {
+						if !elem.IsDropped() {
+							elem.Drop()
+							device.PutMessageBuffer(elem.buffer)
+						}
+						elem.Unlock()
+					}
+				default:
+					return
+				}
+			}
 
 		case elem, ok := <-device.queue.decryption:
 
