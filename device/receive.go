@@ -8,6 +8,7 @@ package device
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"net"
 	"strconv"
 	"sync"
@@ -17,6 +18,7 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
+
 	"golang.zx2c4.com/wireguard/conn"
 )
 
@@ -117,15 +119,13 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 	buffer := device.GetMessageBuffer()
 
 	var (
-		err      error
-		size     int
-		endpoint conn.Endpoint
+		err         error
+		size        int
+		endpoint    conn.Endpoint
+		deathSpiral int
 	)
 
 	for {
-
-		// read next datagram
-
 		switch IP {
 		case ipv4.Version:
 			size, endpoint, err = bind.ReceiveIPv4(buffer[:])
@@ -137,8 +137,18 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 
 		if err != nil {
 			device.PutMessageBuffer(buffer)
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+			device.log.Error.Printf("Failed to receive packet: %v", err)
+			if deathSpiral < 10 {
+				deathSpiral++
+				time.Sleep(time.Second / 3)
+				continue
+			}
 			return
 		}
+		deathSpiral = 0
 
 		if size < MinMessageSize {
 			continue
