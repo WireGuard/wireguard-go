@@ -58,23 +58,6 @@ func (elem *QueueInboundElement) IsDropped() bool {
 	return atomic.LoadInt32(&elem.dropped) == AtomicTrue
 }
 
-func (device *Device) addToInboundAndDecryptionQueues(inboundQueue chan *QueueInboundElement, decryptionQueue chan *QueueInboundElement, elem *QueueInboundElement) bool {
-	select {
-	case inboundQueue <- elem:
-		select {
-		case decryptionQueue <- elem:
-			return true
-		default:
-			elem.Drop()
-			elem.Unlock()
-			return false
-		}
-	default:
-		device.PutInboundElement(elem)
-		return false
-	}
-}
-
 func (device *Device) addToHandshakeQueue(queue chan QueueHandshakeElement, elem QueueHandshakeElement) bool {
 	select {
 	case queue <- elem:
@@ -207,9 +190,9 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 
 			peer.queue.RLock()
 			if peer.isRunning.Get() {
-				if device.addToInboundAndDecryptionQueues(peer.queue.inbound, device.queue.decryption.c, elem) {
-					buffer = device.GetMessageBuffer()
-				}
+				peer.queue.inbound <- elem
+				device.queue.decryption.c <- elem
+				buffer = device.GetMessageBuffer()
 			} else {
 				device.PutInboundElement(elem)
 			}
