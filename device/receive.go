@@ -109,6 +109,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 	logDebug := device.log.Debug
 	defer func() {
 		logDebug.Println("Routine: receive incoming IPv" + strconv.Itoa(IP) + " - stopped")
+		device.queue.decryption.wg.Done()
 		device.net.stopping.Done()
 	}()
 
@@ -206,7 +207,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 
 			peer.queue.RLock()
 			if peer.isRunning.Get() {
-				if device.addToInboundAndDecryptionQueues(peer.queue.inbound, device.queue.decryption, elem) {
+				if device.addToInboundAndDecryptionQueues(peer.queue.inbound, device.queue.decryption.c, elem) {
 					buffer = device.GetMessageBuffer()
 				}
 			} else {
@@ -258,59 +259,35 @@ func (device *Device) RoutineDecryption() {
 	}()
 	logDebug.Println("Routine: decryption worker - started")
 
-	for {
-		select {
-		case <-device.signals.stop:
-			for {
-				select {
-				case elem, ok := <-device.queue.decryption:
-					if ok {
-						if !elem.IsDropped() {
-							elem.Drop()
-							device.PutMessageBuffer(elem.buffer)
-						}
-						elem.Unlock()
-					}
-				default:
-					return
-				}
-			}
+	for elem := range device.queue.decryption.c {
+		// check if dropped
 
-		case elem, ok := <-device.queue.decryption:
-
-			if !ok {
-				return
-			}
-
-			// check if dropped
-
-			if elem.IsDropped() {
-				continue
-			}
-
-			// split message into fields
-
-			counter := elem.packet[MessageTransportOffsetCounter:MessageTransportOffsetContent]
-			content := elem.packet[MessageTransportOffsetContent:]
-
-			// decrypt and release to consumer
-
-			var err error
-			elem.counter = binary.LittleEndian.Uint64(counter)
-			// copy counter to nonce
-			binary.LittleEndian.PutUint64(nonce[0x4:0xc], elem.counter)
-			elem.packet, err = elem.keypair.receive.Open(
-				content[:0],
-				nonce[:],
-				content,
-				nil,
-			)
-			if err != nil {
-				elem.Drop()
-				device.PutMessageBuffer(elem.buffer)
-			}
-			elem.Unlock()
+		if elem.IsDropped() {
+			continue
 		}
+
+		// split message into fields
+
+		counter := elem.packet[MessageTransportOffsetCounter:MessageTransportOffsetContent]
+		content := elem.packet[MessageTransportOffsetContent:]
+
+		// decrypt and release to consumer
+
+		var err error
+		elem.counter = binary.LittleEndian.Uint64(counter)
+		// copy counter to nonce
+		binary.LittleEndian.PutUint64(nonce[0x4:0xc], elem.counter)
+		elem.packet, err = elem.keypair.receive.Open(
+			content[:0],
+			nonce[:],
+			content,
+			nil,
+		)
+		if err != nil {
+			elem.Drop()
+			device.PutMessageBuffer(elem.buffer)
+		}
+		elem.Unlock()
 	}
 }
 
