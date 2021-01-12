@@ -387,7 +387,8 @@ func (device *Device) RemoveAllPeers() {
 func (device *Device) FlushPacketQueues() {
 	for {
 		select {
-		case <-device.queue.handshake:
+		case elem := <-device.queue.handshake:
+			device.PutMessageBuffer(elem.buffer)
 		default:
 			return
 		}
