@@ -247,12 +247,7 @@ func (device *Device) IpcSetOperation(r io.Reader) error {
 						logError.Println("Failed to create new peer:", err)
 						return &IPCError{ipc.IpcErrorInvalid}
 					}
-					if peer == nil {
-						dummy = true
-						peer = &Peer{}
-					} else {
-						logDebug.Println(peer, "- UAPI: Created")
-					}
+					logDebug.Println(peer, "- UAPI: Created")
 				}
 
 			case "update_only":
