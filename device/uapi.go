@@ -393,7 +393,7 @@ func (device *Device) IpcSetOperation(r io.Reader) error {
 		}
 	}
 
-	return nil
+	return scanner.Err()
 }
 
 func (device *Device) IpcGet() (string, error) {
