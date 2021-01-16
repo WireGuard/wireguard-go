@@ -294,7 +294,7 @@ func (module *Module) performBaseRelocation(delta uintptr) (relocated bool, err 
 				}
 
 			default:
-				return false, fmt.Errorf("Unsupported relocation: %w", relType)
+				return false, fmt.Errorf("Unsupported relocation: %v", relType)
 			}
 		}
 
