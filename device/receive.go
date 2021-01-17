@@ -30,7 +30,6 @@ type QueueHandshakeElement struct {
 }
 
 type QueueInboundElement struct {
-	dropped int32
 	sync.Mutex
 	buffer   *[MaxMessageSize]byte
 	packet   []byte
@@ -48,14 +47,6 @@ func (elem *QueueInboundElement) clearPointers() {
 	elem.packet = nil
 	elem.keypair = nil
 	elem.endpoint = nil
-}
-
-func (elem *QueueInboundElement) Drop() {
-	atomic.StoreInt32(&elem.dropped, AtomicTrue)
-}
-
-func (elem *QueueInboundElement) IsDropped() bool {
-	return atomic.LoadInt32(&elem.dropped) == AtomicTrue
 }
 
 func (device *Device) addToHandshakeQueue(queue chan QueueHandshakeElement, elem QueueHandshakeElement) bool {
@@ -180,7 +171,6 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 			elem.packet = packet
 			elem.buffer = buffer
 			elem.keypair = keypair
-			elem.dropped = AtomicFalse
 			elem.endpoint = endpoint
 			elem.counter = 0
 			elem.Mutex = sync.Mutex{}
@@ -243,19 +233,11 @@ func (device *Device) RoutineDecryption() {
 	logDebug.Println("Routine: decryption worker - started")
 
 	for elem := range device.queue.decryption.c {
-		// check if dropped
-
-		if elem.IsDropped() {
-			continue
-		}
-
 		// split message into fields
-
 		counter := elem.packet[MessageTransportOffsetCounter:MessageTransportOffsetContent]
 		content := elem.packet[MessageTransportOffsetContent:]
 
 		// decrypt and release to consumer
-
 		var err error
 		elem.counter = binary.LittleEndian.Uint64(counter)
 		// copy counter to nonce
@@ -267,8 +249,7 @@ func (device *Device) RoutineDecryption() {
 			nil,
 		)
 		if err != nil {
-			elem.Drop()
-			device.PutMessageBuffer(elem.buffer)
+			elem.packet = nil
 		}
 		elem.Unlock()
 	}
@@ -484,9 +465,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		logDebug.Println(peer, "- Routine: sequential receiver - stopped")
 		peer.routines.stopping.Done()
 		if elem != nil {
-			if !elem.IsDropped() {
-				device.PutMessageBuffer(elem.buffer)
-			}
+			device.PutMessageBuffer(elem.buffer)
 			device.PutInboundElement(elem)
 		}
 	}()
@@ -495,9 +474,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 	for {
 		if elem != nil {
-			if !elem.IsDropped() {
-				device.PutMessageBuffer(elem.buffer)
-			}
+			device.PutMessageBuffer(elem.buffer)
 			device.PutInboundElement(elem)
 			elem = nil
 		}
@@ -513,15 +490,13 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		}
 
 		// wait for decryption
-
 		elem.Lock()
-
-		if elem.IsDropped() {
+		if elem.packet == nil {
+			// decryption failed
 			continue
 		}
 
 		// check for replay
-
 		if !elem.keypair.replayFilter.ValidateCounter(elem.counter, RejectAfterMessages) {
 			continue
 		}
