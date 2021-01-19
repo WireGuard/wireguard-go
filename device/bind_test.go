@@ -14,14 +14,11 @@ import (
 type DummyDatagram struct {
 	msg      []byte
 	endpoint conn.Endpoint
-	world    bool // better type
 }
 
 type DummyBind struct {
 	in6    chan DummyDatagram
-	ou6    chan DummyDatagram
 	in4    chan DummyDatagram
-	ou4    chan DummyDatagram
 	closed bool
 }
 
