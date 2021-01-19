@@ -62,7 +62,7 @@ type Peer struct {
 }
 
 func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
-	if device.isClosed.Get() {
+	if device.isClosed() {
 		return nil, errors.New("device closed")
 	}
 
@@ -107,7 +107,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	device.peers.empty.Set(false)
 
 	// start peer
-	if peer.device.isUp.Get() {
+	if peer.device.isUp() {
 		peer.Start()
 	}
 
@@ -121,7 +121,7 @@ func (peer *Peer) SendBuffer(buffer []byte) error {
 	if peer.device.net.bind == nil {
 		// Packets can leak through to SendBuffer while the device is closing.
 		// When that happens, drop them silently to avoid spurious errors.
-		if peer.device.isClosed.Get() {
+		if peer.device.isClosed() {
 			return nil
 		}
 		return errors.New("no bind")
@@ -152,7 +152,7 @@ func (peer *Peer) String() string {
 
 func (peer *Peer) Start() {
 	// should never start a peer on a closed device
-	if peer.device.isClosed.Get() {
+	if peer.device.isClosed() {
 		return
 	}
 

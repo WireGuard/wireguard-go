@@ -225,7 +225,7 @@ func (device *Device) RoutineReadFromTUN() {
 		size, err := device.tun.device.Read(elem.buffer[:], offset)
 
 		if err != nil {
-			if !device.isClosed.Get() {
+			if !device.isClosed() {
 				device.log.Errorf("Failed to read packet from TUN device: %v", err)
 				device.Close()
 			}
@@ -291,7 +291,7 @@ func (peer *Peer) StagePacket(elem *QueueOutboundElement) {
 
 func (peer *Peer) SendStagedPackets() {
 top:
-	if len(peer.queue.staged) == 0 || !peer.device.isUp.Get() {
+	if len(peer.queue.staged) == 0 || !peer.device.isUp() {
 		return
 	}
 

@@ -474,7 +474,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		}
 
 		_, err = device.tun.device.Write(elem.buffer[:MessageTransportOffsetContent+len(elem.packet)], MessageTransportOffsetContent)
-		if err != nil && !device.isClosed.Get() {
+		if err != nil && !device.isClosed() {
 			device.log.Errorf("Failed to write packet to TUN device: %v", err)
 		}
 		if len(peer.queue.inbound) == 0 {

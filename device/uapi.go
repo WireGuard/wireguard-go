@@ -258,7 +258,7 @@ type ipcSetPeer struct {
 }
 
 func (peer *ipcSetPeer) handlePostConfig() {
-	if peer.Peer != nil && !peer.dummy && peer.Peer.device.isUp.Get() {
+	if peer.Peer != nil && !peer.dummy && peer.Peer.device.isUp() {
 		peer.SendStagedPackets()
 	}
 }
@@ -354,7 +354,7 @@ func (device *Device) handlePeerLine(peer *ipcSetPeer, key, value string) error 
 			if err != nil {
 				return ipcErrorf(ipc.IpcErrorIO, "failed to get tun device status: %w", err)
 			}
-			if device.isUp.Get() && !peer.dummy {
+			if device.isUp() && !peer.dummy {
 				peer.SendKeepalive()
 			}
 		}

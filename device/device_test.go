@@ -172,7 +172,7 @@ NextAttempt:
 			// The device might still not be up, e.g. due to an error
 			// in RoutineTUNEventReader's call to dev.Up that got swallowed.
 			// Assume it's due to a transient error (port in use), and retry.
-			if !p.dev.isUp.Get() {
+			if !p.dev.isUp() {
 				tb.Logf("device %d did not come up, trying again", i)
 				p.dev.Close()
 				continue NextAttempt
