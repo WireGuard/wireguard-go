@@ -103,19 +103,19 @@ func CreateNetTUN(localAddresses []net.IP, dnsServers []net.IP, mtu int) (Device
 	}
 	tcpipErr := dev.stack.CreateNIC(1, (*endpoint)(dev))
 	if tcpipErr != nil {
-		return nil, nil, fmt.Errorf("CreateNIC: %w", tcpipErr)
+		return nil, nil, fmt.Errorf("CreateNIC: %v", tcpipErr)
 	}
 	for _, ip := range localAddresses {
 		if ip4 := ip.To4(); ip4 != nil {
 			tcpipErr = dev.stack.AddAddress(1, ipv4.ProtocolNumber, tcpip.Address(ip4))
 			if tcpipErr != nil {
-				return nil, nil, fmt.Errorf("AddAddress(%v): %w", ip4, tcpipErr)
+				return nil, nil, fmt.Errorf("AddAddress(%v): %v", ip4, tcpipErr)
 			}
 			dev.hasV4 = true
 		} else {
 			tcpipErr = dev.stack.AddAddress(1, ipv6.ProtocolNumber, tcpip.Address(ip))
 			if tcpipErr != nil {
-				return nil, nil, fmt.Errorf("AddAddress(%v): %w", ip4, tcpipErr)
+				return nil, nil, fmt.Errorf("AddAddress(%v): %v", ip4, tcpipErr)
 			}
 			dev.hasV6 = true
 		}
