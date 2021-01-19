@@ -298,12 +298,7 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 
 func NewDevice(tunDevice tun.Device, logger *Logger) *Device {
 	device := new(Device)
-
-	device.isUp.Set(false)
-	device.isClosed.Set(false)
-
 	device.log = logger
-
 	device.tun.device = tunDevice
 	mtu, err := device.tun.device.MTU()
 	if err != nil {
