@@ -210,10 +210,8 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 
 func (device *Device) RoutineDecryption() {
 	var nonce [chacha20poly1305.NonceSize]byte
-	defer func() {
-		device.log.Verbosef("Routine: decryption worker - stopped")
-		device.state.stopping.Done()
-	}()
+
+	defer device.log.Verbosef("Routine: decryption worker - stopped")
 	device.log.Verbosef("Routine: decryption worker - started")
 
 	for elem := range device.queue.decryption.c {
