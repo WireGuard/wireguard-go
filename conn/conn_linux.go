@@ -204,7 +204,7 @@ func (bind *nativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
 
 	var end NativeEndpoint
 	if bind.sock6 == -1 {
-		return 0, nil, net.ErrClosed
+		return 0, nil, NetErrClosed
 	}
 	n, err := receive6(
 		bind.sock6,
@@ -220,7 +220,7 @@ func (bind *nativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
 
 	var end NativeEndpoint
 	if bind.sock4 == -1 {
-		return 0, nil, net.ErrClosed
+		return 0, nil, NetErrClosed
 	}
 	n, err := receive4(
 		bind.sock4,
@@ -237,12 +237,12 @@ func (bind *nativeBind) Send(buff []byte, end Endpoint) error {
 	nend := end.(*NativeEndpoint)
 	if !nend.isV6 {
 		if bind.sock4 == -1 {
-			return net.ErrClosed
+			return NetErrClosed
 		}
 		return send4(bind.sock4, nend, buff)
 	} else {
 		if bind.sock6 == -1 {
-			return net.ErrClosed
+			return NetErrClosed
 		}
 		return send6(bind.sock6, nend, buff)
 	}
