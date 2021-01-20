@@ -3,7 +3,7 @@
  * Copyright (C) 2019-2021 WireGuard LLC. All Rights Reserved.
  */
 
-package tun
+package netstack
 
 import (
 	"context"
@@ -17,6 +17,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.zx2c4.com/wireguard/tun"
 
 	"golang.org/x/net/dns/dnsmessage"
 	"gvisor.dev/gvisor/pkg/tcpip"
@@ -33,7 +35,7 @@ import (
 type netTun struct {
 	stack          *stack.Stack
 	dispatcher     stack.NetworkDispatcher
-	events         chan Event
+	events         chan tun.Event
 	incomingPacket chan buffer.VectorisedView
 	mtu            int
 	dnsServers     []net.IP
@@ -88,7 +90,7 @@ func (*endpoint) ARPHardwareType() header.ARPHardwareType {
 func (e *endpoint) AddHeader(local, remote tcpip.LinkAddress, protocol tcpip.NetworkProtocolNumber, pkt *stack.PacketBuffer) {
 }
 
-func CreateNetTUN(localAddresses []net.IP, dnsServers []net.IP, mtu int) (Device, *Net, error) {
+func CreateNetTUN(localAddresses []net.IP, dnsServers []net.IP, mtu int) (tun.Device, *Net, error) {
 	opts := stack.Options{
 		NetworkProtocols:   []stack.NetworkProtocolFactory{ipv4.NewProtocol, ipv6.NewProtocol},
 		TransportProtocols: []stack.TransportProtocolFactory{tcp.NewProtocol, udp.NewProtocol},
@@ -96,7 +98,7 @@ func CreateNetTUN(localAddresses []net.IP, dnsServers []net.IP, mtu int) (Device
 	}
 	dev := &netTun{
 		stack:          stack.New(opts),
-		events:         make(chan Event, 10),
+		events:         make(chan tun.Event, 10),
 		incomingPacket: make(chan buffer.VectorisedView),
 		dnsServers:     dnsServers,
 		mtu:            mtu,
@@ -127,7 +129,7 @@ func CreateNetTUN(localAddresses []net.IP, dnsServers []net.IP, mtu int) (Device
 		dev.stack.AddRoute(tcpip.Route{Destination: header.IPv6EmptySubnet, NIC: 1})
 	}
 
-	dev.events <- EventUp
+	dev.events <- tun.EventUp
 	return dev, (*Net)(dev), nil
 }
 
@@ -139,7 +141,7 @@ func (tun *netTun) File() *os.File {
 	return nil
 }
 
-func (tun *netTun) Events() chan Event {
+func (tun *netTun) Events() chan tun.Event {
 	return tun.events
 }
 
