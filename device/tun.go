@@ -6,6 +6,7 @@
 package device
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"golang.zx2c4.com/wireguard/tun"
@@ -20,16 +21,22 @@ func (device *Device) RoutineTUNEventReader() {
 	for event := range device.tun.device.Events() {
 		if event&tun.EventMTUUpdate != 0 {
 			mtu, err := device.tun.device.MTU()
-			old := atomic.LoadInt32(&device.tun.mtu)
 			if err != nil {
 				device.log.Errorf("Failed to load updated MTU of device: %v", err)
-			} else if int(old) != mtu {
-				if mtu+MessageTransportSize > MaxMessageSize {
-					device.log.Verbosef("MTU updated: %v (too large)", mtu)
-				} else {
-					device.log.Verbosef("MTU updated: %v", mtu)
-				}
-				atomic.StoreInt32(&device.tun.mtu, int32(mtu))
+				continue
+			}
+			if mtu < 0 {
+				device.log.Errorf("MTU not updated to negative value: %v", mtu)
+				continue
+			}
+			var tooLarge string
+			if mtu > MaxContentSize {
+				tooLarge = fmt.Sprintf(" (too large, capped at %v)", MaxContentSize)
+				mtu = MaxContentSize
+			}
+			old := atomic.SwapInt32(&device.tun.mtu, int32(mtu))
+			if int(old) != mtu {
+				device.log.Verbosef("MTU updated: %v%s", mtu, tooLarge)
 			}
 		}
 
