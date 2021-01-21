@@ -15,7 +15,6 @@ import (
 const DefaultMTU = 1420
 
 func (device *Device) RoutineTUNEventReader() {
-	setUp := false
 	device.log.Verbosef("Routine: event worker - started")
 
 	for event := range device.tun.device.Events() {
@@ -40,15 +39,13 @@ func (device *Device) RoutineTUNEventReader() {
 			}
 		}
 
-		if event&tun.EventUp != 0 && !setUp {
-			device.log.Verbosef("Interface set up")
-			setUp = true
+		if event&tun.EventUp != 0 {
+			device.log.Verbosef("Interface up requested")
 			device.Up()
 		}
 
-		if event&tun.EventDown != 0 && setUp {
-			device.log.Verbosef("Interface set down")
-			setUp = false
+		if event&tun.EventDown != 0 {
+			device.log.Verbosef("Interface down requested")
 			device.Down()
 		}
 	}
