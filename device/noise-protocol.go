@@ -319,11 +319,11 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	flood := time.Since(handshake.lastInitiationConsumption) <= HandshakeInitationRate
 	handshake.mutex.RUnlock()
 	if replay {
-		device.log.Debug.Printf("%v - ConsumeMessageInitiation: handshake replay @ %v\n", peer, timestamp)
+		device.debugf("%v - ConsumeMessageInitiation: handshake replay @ %v", peer, timestamp)
 		return nil
 	}
 	if flood {
-		device.log.Debug.Printf("%v - ConsumeMessageInitiation: handshake flood\n", peer)
+		device.debugf("%v - ConsumeMessageInitiation: handshake flood", peer)
 		return nil
 	}
 

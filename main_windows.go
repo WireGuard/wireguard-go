@@ -34,8 +34,8 @@ func main() {
 		device.LogLevelDebug,
 		fmt.Sprintf("(%s) ", interfaceName),
 	)
-	logger.Info.Println("Starting wireguard-go version", device.WireGuardGoVersion)
-	logger.Debug.Println("Debug log enabled")
+	logger.Infof("Starting wireguard-go version %v", device.WireGuardGoVersion)
+	logger.Debugf("Debug log enabled")
 
 	tun, err := tun.CreateTUN(interfaceName, 0)
 	if err == nil {
@@ -44,17 +44,17 @@ func main() {
 			interfaceName = realInterfaceName
 		}
 	} else {
-		logger.Error.Println("Failed to create TUN device:", err)
+		logger.Errorf("Failed to create TUN device: %v", err)
 		os.Exit(ExitSetupFailed)
 	}
 
 	device := device.NewDevice(tun, logger)
 	device.Up()
-	logger.Info.Println("Device started")
+	logger.Infof("Device started")
 
 	uapi, err := ipc.UAPIListen(interfaceName)
 	if err != nil {
-		logger.Error.Println("Failed to listen on uapi socket:", err)
+		logger.Errorf("Failed to listen on uapi socket: %v", err)
 		os.Exit(ExitSetupFailed)
 	}
 
@@ -71,7 +71,7 @@ func main() {
 			go device.IpcHandle(conn)
 		}
 	}()
-	logger.Info.Println("UAPI listener started")
+	logger.Infof("UAPI listener started")
 
 	// wait for program to terminate
 
@@ -90,5 +90,5 @@ func main() {
 	uapi.Close()
 	device.Close()
 
-	logger.Info.Println("Shutting down")
+	logger.Infof("Shutting down")
 }
