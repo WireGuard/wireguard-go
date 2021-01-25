@@ -427,8 +427,8 @@ func (device *Device) IpcHandle(socket net.Conn) {
 	// write status
 	var status *IPCError
 	if err != nil && !errors.As(err, &status) {
-		// I/O error, maybe something unexpected
-		status = ipcErrorf(1, "other UAPI error: %w", err)
+		// shouldn't happen
+		status = ipcErrorf(ipc.IpcErrorUnknown, "other UAPI error: %w", err)
 	}
 	if status != nil {
 		device.log.Error.Println(status)

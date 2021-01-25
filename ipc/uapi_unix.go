@@ -21,6 +21,7 @@ const (
 	IpcErrorProtocol  = -int64(unix.EPROTO)
 	IpcErrorInvalid   = -int64(unix.EINVAL)
 	IpcErrorPortInUse = -int64(unix.EADDRINUSE)
+	IpcErrorUnknown   = -55 // ENOANO
 )
 
 // socketDirectory is variable because it is modified by a linker
