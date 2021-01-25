@@ -19,6 +19,7 @@ const (
 	IpcErrorProtocol  = -int64(71)
 	IpcErrorInvalid   = -int64(22)
 	IpcErrorPortInUse = -int64(98)
+	IpcErrorUnknown   = -int64(55)
 )
 
 type UAPIListener struct {
