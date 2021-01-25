@@ -301,21 +301,13 @@ func (device *Device) handlePeerLine(peer *ipcSetPeer, key, value string) error 
 
 	case "endpoint":
 		device.log.Debug.Println(peer, "- UAPI: Updating endpoint")
-
-		err := func() error {
-			peer.Lock()
-			defer peer.Unlock()
-			endpoint, err := conn.CreateEndpoint(value)
-			if err != nil {
-				return err
-			}
-			peer.endpoint = endpoint
-			return nil
-		}()
-
+		endpoint, err := conn.CreateEndpoint(value)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "failed to set endpoint %v: %w", value, err)
 		}
+		peer.Lock()
+		defer peer.Unlock()
+		peer.endpoint = endpoint
 
 	case "persistent_keepalive_interval":
 		device.log.Debug.Println(peer, "- UAPI: Updating persistent keepalive interval")
