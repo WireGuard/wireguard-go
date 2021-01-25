@@ -202,22 +202,13 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		}
 
 	case "fwmark":
-		// parse fwmark field
-		fwmark, err := func() (uint32, error) {
-			if value == "" {
-				return 0, nil
-			}
-			mark, err := strconv.ParseUint(value, 10, 32)
-			return uint32(mark), err
-		}()
-
+		mark, err := strconv.ParseUint(value, 10, 32)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "invalid fwmark: %w", err)
 		}
 
 		device.log.Debug.Println("UAPI: Updating fwmark")
-
-		if err := device.BindSetMark(uint32(fwmark)); err != nil {
+		if err := device.BindSetMark(uint32(mark)); err != nil {
 			return ipcErrorf(ipc.IpcErrorPortInUse, "failed to update fwmark: %w", err)
 		}
 
