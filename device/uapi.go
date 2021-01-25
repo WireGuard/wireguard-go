@@ -121,6 +121,9 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 // IpcSetOperation implements the WireGuard configuration protocol "set" operation.
 // See https://www.wireguard.com/xplatform/#configuration-protocol for details.
 func (device *Device) IpcSetOperation(r io.Reader) (err error) {
+	device.ipcSetMu.Lock()
+	defer device.ipcSetMu.Unlock()
+
 	defer func() {
 		if err != nil {
 			device.log.Error.Println(err)
