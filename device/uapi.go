@@ -146,7 +146,6 @@ func (device *Device) IpcSetOperation(r io.Reader) (err error) {
 
 		if key == "public_key" {
 			if deviceConfig {
-				device.log.Debug.Println("UAPI: Transition to peer configuration")
 				deviceConfig = false
 			}
 			// Load/create the peer we are now configuring.
