@@ -168,7 +168,10 @@ func (device *Device) IpcSetOperation(r io.Reader) (err error) {
 		}
 	}
 
-	return scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return ipcErrorf(ipc.IpcErrorIO, "failed to read input: %w", err)
+	}
+	return nil
 }
 
 func (device *Device) handleDeviceLine(key, value string) error {
