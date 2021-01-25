@@ -411,31 +411,22 @@ func (device *Device) IpcHandle(socket net.Conn) {
 	}
 
 	// handle operation
-
-	var status *IPCError
-
 	switch op {
 	case "set=1\n":
 		err = device.IpcSetOperation(buffered.Reader)
-		if err != nil && !errors.As(err, &status) {
-			// should never happen
-			status = ipcErrorf(1, "invalid UAPI error: %w", err)
-		}
-
 	case "get=1\n":
 		err = device.IpcGetOperation(buffered.Writer)
-		if err != nil && !errors.As(err, &status) {
-			// should never happen
-			status = ipcErrorf(1, "invalid UAPI error: %w", err)
-		}
-
 	default:
-		device.log.Error.Println("Invalid UAPI operation:", op)
+		device.log.Error.Println("invalid UAPI operation:", op)
 		return
 	}
 
 	// write status
-
+	var status *IPCError
+	if err != nil && !errors.As(err, &status) {
+		// I/O error, maybe something unexpected
+		status = ipcErrorf(1, "other UAPI error: %w", err)
+	}
 	if status != nil {
 		device.log.Error.Println(status)
 		fmt.Fprintf(buffered, "errno=%d\n\n", status.ErrorCode())
