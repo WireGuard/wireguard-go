@@ -108,9 +108,10 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 			sendf("rx_bytes=%d", atomic.LoadUint64(&peer.stats.rxBytes))
 			sendf("persistent_keepalive_interval=%d", atomic.LoadUint32(&peer.persistentKeepaliveInterval))
 
-			for _, ip := range device.allowedips.EntriesForPeer(peer) {
-				sendf("allowed_ip=%s", ip.String())
-			}
+			device.allowedips.EntriesForPeer(peer, func(ip net.IP, cidr uint) bool {
+				sendf("allowed_ip=%s/%d", ip.String(), cidr)
+				return true
+			})
 		}
 	}()
 

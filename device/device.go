@@ -314,7 +314,6 @@ func NewDevice(tunDevice tun.Device, logger *Logger) *Device {
 	device.rate.underLoadUntil.Store(time.Time{})
 
 	device.indexTable.Init()
-	device.allowedips.Reset()
 
 	device.PopulatePools()
 

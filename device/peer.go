@@ -28,6 +28,7 @@ type Peer struct {
 	device                      *Device
 	endpoint                    conn.Endpoint
 	persistentKeepaliveInterval uint32 // accessed atomically
+	firstTrieEntry              *trieEntry
 
 	// These fields are accessed with atomic operations, which must be
 	// 64-bit aligned even on 32-bit platforms. Go guarantees that an
