@@ -403,7 +403,8 @@ func (device *Device) IpcHandle(socket net.Conn) {
 		case "set=1\n":
 			err = device.IpcSetOperation(buffered.Reader)
 		case "get=1\n":
-			nextByte, err := buffered.ReadByte()
+			var nextByte byte
+			nextByte, err = buffered.ReadByte()
 			if err != nil {
 				return
 			}
