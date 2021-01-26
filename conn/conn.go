@@ -29,7 +29,7 @@ type Bind interface {
 	// It reports the number of bytes read, n,
 	// the packet source address ep,
 	// and any error.
-	ReceiveIPv6(buff []byte) (n int, ep Endpoint, err error)
+	ReceiveIPv6(b []byte) (n int, ep Endpoint, err error)
 
 	// ReceiveIPv4 reads an IPv4 UDP packet into b.
 	//
