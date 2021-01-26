@@ -408,7 +408,7 @@ func (device *Device) IpcHandle(socket net.Conn) {
 				return
 			}
 			if nextByte != '\n' {
-				err = ipcErrorf(ipc.IpcErrorInvalid, "trailing character in UAPI get: %c", nextByte, err)
+				err = ipcErrorf(ipc.IpcErrorInvalid, "trailing character in UAPI get: %c", nextByte)
 				break
 			}
 			err = device.IpcGetOperation(buffered.Writer)
