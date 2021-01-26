@@ -99,7 +99,7 @@ func (peer *Peer) SendKeepalive() bool {
 	elem.packet = nil
 	select {
 	case peer.queue.nonce <- elem:
-		peer.device.debugf("%v - Sending keepalive packet", peer)
+		peer.device.log.Verbosef("%v - Sending keepalive packet", peer)
 		return true
 	default:
 		peer.device.PutMessageBuffer(elem.buffer)
@@ -128,11 +128,11 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	peer.handshake.lastSentHandshake = time.Now()
 	peer.handshake.mutex.Unlock()
 
-	peer.device.debugf("%v - Sending handshake initiation", peer)
+	peer.device.log.Verbosef("%v - Sending handshake initiation", peer)
 
 	msg, err := peer.device.CreateMessageInitiation(peer)
 	if err != nil {
-		peer.device.errorf("%v - Failed to create initiation message: %v", peer, err)
+		peer.device.log.Errorf("%v - Failed to create initiation message: %v", peer, err)
 		return err
 	}
 
@@ -147,7 +147,7 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 
 	err = peer.SendBuffer(packet)
 	if err != nil {
-		peer.device.errorf("%v - Failed to send handshake initiation: %v", peer, err)
+		peer.device.log.Errorf("%v - Failed to send handshake initiation: %v", peer, err)
 	}
 	peer.timersHandshakeInitiated()
 
@@ -159,11 +159,11 @@ func (peer *Peer) SendHandshakeResponse() error {
 	peer.handshake.lastSentHandshake = time.Now()
 	peer.handshake.mutex.Unlock()
 
-	peer.device.debugf("%v - Sending handshake response", peer)
+	peer.device.log.Verbosef("%v - Sending handshake response", peer)
 
 	response, err := peer.device.CreateMessageResponse(peer)
 	if err != nil {
-		peer.device.errorf("%v - Failed to create response message: %v", peer, err)
+		peer.device.log.Errorf("%v - Failed to create response message: %v", peer, err)
 		return err
 	}
 
@@ -175,7 +175,7 @@ func (peer *Peer) SendHandshakeResponse() error {
 
 	err = peer.BeginSymmetricSession()
 	if err != nil {
-		peer.device.errorf("%v - Failed to derive keypair: %v", peer, err)
+		peer.device.log.Errorf("%v - Failed to derive keypair: %v", peer, err)
 		return err
 	}
 
@@ -185,19 +185,19 @@ func (peer *Peer) SendHandshakeResponse() error {
 
 	err = peer.SendBuffer(packet)
 	if err != nil {
-		peer.device.errorf("%v - Failed to send handshake response: %v", peer, err)
+		peer.device.log.Errorf("%v - Failed to send handshake response: %v", peer, err)
 	}
 	return err
 }
 
 func (device *Device) SendHandshakeCookie(initiatingElem *QueueHandshakeElement) error {
 
-	device.debugf("Sending cookie response for denied handshake message for %v", initiatingElem.endpoint.DstToString())
+	device.log.Verbosef("Sending cookie response for denied handshake message for %v", initiatingElem.endpoint.DstToString())
 
 	sender := binary.LittleEndian.Uint32(initiatingElem.packet[4:8])
 	reply, err := device.cookieChecker.CreateReply(initiatingElem.packet, sender, initiatingElem.endpoint.DstToBytes())
 	if err != nil {
-		device.errorf("Failed to create cookie reply: %v", err)
+		device.log.Errorf("Failed to create cookie reply: %v", err)
 		return err
 	}
 
@@ -226,11 +226,11 @@ func (peer *Peer) keepKeyFreshSending() {
  */
 func (device *Device) RoutineReadFromTUN() {
 	defer func() {
-		device.debugf("Routine: TUN reader - stopped")
+		device.log.Verbosef("Routine: TUN reader - stopped")
 		device.state.stopping.Done()
 	}()
 
-	device.debugf("Routine: TUN reader - started")
+	device.log.Verbosef("Routine: TUN reader - started")
 
 	var elem *QueueOutboundElement
 
@@ -248,7 +248,7 @@ func (device *Device) RoutineReadFromTUN() {
 
 		if err != nil {
 			if !device.isClosed.Get() {
-				device.errorf("Failed to read packet from TUN device: %v", err)
+				device.log.Errorf("Failed to read packet from TUN device: %v", err)
 				device.Close()
 			}
 			device.PutMessageBuffer(elem.buffer)
@@ -281,7 +281,7 @@ func (device *Device) RoutineReadFromTUN() {
 			peer = device.allowedips.LookupIPv6(dst)
 
 		default:
-			device.debugf("Received packet with unknown IP version")
+			device.log.Verbosef("Received packet with unknown IP version")
 		}
 
 		if peer == nil {
@@ -333,14 +333,14 @@ func (peer *Peer) RoutineNonce() {
 
 	defer func() {
 		flush()
-		device.debugf("%v - Routine: nonce worker - stopped", peer)
+		device.log.Verbosef("%v - Routine: nonce worker - stopped", peer)
 		peer.queue.packetInNonceQueueIsAwaitingKey.Set(false)
 		device.queue.encryption.wg.Done() // no more writes from us
 		close(peer.queue.outbound)        // no more writes to this channel
 		peer.routines.stopping.Done()
 	}()
 
-	device.debugf("%v - Routine: nonce worker - started", peer)
+	device.log.Verbosef("%v - Routine: nonce worker - started", peer)
 
 NextPacket:
 	for {
@@ -385,11 +385,11 @@ NextPacket:
 
 				// wait for key to be established
 
-				device.debugf("%v - Awaiting keypair", peer)
+				device.log.Verbosef("%v - Awaiting keypair", peer)
 
 				select {
 				case <-peer.signals.newKeypairArrived:
-					device.debugf("%v - Obtained awaited keypair", peer)
+					device.log.Verbosef("%v - Obtained awaited keypair", peer)
 
 				case <-peer.signals.flushNonceQueue:
 					device.PutMessageBuffer(elem.buffer)
@@ -453,8 +453,8 @@ func (device *Device) RoutineEncryption() {
 
 	var nonce [chacha20poly1305.NonceSize]byte
 
-	defer device.debugf("Routine: encryption worker - stopped")
-	device.debugf("Routine: encryption worker - started")
+	defer device.log.Verbosef("Routine: encryption worker - stopped")
+	device.log.Verbosef("Routine: encryption worker - started")
 
 	for elem := range device.queue.encryption.c {
 		// populate header fields
@@ -497,8 +497,8 @@ func (peer *Peer) RoutineSequentialSender() {
 
 	device := peer.device
 
-	defer device.debugf("%v - Routine: sequential sender - stopped", peer)
-	device.debugf("%v - Routine: sequential sender - started", peer)
+	defer device.log.Verbosef("%v - Routine: sequential sender - stopped", peer)
+	device.log.Verbosef("%v - Routine: sequential sender - started", peer)
 
 	for elem := range peer.queue.outbound {
 		elem.Lock()
@@ -526,7 +526,7 @@ func (peer *Peer) RoutineSequentialSender() {
 		device.PutMessageBuffer(elem.buffer)
 		device.PutOutboundElement(elem)
 		if err != nil {
-			device.errorf("%v - Failed to send data packet: %v", peer, err)
+			device.log.Errorf("%v - Failed to send data packet: %v", peer, err)
 			continue
 		}
 

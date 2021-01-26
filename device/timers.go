@@ -78,7 +78,7 @@ func (peer *Peer) timersActive() bool {
 
 func expiredRetransmitHandshake(peer *Peer) {
 	if atomic.LoadUint32(&peer.timers.handshakeAttempts) > MaxTimerHandshakes {
-		peer.device.debugf("%s - Handshake did not complete after %d attempts, giving up", peer, MaxTimerHandshakes+2)
+		peer.device.log.Verbosef("%s - Handshake did not complete after %d attempts, giving up", peer, MaxTimerHandshakes+2)
 
 		if peer.timersActive() {
 			peer.timers.sendKeepalive.Del()
@@ -97,7 +97,7 @@ func expiredRetransmitHandshake(peer *Peer) {
 		}
 	} else {
 		atomic.AddUint32(&peer.timers.handshakeAttempts, 1)
-		peer.device.debugf("%s - Handshake did not complete after %d seconds, retrying (try %d)", peer, int(RekeyTimeout.Seconds()), atomic.LoadUint32(&peer.timers.handshakeAttempts)+1)
+		peer.device.log.Verbosef("%s - Handshake did not complete after %d seconds, retrying (try %d)", peer, int(RekeyTimeout.Seconds()), atomic.LoadUint32(&peer.timers.handshakeAttempts)+1)
 
 		/* We clear the endpoint address src address, in case this is the cause of trouble. */
 		peer.Lock()
@@ -121,7 +121,7 @@ func expiredSendKeepalive(peer *Peer) {
 }
 
 func expiredNewHandshake(peer *Peer) {
-	peer.device.debugf("%s - Retrying handshake because we stopped hearing back after %d seconds", peer, int((KeepaliveTimeout + RekeyTimeout).Seconds()))
+	peer.device.log.Verbosef("%s - Retrying handshake because we stopped hearing back after %d seconds", peer, int((KeepaliveTimeout + RekeyTimeout).Seconds()))
 	/* We clear the endpoint address src address, in case this is the cause of trouble. */
 	peer.Lock()
 	if peer.endpoint != nil {
@@ -133,7 +133,7 @@ func expiredNewHandshake(peer *Peer) {
 }
 
 func expiredZeroKeyMaterial(peer *Peer) {
-	peer.device.debugf("%s - Removing all keys, since we haven't received a new one in %d seconds", peer, int((RejectAfterTime * 3).Seconds()))
+	peer.device.log.Verbosef("%s - Removing all keys, since we haven't received a new one in %d seconds", peer, int((RejectAfterTime * 3).Seconds()))
 	peer.ZeroAndFlushAll()
 }
 

@@ -148,7 +148,7 @@ NextAttempt:
 			} else {
 				p.ip = net.ParseIP("1.0.0.2")
 			}
-			level := LogLevelDebug
+			level := LogLevelVerbose
 			if _, ok := tb.(*testing.B); ok && !testing.Verbose() {
 				level = LogLevelError
 			}

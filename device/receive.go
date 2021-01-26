@@ -79,12 +79,12 @@ func (peer *Peer) keepKeyFreshReceiving() {
  */
 func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 	defer func() {
-		device.debugf("Routine: receive incoming IPv%d - stopped", IP)
+		device.log.Verbosef("Routine: receive incoming IPv%d - stopped", IP)
 		device.queue.decryption.wg.Done()
 		device.net.stopping.Done()
 	}()
 
-	device.debugf("Routine: receive incoming IPv%d - started", IP)
+	device.log.Verbosef("Routine: receive incoming IPv%d - started", IP)
 
 	// receive datagrams until conn is closed
 
@@ -112,7 +112,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 			if errors.Is(err, conn.NetErrClosed) {
 				return
 			}
-			device.errorf("Failed to receive packet: %v", err)
+			device.log.Errorf("Failed to receive packet: %v", err)
 			if deathSpiral < 10 {
 				deathSpiral++
 				time.Sleep(time.Second / 3)
@@ -199,7 +199,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 			okay = len(packet) == MessageCookieReplySize
 
 		default:
-			device.debugf("Received message with unknown type")
+			device.log.Verbosef("Received message with unknown type")
 		}
 
 		if okay {
@@ -221,10 +221,10 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 func (device *Device) RoutineDecryption() {
 	var nonce [chacha20poly1305.NonceSize]byte
 	defer func() {
-		device.debugf("Routine: decryption worker - stopped")
+		device.log.Verbosef("Routine: decryption worker - stopped")
 		device.state.stopping.Done()
 	}()
-	device.debugf("Routine: decryption worker - started")
+	device.log.Verbosef("Routine: decryption worker - started")
 
 	for elem := range device.queue.decryption.c {
 		// split message into fields
@@ -256,14 +256,14 @@ func (device *Device) RoutineHandshake() {
 	var ok bool
 
 	defer func() {
-		device.debugf("Routine: handshake worker - stopped")
+		device.log.Verbosef("Routine: handshake worker - stopped")
 		device.state.stopping.Done()
 		if elem.buffer != nil {
 			device.PutMessageBuffer(elem.buffer)
 		}
 	}()
 
-	device.debugf("Routine: handshake worker - started")
+	device.log.Verbosef("Routine: handshake worker - started")
 
 	for {
 		if elem.buffer != nil {
@@ -293,7 +293,7 @@ func (device *Device) RoutineHandshake() {
 			reader := bytes.NewReader(elem.packet)
 			err := binary.Read(reader, binary.LittleEndian, &reply)
 			if err != nil {
-				device.debugf("Failed to decode cookie reply")
+				device.log.Verbosef("Failed to decode cookie reply")
 				return
 			}
 
@@ -308,9 +308,9 @@ func (device *Device) RoutineHandshake() {
 			// consume reply
 
 			if peer := entry.peer; peer.isRunning.Get() {
-				device.debugf("Receiving cookie response from %s", elem.endpoint.DstToString())
+				device.log.Verbosef("Receiving cookie response from %s", elem.endpoint.DstToString())
 				if !peer.cookieGenerator.ConsumeReply(&reply) {
-					device.debugf("Could not decrypt invalid cookie response")
+					device.log.Verbosef("Could not decrypt invalid cookie response")
 				}
 			}
 
@@ -321,7 +321,7 @@ func (device *Device) RoutineHandshake() {
 			// check mac fields and maybe ratelimit
 
 			if !device.cookieChecker.CheckMAC1(elem.packet) {
-				device.debugf("Received packet with invalid mac1")
+				device.log.Verbosef("Received packet with invalid mac1")
 				continue
 			}
 
@@ -344,7 +344,7 @@ func (device *Device) RoutineHandshake() {
 			}
 
 		default:
-			device.errorf("Invalid packet ended up in the handshake queue")
+			device.log.Errorf("Invalid packet ended up in the handshake queue")
 			continue
 		}
 
@@ -359,7 +359,7 @@ func (device *Device) RoutineHandshake() {
 			reader := bytes.NewReader(elem.packet)
 			err := binary.Read(reader, binary.LittleEndian, &msg)
 			if err != nil {
-				device.errorf("Failed to decode initiation message")
+				device.log.Errorf("Failed to decode initiation message")
 				continue
 			}
 
@@ -367,7 +367,7 @@ func (device *Device) RoutineHandshake() {
 
 			peer := device.ConsumeMessageInitiation(&msg)
 			if peer == nil {
-				device.infof("Received invalid initiation message from %s", elem.endpoint.DstToString())
+				device.log.Verbosef("Received invalid initiation message from %s", elem.endpoint.DstToString())
 				continue
 			}
 
@@ -379,7 +379,7 @@ func (device *Device) RoutineHandshake() {
 			// update endpoint
 			peer.SetEndpointFromPacket(elem.endpoint)
 
-			device.debugf("%v - Received handshake initiation", peer)
+			device.log.Verbosef("%v - Received handshake initiation", peer)
 			atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
 
 			peer.SendHandshakeResponse()
@@ -392,7 +392,7 @@ func (device *Device) RoutineHandshake() {
 			reader := bytes.NewReader(elem.packet)
 			err := binary.Read(reader, binary.LittleEndian, &msg)
 			if err != nil {
-				device.errorf("Failed to decode response message")
+				device.log.Errorf("Failed to decode response message")
 				continue
 			}
 
@@ -400,14 +400,14 @@ func (device *Device) RoutineHandshake() {
 
 			peer := device.ConsumeMessageResponse(&msg)
 			if peer == nil {
-				device.infof("Received invalid response message from %s", elem.endpoint.DstToString())
+				device.log.Verbosef("Received invalid response message from %s", elem.endpoint.DstToString())
 				continue
 			}
 
 			// update endpoint
 			peer.SetEndpointFromPacket(elem.endpoint)
 
-			device.debugf("%v - Received handshake response", peer)
+			device.log.Verbosef("%v - Received handshake response", peer)
 			atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
 
 			// update timers
@@ -420,7 +420,7 @@ func (device *Device) RoutineHandshake() {
 			err = peer.BeginSymmetricSession()
 
 			if err != nil {
-				device.errorf("%v - Failed to derive keypair: %v", peer, err)
+				device.log.Errorf("%v - Failed to derive keypair: %v", peer, err)
 				continue
 			}
 
@@ -440,7 +440,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 	var elem *QueueInboundElement
 
 	defer func() {
-		device.debugf("%v - Routine: sequential receiver - stopped", peer)
+		device.log.Verbosef("%v - Routine: sequential receiver - stopped", peer)
 		peer.routines.stopping.Done()
 		if elem != nil {
 			device.PutMessageBuffer(elem.buffer)
@@ -448,7 +448,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		}
 	}()
 
-	device.debugf("%v - Routine: sequential receiver - started", peer)
+	device.log.Verbosef("%v - Routine: sequential receiver - started", peer)
 
 	for {
 		if elem != nil {
@@ -499,7 +499,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		// check for keepalive
 
 		if len(elem.packet) == 0 {
-			device.debugf("%v - Receiving keepalive packet", peer)
+			device.log.Verbosef("%v - Receiving keepalive packet", peer)
 			continue
 		}
 		peer.timersDataReceived()
@@ -527,7 +527,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 			src := elem.packet[IPv4offsetSrc : IPv4offsetSrc+net.IPv4len]
 			if device.allowedips.LookupIPv4(src) != peer {
-				device.infof("IPv4 packet with disallowed source address from %v", peer)
+				device.log.Verbosef("IPv4 packet with disallowed source address from %v", peer)
 				continue
 			}
 
@@ -552,12 +552,12 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 			src := elem.packet[IPv6offsetSrc : IPv6offsetSrc+net.IPv6len]
 			if device.allowedips.LookupIPv6(src) != peer {
-				device.infof("IPv6 packet with disallowed source address from %v", peer)
+				device.log.Verbosef("IPv6 packet with disallowed source address from %v", peer)
 				continue
 			}
 
 		default:
-			device.infof("Packet with invalid IP version from %v", peer)
+			device.log.Verbosef("Packet with invalid IP version from %v", peer)
 			continue
 		}
 
@@ -566,12 +566,12 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		offset := MessageTransportOffsetContent
 		_, err := device.tun.device.Write(elem.buffer[:offset+len(elem.packet)], offset)
 		if err != nil && !device.isClosed.Get() {
-			device.errorf("Failed to write packet to TUN device: %v", err)
+			device.log.Errorf("Failed to write packet to TUN device: %v", err)
 		}
 		if len(peer.queue.inbound) == 0 {
 			err := device.tun.device.Flush()
 			if err != nil {
-				peer.device.errorf("Unable to flush packets: %v", err)
+				peer.device.log.Errorf("Unable to flush packets: %v", err)
 			}
 		}
 	}

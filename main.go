@@ -95,16 +95,14 @@ func main() {
 
 	logLevel := func() int {
 		switch os.Getenv("LOG_LEVEL") {
-		case "debug":
-			return device.LogLevelDebug
-		case "info":
-			return device.LogLevelInfo
+		case "verbose", "debug":
+			return device.LogLevelVerbose
 		case "error":
 			return device.LogLevelError
 		case "silent":
 			return device.LogLevelSilent
 		}
-		return device.LogLevelInfo
+		return device.LogLevelError
 	}()
 
 	// open TUN device (or use supplied fd)
@@ -143,8 +141,7 @@ func main() {
 		fmt.Sprintf("(%s) ", interfaceName),
 	)
 
-	logger.Infof("Starting wireguard-go version %v", device.WireGuardGoVersion)
-	logger.Debugf("Debug log enabled")
+	logger.Verbosef("Starting wireguard-go version %s", device.WireGuardGoVersion)
 
 	if err != nil {
 		logger.Errorf("Failed to create TUN device: %v", err)
@@ -224,7 +221,7 @@ func main() {
 
 	device := device.NewDevice(tun, logger)
 
-	logger.Infof("Device started")
+	logger.Verbosef("Device started")
 
 	errs := make(chan error)
 	term := make(chan os.Signal, 1)
@@ -246,7 +243,7 @@ func main() {
 		}
 	}()
 
-	logger.Infof("UAPI listener started")
+	logger.Verbosef("UAPI listener started")
 
 	// wait for program to terminate
 
@@ -264,5 +261,5 @@ func main() {
 	uapi.Close()
 	device.Close()
 
-	logger.Infof("Shutting down")
+	logger.Verbosef("Shutting down")
 }

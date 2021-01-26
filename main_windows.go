@@ -31,11 +31,10 @@ func main() {
 	fmt.Fprintln(os.Stderr, "Warning: this is a test program for Windows, mainly used for debugging this Go package. For a real WireGuard for Windows client, the repo you want is <https://git.zx2c4.com/wireguard-windows/>, which includes this code as a module.")
 
 	logger := device.NewLogger(
-		device.LogLevelDebug,
+		device.LogLevelVerbose,
 		fmt.Sprintf("(%s) ", interfaceName),
 	)
-	logger.Infof("Starting wireguard-go version %v", device.WireGuardGoVersion)
-	logger.Debugf("Debug log enabled")
+	logger.Verbosef("Starting wireguard-go version %s", device.WireGuardGoVersion)
 
 	tun, err := tun.CreateTUN(interfaceName, 0)
 	if err == nil {
@@ -50,7 +49,7 @@ func main() {
 
 	device := device.NewDevice(tun, logger)
 	device.Up()
-	logger.Infof("Device started")
+	logger.Verbosef("Device started")
 
 	uapi, err := ipc.UAPIListen(interfaceName)
 	if err != nil {
@@ -71,7 +70,7 @@ func main() {
 			go device.IpcHandle(conn)
 		}
 	}()
-	logger.Infof("UAPI listener started")
+	logger.Verbosef("UAPI listener started")
 
 	// wait for program to terminate
 
@@ -90,5 +89,5 @@ func main() {
 	uapi.Close()
 	device.Close()
 
-	logger.Infof("Shutting down")
+	logger.Verbosef("Shutting down")
 }
