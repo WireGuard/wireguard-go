@@ -7,12 +7,14 @@ package device
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -41,12 +43,19 @@ func ipcErrorf(code int64, msg string, args ...interface{}) *IPCError {
 	return &IPCError{code: code, err: fmt.Errorf(msg, args...)}
 }
 
+var byteBufferPool = &sync.Pool{
+	New: func() interface{} { return new(bytes.Buffer) },
+}
+
 // IpcGetOperation implements the WireGuard configuration protocol "get" operation.
 // See https://www.wireguard.com/xplatform/#configuration-protocol for details.
 func (device *Device) IpcGetOperation(w io.Writer) error {
-	lines := make([]string, 0, 100)
-	send := func(line string) {
-		lines = append(lines, line)
+	buf := byteBufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer byteBufferPool.Put(buf)
+	sendf := func(format string, args ...interface{}) {
+		fmt.Fprintf(buf, format, args...)
+		buf.WriteByte('\n')
 	}
 
 	func() {
@@ -65,15 +74,15 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 		// serialize device related values
 
 		if !device.staticIdentity.privateKey.IsZero() {
-			send("private_key=" + device.staticIdentity.privateKey.ToHex())
+			sendf("private_key=%s", device.staticIdentity.privateKey.ToHex())
 		}
 
 		if device.net.port != 0 {
-			send(fmt.Sprintf("listen_port=%d", device.net.port))
+			sendf("listen_port=%d", device.net.port)
 		}
 
 		if device.net.fwmark != 0 {
-			send(fmt.Sprintf("fwmark=%d", device.net.fwmark))
+			sendf("fwmark=%d", device.net.fwmark)
 		}
 
 		// serialize each peer state
@@ -82,37 +91,32 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 			peer.RLock()
 			defer peer.RUnlock()
 
-			send("public_key=" + peer.handshake.remoteStatic.ToHex())
-			send("preshared_key=" + peer.handshake.presharedKey.ToHex())
-			send("protocol_version=1")
+			sendf("public_key=%s", peer.handshake.remoteStatic.ToHex())
+			sendf("preshared_key=%s", peer.handshake.presharedKey.ToHex())
+			sendf("protocol_version=1")
 			if peer.endpoint != nil {
-				send("endpoint=" + peer.endpoint.DstToString())
+				sendf("endpoint=%s", peer.endpoint.DstToString())
 			}
 
 			nano := atomic.LoadInt64(&peer.stats.lastHandshakeNano)
 			secs := nano / time.Second.Nanoseconds()
 			nano %= time.Second.Nanoseconds()
 
-			send(fmt.Sprintf("last_handshake_time_sec=%d", secs))
-			send(fmt.Sprintf("last_handshake_time_nsec=%d", nano))
-			send(fmt.Sprintf("tx_bytes=%d", atomic.LoadUint64(&peer.stats.txBytes)))
-			send(fmt.Sprintf("rx_bytes=%d", atomic.LoadUint64(&peer.stats.rxBytes)))
-			send(fmt.Sprintf("persistent_keepalive_interval=%d", atomic.LoadUint32(&peer.persistentKeepaliveInterval)))
+			sendf("last_handshake_time_sec=%d", secs)
+			sendf("last_handshake_time_nsec=%d", nano)
+			sendf("tx_bytes=%d", atomic.LoadUint64(&peer.stats.txBytes))
+			sendf("rx_bytes=%d", atomic.LoadUint64(&peer.stats.rxBytes))
+			sendf("persistent_keepalive_interval=%d", atomic.LoadUint32(&peer.persistentKeepaliveInterval))
 
 			for _, ip := range device.allowedips.EntriesForPeer(peer) {
-				send("allowed_ip=" + ip.String())
+				sendf("allowed_ip=%s", ip.String())
 			}
-
 		}
 	}()
 
 	// send lines (does not require resource locks)
-
-	for _, line := range lines {
-		_, err := io.WriteString(w, line+"\n")
-		if err != nil {
-			return ipcErrorf(ipc.IpcErrorIO, "failed to write output: %w", err)
-		}
+	if _, err := w.Write(buf.Bytes()); err != nil {
+		return ipcErrorf(ipc.IpcErrorIO, "failed to write output: %w", err)
 	}
 
 	return nil
