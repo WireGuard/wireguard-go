@@ -10,7 +10,6 @@ package tun
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -20,6 +19,7 @@ import (
 
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
+
 	"golang.zx2c4.com/wireguard/rwcancel"
 )
 
@@ -109,7 +109,6 @@ func (tun *NativeTun) routineNetlinkListener() {
 	}()
 
 	for msg := make([]byte, 1<<16); ; {
-
 		var err error
 		var msgn int
 		for {
@@ -118,12 +117,12 @@ func (tun *NativeTun) routineNetlinkListener() {
 				break
 			}
 			if !tun.netlinkCancel.ReadyRead() {
-				tun.errors <- fmt.Errorf("netlink socket closed: %s", err.Error())
+				tun.errors <- fmt.Errorf("netlink socket closed: %w", err)
 				return
 			}
 		}
 		if err != nil {
-			tun.errors <- fmt.Errorf("failed to receive netlink message: %s", err.Error())
+			tun.errors <- fmt.Errorf("failed to receive netlink message: %w", err)
 			return
 		}
 
@@ -237,7 +236,7 @@ func (tun *NativeTun) setMTU(n int) error {
 	)
 
 	if errno != 0 {
-		return errors.New("failed to set MTU of TUN device")
+		return fmt.Errorf("failed to set MTU of TUN device: %w", errno)
 	}
 
 	return nil
@@ -273,7 +272,7 @@ func (tun *NativeTun) MTU() (int, error) {
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)
 	if errno != 0 {
-		return 0, errors.New("failed to get MTU of TUN device: " + errno.Error())
+		return 0, fmt.Errorf("failed to get MTU of TUN device: %w", errno)
 	}
 
 	return int(*(*int32)(unsafe.Pointer(&ifr[unix.IFNAMSIZ]))), nil
@@ -304,10 +303,10 @@ func (tun *NativeTun) nameSlow() (string, error) {
 		)
 	})
 	if err != nil {
-		return "", errors.New("failed to get name of TUN device: " + err.Error())
+		return "", fmt.Errorf("failed to get name of TUN device: %w", err)
 	}
 	if errno != 0 {
-		return "", errors.New("failed to get name of TUN device: " + errno.Error())
+		return "", fmt.Errorf("failed to get name of TUN device: %w", errno)
 	}
 	name := ifr[:]
 	if i := bytes.IndexByte(name, 0); i != -1 {
@@ -402,7 +401,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	var flags uint16 = unix.IFF_TUN // | unix.IFF_NO_PI (disabled for TUN status hack)
 	nameBytes := []byte(name)
 	if len(nameBytes) >= unix.IFNAMSIZ {
-		return nil, errors.New("interface name too long")
+		return nil, fmt.Errorf("interface name too long: %w", unix.ENAMETOOLONG)
 	}
 	copy(ifr[:], nameBytes)
 	*(*uint16)(unsafe.Pointer(&ifr[unix.IFNAMSIZ])) = flags
