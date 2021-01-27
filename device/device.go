@@ -268,7 +268,9 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 	publicKey := sk.publicKey()
 	for key, peer := range device.peers.keyMap {
 		if peer.handshake.remoteStatic.Equals(publicKey) {
+			peer.handshake.mutex.RUnlock()
 			unsafeRemovePeer(device, peer, key)
+			peer.handshake.mutex.RLock()
 		}
 	}
 
