@@ -16,10 +16,6 @@ import (
 	"golang.zx2c4.com/wireguard/conn"
 )
 
-const (
-	PeerRoutineNumber = 2
-)
-
 type Peer struct {
 	isRunning                   AtomicBool
 	sync.RWMutex                // Mostly protects endpoint, but is generally taken whenever we modify peer
@@ -54,17 +50,11 @@ type Peer struct {
 		sentLastMinuteHandshake AtomicBool
 	}
 
-	signals struct {
-		newKeypairArrived chan struct{}
-		flushNonceQueue   chan struct{}
-	}
-
 	queue struct {
 		sync.RWMutex
-		nonce                           chan *QueueOutboundElement // nonce / pre-handshake queue
-		outbound                        chan *QueueOutboundElement // sequential ordering of work
-		inbound                         chan *QueueInboundElement  // sequential ordering of work
-		packetInNonceQueueIsAwaitingKey AtomicBool
+		staged   chan *QueueOutboundElement // staged packets before a handshake is available
+		outbound chan *QueueOutboundElement // sequential ordering of work
+		inbound  chan *QueueInboundElement  // sequential ordering of work
 	}
 
 	routines struct {
@@ -197,25 +187,20 @@ func (peer *Peer) Start() {
 
 	peer.routines.stopping.Wait()
 	peer.routines.stop = make(chan struct{})
-	peer.routines.stopping.Add(PeerRoutineNumber)
+	peer.routines.stopping.Add(1)
 
 	// prepare queues
 	peer.queue.Lock()
-	peer.queue.nonce = make(chan *QueueOutboundElement, QueueOutboundSize)
+	peer.queue.staged = make(chan *QueueOutboundElement, QueueStagedSize)
 	peer.queue.outbound = make(chan *QueueOutboundElement, QueueOutboundSize)
 	peer.queue.inbound = make(chan *QueueInboundElement, QueueInboundSize)
 	peer.queue.Unlock()
 
 	peer.timersInit()
 	peer.handshake.lastSentHandshake = time.Now().Add(-(RekeyTimeout + time.Second))
-	peer.signals.newKeypairArrived = make(chan struct{}, 1)
-	peer.signals.flushNonceQueue = make(chan struct{}, 1)
 
 	// wait for routines to start
 
-	// RoutineNonce writes to the encryption queue; keep it alive until we are done.
-	device.queue.encryption.wg.Add(1)
-	go peer.RoutineNonce()
 	go peer.RoutineSequentialSender()
 	go peer.RoutineSequentialReceiver()
 
@@ -245,7 +230,7 @@ func (peer *Peer) ZeroAndFlushAll() {
 	handshake.Clear()
 	handshake.mutex.Unlock()
 
-	peer.FlushNonceQueue()
+	peer.FlushStagedPackets()
 }
 
 func (peer *Peer) ExpireCurrentKeypairs() {
@@ -291,8 +276,8 @@ func (peer *Peer) Stop() {
 	// close queues
 
 	peer.queue.Lock()
-	close(peer.queue.nonce)
 	close(peer.queue.inbound)
+	close(peer.queue.outbound)
 	peer.queue.Unlock()
 
 	peer.ZeroAndFlushAll()

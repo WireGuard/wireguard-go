@@ -156,6 +156,7 @@ func (device *Device) IpcSetOperation(r io.Reader) (err error) {
 			if deviceConfig {
 				deviceConfig = false
 			}
+			peer.handlePostConfig()
 			// Load/create the peer we are now configuring.
 			err := device.handlePublicKeyLine(peer, value)
 			if err != nil {
@@ -174,6 +175,7 @@ func (device *Device) IpcSetOperation(r io.Reader) (err error) {
 			return err
 		}
 	}
+	peer.handlePostConfig()
 
 	if err := scanner.Err(); err != nil {
 		return ipcErrorf(ipc.IpcErrorIO, "failed to read input: %w", err)
@@ -239,6 +241,12 @@ type ipcSetPeer struct {
 	*Peer        // Peer is the current peer being operated on
 	dummy   bool // dummy reports whether this peer is a temporary, placeholder peer
 	created bool // new reports whether this is a newly created peer
+}
+
+func (peer *ipcSetPeer) handlePostConfig() {
+	if peer.Peer != nil && !peer.dummy && peer.Peer.device.isUp.Get() {
+		peer.SendStagedPackets()
+	}
 }
 
 func (device *Device) handlePublicKeyLine(peer *ipcSetPeer, value string) error {

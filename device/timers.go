@@ -87,7 +87,7 @@ func expiredRetransmitHandshake(peer *Peer) {
 		/* We drop all packets without a keypair and don't try again,
 		 * if we try unsuccessfully for too long to make a handshake.
 		 */
-		peer.FlushNonceQueue()
+		peer.FlushStagedPackets()
 
 		/* We set a timer for destroying any residue that might be left
 		 * of a partial exchange.

@@ -427,10 +427,6 @@ func (device *Device) RoutineHandshake() {
 			peer.timersSessionDerived()
 			peer.timersHandshakeComplete()
 			peer.SendKeepalive()
-			select {
-			case peer.signals.newKeypairArrived <- struct{}{}:
-			default:
-			}
 		}
 	}
 }
@@ -485,10 +481,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		// check if using new keypair
 		if peer.ReceivedWithKeypair(elem.keypair) {
 			peer.timersHandshakeComplete()
-			select {
-			case peer.signals.newKeypairArrived <- struct{}{}:
-			default:
-			}
+			peer.SendStagedPackets()
 		}
 
 		peer.keepKeyFreshReceiving()
