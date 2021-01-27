@@ -60,16 +60,8 @@ func (key *NoisePrivateKey) FromMaybeZeroHex(src string) (err error) {
 	return
 }
 
-func (key NoisePrivateKey) ToHex() string {
-	return hex.EncodeToString(key[:])
-}
-
 func (key *NoisePublicKey) FromHex(src string) error {
 	return loadExactHex(key[:], src)
-}
-
-func (key NoisePublicKey) ToHex() string {
-	return hex.EncodeToString(key[:])
 }
 
 func (key NoisePublicKey) IsZero() bool {
@@ -83,8 +75,4 @@ func (key NoisePublicKey) Equals(tar NoisePublicKey) bool {
 
 func (key *NoisePresharedKey) FromHex(src string) error {
 	return loadExactHex(key[:], src)
-}
-
-func (key NoisePresharedKey) ToHex() string {
-	return hex.EncodeToString(key[:])
 }

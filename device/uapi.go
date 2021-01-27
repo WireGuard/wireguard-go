@@ -57,6 +57,17 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 		fmt.Fprintf(buf, format, args...)
 		buf.WriteByte('\n')
 	}
+	keyf := func(prefix string, key *[32]byte) {
+		buf.Grow(len(key)*2 + 2 + len(prefix))
+		buf.WriteString(prefix)
+		buf.WriteByte('=')
+		const hex = "0123456789abcdef"
+		for i := 0; i < len(key); i++ {
+			buf.WriteByte(hex[key[i]>>4])
+			buf.WriteByte(hex[key[i]&0xf])
+		}
+		buf.WriteByte('\n')
+	}
 
 	func() {
 
@@ -74,7 +85,7 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 		// serialize device related values
 
 		if !device.staticIdentity.privateKey.IsZero() {
-			sendf("private_key=%s", device.staticIdentity.privateKey.ToHex())
+			keyf("private_key", (*[32]byte)(&device.staticIdentity.privateKey))
 		}
 
 		if device.net.port != 0 {
@@ -91,8 +102,8 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 			peer.RLock()
 			defer peer.RUnlock()
 
-			sendf("public_key=%s", peer.handshake.remoteStatic.ToHex())
-			sendf("preshared_key=%s", peer.handshake.presharedKey.ToHex())
+			keyf("public_key", (*[32]byte)(&peer.handshake.remoteStatic))
+			keyf("preshared_key", (*[32]byte)(&peer.handshake.presharedKey))
 			sendf("protocol_version=1")
 			if peer.endpoint != nil {
 				sendf("endpoint=%s", peer.endpoint.DstToString())
