@@ -286,12 +286,12 @@ func (peer *Peer) StagePacket(elem *QueueOutboundElement) {
 		case peer.queue.staged <- elem:
 			return
 		default:
-			select {
-			case tooOld := <-peer.queue.staged:
-				peer.device.PutMessageBuffer(tooOld.buffer)
-				peer.device.PutOutboundElement(tooOld)
-			default:
-			}
+		}
+		select {
+		case tooOld := <-peer.queue.staged:
+			peer.device.PutMessageBuffer(tooOld.buffer)
+			peer.device.PutOutboundElement(tooOld)
+		default:
 		}
 	}
 }
