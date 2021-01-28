@@ -9,19 +9,18 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"errors"
-
-	"golang.org/x/crypto/chacha20poly1305"
 )
 
 const (
-	NoisePublicKeySize  = 32
-	NoisePrivateKeySize = 32
+	NoisePublicKeySize    = 32
+	NoisePrivateKeySize   = 32
+	NoisePresharedKeySize = 32
 )
 
 type (
 	NoisePublicKey    [NoisePublicKeySize]byte
 	NoisePrivateKey   [NoisePrivateKeySize]byte
-	NoiseSymmetricKey [chacha20poly1305.KeySize]byte
+	NoisePresharedKey [NoisePresharedKeySize]byte
 	NoiseNonce        uint64 // padded to 12-bytes
 )
 
@@ -82,10 +81,10 @@ func (key NoisePublicKey) Equals(tar NoisePublicKey) bool {
 	return subtle.ConstantTimeCompare(key[:], tar[:]) == 1
 }
 
-func (key *NoiseSymmetricKey) FromHex(src string) error {
+func (key *NoisePresharedKey) FromHex(src string) error {
 	return loadExactHex(key[:], src)
 }
 
-func (key NoiseSymmetricKey) ToHex() string {
+func (key NoisePresharedKey) ToHex() string {
 	return hex.EncodeToString(key[:])
 }
