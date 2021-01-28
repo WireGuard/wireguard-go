@@ -23,7 +23,6 @@ type Device struct {
 	isUp     AtomicBool // device is (going) up
 	isClosed AtomicBool // device is closed? (acting as guard)
 	log      *Logger
-	ipcSetMu sync.Mutex // serializes UAPI set operations
 
 	// synchronized resources (locks acquired in order)
 
@@ -89,6 +88,8 @@ type Device struct {
 		device tun.Device
 		mtu    int32
 	}
+
+	ipcMutex sync.RWMutex
 }
 
 // An encryptionQueue is a channel of QueueOutboundElements awaiting encryption.
