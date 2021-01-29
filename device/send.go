@@ -367,7 +367,7 @@ func calculatePaddingSize(packetSize, mtu int) int {
  * Obs. One instance per core
  */
 func (device *Device) RoutineEncryption() {
-
+	var paddingZeros [PaddingMultiple]byte
 	var nonce [chacha20poly1305.NonceSize]byte
 
 	defer device.log.Verbosef("Routine: encryption worker - stopped")
@@ -386,11 +386,8 @@ func (device *Device) RoutineEncryption() {
 		binary.LittleEndian.PutUint64(fieldNonce, elem.nonce)
 
 		// pad content to multiple of 16
-
 		paddingSize := calculatePaddingSize(len(elem.packet), int(atomic.LoadInt32(&device.tun.mtu)))
-		for i := 0; i < paddingSize; i++ {
-			elem.packet = append(elem.packet, 0)
-		}
+		elem.packet = append(elem.packet, paddingZeros[:paddingSize]...)
 
 		// encrypt content and release to consumer
 
