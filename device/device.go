@@ -62,7 +62,7 @@ type Device struct {
 	cookieChecker CookieChecker
 
 	rate struct {
-		underLoadUntil atomic.Value
+		underLoadUntil int64
 		limiter        ratelimiter.Ratelimiter
 	}
 
@@ -245,20 +245,15 @@ func (device *Device) Down() {
 }
 
 func (device *Device) IsUnderLoad() bool {
-
 	// check if currently under load
-
 	now := time.Now()
 	underLoad := len(device.queue.handshake.c) >= UnderLoadQueueSize
 	if underLoad {
-		device.rate.underLoadUntil.Store(now.Add(UnderLoadAfterTime))
+		atomic.StoreInt64(&device.rate.underLoadUntil, now.Add(UnderLoadAfterTime).UnixNano())
 		return true
 	}
-
 	// check if recently under load
-
-	until := device.rate.underLoadUntil.Load().(time.Time)
-	return until.After(now)
+	return atomic.LoadInt64(&device.rate.underLoadUntil) > now.UnixNano()
 }
 
 func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
@@ -327,14 +322,9 @@ func NewDevice(tunDevice tun.Device, logger *Logger) *Device {
 		mtu = DefaultMTU
 	}
 	device.tun.mtu = int32(mtu)
-
 	device.peers.keyMap = make(map[NoisePublicKey]*Peer)
-
 	device.rate.limiter.Init()
-	device.rate.underLoadUntil.Store(time.Time{})
-
 	device.indexTable.Init()
-
 	device.PopulatePools()
 
 	// create queues

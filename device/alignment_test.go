@@ -41,3 +41,27 @@ func TestPeerAlignment(t *testing.T) {
 	checkAlignment(t, "Peer.stats", unsafe.Offsetof(p.stats))
 	checkAlignment(t, "Peer.isRunning", unsafe.Offsetof(p.isRunning))
 }
+
+
+// TestDeviceAlignment checks that atomically-accessed fields are
+// aligned to 64-bit boundaries, as required by the atomic package.
+//
+// Unfortunately, violating this rule on 32-bit platforms results in a
+// hard segfault at runtime.
+func TestDeviceAlignment(t *testing.T) {
+	var d Device
+
+	typ := reflect.TypeOf(&d).Elem()
+	t.Logf("Device type size: %d, with fields:", typ.Size())
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		t.Logf("\t%30s\toffset=%3v\t(type size=%3d, align=%d)",
+			field.Name,
+			field.Offset,
+			field.Type.Size(),
+			field.Type.Align(),
+		)
+	}
+
+	checkAlignment(t, "Device.rate.underLoadUntil", unsafe.Offsetof(d.rate.underLoadUntil))
+}
