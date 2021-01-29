@@ -75,8 +75,8 @@ type Device struct {
 	}
 
 	queue struct {
-		encryption *encryptionQueue
-		decryption *decryptionQueue
+		encryption *outboundQueue
+		decryption *inboundQueue
 		handshake  chan QueueHandshakeElement
 	}
 
@@ -92,21 +92,21 @@ type Device struct {
 	ipcMutex sync.RWMutex
 }
 
-// An encryptionQueue is a channel of QueueOutboundElements awaiting encryption.
-// An encryptionQueue is ref-counted using its wg field.
-// An encryptionQueue created with newEncryptionQueue has one reference.
+// An outboundQueue is a channel of QueueOutboundElements awaiting encryption.
+// An outboundQueue is ref-counted using its wg field.
+// An outboundQueue created with newOutboundQueue has one reference.
 // Every additional writer must call wg.Add(1).
 // Every completed writer must call wg.Done().
 // When no further writers will be added,
 // call wg.Done to remove the initial reference.
 // When the refcount hits 0, the queue's channel is closed.
-type encryptionQueue struct {
+type outboundQueue struct {
 	c  chan *QueueOutboundElement
 	wg sync.WaitGroup
 }
 
-func newEncryptionQueue() *encryptionQueue {
-	q := &encryptionQueue{
+func newOutboundQueue() *outboundQueue {
+	q := &outboundQueue{
 		c: make(chan *QueueOutboundElement, QueueOutboundSize),
 	}
 	q.wg.Add(1)
@@ -117,14 +117,14 @@ func newEncryptionQueue() *encryptionQueue {
 	return q
 }
 
-// A decryptionQueue is similar to an encryptionQueue; see those docs.
-type decryptionQueue struct {
+// A inboundQueue is similar to an outboundQueue; see those docs.
+type inboundQueue struct {
 	c  chan *QueueInboundElement
 	wg sync.WaitGroup
 }
 
-func newDecryptionQueue() *decryptionQueue {
-	q := &decryptionQueue{
+func newInboundQueue() *inboundQueue {
+	q := &inboundQueue{
 		c: make(chan *QueueInboundElement, QueueInboundSize),
 	}
 	q.wg.Add(1)
@@ -323,8 +323,8 @@ func NewDevice(tunDevice tun.Device, logger *Logger) *Device {
 	// create queues
 
 	device.queue.handshake = make(chan QueueHandshakeElement, QueueHandshakeSize)
-	device.queue.encryption = newEncryptionQueue()
-	device.queue.decryption = newDecryptionQueue()
+	device.queue.encryption = newOutboundQueue()
+	device.queue.decryption = newInboundQueue()
 
 	// prepare signals
 
