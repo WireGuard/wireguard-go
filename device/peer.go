@@ -177,6 +177,7 @@ func (peer *Peer) Start() {
 	if peer.queue.staged == nil {
 		peer.queue.staged = make(chan *QueueOutboundElement, QueueStagedSize)
 	}
+	peer.device.queue.encryption.wg.Add(1) // keep encryption queue open for our writes
 
 	peer.timersInit()
 	peer.handshake.lastSentHandshake = time.Now().Add(-(RekeyTimeout + time.Second))
@@ -248,6 +249,7 @@ func (peer *Peer) Stop() {
 	close(peer.queue.inbound)
 	close(peer.queue.outbound)
 	peer.stopping.Wait()
+	peer.device.queue.encryption.wg.Done() // no more writes to encryption queue from us
 
 	peer.ZeroAndFlushAll()
 }

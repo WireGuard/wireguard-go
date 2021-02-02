@@ -291,8 +291,6 @@ func (peer *Peer) StagePacket(elem *QueueOutboundElement) {
 }
 
 func (peer *Peer) SendStagedPackets() {
-	peer.device.queue.encryption.wg.Add(1)
-	defer peer.device.queue.encryption.wg.Done()
 top:
 	if len(peer.queue.staged) == 0 || !peer.device.isUp.Get() {
 		return

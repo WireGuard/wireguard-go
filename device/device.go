@@ -397,6 +397,10 @@ func (device *Device) Close() {
 
 	device.isUp.Set(false)
 
+	// Remove peers before closing queues,
+	// because peers assume that queues are active.
+	device.RemoveAllPeers()
+
 	// We kept a reference to the encryption and decryption queues,
 	// in case we started any new peers that might write to them.
 	// No new peers are coming; we are done with these queues.
@@ -404,8 +408,6 @@ func (device *Device) Close() {
 	device.queue.decryption.wg.Done()
 	device.queue.handshake.wg.Done()
 	device.state.stopping.Wait()
-
-	device.RemoveAllPeers()
 
 	device.rate.limiter.Close()
 
