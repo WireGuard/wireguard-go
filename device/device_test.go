@@ -12,6 +12,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"runtime"
+	"runtime/pprof"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -163,6 +165,7 @@ NextAttempt:
 				// If there's something permanent wrong,
 				// we'll see that when we run out of attempts.
 				tb.Logf("failed to configure device %d: %v", i, err)
+				p.dev.Close()
 				continue NextAttempt
 			}
 			// The device might still not be up, e.g. due to an error
@@ -170,6 +173,7 @@ NextAttempt:
 			// Assume it's due to a transient error (port in use), and retry.
 			if !p.dev.isUp.Get() {
 				tb.Logf("device %d did not come up, trying again", i)
+				p.dev.Close()
 				continue NextAttempt
 			}
 			// The device is up. Close it when the test completes.
@@ -183,6 +187,7 @@ NextAttempt:
 }
 
 func TestTwoDevicePing(t *testing.T) {
+	goroutineLeakCheck(t)
 	pair := genTestPair(t)
 	t.Run("ping 1.0.0.1", func(t *testing.T) {
 		pair.Send(t, Ping, nil)
@@ -351,4 +356,30 @@ func BenchmarkUAPIGet(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		pair[0].dev.IpcGetOperation(ioutil.Discard)
 	}
+}
+
+func goroutineLeakCheck(t *testing.T) {
+	goroutines := func() (int, []byte) {
+		p := pprof.Lookup("goroutine")
+		b := new(bytes.Buffer)
+		p.WriteTo(b, 1)
+		return p.Count(), b.Bytes()
+	}
+
+	startGoroutines, startStacks := goroutines()
+	t.Cleanup(func() {
+		if t.Failed() {
+			return
+		}
+		// Give goroutines time to exit, if they need it.
+		for i := 0; i < 1000 && startGoroutines < runtime.NumGoroutine(); i++ {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if got := runtime.NumGoroutine(); startGoroutines < got {
+			_, endStacks := goroutines()
+			t.Logf("starting stacks:\n%s\n", startStacks)
+			t.Logf("ending stacks:\n%s\n", endStacks)
+			t.Fatalf("expected %d goroutines, got %d, leak?", startGoroutines, got)
+		}
+	})
 }
