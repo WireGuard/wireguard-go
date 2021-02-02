@@ -67,12 +67,9 @@ type Device struct {
 	}
 
 	pool struct {
-		messageBufferPool        *sync.Pool
-		messageBufferReuseChan   chan *[MaxMessageSize]byte
-		inboundElementPool       *sync.Pool
-		inboundElementReuseChan  chan *QueueInboundElement
-		outboundElementPool      *sync.Pool
-		outboundElementReuseChan chan *QueueOutboundElement
+		messageBuffers   *WaitPool
+		inboundElements  *WaitPool
+		outboundElements *WaitPool
 	}
 
 	queue struct {

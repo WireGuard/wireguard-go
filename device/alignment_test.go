@@ -42,7 +42,6 @@ func TestPeerAlignment(t *testing.T) {
 	checkAlignment(t, "Peer.isRunning", unsafe.Offsetof(p.isRunning))
 }
 
-
 // TestDeviceAlignment checks that atomically-accessed fields are
 // aligned to 64-bit boundaries, as required by the atomic package.
 //
