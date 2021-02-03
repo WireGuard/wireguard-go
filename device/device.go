@@ -342,7 +342,6 @@ func NewDevice(tunDevice tun.Device, logger *Logger) *Device {
 	for i := 0; i < cpus; i++ {
 		go device.RoutineEncryption()
 		go device.RoutineDecryption()
-		device.state.stopping.Add(1) // handshake
 		go device.RoutineHandshake()
 	}
 
