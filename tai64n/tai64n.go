@@ -33,3 +33,7 @@ func Now() Timestamp {
 func (t1 Timestamp) After(t2 Timestamp) bool {
 	return bytes.Compare(t1[:], t2[:]) > 0
 }
+
+func (t Timestamp) String() string {
+	return time.Unix(int64(binary.BigEndian.Uint64(t[:8])-base), int64(binary.BigEndian.Uint32(t[8:12]))).String()
+}
