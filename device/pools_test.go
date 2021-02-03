@@ -58,3 +58,26 @@ func TestWaitPool(t *testing.T) {
 		t.Errorf("Actual maximum count (%d) != ideal maximum count (%d)", max, p.max)
 	}
 }
+
+func BenchmarkWaitPool(b *testing.B) {
+	var wg sync.WaitGroup
+	trials := int32(b.N)
+	workers := runtime.NumCPU() + 2
+	if workers-4 <= 0 {
+		b.Skip("Not enough cores")
+	}
+	p := NewWaitPool(uint32(workers-4), func() interface{} { return make([]byte, 16) })
+	wg.Add(workers)
+	b.ResetTimer()
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			for atomic.AddInt32(&trials, -1) > 0 {
+				x := p.Get()
+				time.Sleep(time.Duration(rand.Intn(100)) * time.Microsecond)
+				p.Put(x)
+			}
+		}()
+	}
+	wg.Wait()
+}
