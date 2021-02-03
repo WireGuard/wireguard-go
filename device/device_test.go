@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net"
 	"runtime"
@@ -31,13 +30,13 @@ func getFreePort(tb testing.TB) string {
 	return fmt.Sprintf("%d", l.LocalAddr().(*net.UDPAddr).Port)
 }
 
-// uapiCfg returns a reader that contains cfg formatted use with IpcSetOperation.
+// uapiCfg returns a string that contains cfg formatted use with IpcSet.
 // cfg is a series of alternating key/value strings.
 // uapiCfg exists because editors and humans like to insert
 // whitespace into configs, which can cause failures, some of which are silent.
 // For example, a leading blank newline causes the remainder
 // of the config to be silently ignored.
-func uapiCfg(cfg ...string) io.ReadSeeker {
+func uapiCfg(cfg ...string) string {
 	if len(cfg)%2 != 0 {
 		panic("odd number of args to uapiReader")
 	}
@@ -50,12 +49,12 @@ func uapiCfg(cfg ...string) io.ReadSeeker {
 		}
 		buf.WriteByte(sep)
 	}
-	return bytes.NewReader(buf.Bytes())
+	return buf.String()
 }
 
 // genConfigs generates a pair of configs that connect to each other.
 // The configs use distinct, probably-usable ports.
-func genConfigs(tb testing.TB) (cfgs [2]io.Reader) {
+func genConfigs(tb testing.TB) (cfgs [2]string) {
 	var port1, port2 string
 	for port1 == port2 {
 		port1 = getFreePort(tb)
@@ -156,7 +155,7 @@ NextAttempt:
 			}
 			p.dev = NewDevice(p.tun.TUN(), NewLogger(level, fmt.Sprintf("dev%d: ", i)))
 			p.dev.Up()
-			if err := p.dev.IpcSetOperation(cfg[i]); err != nil {
+			if err := p.dev.IpcSet(cfg[i]); err != nil {
 				// genConfigs attempted to pick ports that were free.
 				// There's a tiny window between genConfigs closing the port
 				// and us opening it, during which another process could
@@ -226,9 +225,8 @@ func TestConcurrencySafety(t *testing.T) {
 	}()
 	warmup.Wait()
 
-	applyCfg := func(cfg io.ReadSeeker) {
-		cfg.Seek(0, io.SeekStart)
-		err := pair[0].dev.IpcSetOperation(cfg)
+	applyCfg := func(cfg string) {
+		err := pair[0].dev.IpcSet(cfg)
 		if err != nil {
 			t.Fatal(err)
 		}
