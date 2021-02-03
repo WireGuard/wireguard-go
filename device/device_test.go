@@ -7,9 +7,11 @@ package device
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"runtime"
 	"runtime/pprof"
@@ -194,6 +196,39 @@ func TestTwoDevicePing(t *testing.T) {
 	t.Run("ping 1.0.0.2", func(t *testing.T) {
 		pair.Send(t, Pong, nil)
 	})
+}
+
+func TestUpDown(t *testing.T) {
+	goroutineLeakCheck(t)
+	const itrials = 200
+	const otrials = 10
+
+	for n := 0; n < otrials; n++ {
+		pair := genTestPair(t)
+		for i := range pair {
+			for k := range pair[i].dev.peers.keyMap {
+				pair[i].dev.IpcSet(fmt.Sprintf("public_key=%s\npersistent_keepalive_interval=1\n", hex.EncodeToString(k[:])))
+			}
+		}
+		var wg sync.WaitGroup
+		wg.Add(len(pair))
+		for i := range pair {
+			go func(d *Device) {
+				defer wg.Done()
+				for i := 0; i < itrials; i++ {
+					d.Up()
+					time.Sleep(time.Duration(rand.Intn(int(time.Nanosecond * (0x10000 - 1)))))
+					d.Down()
+					time.Sleep(time.Duration(rand.Intn(int(time.Nanosecond * (0x10000 - 1)))))
+				}
+			}(pair[i].dev)
+		}
+		wg.Wait()
+		for i := range pair {
+			pair[i].dev.Up()
+			pair[i].dev.Close()
+		}
+	}
 }
 
 // TestConcurrencySafety does other things concurrently with tunnel use.
