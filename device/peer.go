@@ -171,6 +171,10 @@ func (peer *Peer) Start() {
 	peer.stopping.Wait()
 	peer.stopping.Add(2)
 
+	peer.handshake.mutex.Lock()
+	peer.handshake.lastSentHandshake = time.Now().Add(-(RekeyTimeout + time.Second))
+	peer.handshake.mutex.Unlock()
+
 	// prepare queues
 	peer.queue.outbound = make(chan *QueueOutboundElement, QueueOutboundSize)
 	peer.queue.inbound = make(chan *QueueInboundElement, QueueInboundSize)
@@ -180,7 +184,6 @@ func (peer *Peer) Start() {
 	peer.device.queue.encryption.wg.Add(1) // keep encryption queue open for our writes
 
 	peer.timersInit()
-	peer.handshake.lastSentHandshake = time.Now().Add(-(RekeyTimeout + time.Second))
 
 	go peer.RoutineSequentialSender()
 	go peer.RoutineSequentialReceiver()
