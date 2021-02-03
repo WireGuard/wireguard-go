@@ -405,14 +405,15 @@ func goroutineLeakCheck(t *testing.T) {
 			return
 		}
 		// Give goroutines time to exit, if they need it.
-		for i := 0; i < 1000 && startGoroutines < runtime.NumGoroutine(); i++ {
-			time.Sleep(10 * time.Millisecond)
+		for i := 0; i < 10000; i++ {
+			if runtime.NumGoroutine() <= startGoroutines {
+				return
+			}
+			time.Sleep(1 * time.Millisecond)
 		}
-		if got := runtime.NumGoroutine(); startGoroutines < got {
-			_, endStacks := goroutines()
-			t.Logf("starting stacks:\n%s\n", startStacks)
-			t.Logf("ending stacks:\n%s\n", endStacks)
-			t.Fatalf("expected %d goroutines, got %d, leak?", startGoroutines, got)
-		}
+		endGoroutines, endStacks := goroutines()
+		t.Logf("starting stacks:\n%s\n", startStacks)
+		t.Logf("ending stacks:\n%s\n", endStacks)
+		t.Fatalf("expected %d goroutines, got %d, leak?", startGoroutines, endGoroutines)
 	})
 }
