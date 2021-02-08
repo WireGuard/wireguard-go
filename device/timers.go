@@ -14,10 +14,8 @@ import (
 	"time"
 )
 
-/* This Timer structure and related functions should roughly copy the interface of
- * the Linux kernel's struct timer_list.
- */
-
+// A Timer manages time-based aspects of the WireGuard protocol.
+// Timer roughly copies the interface of the Linux kernel's struct timer_list.
 type Timer struct {
 	*time.Timer
 	modifyingLock sync.RWMutex
@@ -213,6 +211,9 @@ func (peer *Peer) timersInit() {
 	peer.timers.newHandshake = peer.NewTimer(expiredNewHandshake)
 	peer.timers.zeroKeyMaterial = peer.NewTimer(expiredZeroKeyMaterial)
 	peer.timers.persistentKeepalive = peer.NewTimer(expiredPersistentKeepalive)
+}
+
+func (peer *Peer) timersStart() {
 	atomic.StoreUint32(&peer.timers.handshakeAttempts, 0)
 	peer.timers.sentLastMinuteHandshake.Set(false)
 	peer.timers.needAnotherKeepalive.Set(false)

@@ -107,6 +107,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	device.peers.empty.Set(false)
 
 	// start peer
+	peer.timersInit()
 	if peer.device.isUp() {
 		peer.Start()
 	}
@@ -183,7 +184,7 @@ func (peer *Peer) Start() {
 	}
 	peer.device.queue.encryption.wg.Add(1) // keep encryption queue open for our writes
 
-	peer.timersInit()
+	peer.timersStart()
 
 	go peer.RoutineSequentialSender()
 	go peer.RoutineSequentialReceiver()
