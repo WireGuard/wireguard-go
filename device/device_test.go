@@ -61,22 +61,32 @@ func genConfigs(tb testing.TB) (cfgs [2]string) {
 		port1 = getFreePort(tb)
 		port2 = getFreePort(tb)
 	}
+	var key1, key2 NoisePrivateKey
+	_, err := rand.Read(key1[:])
+	if err != nil {
+		tb.Errorf("unable to generate private key random bytes: %v", err)
+	}
+	_, err = rand.Read(key2[:])
+	if err != nil {
+		tb.Errorf("unable to generate private key random bytes: %v", err)
+	}
+	pub1, pub2 := key1.publicKey(), key2.publicKey()
 
 	cfgs[0] = uapiCfg(
-		"private_key", "481eb0d8113a4a5da532d2c3e9c14b53c8454b34ab109676f6b58c2245e37b58",
+		"private_key", hex.EncodeToString(key1[:]),
 		"listen_port", port1,
 		"replace_peers", "true",
-		"public_key", "f70dbb6b1b92a1dde1c783b297016af3f572fef13b0abb16a2623d89a58e9725",
+		"public_key", hex.EncodeToString(pub2[:]),
 		"protocol_version", "1",
 		"replace_allowed_ips", "true",
 		"allowed_ip", "1.0.0.2/32",
 		"endpoint", "127.0.0.1:"+port2,
 	)
 	cfgs[1] = uapiCfg(
-		"private_key", "98c7989b1661a0d64fd6af3502000f87716b7c4bbcf00d04fc6073aa7b539768",
+		"private_key", hex.EncodeToString(key2[:]),
 		"listen_port", port2,
 		"replace_peers", "true",
-		"public_key", "49e80929259cebdda4f322d6d2b1a6fad819d603acd26fd5d845e7a123036427",
+		"public_key", hex.EncodeToString(pub1[:]),
 		"protocol_version", "1",
 		"replace_allowed_ips", "true",
 		"allowed_ip", "1.0.0.1/32",
@@ -275,8 +285,13 @@ func TestConcurrencySafety(t *testing.T) {
 
 	// Change persistent_keepalive_interval concurrently with tunnel use.
 	t.Run("persistentKeepaliveInterval", func(t *testing.T) {
+		var pub NoisePublicKey
+		for key := range pair[0].dev.peers.keyMap {
+			pub = key
+			break
+		}
 		cfg := uapiCfg(
-			"public_key", "f70dbb6b1b92a1dde1c783b297016af3f572fef13b0abb16a2623d89a58e9725",
+			"public_key", hex.EncodeToString(pub[:]),
 			"persistent_keepalive_interval", "1",
 		)
 		for i := 0; i < 1000; i++ {
@@ -287,7 +302,7 @@ func TestConcurrencySafety(t *testing.T) {
 	// Change private keys concurrently with tunnel use.
 	t.Run("privateKey", func(t *testing.T) {
 		bad := uapiCfg("private_key", "7777777777777777777777777777777777777777777777777777777777777777")
-		good := uapiCfg("private_key", "481eb0d8113a4a5da532d2c3e9c14b53c8454b34ab109676f6b58c2245e37b58")
+		good := uapiCfg("private_key", hex.EncodeToString(pair[0].dev.staticIdentity.privateKey[:]))
 		// Set iters to a large number like 1000 to flush out data races quickly.
 		// Don't leave it large. That can cause logical races
 		// in which the handshake is interleaved with key changes
