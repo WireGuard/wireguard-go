@@ -76,7 +76,6 @@ func (elem *QueueOutboundElement) clearPointers() {
 func (peer *Peer) SendKeepalive() {
 	if len(peer.queue.staged) == 0 && peer.isRunning.Get() {
 		elem := peer.device.NewOutboundElement()
-		elem.packet = nil
 		select {
 		case peer.queue.staged <- elem:
 			peer.device.log.Verbosef("%v - Sending keepalive packet", peer)
