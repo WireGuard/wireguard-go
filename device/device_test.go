@@ -8,7 +8,6 @@ package device
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -103,6 +102,13 @@ const (
 	Pong SendDirection = false
 )
 
+func (d SendDirection) String() string {
+	if d == Ping {
+		return "ping"
+	}
+	return "pong"
+}
+
 func (pair *testPair) Send(tb testing.TB, ping SendDirection, done chan struct{}) {
 	tb.Helper()
 	p0, p1 := pair[0], pair[1]
@@ -118,10 +124,10 @@ func (pair *testPair) Send(tb testing.TB, ping SendDirection, done chan struct{}
 	select {
 	case msgRecv := <-p0.tun.Inbound:
 		if !bytes.Equal(msg, msgRecv) {
-			err = errors.New("ping did not transit correctly")
+			err = fmt.Errorf("%s did not transit correctly", ping)
 		}
 	case <-timer.C:
-		err = errors.New("ping did not transit")
+		err = fmt.Errorf("%s did not transit", ping)
 	case <-done:
 	}
 	if err != nil {
