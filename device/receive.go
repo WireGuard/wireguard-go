@@ -166,7 +166,6 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 			elem.Lock()
 
 			// add to decryption queues
-			peer.queue.RLock()
 			if peer.isRunning.Get() {
 				peer.queue.inbound <- elem
 				device.queue.decryption.c <- elem
@@ -174,8 +173,6 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 			} else {
 				device.PutInboundElement(elem)
 			}
-			peer.queue.RUnlock()
-
 			continue
 
 		// otherwise it is a fixed size & handshake related packet
@@ -406,6 +403,9 @@ func (peer *Peer) RoutineSequentialReceiver() {
 	device.log.Verbosef("%v - Routine: sequential receiver - started", peer)
 
 	for elem := range peer.queue.inbound {
+		if elem == nil {
+			return
+		}
 		var err error
 		elem.Lock()
 		if elem.packet == nil {

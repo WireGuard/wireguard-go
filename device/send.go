@@ -316,7 +316,6 @@ top:
 			elem.Lock()
 
 			// add to parallel and sequential queue
-			peer.queue.RLock()
 			if peer.isRunning.Get() {
 				peer.queue.outbound <- elem
 				peer.device.queue.encryption.c <- elem
@@ -324,7 +323,6 @@ top:
 				peer.device.PutMessageBuffer(elem.buffer)
 				peer.device.PutOutboundElement(elem)
 			}
-			peer.queue.RUnlock()
 		default:
 			return
 		}
@@ -413,6 +411,9 @@ func (peer *Peer) RoutineSequentialSender() {
 	device.log.Verbosef("%v - Routine: sequential sender - started", peer)
 
 	for elem := range peer.queue.outbound {
+		if elem == nil {
+			return
+		}
 		elem.Lock()
 		if !peer.isRunning.Get() {
 			// peer has been stopped; return re-usable elems to the shared pool.
