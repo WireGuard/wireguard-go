@@ -383,7 +383,7 @@ func NewDevice(tunDevice tun.Device, logger *Logger) *Device {
 		go device.RoutineHandshake()
 	}
 
-	device.state.stopping.Add(2)
+	device.state.stopping.Add(1) // read from TUN
 	go device.RoutineReadFromTUN()
 	go device.RoutineTUNEventReader()
 

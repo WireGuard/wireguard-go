@@ -47,5 +47,4 @@ func (device *Device) RoutineTUNEventReader() {
 	}
 
 	device.log.Verbosef("Routine: event worker - stopped")
-	device.state.stopping.Done()
 }
