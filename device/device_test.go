@@ -157,14 +157,13 @@ func genTestPair(tb testing.TB) (pair testPair) {
 			level = LogLevelError
 		}
 		p.dev = NewDevice(p.tun.TUN(), NewLogger(level, fmt.Sprintf("dev%d: ", i)))
-		p.dev.Up()
 		if err := p.dev.IpcSet(cfg[i]); err != nil {
 			tb.Errorf("failed to configure device %d: %v", i, err)
 			p.dev.Close()
 			continue
 		}
-		if !p.dev.isUp() {
-			tb.Errorf("device %d did not come up", i)
+		if err := p.dev.Up(); err != nil {
+			tb.Errorf("failed to bring up device %d: %v", i, err)
 			p.dev.Close()
 			continue
 		}
@@ -212,9 +211,13 @@ func TestUpDown(t *testing.T) {
 			go func(d *Device) {
 				defer wg.Done()
 				for i := 0; i < itrials; i++ {
-					d.Up()
+					if err := d.Up(); err != nil {
+						t.Errorf("failed up bring up device: %v", err)
+					}
 					time.Sleep(time.Duration(rand.Intn(int(time.Nanosecond * (0x10000 - 1)))))
-					d.Down()
+					if err := d.Down(); err != nil {
+						t.Errorf("failed to bring down device: %v", err)
+					}
 					time.Sleep(time.Duration(rand.Intn(int(time.Nanosecond * (0x10000 - 1)))))
 				}
 			}(pair[i].dev)

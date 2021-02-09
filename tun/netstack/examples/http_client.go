@@ -31,7 +31,10 @@ public_key=25123c5dcd3328ff645e4f2a3fce0d754400d3887a0cb7c56f0267e20fbf3c5b
 endpoint=163.172.161.0:12912
 allowed_ip=0.0.0.0/0
 `)
-	dev.Up()
+	err = dev.Up()
+	if err != nil {
+		log.Panic(err)
+	}
 
 	client := http.Client{
 		Transport: &http.Transport{

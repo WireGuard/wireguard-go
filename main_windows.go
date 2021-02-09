@@ -48,7 +48,11 @@ func main() {
 	}
 
 	device := device.NewDevice(tun, logger)
-	device.Up()
+	err = device.Up()
+	if err != nil {
+		logger.Errorf("Failed to bring up device: %v", err)
+		os.Exit(ExitSetupFailed)
+	}
 	logger.Verbosef("Device started")
 
 	uapi, err := ipc.UAPIListen(interfaceName)

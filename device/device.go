@@ -139,37 +139,42 @@ func removePeerLocked(device *Device, peer *Peer, key NoisePublicKey) {
 }
 
 // changeState attempts to change the device state to match want.
-func (device *Device) changeState(want deviceState) {
+func (device *Device) changeState(want deviceState) (err error) {
 	device.state.Lock()
 	defer device.state.Unlock()
 	old := device.deviceState()
 	if old == deviceStateClosed {
 		// once closed, always closed
 		device.log.Verbosef("Interface closed, ignored requested state %s", want)
-		return
+		return nil
 	}
 	switch want {
 	case old:
-		return
+		return nil
 	case deviceStateUp:
 		atomic.StoreUint32(&device.state.state, uint32(deviceStateUp))
-		if ok := device.upLocked(); ok {
+		err = device.upLocked()
+		if err == nil {
 			break
 		}
 		fallthrough // up failed; bring the device all the way back down
 	case deviceStateDown:
 		atomic.StoreUint32(&device.state.state, uint32(deviceStateDown))
-		device.downLocked()
+		errDown := device.downLocked()
+		if err == nil {
+			err = errDown
+		}
 	}
 	device.log.Verbosef("Interface state was %s, requested %s, now %s", old, want, device.deviceState())
+	return
 }
 
 // upLocked attempts to bring the device up and reports whether it succeeded.
 // The caller must hold device.state.mu and is responsible for updating device.state.state.
-func (device *Device) upLocked() bool {
+func (device *Device) upLocked() error {
 	if err := device.BindUpdate(); err != nil {
 		device.log.Errorf("Unable to update bind: %v", err)
-		return false
+		return err
 	}
 
 	device.peers.RLock()
@@ -180,12 +185,12 @@ func (device *Device) upLocked() bool {
 		}
 	}
 	device.peers.RUnlock()
-	return true
+	return nil
 }
 
 // downLocked attempts to bring the device down.
 // The caller must hold device.state.mu and is responsible for updating device.state.state.
-func (device *Device) downLocked() {
+func (device *Device) downLocked() error {
 	err := device.BindClose()
 	if err != nil {
 		device.log.Errorf("Bind close failed: %v", err)
@@ -196,14 +201,15 @@ func (device *Device) downLocked() {
 		peer.Stop()
 	}
 	device.peers.RUnlock()
+	return err
 }
 
-func (device *Device) Up() {
-	device.changeState(deviceStateUp)
+func (device *Device) Up() error {
+	return device.changeState(deviceStateUp)
 }
 
-func (device *Device) Down() {
-	device.changeState(deviceStateDown)
+func (device *Device) Down() error {
+	return device.changeState(deviceStateDown)
 }
 
 func (device *Device) IsUnderLoad() bool {
