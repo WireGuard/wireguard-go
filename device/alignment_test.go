@@ -61,6 +61,5 @@ func TestDeviceAlignment(t *testing.T) {
 			field.Type.Align(),
 		)
 	}
-
-	checkAlignment(t, "Device.rate.underLoadUntil", unsafe.Offsetof(d.rate.underLoadUntil))
+	checkAlignment(t, "Device.rate.underLoadUntil", unsafe.Offsetof(d.rate)+unsafe.Offsetof(d.rate.underLoadUntil))
 }

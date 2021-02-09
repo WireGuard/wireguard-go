@@ -21,10 +21,6 @@ import (
 )
 
 type Device struct {
-	log *Logger
-
-	// synchronized resources (locks acquired in order)
-
 	state struct {
 		// state holds the device's state. It is accessed atomically.
 		// Use the device.deviceState method to read it.
@@ -64,8 +60,6 @@ type Device struct {
 		keyMap       map[NoisePublicKey]*Peer
 	}
 
-	// unprotected / "self-synchronising resources"
-
 	allowedips    AllowedIPs
 	indexTable    IndexTable
 	cookieChecker CookieChecker
@@ -94,6 +88,7 @@ type Device struct {
 
 	ipcMutex sync.RWMutex
 	closed   chan struct{}
+	log      *Logger
 }
 
 // deviceState represents the state of a Device.
