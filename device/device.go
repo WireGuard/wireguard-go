@@ -24,8 +24,10 @@ type Device struct {
 	state struct {
 		// state holds the device's state. It is accessed atomically.
 		// Use the device.deviceState method to read it.
-		// If state is not locked, state is the current state of the device.
-		// If state is locked, state is the current state or intended future state of the device.
+		// device.deviceState does not acquire the mutex, so it captures only a snapshot.
+		// During state transitions, the state variable is updated before the device itself.
+		// The state is thus either the current state of the device or
+		// the intended future state of the device.
 		// For example, while executing a call to Up, state will be deviceStateUp.
 		// There is no guarantee that that intended future state of the device
 		// will become the actual state; Up can fail.
