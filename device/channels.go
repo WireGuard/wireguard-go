@@ -71,14 +71,15 @@ func newHandshakeQueue() *handshakeQueue {
 	return q
 }
 
+type autodrainingInboundQueue struct {
+	c chan *QueueInboundElement
+}
+
 // newAutodrainingInboundQueue returns a channel that will be drained when it gets GC'd.
 // It is useful in cases in which is it hard to manage the lifetime of the channel.
 // The returned channel must not be closed. Senders should signal shutdown using
 // some other means, such as sending a sentinel nil values.
-func newAutodrainingInboundQueue(device *Device) chan *QueueInboundElement {
-	type autodrainingInboundQueue struct {
-		c chan *QueueInboundElement
-	}
+func newAutodrainingInboundQueue(device *Device) *autodrainingInboundQueue {
 	q := &autodrainingInboundQueue{
 		c: make(chan *QueueInboundElement, QueueInboundSize),
 	}
@@ -97,7 +98,11 @@ func newAutodrainingInboundQueue(device *Device) chan *QueueInboundElement {
 			}
 		}
 	})
-	return q.c
+	return q
+}
+
+type autodrainingOutboundQueue struct {
+	c chan *QueueOutboundElement
 }
 
 // newAutodrainingOutboundQueue returns a channel that will be drained when it gets GC'd.
@@ -105,10 +110,7 @@ func newAutodrainingInboundQueue(device *Device) chan *QueueInboundElement {
 // The returned channel must not be closed. Senders should signal shutdown using
 // some other means, such as sending a sentinel nil values.
 // All sends to the channel must be best-effort, because there may be no receivers.
-func newAutodrainingOutboundQueue(device *Device) chan *QueueOutboundElement {
-	type autodrainingOutboundQueue struct {
-		c chan *QueueOutboundElement
-	}
+func newAutodrainingOutboundQueue(device *Device) *autodrainingOutboundQueue {
 	q := &autodrainingOutboundQueue{
 		c: make(chan *QueueOutboundElement, QueueOutboundSize),
 	}
@@ -127,5 +129,5 @@ func newAutodrainingOutboundQueue(device *Device) chan *QueueOutboundElement {
 			}
 		}
 	})
-	return q.c
+	return q
 }

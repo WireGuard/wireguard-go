@@ -57,8 +57,8 @@ type Peer struct {
 
 	queue struct {
 		staged   chan *QueueOutboundElement // staged packets before a handshake is available
-		outbound chan *QueueOutboundElement // sequential ordering of udp transmission
-		inbound  chan *QueueInboundElement  // sequential ordering of tun writing
+		outbound *autodrainingOutboundQueue // sequential ordering of udp transmission
+		inbound  *autodrainingInboundQueue  // sequential ordering of tun writing
 	}
 
 	cookieGenerator CookieGenerator
@@ -253,8 +253,8 @@ func (peer *Peer) Stop() {
 
 	peer.timersStop()
 	// Signal that RoutineSequentialSender and RoutineSequentialReceiver should exit.
-	peer.queue.inbound <- nil
-	peer.queue.outbound <- nil
+	peer.queue.inbound.c <- nil
+	peer.queue.outbound.c <- nil
 	peer.stopping.Wait()
 	peer.device.queue.encryption.wg.Done() // no more writes to encryption queue from us
 

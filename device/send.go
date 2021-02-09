@@ -317,7 +317,7 @@ top:
 
 			// add to parallel and sequential queue
 			if peer.isRunning.Get() {
-				peer.queue.outbound <- elem
+				peer.queue.outbound.c <- elem
 				peer.device.queue.encryption.c <- elem
 			} else {
 				peer.device.PutMessageBuffer(elem.buffer)
@@ -410,7 +410,7 @@ func (peer *Peer) RoutineSequentialSender() {
 	}()
 	device.log.Verbosef("%v - Routine: sequential sender - started", peer)
 
-	for elem := range peer.queue.outbound {
+	for elem := range peer.queue.outbound.c {
 		if elem == nil {
 			return
 		}

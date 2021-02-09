@@ -167,7 +167,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 
 			// add to decryption queues
 			if peer.isRunning.Get() {
-				peer.queue.inbound <- elem
+				peer.queue.inbound.c <- elem
 				device.queue.decryption.c <- elem
 				buffer = device.GetMessageBuffer()
 			} else {
@@ -402,7 +402,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 	}()
 	device.log.Verbosef("%v - Routine: sequential receiver - started", peer)
 
-	for elem := range peer.queue.inbound {
+	for elem := range peer.queue.inbound.c {
 		if elem == nil {
 			return
 		}
@@ -477,7 +477,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		if err != nil && !device.isClosed() {
 			device.log.Errorf("Failed to write packet to TUN device: %v", err)
 		}
-		if len(peer.queue.inbound) == 0 {
+		if len(peer.queue.inbound.c) == 0 {
 			err = device.tun.device.Flush()
 			if err != nil {
 				peer.device.log.Errorf("Unable to flush packets: %v", err)
