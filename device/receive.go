@@ -237,7 +237,10 @@ func (device *Device) RoutineDecryption() {
 /* Handles incoming packets related to handshake
  */
 func (device *Device) RoutineHandshake() {
-	defer device.log.Verbosef("Routine: handshake worker - stopped")
+	defer func() {
+		device.log.Verbosef("Routine: handshake worker - stopped")
+		device.queue.encryption.wg.Done()
+	}()
 	device.log.Verbosef("Routine: handshake worker - started")
 
 	for elem := range device.queue.handshake.c {

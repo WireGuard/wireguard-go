@@ -305,6 +305,7 @@ func NewDevice(tunDevice tun.Device, logger *Logger) *Device {
 
 	cpus := runtime.NumCPU()
 	device.state.stopping.Wait()
+	device.queue.encryption.wg.Add(cpus) // One for each RoutineHandshake
 	for i := 0; i < cpus; i++ {
 		go device.RoutineEncryption()
 		go device.RoutineDecryption()
