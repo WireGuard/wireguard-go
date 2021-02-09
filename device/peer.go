@@ -52,7 +52,7 @@ type Peer struct {
 	}
 
 	state struct {
-		mu sync.Mutex // protects against concurrent Start/Stop
+		sync.Mutex // protects against concurrent Start/Stop
 	}
 
 	queue struct {
@@ -161,8 +161,8 @@ func (peer *Peer) Start() {
 	}
 
 	// prevent simultaneous start/stop operations
-	peer.state.mu.Lock()
-	defer peer.state.mu.Unlock()
+	peer.state.Lock()
+	defer peer.state.Unlock()
 
 	if peer.isRunning.Get() {
 		return
@@ -242,8 +242,8 @@ func (peer *Peer) ExpireCurrentKeypairs() {
 }
 
 func (peer *Peer) Stop() {
-	peer.state.mu.Lock()
-	defer peer.state.mu.Unlock()
+	peer.state.Lock()
+	defer peer.state.Unlock()
 
 	if !peer.isRunning.Swap(false) {
 		return

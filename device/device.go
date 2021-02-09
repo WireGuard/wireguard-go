@@ -24,9 +24,8 @@ type Device struct {
 	state struct {
 		// state holds the device's state. It is accessed atomically.
 		// Use the device.deviceState method to read it.
-		// If state.mu is (r)locked, state is the current state of the device.
-		// Without state.mu (r)locked, state is either the current state
-		// of the device or the intended future state of the device.
+		// If state is not locked, state is the current state of the device.
+		// If state is locked, state is the current state or intended future state of the device.
 		// For example, while executing a call to Up, state will be deviceStateUp.
 		// There is no guarantee that that intended future state of the device
 		// will become the actual state; Up can fail.
@@ -36,7 +35,7 @@ type Device struct {
 		// stopping blocks until all inputs to Device have been closed.
 		stopping sync.WaitGroup
 		// mu protects state changes.
-		mu sync.Mutex
+		sync.Mutex
 	}
 
 	net struct {
@@ -145,8 +144,8 @@ func unsafeRemovePeer(device *Device, peer *Peer, key NoisePublicKey) {
 
 // changeState attempts to change the device state to match want.
 func (device *Device) changeState(want deviceState) {
-	device.state.mu.Lock()
-	defer device.state.mu.Unlock()
+	device.state.Lock()
+	defer device.state.Unlock()
 	old := device.deviceState()
 	if old == deviceStateClosed {
 		// once closed, always closed
@@ -353,8 +352,8 @@ func (device *Device) RemoveAllPeers() {
 }
 
 func (device *Device) Close() {
-	device.state.mu.Lock()
-	defer device.state.mu.Unlock()
+	device.state.Lock()
+	defer device.state.Unlock()
 	if device.isClosed() {
 		return
 	}
