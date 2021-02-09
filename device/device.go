@@ -311,7 +311,8 @@ func NewDevice(tunDevice tun.Device, logger *Logger) *Device {
 		go device.RoutineHandshake()
 	}
 
-	device.state.stopping.Add(1) // read from TUN
+	device.state.stopping.Add(1)      // RoutineReadFromTUN
+	device.queue.encryption.wg.Add(1) // RoutineReadFromTUN
 	go device.RoutineReadFromTUN()
 	go device.RoutineTUNEventReader()
 
