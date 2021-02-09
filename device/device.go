@@ -125,12 +125,8 @@ func (device *Device) isUp() bool {
 	return device.deviceState() == deviceStateUp
 }
 
-/* Converts the peer into a "zombie", which remains in the peer map,
- * but processes no packets and does not exists in the routing table.
- *
- * Must hold device.peers.Mutex
- */
-func unsafeRemovePeer(device *Device, peer *Peer, key NoisePublicKey) {
+// Must hold device.peers.Lock()
+func removePeerLocked(device *Device, peer *Peer, key NoisePublicKey) {
 	// stop routing and processing of packets
 	device.allowedips.RemoveByPeer(peer)
 	peer.Stop()
@@ -245,7 +241,7 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 	for key, peer := range device.peers.keyMap {
 		if peer.handshake.remoteStatic.Equals(publicKey) {
 			peer.handshake.mutex.RUnlock()
-			unsafeRemovePeer(device, peer, key)
+			removePeerLocked(device, peer, key)
 			peer.handshake.mutex.RLock()
 		}
 	}
@@ -334,7 +330,7 @@ func (device *Device) RemovePeer(key NoisePublicKey) {
 
 	peer, ok := device.peers.keyMap[key]
 	if ok {
-		unsafeRemovePeer(device, peer, key)
+		removePeerLocked(device, peer, key)
 	}
 }
 
@@ -343,7 +339,7 @@ func (device *Device) RemoveAllPeers() {
 	defer device.peers.Unlock()
 
 	for key, peer := range device.peers.keyMap {
-		unsafeRemovePeer(device, peer, key)
+		removePeerLocked(device, peer, key)
 	}
 
 	device.peers.keyMap = make(map[NoisePublicKey]*Peer)
