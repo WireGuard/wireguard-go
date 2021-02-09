@@ -186,6 +186,8 @@ func (peer *Peer) Start() {
 
 	peer.timersStart()
 
+	device.flushInboundQueue(peer.queue.inbound)
+	device.flushOutboundQueue(peer.queue.outbound)
 	go peer.RoutineSequentialSender()
 	go peer.RoutineSequentialReceiver()
 

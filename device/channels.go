@@ -83,19 +83,21 @@ func newAutodrainingInboundQueue(device *Device) *autodrainingInboundQueue {
 	q := &autodrainingInboundQueue{
 		c: make(chan *QueueInboundElement, QueueInboundSize),
 	}
-	runtime.SetFinalizer(q, func(q *autodrainingInboundQueue) {
-		for {
-			select {
-			case elem := <-q.c:
-				elem.Lock()
-				device.PutMessageBuffer(elem.buffer)
-				device.PutInboundElement(elem)
-			default:
-				return
-			}
-		}
-	})
+	runtime.SetFinalizer(q, device.flushInboundQueue)
 	return q
+}
+
+func (device *Device) flushInboundQueue(q *autodrainingInboundQueue) {
+	for {
+		select {
+		case elem := <-q.c:
+			elem.Lock()
+			device.PutMessageBuffer(elem.buffer)
+			device.PutInboundElement(elem)
+		default:
+			return
+		}
+	}
 }
 
 type autodrainingOutboundQueue struct {
@@ -111,17 +113,19 @@ func newAutodrainingOutboundQueue(device *Device) *autodrainingOutboundQueue {
 	q := &autodrainingOutboundQueue{
 		c: make(chan *QueueOutboundElement, QueueOutboundSize),
 	}
-	runtime.SetFinalizer(q, func(q *autodrainingOutboundQueue) {
-		for {
-			select {
-			case elem := <-q.c:
-				elem.Lock()
-				device.PutMessageBuffer(elem.buffer)
-				device.PutOutboundElement(elem)
-			default:
-				return
-			}
-		}
-	})
+	runtime.SetFinalizer(q, device.flushOutboundQueue)
 	return q
+}
+
+func (device *Device) flushOutboundQueue(q *autodrainingOutboundQueue) {
+	for {
+		select {
+		case elem := <-q.c:
+			elem.Lock()
+			device.PutMessageBuffer(elem.buffer)
+			device.PutOutboundElement(elem)
+		default:
+			return
+		}
+	}
 }
