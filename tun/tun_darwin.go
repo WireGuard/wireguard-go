@@ -6,6 +6,7 @@
 package tun
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -31,13 +32,9 @@ type NativeTun struct {
 func retryInterfaceByIndex(index int) (iface *net.Interface, err error) {
 	for i := 0; i < 20; i++ {
 		iface, err = net.InterfaceByIndex(index)
-		if err != nil {
-			if opErr, ok := err.(*net.OpError); ok {
-				if syscallErr, ok := opErr.Err.(*os.SyscallError); ok && syscallErr.Err == syscall.ENOMEM {
-					time.Sleep(time.Duration(i) * time.Second / 3)
-					continue
-				}
-			}
+		if err != nil && errors.Is(err, syscall.ENOMEM) {
+			time.Sleep(time.Duration(i) * time.Second / 3)
+			continue
 		}
 		return iface, err
 	}

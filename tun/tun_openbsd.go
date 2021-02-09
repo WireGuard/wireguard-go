@@ -6,6 +6,7 @@
 package tun
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -99,16 +100,6 @@ func (tun *NativeTun) routineRouteListener(tunIfindex int) {
 	}
 }
 
-func errorIsEBUSY(err error) bool {
-	if pe, ok := err.(*os.PathError); ok {
-		err = pe.Err
-	}
-	if errno, ok := err.(syscall.Errno); ok && errno == syscall.EBUSY {
-		return true
-	}
-	return false
-}
-
 func CreateTUN(name string, mtu int) (Device, error) {
 	ifIndex := -1
 	if name != "tun" {
@@ -126,7 +117,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	} else {
 		for ifIndex = 0; ifIndex < 256; ifIndex++ {
 			tunfile, err = os.OpenFile(fmt.Sprintf("/dev/tun%d", ifIndex), unix.O_RDWR, 0)
-			if err == nil || !errorIsEBUSY(err) {
+			if err == nil || !errors.Is(err, syscall.EBUSY) {
 				break
 			}
 		}
