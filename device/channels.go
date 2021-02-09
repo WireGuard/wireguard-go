@@ -89,6 +89,7 @@ func newAutodrainingInboundQueue(device *Device) chan *QueueInboundElement {
 				if elem == nil {
 					continue
 				}
+				elem.Lock()
 				device.PutMessageBuffer(elem.buffer)
 				device.PutInboundElement(elem)
 			default:
@@ -118,6 +119,7 @@ func newAutodrainingOutboundQueue(device *Device) chan *QueueOutboundElement {
 				if elem == nil {
 					continue
 				}
+				elem.Lock()
 				device.PutMessageBuffer(elem.buffer)
 				device.PutOutboundElement(elem)
 			default:
