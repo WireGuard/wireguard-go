@@ -32,7 +32,7 @@ type Device struct {
 		// will become the actual state; Up can fail.
 		// The device can also change state multiple times between time of check and time of use.
 		// Unsynchronized uses of state must therefore be advisory/best-effort only.
-		state uint32 // actually a deviceState, but typed uint32 for conveniene
+		state uint32 // actually a deviceState, but typed uint32 for convenience
 		// stopping blocks until all inputs to Device have been closed.
 		stopping sync.WaitGroup
 		// mu protects state changes.
