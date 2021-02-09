@@ -196,8 +196,8 @@ func TestTwoDevicePing(t *testing.T) {
 
 func TestUpDown(t *testing.T) {
 	goroutineLeakCheck(t)
-	const itrials = 200
-	const otrials = 10
+	const itrials = 20
+	const otrials = 1
 
 	for n := 0; n < otrials; n++ {
 		pair := genTestPair(t)
