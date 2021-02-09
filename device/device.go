@@ -160,7 +160,6 @@ func (device *Device) changeState(want deviceState) {
 	}
 	switch want {
 	case old:
-		device.log.Verbosef("Interface already in state %s", want)
 		return
 	case deviceStateUp:
 		atomic.StoreUint32(&device.state.state, uint32(deviceStateUp))
