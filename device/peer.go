@@ -179,10 +179,10 @@ func (peer *Peer) Start() {
 	peer.handshake.lastSentHandshake = time.Now().Add(-(RekeyTimeout + time.Second))
 	peer.handshake.mutex.Unlock()
 
-	// prepare queues
-	peer.queue.outbound = newAutodrainingOutboundQueue(device)
-	peer.queue.inbound = newAutodrainingInboundQueue(device)
-	if peer.queue.staged == nil {
+	// prepare queues (once)
+	if peer.queue.outbound == nil {
+		peer.queue.outbound = newAutodrainingOutboundQueue(device)
+		peer.queue.inbound = newAutodrainingInboundQueue(device)
 		peer.queue.staged = make(chan *QueueOutboundElement, QueueStagedSize)
 	}
 	peer.device.queue.encryption.wg.Add(1) // keep encryption queue open for our writes
