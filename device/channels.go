@@ -87,9 +87,6 @@ func newAutodrainingInboundQueue(device *Device) *autodrainingInboundQueue {
 		for {
 			select {
 			case elem := <-q.c:
-				if elem == nil {
-					continue
-				}
 				elem.Lock()
 				device.PutMessageBuffer(elem.buffer)
 				device.PutInboundElement(elem)
@@ -118,9 +115,6 @@ func newAutodrainingOutboundQueue(device *Device) *autodrainingOutboundQueue {
 		for {
 			select {
 			case elem := <-q.c:
-				if elem == nil {
-					continue
-				}
 				elem.Lock()
 				device.PutMessageBuffer(elem.buffer)
 				device.PutOutboundElement(elem)
