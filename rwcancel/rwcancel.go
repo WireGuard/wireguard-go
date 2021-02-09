@@ -46,17 +46,7 @@ func NewRWCancel(fd int) (*RWCancel, error) {
 }
 
 func RetryAfterError(err error) bool {
-	if pe, ok := err.(*os.PathError); ok {
-		err = pe.Err
-	}
-	if errno, ok := err.(syscall.Errno); ok {
-		switch errno {
-		case syscall.EAGAIN, syscall.EINTR:
-			return true
-		}
-
-	}
-	return false
+	return errors.Is(err, syscall.EAGAIN) || errors.Is(err, syscall.EINTR)
 }
 
 func (rw *RWCancel) ReadyRead() bool {
