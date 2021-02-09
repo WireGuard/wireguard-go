@@ -123,6 +123,7 @@ again:
 	bind.sock4, newPort, err = create4(port)
 	if err != nil {
 		if originalPort == 0 && err == syscall.EADDRINUSE && tries < 100 {
+			unix.Close(bind.sock6)
 			tries++
 			goto again
 		}

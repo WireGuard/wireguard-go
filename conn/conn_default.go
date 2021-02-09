@@ -99,6 +99,7 @@ again:
 
 	bind.ipv6, port, err = listenNet("udp6", port)
 	if uport == 0 && err != nil && errors.Is(err, syscall.EADDRINUSE) && tries < 100 {
+		bind.ipv4.Close()
 		tries++
 		goto again
 	}
