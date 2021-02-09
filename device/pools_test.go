@@ -17,6 +17,10 @@ import (
 func TestWaitPool(t *testing.T) {
 	var wg sync.WaitGroup
 	trials := int32(100000)
+	if raceEnabled {
+		// This test can be very slow with -race.
+		trials /= 10
+	}
 	workers := runtime.NumCPU() + 2
 	if workers-4 <= 0 {
 		t.Skip("Not enough cores")
