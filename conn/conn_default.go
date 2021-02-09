@@ -99,7 +99,9 @@ func extractErrno(err error) error {
 func createBind(uport uint16) (Bind, uint16, error) {
 	var err error
 	var bind nativeBind
+	var tries int
 
+again:
 	port := int(uport)
 
 	bind.ipv4, port, err = listenNet("udp4", port)
@@ -108,6 +110,10 @@ func createBind(uport uint16) (Bind, uint16, error) {
 	}
 
 	bind.ipv6, port, err = listenNet("udp6", port)
+	if uport == 0 && err != nil && extractErrno(err) == syscall.EADDRINUSE && tries < 100 {
+		tries++
+		goto again
+	}
 	if err != nil && extractErrno(err) != syscall.EAFNOSUPPORT {
 		bind.ipv4.Close()
 		bind.ipv4 = nil
