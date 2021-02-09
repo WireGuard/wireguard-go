@@ -106,6 +106,7 @@ func (tun *NativeTun) routineNetlinkListener() {
 		unix.Close(tun.netlinkSock)
 		tun.hackListenerClosed.Lock()
 		close(tun.events)
+		tun.netlinkCancel.Close()
 	}()
 
 	for msg := make([]byte, 1<<16); ; {

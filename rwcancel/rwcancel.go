@@ -119,3 +119,8 @@ func (rw *RWCancel) Cancel() (err error) {
 	_, err = rw.closingWriter.Write([]byte{0})
 	return
 }
+
+func (rw *RWCancel) Close() {
+	rw.closingReader.Close()
+	rw.closingWriter.Close()
+}

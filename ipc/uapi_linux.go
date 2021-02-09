@@ -99,6 +99,7 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 	go func(l *UAPIListener) {
 		var buff [0]byte
 		for {
+			defer uapi.inotifyRWCancel.Close()
 			// start with lstat to avoid race condition
 			if _, err := os.Lstat(socketPath); os.IsNotExist(err) {
 				l.connErr <- err

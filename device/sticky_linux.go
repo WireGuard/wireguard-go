@@ -49,6 +49,7 @@ func (device *Device) routineRouteListener(bind conn.Bind, netlinkSock int, netl
 	var reqPeer map[uint32]peerEndpointPtr
 	var reqPeerLock sync.Mutex
 
+	defer netlinkCancel.Close()
 	defer unix.Close(netlinkSock)
 
 	for msg := make([]byte, 1<<16); ; {
