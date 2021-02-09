@@ -91,20 +91,18 @@ type Device struct {
 }
 
 // deviceState represents the state of a Device.
-// There are four states: new, down, up, closed.
-// However, state new should never be observable.
+// There are three states: down, up, closed.
 // Transitions:
 //
-//   new -> down -----+
-//            ↑↓      ↓
-//            up -> closed
+//   down -----+
+//     ↑↓      ↓
+//     up -> closed
 //
 type deviceState uint32
 
-//go:generate stringer -type deviceState -trimprefix=deviceState
+//go:generate go run golang.org/x/tools/cmd/stringer -type deviceState -trimprefix=deviceState
 const (
-	deviceStateNew deviceState = iota
-	deviceStateDown
+	deviceStateDown deviceState = iota
 	deviceStateUp
 	deviceStateClosed
 )

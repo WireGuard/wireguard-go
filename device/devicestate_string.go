@@ -4,19 +4,9 @@ package device
 
 import "strconv"
 
-func _() {
-	// An "invalid array index" compiler error signifies that the constant values have changed.
-	// Re-run the stringer command to generate them again.
-	var x [1]struct{}
-	_ = x[deviceStateNew-0]
-	_ = x[deviceStateDown-1]
-	_ = x[deviceStateUp-2]
-	_ = x[deviceStateClosed-3]
-}
+const _deviceState_name = "DownUpClosed"
 
-const _deviceState_name = "NewDownUpClosed"
-
-var _deviceState_index = [...]uint8{0, 3, 7, 9, 15}
+var _deviceState_index = [...]uint8{0, 4, 6, 12}
 
 func (i deviceState) String() string {
 	if i >= deviceState(len(_deviceState_index)-1) {
