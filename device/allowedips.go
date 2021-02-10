@@ -6,6 +6,7 @@
 package device
 
 import (
+	"container/list"
 	"errors"
 	"math/bits"
 	"net"
@@ -14,14 +15,13 @@ import (
 )
 
 type trieEntry struct {
-	child             [2]*trieEntry
-	peer              *Peer
-	bits              net.IP
-	cidr              uint
-	bit_at_byte       uint
-	bit_at_shift      uint
-	nextEntryForPeer  *trieEntry
-	pprevEntryForPeer **trieEntry
+	child        [2]*trieEntry
+	peer         *Peer
+	bits         net.IP
+	cidr         uint
+	bit_at_byte  uint
+	bit_at_shift uint
+	perPeerElem  *list.Element
 }
 
 func isLittleEndian() bool {
@@ -69,28 +69,14 @@ func commonBits(ip1 net.IP, ip2 net.IP) uint {
 }
 
 func (node *trieEntry) addToPeerEntries() {
-	p := node.peer
-	first := p.firstTrieEntry
-	node.nextEntryForPeer = first
-	if first != nil {
-		first.pprevEntryForPeer = &node.nextEntryForPeer
-	}
-	p.firstTrieEntry = node
-	node.pprevEntryForPeer = &p.firstTrieEntry
+	node.perPeerElem = node.peer.trieEntries.PushBack(node)
 }
 
 func (node *trieEntry) removeFromPeerEntries() {
-	if node.pprevEntryForPeer == nil {
-		return
+	if node.perPeerElem != nil {
+		node.peer.trieEntries.Remove(node.perPeerElem)
+		node.perPeerElem = nil
 	}
-	next := node.nextEntryForPeer
-	pprev := node.pprevEntryForPeer
-	*pprev = next
-	if next != nil {
-		next.pprevEntryForPeer = pprev
-	}
-	node.nextEntryForPeer = nil
-	node.pprevEntryForPeer = nil
 }
 
 func (node *trieEntry) removeByPeer(p *Peer) *trieEntry {
@@ -226,7 +212,8 @@ func (table *AllowedIPs) EntriesForPeer(peer *Peer, cb func(ip net.IP, cidr uint
 	table.mutex.RLock()
 	defer table.mutex.RUnlock()
 
-	for node := peer.firstTrieEntry; node != nil; node = node.nextEntryForPeer {
+	for elem := peer.trieEntries.Front(); elem != nil; elem = elem.Next() {
+		node := elem.Value.(*trieEntry)
 		if !cb(node.bits, node.cidr) {
 			return
 		}
