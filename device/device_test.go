@@ -8,6 +8,7 @@ package device
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -16,6 +17,7 @@ import (
 	"runtime/pprof"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -211,8 +213,17 @@ func TestUpDown(t *testing.T) {
 			go func(d *Device) {
 				defer wg.Done()
 				for i := 0; i < itrials; i++ {
-					if err := d.Up(); err != nil {
-						t.Errorf("failed up bring up device: %v", err)
+					start := time.Now()
+					for {
+						if err := d.Up(); err != nil {
+							if errors.Is(err, syscall.EADDRINUSE) && time.Now().Sub(start) < time.Second*4 {
+								// Some other test process is racing with us, so try again.
+								time.Sleep(time.Millisecond * 10)
+								continue
+							}
+							t.Errorf("failed up bring up device: %v", err)
+						}
+						break
 					}
 					time.Sleep(time.Duration(rand.Intn(int(time.Nanosecond * (0x10000 - 1)))))
 					if err := d.Down(); err != nil {
