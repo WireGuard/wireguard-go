@@ -101,7 +101,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 
 		if err != nil {
 			device.PutMessageBuffer(buffer)
-			if errors.Is(err, conn.NetErrClosed) {
+			if errors.Is(err, net.ErrClosed) {
 				return
 			}
 			device.log.Errorf("Failed to receive packet: %v", err)
