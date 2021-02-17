@@ -10,7 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net"
 	"runtime"
@@ -402,7 +402,7 @@ func BenchmarkUAPIGet(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		pair[0].dev.IpcGetOperation(ioutil.Discard)
+		pair[0].dev.IpcGetOperation(io.Discard)
 	}
 }
 
