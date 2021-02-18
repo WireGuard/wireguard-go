@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 	_ "unsafe"
@@ -42,6 +43,7 @@ type NativeTun struct {
 	rate      rateJuggler
 	session   wintun.Session
 	readWait  windows.Handle
+	closeOnce sync.Once
 }
 
 var WintunPool, _ = wintun.MakePool("WireGuard")
@@ -122,13 +124,15 @@ func (tun *NativeTun) Events() chan Event {
 }
 
 func (tun *NativeTun) Close() error {
-	tun.close = true
-	tun.session.End()
 	var err error
-	if tun.wt != nil {
-		_, err = tun.wt.Delete(false)
-	}
-	close(tun.events)
+	tun.closeOnce.Do(func() {
+		tun.close = true
+		tun.session.End()
+		if tun.wt != nil {
+			_, err = tun.wt.Delete(false)
+		}
+		close(tun.events)
+	})
 	return err
 }
 

@@ -39,6 +39,8 @@ type NativeTun struct {
 	hackListenerClosed      sync.Mutex
 	statusListenersShutdown chan struct{}
 
+	closeOnce sync.Once
+
 	nameOnce  sync.Once // guards calling initNameCache, which sets following fields
 	nameCache string    // name of interface
 	nameErr   error
@@ -372,17 +374,18 @@ func (tun *NativeTun) Events() chan Event {
 }
 
 func (tun *NativeTun) Close() error {
-	var err1 error
-	if tun.statusListenersShutdown != nil {
-		close(tun.statusListenersShutdown)
-		if tun.netlinkCancel != nil {
-			err1 = tun.netlinkCancel.Cancel()
+	var err1, err2 error
+	tun.closeOnce.Do(func() {
+		if tun.statusListenersShutdown != nil {
+			close(tun.statusListenersShutdown)
+			if tun.netlinkCancel != nil {
+				err1 = tun.netlinkCancel.Cancel()
+			}
+		} else if tun.events != nil {
+			close(tun.events)
 		}
-	} else if tun.events != nil {
-		close(tun.events)
-	}
-	err2 := tun.tunFile.Close()
-
+		err2 = tun.tunFile.Close()
+	})
 	if err1 != nil {
 		return err1
 	}

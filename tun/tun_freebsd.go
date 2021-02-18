@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"syscall"
 	"unsafe"
 
@@ -82,6 +83,7 @@ type NativeTun struct {
 	events      chan Event
 	errors      chan error
 	routeSocket int
+	closeOnce   sync.Once
 }
 
 func (tun *NativeTun) routineRouteListener(tunIfindex int) {
@@ -472,16 +474,18 @@ func (tun *NativeTun) Flush() error {
 }
 
 func (tun *NativeTun) Close() error {
-	var err3 error
-	err1 := tun.tunFile.Close()
-	err2 := tunDestroy(tun.name)
-	if tun.routeSocket != -1 {
-		unix.Shutdown(tun.routeSocket, unix.SHUT_RDWR)
-		err3 = unix.Close(tun.routeSocket)
-		tun.routeSocket = -1
-	} else if tun.events != nil {
-		close(tun.events)
-	}
+	var err1, err2, err3 error
+	tun.closeOnce.Do(func() {
+		err1 = tun.tunFile.Close()
+		err2 = tunDestroy(tun.name)
+		if tun.routeSocket != -1 {
+			unix.Shutdown(tun.routeSocket, unix.SHUT_RDWR)
+			err3 = unix.Close(tun.routeSocket)
+			tun.routeSocket = -1
+		} else if tun.events != nil {
+			close(tun.events)
+		}
+	})
 	if err1 != nil {
 		return err1
 	}
