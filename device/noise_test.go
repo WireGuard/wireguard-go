@@ -9,6 +9,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"testing"
+
+	"golang.zx2c4.com/wireguard/conn"
+	"golang.zx2c4.com/wireguard/tun/tuntest"
 )
 
 func TestCurveWrappers(t *testing.T) {
@@ -26,6 +29,30 @@ func TestCurveWrappers(t *testing.T) {
 
 	if ss1 != ss2 {
 		t.Fatal("Failed to compute shared secet")
+	}
+}
+
+func randDevice(t *testing.T) *Device {
+	sk, err := newPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tun := tuntest.NewChannelTUN()
+	logger := NewLogger(LogLevelError, "")
+	device := NewDevice(tun.TUN(), conn.NewDefaultBind(), logger)
+	device.SetPrivateKey(sk)
+	return device
+}
+
+func assertNil(t *testing.T, err error) {
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertEqual(t *testing.T, a, b []byte) {
+	if !bytes.Equal(a, b) {
+		t.Fatal(a, "!=", b)
 	}
 }
 

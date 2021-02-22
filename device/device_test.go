@@ -314,30 +314,6 @@ func TestConcurrencySafety(t *testing.T) {
 	close(done)
 }
 
-func assertNil(t *testing.T, err error) {
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func assertEqual(t *testing.T, a, b []byte) {
-	if !bytes.Equal(a, b) {
-		t.Fatal(a, "!=", b)
-	}
-}
-
-func randDevice(t *testing.T) *Device {
-	sk, err := newPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	tun := newDummyTUN("dummy")
-	logger := NewLogger(LogLevelError, "")
-	device := NewDevice(tun, conn.NewDefaultBind(), logger)
-	device.SetPrivateKey(sk)
-	return device
-}
-
 func BenchmarkLatency(b *testing.B) {
 	pair := genTestPair(b)
 
