@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"syscall"
 
+	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/ipc"
 	"golang.zx2c4.com/wireguard/tun"
@@ -219,7 +220,7 @@ func main() {
 		return
 	}
 
-	device := device.NewDevice(tun, logger)
+	device := device.NewDevice(tun, conn.NewDefaultBind(), logger)
 
 	logger.Verbosef("Device started")
 

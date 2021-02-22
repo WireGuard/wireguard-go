@@ -1,4 +1,4 @@
-// +build android openbsd freebsd
+// +build linux openbsd freebsd
 
 /* SPDX-License-Identifier: MIT
  *
@@ -26,7 +26,7 @@ func init() {
 	}
 }
 
-func (bind *nativeBind) SetMark(mark uint32) error {
+func (bind *StdNetBind) SetMark(mark uint32) error {
 	var operr error
 	if fwmarkIoctl == 0 {
 		return nil

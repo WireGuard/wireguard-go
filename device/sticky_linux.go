@@ -1,5 +1,3 @@
-// +build !android
-
 /* SPDX-License-Identifier: MIT
  *
  * Copyright (C) 2017-2021 WireGuard LLC. All Rights Reserved.
@@ -21,11 +19,16 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/unix"
+
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/rwcancel"
 )
 
 func (device *Device) startRouteListener(bind conn.Bind) (*rwcancel.RWCancel, error) {
+	if _, ok := bind.(*conn.LinuxSocketBind); !ok {
+		return nil, nil
+	}
+
 	netlinkSock, err := createNetlinkRouteSocket()
 	if err != nil {
 		return nil, err
@@ -109,11 +112,11 @@ func (device *Device) routineRouteListener(bind conn.Bind, netlinkSock int, netl
 									pePtr.peer.Unlock()
 									break
 								}
-								if uint32(pePtr.peer.endpoint.(*conn.NativeEndpoint).Src4().Ifindex) == ifidx {
+								if uint32(pePtr.peer.endpoint.(*conn.LinuxSocketEndpoint).Src4().Ifindex) == ifidx {
 									pePtr.peer.Unlock()
 									break
 								}
-								pePtr.peer.endpoint.(*conn.NativeEndpoint).ClearSrc()
+								pePtr.peer.endpoint.(*conn.LinuxSocketEndpoint).ClearSrc()
 								pePtr.peer.Unlock()
 							}
 							attr = attr[attrhdr.Len:]
@@ -133,7 +136,7 @@ func (device *Device) routineRouteListener(bind conn.Bind, netlinkSock int, netl
 							peer.RUnlock()
 							continue
 						}
-						nativeEP, _ := peer.endpoint.(*conn.NativeEndpoint)
+						nativeEP, _ := peer.endpoint.(*conn.LinuxSocketEndpoint)
 						if nativeEP == nil {
 							peer.RUnlock()
 							continue
@@ -176,7 +179,7 @@ func (device *Device) routineRouteListener(bind conn.Bind, netlinkSock int, netl
 								Len:  8,
 								Type: unix.RTA_MARK,
 							},
-							uint32(bind.LastMark()),
+							device.net.fwmark,
 						}
 						nlmsg.hdr.Len = uint32(unsafe.Sizeof(nlmsg))
 						reqPeerLock.Lock()

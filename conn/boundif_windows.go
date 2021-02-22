@@ -17,7 +17,7 @@ const (
 	sockoptIPV6_UNICAST_IF = 31
 )
 
-func (bind *nativeBind) BindSocketToInterface4(interfaceIndex uint32, blackhole bool) error {
+func (bind *StdNetBind) BindSocketToInterface4(interfaceIndex uint32, blackhole bool) error {
 	/* MSDN says for IPv4 this needs to be in net byte order, so that it's like an IP address with leading zeros. */
 	bytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(bytes, interfaceIndex)
@@ -40,7 +40,7 @@ func (bind *nativeBind) BindSocketToInterface4(interfaceIndex uint32, blackhole 
 	return nil
 }
 
-func (bind *nativeBind) BindSocketToInterface6(interfaceIndex uint32, blackhole bool) error {
+func (bind *StdNetBind) BindSocketToInterface6(interfaceIndex uint32, blackhole bool) error {
 	sysconn, err := bind.ipv6.SyscallConn()
 	if err != nil {
 		return err

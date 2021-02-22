@@ -17,40 +17,30 @@ import (
 // A Bind interface may also be a PeekLookAtSocketFd or BindSocketToInterface,
 // depending on the platform-specific implementation.
 type Bind interface {
-	// LastMark reports the last mark set for this Bind.
-	LastMark() uint32
+	// Open puts the Bind into a listening state on a given port and reports the actual
+	// port that it bound to. Passing zero results in a random selection.
+	Open(port uint16) (actualPort uint16, err error)
+
+	// Close closes the Bind listener.
+	Close() error
 
 	// SetMark sets the mark for each packet sent through this Bind.
 	// This mark is passed to the kernel as the socket option SO_MARK.
 	SetMark(mark uint32) error
 
-	// ReceiveIPv6 reads an IPv6 UDP packet into b.
-	//
-	// It reports the number of bytes read, n,
-	// the packet source address ep,
-	// and any error.
+	// ReceiveIPv6 reads an IPv6 UDP packet into b.  It reports the number of bytes read,
+	// n, the packet source address ep, and any error.
 	ReceiveIPv6(b []byte) (n int, ep Endpoint, err error)
 
-	// ReceiveIPv4 reads an IPv4 UDP packet into b.
-	//
-	// It reports the number of bytes read, n,
-	// the packet source address ep,
-	// and any error.
+	// ReceiveIPv4 reads an IPv4 UDP packet into b. It reports the number of bytes read,
+	// n, the packet source address ep, and any error.
 	ReceiveIPv4(b []byte) (n int, ep Endpoint, err error)
 
 	// Send writes a packet b to address ep.
 	Send(b []byte, ep Endpoint) error
 
-	// Close closes the Bind connection.
-	Close() error
-}
-
-// CreateBind creates a Bind bound to a port.
-//
-// The value actualPort reports the actual port number the Bind
-// object gets bound to.
-func CreateBind(port uint16) (b Bind, actualPort uint16, err error) {
-	return createBind(port)
+	// ParseEndpoint creates a new endpoint from a string.
+	ParseEndpoint(s string) (Endpoint, error)
 }
 
 // BindSocketToInterface is implemented by Bind objects that support being
@@ -69,8 +59,8 @@ type PeekLookAtSocketFd interface {
 
 // An Endpoint maintains the source/destination caching for a peer.
 //
-//	dst : the remote address of a peer ("endpoint" in uapi terminology)
-//	src : the local address from which datagrams originate going to the peer
+//	dst: the remote address of a peer ("endpoint" in uapi terminology)
+//	src: the local address from which datagrams originate going to the peer
 type Endpoint interface {
 	ClearSrc()           // clears the source address
 	SrcToString() string // returns the local source address (ip:port)
@@ -109,3 +99,8 @@ func parseEndpoint(s string) (*net.UDPAddr, error) {
 	}
 	return addr, err
 }
+
+var (
+	ErrBindAlreadyOpen   = errors.New("bind is already open")
+	ErrWrongEndpointType = errors.New("endpoint type does not correspond with bind type")
+)

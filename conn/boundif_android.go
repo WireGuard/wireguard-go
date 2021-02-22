@@ -5,7 +5,7 @@
 
 package conn
 
-func (bind *nativeBind) PeekLookAtSocketFd4() (fd int, err error) {
+func (bind *StdNetBind) PeekLookAtSocketFd4() (fd int, err error) {
 	sysconn, err := bind.ipv4.SyscallConn()
 	if err != nil {
 		return -1, err
@@ -19,7 +19,7 @@ func (bind *nativeBind) PeekLookAtSocketFd4() (fd int, err error) {
 	return
 }
 
-func (bind *nativeBind) PeekLookAtSocketFd6() (fd int, err error) {
+func (bind *StdNetBind) PeekLookAtSocketFd6() (fd int, err error) {
 	sysconn, err := bind.ipv6.SyscallConn()
 	if err != nil {
 		return -1, err

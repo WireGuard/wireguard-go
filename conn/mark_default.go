@@ -7,6 +7,6 @@
 
 package conn
 
-func (bind *nativeBind) SetMark(mark uint32) error {
+func (bind *StdNetBind) SetMark(mark uint32) error {
 	return nil
 }

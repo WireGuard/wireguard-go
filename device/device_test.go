@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/tun/tuntest"
 )
 
@@ -158,7 +159,7 @@ func genTestPair(tb testing.TB) (pair testPair) {
 		if _, ok := tb.(*testing.B); ok && !testing.Verbose() {
 			level = LogLevelError
 		}
-		p.dev = NewDevice(p.tun.TUN(), NewLogger(level, fmt.Sprintf("dev%d: ", i)))
+		p.dev = NewDevice(p.tun.TUN(), conn.NewDefaultBind(), NewLogger(level, fmt.Sprintf("dev%d: ", i)))
 		if err := p.dev.IpcSet(cfg[i]); err != nil {
 			tb.Errorf("failed to configure device %d: %v", i, err)
 			p.dev.Close()
@@ -332,7 +333,7 @@ func randDevice(t *testing.T) *Device {
 	}
 	tun := newDummyTUN("dummy")
 	logger := NewLogger(LogLevelError, "")
-	device := NewDevice(tun, logger)
+	device := NewDevice(tun, conn.NewDefaultBind(), logger)
 	device.SetPrivateKey(sk)
 	return device
 }
