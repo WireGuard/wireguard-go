@@ -8,7 +8,6 @@ package device
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -17,11 +16,11 @@ import (
 	"runtime/pprof"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"testing"
 	"time"
 
 	"golang.zx2c4.com/wireguard/conn"
+	"golang.zx2c4.com/wireguard/conn/bindtest"
 	"golang.zx2c4.com/wireguard/tun/tuntest"
 )
 
@@ -148,8 +147,14 @@ func (pair *testPair) Send(tb testing.TB, ping SendDirection, done chan struct{}
 }
 
 // genTestPair creates a testPair.
-func genTestPair(tb testing.TB) (pair testPair) {
+func genTestPair(tb testing.TB, realSocket bool) (pair testPair) {
 	cfg, endpointCfg := genConfigs(tb)
+	var binds [2]conn.Bind
+	if realSocket {
+		binds[0], binds[1] = conn.NewDefaultBind(), conn.NewDefaultBind()
+	} else {
+		binds = bindtest.NewChannelBinds()
+	}
 	// Bring up a ChannelTun for each config.
 	for i := range pair {
 		p := &pair[i]
@@ -159,7 +164,7 @@ func genTestPair(tb testing.TB) (pair testPair) {
 		if _, ok := tb.(*testing.B); ok && !testing.Verbose() {
 			level = LogLevelError
 		}
-		p.dev = NewDevice(p.tun.TUN(), conn.NewDefaultBind(), NewLogger(level, fmt.Sprintf("dev%d: ", i)))
+		p.dev = NewDevice(p.tun.TUN(), binds[i], NewLogger(level, fmt.Sprintf("dev%d: ", i)))
 		if err := p.dev.IpcSet(cfg[i]); err != nil {
 			tb.Errorf("failed to configure device %d: %v", i, err)
 			p.dev.Close()
@@ -187,7 +192,7 @@ func genTestPair(tb testing.TB) (pair testPair) {
 
 func TestTwoDevicePing(t *testing.T) {
 	goroutineLeakCheck(t)
-	pair := genTestPair(t)
+	pair := genTestPair(t, true)
 	t.Run("ping 1.0.0.1", func(t *testing.T) {
 		pair.Send(t, Ping, nil)
 	})
@@ -198,11 +203,11 @@ func TestTwoDevicePing(t *testing.T) {
 
 func TestUpDown(t *testing.T) {
 	goroutineLeakCheck(t)
-	const itrials = 20
-	const otrials = 1
+	const itrials = 50
+	const otrials = 10
 
 	for n := 0; n < otrials; n++ {
-		pair := genTestPair(t)
+		pair := genTestPair(t, false)
 		for i := range pair {
 			for k := range pair[i].dev.peers.keyMap {
 				pair[i].dev.IpcSet(fmt.Sprintf("public_key=%s\npersistent_keepalive_interval=1\n", hex.EncodeToString(k[:])))
@@ -214,17 +219,8 @@ func TestUpDown(t *testing.T) {
 			go func(d *Device) {
 				defer wg.Done()
 				for i := 0; i < itrials; i++ {
-					start := time.Now()
-					for {
-						if err := d.Up(); err != nil {
-							if errors.Is(err, syscall.EADDRINUSE) && time.Now().Sub(start) < time.Second*4 {
-								// Some other test process is racing with us, so try again.
-								time.Sleep(time.Millisecond * 10)
-								continue
-							}
-							t.Errorf("failed up bring up device: %v", err)
-						}
-						break
+					if err := d.Up(); err != nil {
+						t.Errorf("failed up bring up device: %v", err)
 					}
 					time.Sleep(time.Duration(rand.Intn(int(time.Nanosecond * (0x10000 - 1)))))
 					if err := d.Down(); err != nil {
@@ -245,7 +241,7 @@ func TestUpDown(t *testing.T) {
 // TestConcurrencySafety does other things concurrently with tunnel use.
 // It is intended to be used with the race detector to catch data races.
 func TestConcurrencySafety(t *testing.T) {
-	pair := genTestPair(t)
+	pair := genTestPair(t, true)
 	done := make(chan struct{})
 
 	const warmupIters = 10
@@ -315,7 +311,7 @@ func TestConcurrencySafety(t *testing.T) {
 }
 
 func BenchmarkLatency(b *testing.B) {
-	pair := genTestPair(b)
+	pair := genTestPair(b, true)
 
 	// Establish a connection.
 	pair.Send(b, Ping, nil)
@@ -329,7 +325,7 @@ func BenchmarkLatency(b *testing.B) {
 }
 
 func BenchmarkThroughput(b *testing.B) {
-	pair := genTestPair(b)
+	pair := genTestPair(b, true)
 
 	// Establish a connection.
 	pair.Send(b, Ping, nil)
@@ -373,7 +369,7 @@ func BenchmarkThroughput(b *testing.B) {
 }
 
 func BenchmarkUAPIGet(b *testing.B) {
-	pair := genTestPair(b)
+	pair := genTestPair(b, true)
 	pair.Send(b, Ping, nil)
 	pair.Send(b, Pong, nil)
 	b.ReportAllocs()

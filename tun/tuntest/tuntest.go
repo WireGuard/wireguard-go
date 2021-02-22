@@ -79,7 +79,6 @@ func genICMPv4(payload []byte, dst, src net.IP) []byte {
 	return pkt
 }
 
-// TODO(crawshaw): find a reusable home for this. package devicetest?
 type ChannelTUN struct {
 	Inbound  chan []byte // incoming packets, closed on TUN close
 	Outbound chan []byte // outbound packets, blocks forever on TUN close
