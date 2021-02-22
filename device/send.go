@@ -421,7 +421,7 @@ func (peer *Peer) RoutineSequentialSender() {
 			// This is an optimization only. It is possible for the peer to be stopped
 			// immediately after this check, in which case, elem will get processed.
 			// The timers and SendBuffer code are resilient to a few stragglers.
-			// TODO(josharian): rework peer shutdown order to ensure
+			// TODO: rework peer shutdown order to ensure
 			// that we never accidentally keep timers alive longer than necessary.
 			device.PutMessageBuffer(elem.buffer)
 			device.PutOutboundElement(elem)

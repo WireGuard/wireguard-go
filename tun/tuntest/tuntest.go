@@ -113,7 +113,7 @@ func (t *chTun) File() *os.File { return nil }
 func (t *chTun) Read(data []byte, offset int) (int, error) {
 	select {
 	case <-t.c.closed:
-		return 0, io.EOF // TODO(crawshaw): what is the correct error value?
+		return 0, os.ErrClosed
 	case msg := <-t.c.Outbound:
 		return copy(data[offset:], msg), nil
 	}
@@ -130,7 +130,7 @@ func (t *chTun) Write(data []byte, offset int) (int, error) {
 	copy(msg, data[offset:])
 	select {
 	case <-t.c.closed:
-		return 0, io.EOF // TODO(crawshaw): what is the correct error value?
+		return 0, os.ErrClosed
 	case t.c.Inbound <- msg:
 		return len(data) - offset, nil
 	}

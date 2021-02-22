@@ -20,7 +20,6 @@ import (
 
 type handshakeState int
 
-// TODO(crawshaw): add commentary describing each state and the transitions
 const (
 	handshakeZeroed = handshakeState(iota)
 	handshakeInitiationCreated
