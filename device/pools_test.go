@@ -15,6 +15,7 @@ import (
 )
 
 func TestWaitPool(t *testing.T) {
+	t.Skip("Currently disabled")
 	var wg sync.WaitGroup
 	trials := int32(100000)
 	if raceEnabled {
