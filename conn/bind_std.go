@@ -128,6 +128,8 @@ func (bind *StdNetBind) Close() error {
 		err2 = bind.ipv6.Close()
 		bind.ipv6 = nil
 	}
+	bind.blackhole4 = false
+	bind.blackhole6 = false
 	if err1 != nil {
 		return err1
 	}
