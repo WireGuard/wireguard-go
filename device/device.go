@@ -55,20 +55,19 @@ type Device struct {
 		publicKey  NoisePublicKey
 	}
 
+	rate struct {
+		underLoadUntil int64
+		limiter        ratelimiter.Ratelimiter
+	}
+
 	peers struct {
-		empty        AtomicBool // empty reports whether len(keyMap) == 0
-		sync.RWMutex            // protects keyMap
+		sync.RWMutex // protects keyMap
 		keyMap       map[NoisePublicKey]*Peer
 	}
 
 	allowedips    AllowedIPs
 	indexTable    IndexTable
 	cookieChecker CookieChecker
-
-	rate struct {
-		underLoadUntil int64
-		limiter        ratelimiter.Ratelimiter
-	}
 
 	pool struct {
 		messageBuffers   *WaitPool
@@ -135,7 +134,6 @@ func removePeerLocked(device *Device, peer *Peer, key NoisePublicKey) {
 
 	// remove from peer map
 	delete(device.peers.keyMap, key)
-	device.peers.empty.Set(len(device.peers.keyMap) == 0)
 }
 
 // changeState attempts to change the device state to match want.
