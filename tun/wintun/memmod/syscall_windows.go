@@ -324,8 +324,6 @@ const (
 	DLL_PROCESS_DETACH = 0
 )
 
-//sys	isBadReadPtr(addr uintptr, ucb uintptr) (ret bool) = kernel32.IsBadReadPtr
-
 type SYSTEM_INFO struct {
 	ProcessorArchitecture     uint16
 	Reserved                  uint16
