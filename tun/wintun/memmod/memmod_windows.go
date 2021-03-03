@@ -312,7 +312,7 @@ func (module *Module) buildImportTable() error {
 
 	module.modules = make([]windows.Handle, 0, 16)
 	importDesc := (*IMAGE_IMPORT_DESCRIPTOR)(a2p(module.codeBase + uintptr(directory.VirtualAddress)))
-	for !isBadReadPtr(uintptr(unsafe.Pointer(importDesc)), unsafe.Sizeof(*importDesc)) && importDesc.Name != 0 {
+	for importDesc.Name != 0 {
 		handle, err := windows.LoadLibraryEx(windows.BytePtrToString((*byte)(a2p(module.codeBase+uintptr(importDesc.Name)))), 0, windows.LOAD_LIBRARY_SEARCH_SYSTEM32)
 		if err != nil {
 			return fmt.Errorf("Error loading module: %w", err)
