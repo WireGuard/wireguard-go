@@ -27,7 +27,7 @@ type ipv6Source struct {
 }
 
 type LinuxSocketEndpoint struct {
-	sync.Mutex
+	mu   sync.Mutex
 	dst  [unsafe.Sizeof(unix.SockaddrInet6{})]byte
 	src  [unsafe.Sizeof(ipv6Source{})]byte
 	isV6 bool
@@ -450,9 +450,9 @@ func send4(sock int, end *LinuxSocketEndpoint, buff []byte) error {
 		},
 	}
 
-	end.Lock()
+	end.mu.Lock()
 	_, err := unix.SendmsgN(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], end.dst4(), 0)
-	end.Unlock()
+	end.mu.Unlock()
 
 	if err == nil {
 		return nil
@@ -463,9 +463,9 @@ func send4(sock int, end *LinuxSocketEndpoint, buff []byte) error {
 	if err == unix.EINVAL {
 		end.ClearSrc()
 		cmsg.pktinfo = unix.Inet4Pktinfo{}
-		end.Lock()
+		end.mu.Lock()
 		_, err = unix.SendmsgN(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], end.dst4(), 0)
-		end.Unlock()
+		end.mu.Unlock()
 	}
 
 	return err
@@ -494,9 +494,9 @@ func send6(sock int, end *LinuxSocketEndpoint, buff []byte) error {
 		cmsg.pktinfo.Ifindex = 0
 	}
 
-	end.Lock()
+	end.mu.Lock()
 	_, err := unix.SendmsgN(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], end.dst6(), 0)
-	end.Unlock()
+	end.mu.Unlock()
 
 	if err == nil {
 		return nil
@@ -507,9 +507,9 @@ func send6(sock int, end *LinuxSocketEndpoint, buff []byte) error {
 	if err == unix.EINVAL {
 		end.ClearSrc()
 		cmsg.pktinfo = unix.Inet6Pktinfo{}
-		end.Lock()
+		end.mu.Lock()
 		_, err = unix.SendmsgN(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], end.dst6(), 0)
-		end.Unlock()
+		end.mu.Unlock()
 	}
 
 	return err
