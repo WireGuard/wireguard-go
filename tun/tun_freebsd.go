@@ -346,22 +346,24 @@ func CreateTUN(name string, mtu int) (Device, error) {
 		return nil, fmt.Errorf("Unable to set nd6 flags for %s: %w", assignedName, errno)
 	}
 
-	// Rename the interface
-	var newnp [unix.IFNAMSIZ]byte
-	copy(newnp[:], name)
-	var ifr ifreq_ptr
-	copy(ifr.Name[:], assignedName)
-	ifr.Data = uintptr(unsafe.Pointer(&newnp[0]))
-	_, _, errno = unix.Syscall(
-		unix.SYS_IOCTL,
-		uintptr(confd),
-		uintptr(unix.SIOCSIFNAME),
-		uintptr(unsafe.Pointer(&ifr)),
-	)
-	if errno != 0 {
-		tunFile.Close()
-		tunDestroy(assignedName)
-		return nil, fmt.Errorf("Failed to rename %s to %s: %w", assignedName, name, errno)
+	if name != "" {
+		// Rename the interface
+		var newnp [unix.IFNAMSIZ]byte
+		copy(newnp[:], name)
+		var ifr ifreq_ptr
+		copy(ifr.Name[:], assignedName)
+		ifr.Data = uintptr(unsafe.Pointer(&newnp[0]))
+		_, _, errno = unix.Syscall(
+			unix.SYS_IOCTL,
+			uintptr(confd),
+			uintptr(unix.SIOCSIFNAME),
+			uintptr(unsafe.Pointer(&ifr)),
+		)
+		if errno != 0 {
+			tunFile.Close()
+			tunDestroy(assignedName)
+			return nil, fmt.Errorf("Failed to rename %s to %s: %w", assignedName, name, errno)
+		}
 	}
 
 	return CreateTUNFromFile(tunFile, mtu)
