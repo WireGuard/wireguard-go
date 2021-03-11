@@ -228,7 +228,7 @@ func (device *Device) RoutineReadFromTUN() {
 		if err != nil {
 			if !device.isClosed() {
 				device.log.Errorf("Failed to read packet from TUN device: %v", err)
-				device.Close()
+				go device.Close()
 			}
 			device.PutMessageBuffer(elem.buffer)
 			device.PutOutboundElement(elem)
