@@ -55,6 +55,11 @@ func (tun *NativeTun) routineHackListener() {
 	/* This is needed for the detection to work across network namespaces
 	 * If you are reading this and know a better method, please get in touch.
 	 */
+	last := 0
+	const (
+		up   = 1
+		down = 2
+	)
 	for {
 		sysconn, err := tun.tunFile.SyscallConn()
 		if err != nil {
@@ -68,13 +73,19 @@ func (tun *NativeTun) routineHackListener() {
 		}
 		switch err {
 		case unix.EINVAL:
-			// If the tunnel is up, it reports that write() is
-			// allowed but we provided invalid data.
-			tun.events <- EventUp
+			if last != up {
+				// If the tunnel is up, it reports that write() is
+				// allowed but we provided invalid data.
+				tun.events <- EventUp
+				last = up
+			}
 		case unix.EIO:
-			// If the tunnel is down, it reports that no I/O
-			// is possible, without checking our provided data.
-			tun.events <- EventDown
+			if last != down {
+				// If the tunnel is down, it reports that no I/O
+				// is possible, without checking our provided data.
+				tun.events <- EventDown
+				last = down
+			}
 		default:
 			return
 		}
