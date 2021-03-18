@@ -100,7 +100,10 @@ func (node *trieEntry) removeByPeer(p *Peer) *trieEntry {
 	if node.child[0] == nil {
 		return node.child[1]
 	}
-	return node.child[0]
+	if node.child[1] == nil {
+		return node.child[0]
+	}
+	return node
 }
 
 func (node *trieEntry) choose(ip net.IP) byte {
