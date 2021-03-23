@@ -292,6 +292,23 @@ func CreateTUN(name string, mtu int) (Device, error) {
 		return nil, fmt.Errorf("Unable to put into IFHEAD mode: %w", errno)
 	}
 
+	// Get out of PPP mode.
+	ifflags := syscall.IFF_BROADCAST
+	tun.operateOnFd(func(fd uintptr) {
+		_, _, errno = unix.Syscall(
+			unix.SYS_IOCTL,
+			fd,
+			uintptr(_TUNSIFMODE),
+			uintptr(unsafe.Pointer(&ifflags)),
+		)
+	})
+
+	if errno != 0 {
+		tunFile.Close()
+		tunDestroy(assignedName)
+		return nil, fmt.Errorf("Unable to put into IFF_BROADCAST mode: %w", errno)
+	}
+
 	// Open control sockets
 	confd, err := unix.Socket(
 		unix.AF_INET,
