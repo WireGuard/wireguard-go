@@ -400,7 +400,9 @@ func (device *Device) SendKeepalivesToPeersWithCurrentKeypair() {
 	device.peers.RUnlock()
 }
 
-func unsafeCloseBind(device *Device) error {
+// closeBindLocked closes the device's net.bind.
+// The caller must hold the net mutex.
+func closeBindLocked(device *Device) error {
 	var err error
 	netc := &device.net
 	if netc.netlinkCancel != nil {
@@ -455,7 +457,7 @@ func (device *Device) BindUpdate() error {
 	defer device.net.Unlock()
 
 	// close existing sockets
-	if err := unsafeCloseBind(device); err != nil {
+	if err := closeBindLocked(device); err != nil {
 		return err
 	}
 
@@ -511,7 +513,7 @@ func (device *Device) BindUpdate() error {
 
 func (device *Device) BindClose() error {
 	device.net.Lock()
-	err := unsafeCloseBind(device)
+	err := closeBindLocked(device)
 	device.net.Unlock()
 	return err
 }
