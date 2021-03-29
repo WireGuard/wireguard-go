@@ -161,22 +161,21 @@ func (bind *StdNetBind) Send(buff []byte, endpoint Endpoint) error {
 	if !ok {
 		return ErrWrongEndpointType
 	}
+	var conn *net.UDPConn
+	var blackhole bool
 	if nend.IP.To4() != nil {
-		if bind.ipv4 == nil {
-			return syscall.EAFNOSUPPORT
-		}
-		if bind.blackhole4 {
-			return nil
-		}
-		_, err = bind.ipv4.WriteToUDP(buff, (*net.UDPAddr)(nend))
+		blackhole = bind.blackhole4
+		conn = bind.ipv4
 	} else {
-		if bind.ipv6 == nil {
-			return syscall.EAFNOSUPPORT
-		}
-		if bind.blackhole6 {
-			return nil
-		}
-		_, err = bind.ipv6.WriteToUDP(buff, (*net.UDPAddr)(nend))
+		blackhole = bind.blackhole6
+		conn = bind.ipv6
 	}
+	if blackhole {
+		return nil
+	}
+	if conn == nil {
+		return syscall.EAFNOSUPPORT
+	}
+	_, err = conn.WriteToUDP(buff, (*net.UDPAddr)(nend))
 	return err
 }
