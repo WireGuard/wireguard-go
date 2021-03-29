@@ -89,6 +89,8 @@ func (bind *StdNetBind) Open(uport uint16) (uint16, error) {
 		return 0, ErrBindAlreadyOpen
 	}
 
+	// Attempt to open ipv4 and ipv6 listeners on the same port.
+	// If uport is 0, we can retry on failure.
 again:
 	port := int(uport)
 	var ipv4, ipv6 *net.UDPConn
@@ -98,6 +100,7 @@ again:
 		return 0, err
 	}
 
+	// Listen on the same port as we're using for ipv4.
 	ipv6, port, err = listenNet("udp6", port)
 	if uport == 0 && errors.Is(err, syscall.EADDRINUSE) && tries < 100 {
 		ipv4.Close()
