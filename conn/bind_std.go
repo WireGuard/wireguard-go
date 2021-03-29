@@ -91,30 +91,28 @@ func (bind *StdNetBind) Open(uport uint16) (uint16, error) {
 
 again:
 	port := int(uport)
+	var ipv4, ipv6 *net.UDPConn
 
-	bind.ipv4, port, err = listenNet("udp4", port)
+	ipv4, port, err = listenNet("udp4", port)
 	if err != nil && !errors.Is(err, syscall.EAFNOSUPPORT) {
-		bind.ipv4 = nil
 		return 0, err
 	}
 
-	bind.ipv6, port, err = listenNet("udp6", port)
-	if uport == 0 && err != nil && errors.Is(err, syscall.EADDRINUSE) && tries < 100 {
-		bind.ipv4.Close()
-		bind.ipv4 = nil
-		bind.ipv6 = nil
+	ipv6, port, err = listenNet("udp6", port)
+	if uport == 0 && errors.Is(err, syscall.EADDRINUSE) && tries < 100 {
+		ipv4.Close()
 		tries++
 		goto again
 	}
 	if err != nil && !errors.Is(err, syscall.EAFNOSUPPORT) {
-		bind.ipv4.Close()
-		bind.ipv4 = nil
-		bind.ipv6 = nil
+		ipv4.Close()
 		return 0, err
 	}
-	if bind.ipv4 == nil && bind.ipv6 == nil {
+	if ipv4 == nil && ipv6 == nil {
 		return 0, syscall.EAFNOSUPPORT
 	}
+	bind.ipv4 = ipv4
+	bind.ipv6 = ipv6
 	return uint16(port), nil
 }
 
