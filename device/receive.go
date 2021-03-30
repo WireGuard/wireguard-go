@@ -104,6 +104,9 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 			if errors.Is(err, net.ErrClosed) {
 				return
 			}
+			if neterr, ok := err.(net.Error); ok && !neterr.Temporary() {
+				return
+			}
 			device.log.Errorf("Failed to receive packet: %v", err)
 			if deathSpiral < 10 {
 				deathSpiral++
