@@ -65,12 +65,14 @@ func (c ChannelEndpoint) DstIP() net.IP { return net.IPv4(127, 0, 0, 1) }
 
 func (c ChannelEndpoint) SrcIP() net.IP { return nil }
 
-func (c *ChannelBind) Open(port uint16) (actualPort uint16, err error) {
+func (c *ChannelBind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err error) {
 	c.closeSignal = make(chan bool)
+	fns = append(fns, c.makeReceiveFunc(*c.rx4))
+	fns = append(fns, c.makeReceiveFunc(*c.rx6))
 	if rand.Uint32()&1 == 0 {
-		return uint16(c.source4), nil
+		return fns, uint16(c.source4), nil
 	} else {
-		return uint16(c.source6), nil
+		return fns, uint16(c.source6), nil
 	}
 }
 
@@ -87,21 +89,14 @@ func (c *ChannelBind) Close() error {
 
 func (c *ChannelBind) SetMark(mark uint32) error { return nil }
 
-func (c *ChannelBind) ReceiveIPv6(b []byte) (n int, ep conn.Endpoint, err error) {
-	select {
-	case <-c.closeSignal:
-		return 0, nil, net.ErrClosed
-	case rx := <-*c.rx6:
-		return copy(b, rx), c.target6, nil
-	}
-}
-
-func (c *ChannelBind) ReceiveIPv4(b []byte) (n int, ep conn.Endpoint, err error) {
-	select {
-	case <-c.closeSignal:
-		return 0, nil, net.ErrClosed
-	case rx := <-*c.rx4:
-		return copy(b, rx), c.target4, nil
+func (c *ChannelBind) makeReceiveFunc(ch chan []byte) conn.ReceiveFunc {
+	return func(b []byte) (n int, ep conn.Endpoint, err error) {
+		select {
+		case <-c.closeSignal:
+			return 0, nil, net.ErrClosed
+		case rx := <-ch:
+			return copy(b, rx), c.target6, nil
+		}
 	}
 }
 

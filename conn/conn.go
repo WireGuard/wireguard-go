@@ -12,6 +12,11 @@ import (
 	"strings"
 )
 
+// A ReceiveFunc receives a single inbound packet from the network.
+// It writes the data into b. n is the length of the packet.
+// ep is the remote endpoint.
+type ReceiveFunc func(b []byte) (n int, ep Endpoint, err error)
+
 // A Bind listens on a port for both IPv6 and IPv4 UDP traffic.
 //
 // A Bind interface may also be a PeekLookAtSocketFd or BindSocketToInterface,
@@ -19,22 +24,16 @@ import (
 type Bind interface {
 	// Open puts the Bind into a listening state on a given port and reports the actual
 	// port that it bound to. Passing zero results in a random selection.
-	Open(port uint16) (actualPort uint16, err error)
+	// fns is the set of functions that will be called to receive packets.
+	Open(port uint16) (fns []ReceiveFunc, actualPort uint16, err error)
 
 	// Close closes the Bind listener.
+	// All fns returned by Open must return net.ErrClosed after a call to Close.
 	Close() error
 
 	// SetMark sets the mark for each packet sent through this Bind.
 	// This mark is passed to the kernel as the socket option SO_MARK.
 	SetMark(mark uint32) error
-
-	// ReceiveIPv6 reads an IPv6 UDP packet into b.  It reports the number of bytes read,
-	// n, the packet source address ep, and any error.
-	ReceiveIPv6(b []byte) (n int, ep Endpoint, err error)
-
-	// ReceiveIPv4 reads an IPv4 UDP packet into b. It reports the number of bytes read,
-	// n, the packet source address ep, and any error.
-	ReceiveIPv4(b []byte) (n int, ep Endpoint, err error)
 
 	// Send writes a packet b to address ep.
 	Send(b []byte, ep Endpoint) error

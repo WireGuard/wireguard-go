@@ -266,7 +266,7 @@ func (bind *afWinRingBind) Open(family int32, sa windows.Sockaddr) (windows.Sock
 	return sa, nil
 }
 
-func (bind *WinRingBind) Open(port uint16) (selectedPort uint16, err error) {
+func (bind *WinRingBind) Open(port uint16) (recvFns []ReceiveFunc, selectedPort uint16, err error) {
 	bind.mu.Lock()
 	defer bind.mu.Unlock()
 	defer func() {
@@ -275,30 +275,30 @@ func (bind *WinRingBind) Open(port uint16) (selectedPort uint16, err error) {
 		}
 	}()
 	if atomic.LoadUint32(&bind.isOpen) != 0 {
-		return 0, ErrBindAlreadyOpen
+		return nil, 0, ErrBindAlreadyOpen
 	}
 	var sa windows.Sockaddr
 	sa, err = bind.v4.Open(windows.AF_INET, &windows.SockaddrInet4{Port: int(port)})
 	if err != nil {
-		return 0, err
+		return nil, 0, err
 	}
 	sa, err = bind.v6.Open(windows.AF_INET6, &windows.SockaddrInet6{Port: sa.(*windows.SockaddrInet4).Port})
 	if err != nil {
-		return 0, err
+		return nil, 0, err
 	}
 	selectedPort = uint16(sa.(*windows.SockaddrInet6).Port)
 	for i := 0; i < packetsPerRing; i++ {
 		err = bind.v4.InsertReceiveRequest()
 		if err != nil {
-			return 0, err
+			return nil, 0, err
 		}
 		err = bind.v6.InsertReceiveRequest()
 		if err != nil {
-			return 0, err
+			return nil, 0, err
 		}
 	}
 	atomic.StoreUint32(&bind.isOpen, 1)
-	return
+	return []ReceiveFunc{bind.receiveIPv4, bind.receiveIPv6}, selectedPort, err
 }
 
 func (bind *WinRingBind) Close() error {
@@ -395,13 +395,13 @@ func (bind *afWinRingBind) Receive(buf []byte, isOpen *uint32) (int, Endpoint, e
 	return n, &ep, nil
 }
 
-func (bind *WinRingBind) ReceiveIPv4(buf []byte) (int, Endpoint, error) {
+func (bind *WinRingBind) receiveIPv4(buf []byte) (int, Endpoint, error) {
 	bind.mu.RLock()
 	defer bind.mu.RUnlock()
 	return bind.v4.Receive(buf, &bind.isOpen)
 }
 
-func (bind *WinRingBind) ReceiveIPv6(buf []byte) (int, Endpoint, error) {
+func (bind *WinRingBind) receiveIPv6(buf []byte) (int, Endpoint, error) {
 	bind.mu.RLock()
 	defer bind.mu.RUnlock()
 	return bind.v6.Receive(buf, &bind.isOpen)
@@ -482,6 +482,8 @@ func (bind *WinRingBind) Send(buf []byte, endpoint Endpoint) error {
 }
 
 func (bind *StdNetBind) BindSocketToInterface4(interfaceIndex uint32, blackhole bool) error {
+	bind.mu.Lock()
+	defer bind.mu.Unlock()
 	sysconn, err := bind.ipv4.SyscallConn()
 	if err != nil {
 		return err
@@ -500,6 +502,8 @@ func (bind *StdNetBind) BindSocketToInterface4(interfaceIndex uint32, blackhole 
 }
 
 func (bind *StdNetBind) BindSocketToInterface6(interfaceIndex uint32, blackhole bool) error {
+	bind.mu.Lock()
+	defer bind.mu.Unlock()
 	sysconn, err := bind.ipv6.SyscallConn()
 	if err != nil {
 		return err

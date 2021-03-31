@@ -68,15 +68,15 @@ func (peer *Peer) keepKeyFreshReceiving() {
  * Every time the bind is updated a new routine is started for
  * IPv4 and IPv6 (separately)
  */
-func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
+func (device *Device) RoutineReceiveIncoming(recv conn.ReceiveFunc) {
 	defer func() {
-		device.log.Verbosef("Routine: receive incoming IPv%d - stopped", IP)
+		device.log.Verbosef("Routine: receive incoming %p - stopped", recv)
 		device.queue.decryption.wg.Done()
 		device.queue.handshake.wg.Done()
 		device.net.stopping.Done()
 	}()
 
-	device.log.Verbosef("Routine: receive incoming IPv%d - started", IP)
+	device.log.Verbosef("Routine: receive incoming %p - started", recv)
 
 	// receive datagrams until conn is closed
 
@@ -90,14 +90,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 	)
 
 	for {
-		switch IP {
-		case ipv4.Version:
-			size, endpoint, err = bind.ReceiveIPv4(buffer[:])
-		case ipv6.Version:
-			size, endpoint, err = bind.ReceiveIPv6(buffer[:])
-		default:
-			panic("invalid IP version")
-		}
+		size, endpoint, err = recv(buffer[:])
 
 		if err != nil {
 			device.PutMessageBuffer(buffer)
