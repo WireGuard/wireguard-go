@@ -161,6 +161,7 @@ func CreateIOCPCompletionQueue(queueSize uint32, iocp windows.Handle, key uintpt
 	notificationCompletion := &iocpNotificationCompletion{
 		completionType: iocpCompletion,
 		iocp:           iocp,
+		key:            key,
 		overlapped:     overlapped,
 	}
 	ret, _, err := syscall.Syscall(extensionFunctionTable.rioCreateCompletionQueue, 2, uintptr(queueSize), uintptr(unsafe.Pointer(notificationCompletion)), 0)
