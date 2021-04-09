@@ -47,7 +47,7 @@ func (rb *ringBuffer) Push() *ringPacket {
 	}
 	ret := (*ringPacket)(unsafe.Pointer(rb.packets + (uintptr(rb.tail%packetsPerRing) * unsafe.Sizeof(ringPacket{}))))
 	rb.tail += 1
-	if rb.tail == rb.head {
+	if rb.tail%packetsPerRing == rb.head%packetsPerRing {
 		rb.isFull = true
 	}
 	return ret
