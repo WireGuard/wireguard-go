@@ -148,11 +148,11 @@ again:
 
 	var fns []ReceiveFunc
 	if sock4 != -1 {
-		fns = append(fns, makeReceiveIPv4(sock4))
+		fns = append(fns, bind.makeReceiveIPv4(sock4))
 		bind.sock4 = sock4
 	}
 	if sock6 != -1 {
-		fns = append(fns, makeReceiveIPv6(sock6))
+		fns = append(fns, bind.makeReceiveIPv6(sock6))
 		bind.sock6 = sock6
 	}
 	if len(fns) == 0 {
@@ -224,7 +224,7 @@ func (bind *LinuxSocketBind) Close() error {
 	return err2
 }
 
-func makeReceiveIPv6(sock int) ReceiveFunc {
+func (*LinuxSocketBind) makeReceiveIPv6(sock int) ReceiveFunc {
 	return func(buff []byte) (int, Endpoint, error) {
 		var end LinuxSocketEndpoint
 		n, err := receive6(sock, buff, &end)
@@ -232,7 +232,7 @@ func makeReceiveIPv6(sock int) ReceiveFunc {
 	}
 }
 
-func makeReceiveIPv4(sock int) ReceiveFunc {
+func (*LinuxSocketBind) makeReceiveIPv4(sock int) ReceiveFunc {
 	return func(buff []byte) (int, Endpoint, error) {
 		var end LinuxSocketEndpoint
 		n, err := receive4(sock, buff, &end)

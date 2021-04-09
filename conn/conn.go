@@ -8,7 +8,10 @@ package conn
 
 import (
 	"errors"
+	"fmt"
 	"net"
+	"reflect"
+	"runtime"
 	"strings"
 )
 
@@ -69,6 +72,54 @@ type Endpoint interface {
 	SrcIP() net.IP
 }
 
+var (
+	ErrBindAlreadyOpen   = errors.New("bind is already open")
+	ErrWrongEndpointType = errors.New("endpoint type does not correspond with bind type")
+)
+
+func (fn ReceiveFunc) PrettyName() string {
+	name := runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
+	// 0. cheese/taco.beansIPv6.func12.func21218-fm
+	name = strings.TrimSuffix(name, "-fm")
+	// 1. cheese/taco.beansIPv6.func12.func21218
+	if idx := strings.LastIndexByte(name, '/'); idx != -1 {
+		name = name[idx+1:]
+		// 2. taco.beansIPv6.func12.func21218
+	}
+	for {
+		var idx int
+		for idx = len(name) - 1; idx >= 0; idx-- {
+			if name[idx] < '0' || name[idx] > '9' {
+				break
+			}
+		}
+		if idx == len(name)-1 {
+			break
+		}
+		const dotFunc = ".func"
+		if !strings.HasSuffix(name[:idx+1], dotFunc) {
+			break
+		}
+		name = name[:idx+1-len(dotFunc)]
+		// 3. taco.beansIPv6.func12
+		// 4. taco.beansIPv6
+	}
+	if idx := strings.LastIndexByte(name, '.'); idx != -1 {
+		name = name[idx+1:]
+		// 5. beansIPv6
+	}
+	if name == "" {
+		return fmt.Sprintf("%p", fn)
+	}
+	if strings.HasSuffix(name, "IPv4") {
+		return "v4"
+	}
+	if strings.HasSuffix(name, "IPv6") {
+		return "v6"
+	}
+	return name
+}
+
 func parseEndpoint(s string) (*net.UDPAddr, error) {
 	// ensure that the host is an IP address
 
@@ -98,8 +149,3 @@ func parseEndpoint(s string) (*net.UDPAddr, error) {
 	}
 	return addr, err
 }
-
-var (
-	ErrBindAlreadyOpen   = errors.New("bind is already open")
-	ErrWrongEndpointType = errors.New("endpoint type does not correspond with bind type")
-)

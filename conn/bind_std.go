@@ -118,11 +118,11 @@ again:
 	}
 	var fns []ReceiveFunc
 	if ipv4 != nil {
-		fns = append(fns, makeReceiveFunc(ipv4, true))
+		fns = append(fns, bind.makeReceiveIPv4(ipv4))
 		bind.ipv4 = ipv4
 	}
 	if ipv6 != nil {
-		fns = append(fns, makeReceiveFunc(ipv6, false))
+		fns = append(fns, bind.makeReceiveIPv6(ipv6))
 		bind.ipv6 = ipv6
 	}
 	if len(fns) == 0 {
@@ -152,12 +152,19 @@ func (bind *StdNetBind) Close() error {
 	return err2
 }
 
-func makeReceiveFunc(conn *net.UDPConn, isIPv4 bool) ReceiveFunc {
+func (*StdNetBind) makeReceiveIPv4(conn *net.UDPConn) ReceiveFunc {
 	return func(buff []byte) (int, Endpoint, error) {
 		n, endpoint, err := conn.ReadFromUDP(buff)
-		if isIPv4 && endpoint != nil {
+		if endpoint != nil {
 			endpoint.IP = endpoint.IP.To4()
 		}
+		return n, (*StdNetEndpoint)(endpoint), err
+	}
+}
+
+func (*StdNetBind) makeReceiveIPv6(conn *net.UDPConn) ReceiveFunc {
+	return func(buff []byte) (int, Endpoint, error) {
+		n, endpoint, err := conn.ReadFromUDP(buff)
 		return n, (*StdNetEndpoint)(endpoint), err
 	}
 }
