@@ -197,6 +197,9 @@ func (ring *ringBuffer) CloseAndZero() {
 		windows.VirtualFree(ring.packets, 0, windows.MEM_RELEASE)
 		ring.packets = 0
 	}
+	ring.head = 0
+	ring.tail = 0
+	ring.isFull = false
 }
 
 func (bind *afWinRingBind) CloseAndZero() {
