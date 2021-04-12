@@ -9,8 +9,8 @@ func (device *Device) DisableSomeRoamingForBrokenMobileSemantics() {
 	device.peers.RLock()
 	for _, peer := range device.peers.keyMap {
 		peer.Lock()
-		defer peer.Unlock()
 		peer.disableRoaming = peer.endpoint != nil
+		peer.Unlock()
 	}
 	device.peers.RUnlock()
 }
