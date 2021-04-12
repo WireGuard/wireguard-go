@@ -104,6 +104,7 @@ func (device *Device) RoutineReceiveIncoming(recv conn.ReceiveFunc) {
 			if deathSpiral < 10 {
 				deathSpiral++
 				time.Sleep(time.Second / 3)
+				buffer = device.GetMessageBuffer()
 				continue
 			}
 			return
