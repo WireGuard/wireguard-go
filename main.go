@@ -33,25 +33,28 @@ const (
 )
 
 func printUsage() {
-	fmt.Printf("usage:\n")
-	fmt.Printf("%s [-f/--foreground] INTERFACE-NAME\n", os.Args[0])
+	fmt.Printf("Usage: %s [-f/--foreground] INTERFACE-NAME\n", os.Args[0])
 }
 
 func warning() {
-	if runtime.GOOS != "linux" || os.Getenv(ENV_WG_PROCESS_FOREGROUND) == "1" {
+	switch runtime.GOOS {
+	case "linux", "freebsd", "openbsd":
+		if os.Getenv(ENV_WG_PROCESS_FOREGROUND) == "1" {
+			return
+		}
+	default:
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, "┌───────────────────────────────────────────────────┐")
-	fmt.Fprintln(os.Stderr, "│                                                   │")
-	fmt.Fprintln(os.Stderr, "│   Running this software on Linux is unnecessary,  │")
-	fmt.Fprintln(os.Stderr, "│   because the Linux kernel has built-in first     │")
-	fmt.Fprintln(os.Stderr, "│   class support for WireGuard, which will be      │")
-	fmt.Fprintln(os.Stderr, "│   faster, slicker, and better integrated. For     │")
-	fmt.Fprintln(os.Stderr, "│   information on installing the kernel module,    │")
-	fmt.Fprintln(os.Stderr, "│   please visit: <https://wireguard.com/install>.  │")
-	fmt.Fprintln(os.Stderr, "│                                                   │")
-	fmt.Fprintln(os.Stderr, "└───────────────────────────────────────────────────┘")
+	fmt.Fprintln(os.Stderr, "┌──────────────────────────────────────────────────────┐")
+	fmt.Fprintln(os.Stderr, "│                                                      │")
+	fmt.Fprintln(os.Stderr, "│   Running wireguard-go is not required because this  │")
+	fmt.Fprintln(os.Stderr, "│   kernel has first class support for WireGuard. For  │")
+	fmt.Fprintln(os.Stderr, "│   information on installing the kernel module,       │")
+	fmt.Fprintln(os.Stderr, "│   please visit:                                      │")
+	fmt.Fprintln(os.Stderr, "│         https://www.wireguard.com/install/           │")
+	fmt.Fprintln(os.Stderr, "│                                                      │")
+	fmt.Fprintln(os.Stderr, "└──────────────────────────────────────────────────────┘")
 }
 
 func main() {
