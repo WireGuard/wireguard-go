@@ -143,9 +143,9 @@ func (tun *NativeTun) routineRouteListener(tunIfindex int) {
 }
 
 func tunName(fd uintptr) (string, error) {
-	//Terrible hack to make up for freebsd not having a TUNGIFNAME
+	// Terrible hack to make up for freebsd not having a TUNGIFNAME
 
-	//First, make sure the tun pid matches this proc's pid
+	// First, make sure the tun pid matches this proc's pid
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
 		uintptr(fd),
@@ -173,7 +173,7 @@ func tunName(fd uintptr) (string, error) {
 
 	procPid := os.Getpid()
 
-	//Try to find interface with matching PID
+	// Try to find interface with matching PID
 	for i := 1; ; i++ {
 		iface, _ := net.InterfaceByIndex(i)
 		if err != nil || iface == nil {
@@ -293,7 +293,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	}
 
 	// Get out of PPP mode.
-	ifflags := syscall.IFF_BROADCAST
+	ifflags := syscall.IFF_BROADCAST | syscall.IFF_MULTICAST
 	tun.operateOnFd(func(fd uintptr) {
 		_, _, errno = unix.Syscall(
 			unix.SYS_IOCTL,
