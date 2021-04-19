@@ -21,6 +21,7 @@ const (
 	_TUNSIFHEAD = 0x80047460
 	_TUNSIFMODE = 0x8004745e
 	_TUNGIFNAME = 0x4020745d
+	_TUNSIFPID  = 0x2000745f
 
 	_SIOCGIFINFO_IN6        = 0xc048696c
 	_SIOCSIFINFO_IN6        = 0xc048696d
@@ -264,6 +265,15 @@ func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 		tunFile: file,
 		events:  make(chan Event, 10),
 		errors:  make(chan error, 1),
+	}
+
+	var errno syscall.Errno
+	tun.operateOnFd(func(fd uintptr) {
+		_, _, errno = unix.Syscall(unix.SYS_IOCTL, fd, _TUNSIFPID, uintptr(0))
+	})
+	if errno != 0 {
+		tun.tunFile.Close()
+		return nil, fmt.Errorf("unable to become controlling TUN process: %w", errno)
 	}
 
 	name, err := tun.Name()
