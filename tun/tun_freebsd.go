@@ -8,6 +8,7 @@ package tun
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"sync"
@@ -347,7 +348,13 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 }
 
 func (tun *NativeTun) Write(buf []byte, offset int) (int, error) {
+	if offset < 4 {
+		return 0, io.ErrShortBuffer
+	}
 	buf = buf[offset-4:]
+	if len(buf) < 5 {
+		return 0, io.ErrShortBuffer
+	}
 	buf[0] = 0x00
 	buf[1] = 0x00
 	buf[2] = 0x00
