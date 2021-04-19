@@ -6,7 +6,6 @@
 package tun
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net"
@@ -19,12 +18,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// _TUNSIFHEAD, value derived from sys/net/{if_tun,ioccom}.h
-// const _TUNSIFHEAD = ((0x80000000) | (((4) & ((1 << 13) - 1) ) << 16) | (uint32(byte('t')) << 8) | (96))
 const (
 	_TUNSIFHEAD = 0x80047460
 	_TUNSIFMODE = 0x8004745e
-	_TUNSIFPID  = 0x2000745f
+	_TUNGIFNAME = 0x4020745d
 )
 
 // TODO: move into x/sys/unix
@@ -40,6 +37,12 @@ const _IFSTATMAX = 800
 
 const SIZEOF_UINTPTR = 4 << (^uintptr(0) >> 32 & 1)
 
+// structure for iface requests for just the name
+type ifreq_name struct {
+	Name [unix.IFNAMSIZ]byte
+	Pad0 [16]byte
+}
+
 // structure for iface requests with a pointer
 type ifreq_ptr struct {
 	Name [unix.IFNAMSIZ]byte
@@ -52,12 +55,6 @@ type ifreq_mtu struct {
 	Name [unix.IFNAMSIZ]byte
 	MTU  uint32
 	Pad0 [12]byte
-}
-
-// Structure for interface status request ioctl
-type ifstat struct {
-	IfsName [unix.IFNAMSIZ]byte
-	Ascii   [_IFSTATMAX]byte
 }
 
 // Structures for nd6 flag manipulation
@@ -110,10 +107,10 @@ func (tun *NativeTun) routineRouteListener(tunIfindex int) {
 			continue
 		}
 
-		if data[3 /* type */] != unix.RTM_IFINFO {
+		if data[3 /* type */ ] != unix.RTM_IFINFO {
 			continue
 		}
-		ifindex := int(*(*uint16)(unsafe.Pointer(&data[12 /* ifindex */])))
+		ifindex := int(*(*uint16)(unsafe.Pointer(&data[12 /* ifindex */ ])))
 		if ifindex != tunIfindex {
 			continue
 		}
@@ -143,80 +140,12 @@ func (tun *NativeTun) routineRouteListener(tunIfindex int) {
 }
 
 func tunName(fd uintptr) (string, error) {
-	// Terrible hack to make up for freebsd not having a TUNGIFNAME
-
-	// First, make sure the tun pid matches this proc's pid
-	_, _, errno := unix.Syscall(
-		unix.SYS_IOCTL,
-		uintptr(fd),
-		uintptr(_TUNSIFPID),
-		uintptr(0),
-	)
-
-	if errno != 0 {
-		return "", fmt.Errorf("failed to set tun device PID: %s", errno.Error())
-	}
-
-	// Open iface control socket
-
-	confd, err := unix.Socket(
-		unix.AF_INET,
-		unix.SOCK_DGRAM,
-		0,
-	)
-
-	if err != nil {
+	var ifreq ifreq_name
+	_, _, err := unix.Syscall(unix.SYS_IOCTL, fd, _TUNGIFNAME, uintptr(unsafe.Pointer(&ifreq)))
+	if err != 0 {
 		return "", err
 	}
-
-	defer unix.Close(confd)
-
-	procPid := os.Getpid()
-
-	// Try to find interface with matching PID
-	for i := 1; ; i++ {
-		iface, _ := net.InterfaceByIndex(i)
-		if err != nil || iface == nil {
-			break
-		}
-
-		// Structs for getting data in and out of SIOCGIFSTATUS ioctl
-		var ifstatus ifstat
-		copy(ifstatus.IfsName[:], iface.Name)
-
-		// Make the syscall to get the status string
-		_, _, errno := unix.Syscall(
-			unix.SYS_IOCTL,
-			uintptr(confd),
-			uintptr(unix.SIOCGIFSTATUS),
-			uintptr(unsafe.Pointer(&ifstatus)),
-		)
-
-		if errno != 0 {
-			continue
-		}
-
-		nullStr := ifstatus.Ascii[:]
-		i := bytes.IndexByte(nullStr, 0)
-		if i < 1 {
-			continue
-		}
-		statStr := string(nullStr[:i])
-		var pidNum int = 0
-
-		// Finally get the owning PID
-		// Format string taken from sys/net/if_tun.c
-		_, err := fmt.Sscanf(statStr, "\tOpened by PID %d\n", &pidNum)
-		if err != nil {
-			continue
-		}
-
-		if pidNum == procPid {
-			return iface.Name, nil
-		}
-	}
-
-	return "", nil
+	return unix.ByteSliceToString(ifreq.Name[:]), nil
 }
 
 // Destroy a named system interface
