@@ -8,7 +8,6 @@ package tun
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -60,14 +59,17 @@ func nanotime() int64
 // interface with the same name exist, it is reused.
 //
 func CreateTUN(ifname string, mtu int) (Device, error) {
-	return CreateTUNWithRequestedGUID(ifname, WintunStaticRequestedGUID, mtu)
+	// Don't want to break interface API, so for generic CreateTUN API call ignore needReboot.
+	tun, _, err := CreateTUNWithRequestedGUID(ifname, WintunStaticRequestedGUID, mtu)
+	return tun, err
 }
 
 //
 // CreateTUNWithRequestedGUID creates a Wintun interface with the given name and
 // a requested GUID. Should a Wintun interface with the same name exist, it is reused.
+// Bool paramater shows if Windows indicated it needs a reboot to complete wintun driver instalation
 //
-func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu int) (Device, error) {
+func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu int) (Device, bool, error) {
 	var err error
 	var wt *wintun.Adapter
 
@@ -77,15 +79,12 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu 
 		// If so, we delete it, in case it has weird residual configuration.
 		_, err = wt.Delete(true)
 		if err != nil {
-			return nil, fmt.Errorf("Error deleting already existing interface: %w", err)
+			return nil, false, fmt.Errorf("Error deleting already existing interface: %w", err)
 		}
 	}
 	wt, rebootRequired, err := WintunPool.CreateAdapter(ifname, requestedGUID)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating interface: %w", err)
-	}
-	if rebootRequired {
-		log.Println("Windows indicated a reboot is required.")
+		return nil, false, fmt.Errorf("Error creating interface: %w", err)
 	}
 
 	forcedMTU := 1420
@@ -105,10 +104,10 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu 
 	if err != nil {
 		tun.wt.Delete(false)
 		close(tun.events)
-		return nil, fmt.Errorf("Error starting session: %w", err)
+		return nil, false, fmt.Errorf("Error starting session: %w", err)
 	}
 	tun.readWait = tun.session.ReadWaitEvent()
-	return tun, nil
+	return tun, rebootRequired, nil
 }
 
 func (tun *NativeTun) Name() (string, error) {
