@@ -352,8 +352,11 @@ func (bind *afWinRingBind) Receive(buf []byte, isOpen *uint32) (int, Endpoint, e
 	}
 	bind.rx.mu.Lock()
 	defer bind.rx.mu.Unlock()
+
+	var err error
 	var count uint32
 	var results [1]winrio.Result
+retry:
 	for tries := 0; count == 0 && tries < receiveSpins; tries++ {
 		if tries > 0 {
 			if atomic.LoadUint32(isOpen) != 1 {
@@ -364,7 +367,7 @@ func (bind *afWinRingBind) Receive(buf []byte, isOpen *uint32) (int, Endpoint, e
 		count = winrio.DequeueCompletion(bind.rx.cq, results[:])
 	}
 	if count == 0 {
-		err := winrio.Notify(bind.rx.cq)
+		err = winrio.Notify(bind.rx.cq)
 		if err != nil {
 			return 0, nil, err
 		}
@@ -385,9 +388,18 @@ func (bind *afWinRingBind) Receive(buf []byte, isOpen *uint32) (int, Endpoint, e
 		}
 	}
 	bind.rx.Return(1)
-	err := bind.InsertReceiveRequest()
+	err = bind.InsertReceiveRequest()
 	if err != nil {
 		return 0, nil, err
+	}
+	// We limit the MTU well below the 65k max for practicality, but this means a remote host can still send us
+	// huge packets. Just try again when this happens. The infinite loop this could cause is still limited to
+	// attacker bandwidth, just like the rest of the receive path.
+	if windows.Errno(results[0].Status) == windows.WSAEMSGSIZE {
+		if atomic.LoadUint32(isOpen) != 1 {
+			return 0, nil, net.ErrClosed
+		}
+		goto retry
 	}
 	if results[0].Status != 0 {
 		return 0, nil, windows.Errno(results[0].Status)
