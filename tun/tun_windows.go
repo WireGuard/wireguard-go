@@ -148,7 +148,11 @@ func (tun *NativeTun) MTU() (int, error) {
 
 // TODO: This is a temporary hack. We really need to be monitoring the interface in real time and adapting to MTU changes.
 func (tun *NativeTun) ForceMTU(mtu int) {
+	update := tun.forcedMTU != mtu
 	tun.forcedMTU = mtu
+	if update {
+		tun.events <- EventMTUUpdate
+	}
 }
 
 // Note: Read() and Write() assume the caller comes only from a single thread; there's no locking.
