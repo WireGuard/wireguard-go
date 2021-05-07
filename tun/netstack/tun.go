@@ -25,6 +25,7 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip/adapters/gonet"
 	"gvisor.dev/gvisor/pkg/tcpip/buffer"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
+	"gvisor.dev/gvisor/pkg/tcpip/link/channel"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv4"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv6"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
@@ -33,8 +34,9 @@ import (
 )
 
 type netTun struct {
+	*channel.Endpoint
+
 	stack          *stack.Stack
-	dispatcher     stack.NetworkDispatcher
 	events         chan tun.Event
 	incomingPacket chan buffer.VectorisedView
 	mtu            int
@@ -44,12 +46,12 @@ type netTun struct {
 type endpoint netTun
 type Net netTun
 
-func (e *endpoint) Attach(dispatcher stack.NetworkDispatcher) {
-	e.dispatcher = dispatcher
-}
-
-func (e *endpoint) IsAttached() bool {
-	return e.dispatcher != nil
+func (nt *netTun) WriteNotify() {
+	info, ok := nt.Endpoint.Read()
+	if !ok {
+		return
+	}
+	nt.incomingPacket <- buffer.NewVectorisedView(info.Pkt.Size(), info.Pkt.Views())
 }
 
 func (e *endpoint) MTU() uint32 {
@@ -60,36 +62,6 @@ func (e *endpoint) MTU() uint32 {
 	return uint32(mtu)
 }
 
-func (*endpoint) Capabilities() stack.LinkEndpointCapabilities {
-	return stack.CapabilityNone
-}
-
-func (*endpoint) MaxHeaderLength() uint16 {
-	return 0
-}
-
-func (*endpoint) LinkAddress() tcpip.LinkAddress {
-	return ""
-}
-
-func (*endpoint) Wait() {}
-
-func (e *endpoint) WritePacket(_ stack.RouteInfo, _ tcpip.NetworkProtocolNumber, pkt *stack.PacketBuffer) tcpip.Error {
-	e.incomingPacket <- buffer.NewVectorisedView(pkt.Size(), pkt.Views())
-	return nil
-}
-
-func (e *endpoint) WritePackets(stack.RouteInfo, stack.PacketBufferList, tcpip.NetworkProtocolNumber) (int, tcpip.Error) {
-	panic("not implemented")
-}
-
-func (*endpoint) ARPHardwareType() header.ARPHardwareType {
-	return header.ARPHardwareNone
-}
-
-func (e *endpoint) AddHeader(tcpip.LinkAddress, tcpip.LinkAddress, tcpip.NetworkProtocolNumber, *stack.PacketBuffer) {
-}
-
 func CreateNetTUN(localAddresses, dnsServers []net.IP, mtu int) (tun.Device, *Net, error) {
 	opts := stack.Options{
 		NetworkProtocols:   []stack.NetworkProtocolFactory{ipv4.NewProtocol, ipv6.NewProtocol},
@@ -97,12 +69,14 @@ func CreateNetTUN(localAddresses, dnsServers []net.IP, mtu int) (tun.Device, *Ne
 		HandleLocal:        true,
 	}
 	dev := &netTun{
+		Endpoint:       channel.New(512, uint32(mtu), ""),
 		stack:          stack.New(opts),
 		events:         make(chan tun.Event, 10),
 		incomingPacket: make(chan buffer.VectorisedView),
 		dnsServers:     dnsServers,
 		mtu:            mtu,
 	}
+	dev.Endpoint.AddNotify(dev)
 	tcpipErr := dev.stack.CreateNIC(1, (*endpoint)(dev))
 	if tcpipErr != nil {
 		return nil, nil, fmt.Errorf("CreateNIC: %v", tcpipErr)
@@ -154,17 +128,22 @@ func (tun *netTun) Read(buf []byte, offset int) (int, error) {
 }
 
 func (tun *netTun) Write(buf []byte, offset int) (int, error) {
-	packet := buf[offset:]
-	if len(packet) == 0 {
+	pkt := buf[offset:]
+	if len(pkt) == 0 {
 		return 0, nil
 	}
 
-	pkb := stack.NewPacketBuffer(stack.PacketBufferOptions{Data: buffer.NewVectorisedView(len(packet), []buffer.View{buffer.NewViewFromBytes(packet)})})
-	switch packet[0] >> 4 {
-	case 4:
-		tun.dispatcher.DeliverNetworkPacket("", "", ipv4.ProtocolNumber, pkb)
-	case 6:
-		tun.dispatcher.DeliverNetworkPacket("", "", ipv6.ProtocolNumber, pkb)
+	switch header.IPVersion(pkt) {
+	case header.IPv4Version:
+		tun.Endpoint.InjectInbound(header.IPv4ProtocolNumber, stack.NewPacketBuffer(stack.PacketBufferOptions{
+			ReserveHeaderBytes: 0,
+			Data:               buffer.NewVectorisedView(len(pkt), []buffer.View{buffer.NewViewFromBytes(pkt)}),
+		}))
+	case header.IPv6Version:
+		tun.Endpoint.InjectInbound(header.IPv6ProtocolNumber, stack.NewPacketBuffer(stack.PacketBufferOptions{
+			ReserveHeaderBytes: 0,
+			Data:               buffer.NewVectorisedView(len(pkt), []buffer.View{buffer.NewViewFromBytes(pkt)}),
+		}))
 	}
 
 	return len(buf), nil
