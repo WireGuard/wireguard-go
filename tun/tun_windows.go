@@ -36,14 +36,14 @@ type rateJuggler struct {
 type NativeTun struct {
 	wt        *wintun.Adapter
 	handle    windows.Handle
-	close     bool
-	closing   sync.RWMutex
-	events    chan Event
-	forcedMTU int
 	rate      rateJuggler
 	session   wintun.Session
 	readWait  windows.Handle
+	events    chan Event
+	closing   sync.RWMutex
 	closeOnce sync.Once
+	forcedMTU int
+	close     bool
 }
 
 var WintunPool, _ = wintun.MakePool("WireGuard")
