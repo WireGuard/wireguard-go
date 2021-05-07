@@ -362,12 +362,12 @@ func calculatePaddingSize(packetSize, mtu int) int {
  *
  * Obs. One instance per core
  */
-func (device *Device) RoutineEncryption() {
+func (device *Device) RoutineEncryption(id int) {
 	var paddingZeros [PaddingMultiple]byte
 	var nonce [chacha20poly1305.NonceSize]byte
 
-	defer device.log.Verbosef("Routine: encryption worker - stopped")
-	device.log.Verbosef("Routine: encryption worker - started")
+	defer device.log.Verbosef("Routine: encryption worker %d - stopped", id)
+	device.log.Verbosef("Routine: encryption worker %d - started", id)
 
 	for elem := range device.queue.encryption.c {
 		// populate header fields
