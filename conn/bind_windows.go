@@ -357,6 +357,7 @@ func (bind *afWinRingBind) Receive(buf []byte, isOpen *uint32) (int, Endpoint, e
 	var count uint32
 	var results [1]winrio.Result
 retry:
+	count = 0
 	for tries := 0; count == 0 && tries < receiveSpins; tries++ {
 		if tries > 0 {
 			if atomic.LoadUint32(isOpen) != 1 {
