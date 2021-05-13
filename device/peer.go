@@ -7,7 +7,6 @@ package device
 
 import (
 	"container/list"
-	"encoding/base64"
 	"errors"
 	"sync"
 	"sync/atomic"
@@ -150,19 +149,22 @@ func (peer *Peer) String() string {
 	//   return fmt.Sprintf("peer(%s)", abbreviatedKey)
 	//
 	// except that it is considerably more efficient.
-	const prefix = "peer("
-	b := make([]byte, len(prefix)+44)
-	copy(b, prefix)
-	r := b[len(prefix):]
-	base64.StdEncoding.Encode(r, peer.handshake.remoteStatic[:])
-	r = r[4:]
-	copy(r, "…")
-	r = r[len("…"):]
-	copy(r, b[len(prefix)+39:len(prefix)+43])
-	r = r[4:]
-	r[0] = ')'
-	r = r[1:]
-	return string(b[:len(b)-len(r)])
+	src := peer.handshake.remoteStatic
+	b64 := func(input byte) byte {
+		return input + 'A' + byte(((25-int(input))>>8)&6) - byte(((51-int(input))>>8)&75) - byte(((61-int(input))>>8)&15) + byte(((62-int(input))>>8)&3)
+	}
+	b := []byte("peer(____…____)")
+	const first = len("peer(")
+	const second = len("peer(____…")
+	b[first+0] = b64((src[0] >> 2) & 63)
+	b[first+1] = b64(((src[0] << 4) | (src[1] >> 4)) & 63)
+	b[first+2] = b64(((src[1] << 2) | (src[2] >> 6)) & 63)
+	b[first+3] = b64(src[2] & 63)
+	b[second+0] = b64(src[29] & 63)
+	b[second+1] = b64((src[30] >> 2) & 63)
+	b[second+2] = b64(((src[30] << 4) | (src[31] >> 4)) & 63)
+	b[second+3] = b64((src[31] << 2) & 63)
+	return string(b)
 }
 
 func (peer *Peer) Start() {
