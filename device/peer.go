@@ -9,7 +9,6 @@ import (
 	"container/list"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -144,12 +143,26 @@ func (peer *Peer) SendBuffer(buffer []byte) error {
 }
 
 func (peer *Peer) String() string {
-	base64Key := base64.StdEncoding.EncodeToString(peer.handshake.remoteStatic[:])
-	abbreviatedKey := "invalid"
-	if len(base64Key) == 44 {
-		abbreviatedKey = base64Key[0:4] + "…" + base64Key[39:43]
-	}
-	return fmt.Sprintf("peer(%s)", abbreviatedKey)
+	// The awful goo that follows is identical to:
+	//
+	//   base64Key := base64.StdEncoding.EncodeToString(peer.handshake.remoteStatic[:])
+	//   abbreviatedKey := base64Key[0:4] + "…" + base64Key[39:43]
+	//   return fmt.Sprintf("peer(%s)", abbreviatedKey)
+	//
+	// except that it is considerably more efficient.
+	const prefix = "peer("
+	b := make([]byte, len(prefix)+44)
+	copy(b, prefix)
+	r := b[len(prefix):]
+	base64.StdEncoding.Encode(r, peer.handshake.remoteStatic[:])
+	r = r[4:]
+	copy(r, "…")
+	r = r[len("…"):]
+	copy(r, b[len(prefix)+39:len(prefix)+43])
+	r = r[4:]
+	r[0] = ')'
+	r = r[1:]
+	return string(b[:len(b)-len(r)])
 }
 
 func (peer *Peer) Start() {
