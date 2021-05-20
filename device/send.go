@@ -8,7 +8,9 @@ package device
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -227,7 +229,9 @@ func (device *Device) RoutineReadFromTUN() {
 
 		if err != nil {
 			if !device.isClosed() {
-				device.log.Errorf("Failed to read packet from TUN device: %v", err)
+				if !errors.Is(err, os.ErrClosed) {
+					device.log.Errorf("Failed to read packet from TUN device: %v", err)
+				}
 				go device.Close()
 			}
 			device.PutMessageBuffer(elem.buffer)
