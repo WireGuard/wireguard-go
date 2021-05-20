@@ -89,7 +89,7 @@ func (rw *RWCancel) Read(p []byte) (n int, err error) {
 			return n, err
 		}
 		if !rw.ReadyRead() {
-			return 0, errors.New("fd closed")
+			return 0, os.ErrClosed
 		}
 	}
 }
@@ -101,7 +101,7 @@ func (rw *RWCancel) Write(p []byte) (n int, err error) {
 			return n, err
 		}
 		if !rw.ReadyWrite() {
-			return 0, errors.New("fd closed")
+			return 0, os.ErrClosed
 		}
 	}
 }
