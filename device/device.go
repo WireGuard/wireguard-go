@@ -210,7 +210,7 @@ func (device *Device) Down() error {
 func (device *Device) IsUnderLoad() bool {
 	// check if currently under load
 	now := time.Now()
-	underLoad := len(device.queue.handshake.c) >= UnderLoadQueueSize
+	underLoad := len(device.queue.handshake.c) >= QueueHandshakeSize/8
 	if underLoad {
 		atomic.StoreInt64(&device.rate.underLoadUntil, now.Add(UnderLoadAfterTime).UnixNano())
 		return true
