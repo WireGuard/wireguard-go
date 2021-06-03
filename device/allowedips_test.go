@@ -102,14 +102,14 @@ func TestTrieIPv4(t *testing.T) {
 	}
 
 	assertEQ := func(peer *Peer, a, b, c, d byte) {
-		p := allowedIPs.LookupIPv4([]byte{a, b, c, d})
+		p := allowedIPs.Lookup([]byte{a, b, c, d})
 		if p != peer {
 			t.Error("Assert EQ failed")
 		}
 	}
 
 	assertNEQ := func(peer *Peer, a, b, c, d byte) {
-		p := allowedIPs.LookupIPv4([]byte{a, b, c, d})
+		p := allowedIPs.Lookup([]byte{a, b, c, d})
 		if p == peer {
 			t.Error("Assert NEQ failed")
 		}
@@ -208,7 +208,7 @@ func TestTrieIPv6(t *testing.T) {
 		addr = append(addr, expand(b)...)
 		addr = append(addr, expand(c)...)
 		addr = append(addr, expand(d)...)
-		p := allowedIPs.LookupIPv6(addr)
+		p := allowedIPs.Lookup(addr)
 		if p != peer {
 			t.Error("Assert EQ failed")
 		}

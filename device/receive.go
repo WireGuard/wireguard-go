@@ -447,7 +447,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			}
 			elem.packet = elem.packet[:length]
 			src := elem.packet[IPv4offsetSrc : IPv4offsetSrc+net.IPv4len]
-			if device.allowedips.LookupIPv4(src) != peer {
+			if device.allowedips.Lookup(src) != peer {
 				device.log.Verbosef("IPv4 packet with disallowed source address from %v", peer)
 				goto skip
 			}
@@ -464,7 +464,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			}
 			elem.packet = elem.packet[:length]
 			src := elem.packet[IPv6offsetSrc : IPv6offsetSrc+net.IPv6len]
-			if device.allowedips.LookupIPv6(src) != peer {
+			if device.allowedips.Lookup(src) != peer {
 				device.log.Verbosef("IPv6 packet with disallowed source address from %v", peer)
 				goto skip
 			}

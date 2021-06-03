@@ -285,14 +285,15 @@ func (table *AllowedIPs) Insert(ip net.IP, cidr uint8, peer *Peer) {
 	}
 }
 
-func (table *AllowedIPs) LookupIPv4(address []byte) *Peer {
+func (table *AllowedIPs) Lookup(address []byte) *Peer {
 	table.mutex.RLock()
 	defer table.mutex.RUnlock()
-	return table.IPv4.lookup(address)
-}
-
-func (table *AllowedIPs) LookupIPv6(address []byte) *Peer {
-	table.mutex.RLock()
-	defer table.mutex.RUnlock()
-	return table.IPv6.lookup(address)
+	switch len(address) {
+	case net.IPv6len:
+		return table.IPv6.lookup(address)
+	case net.IPv4len:
+		return table.IPv4.lookup(address)
+	default:
+		panic(errors.New("looking up unknown address type"))
+	}
 }

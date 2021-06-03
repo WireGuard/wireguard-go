@@ -108,7 +108,7 @@ func TestTrieRandom(t *testing.T) {
 			var addr4 [4]byte
 			rand.Read(addr4[:])
 			peer1 := slow4.Lookup(addr4[:])
-			peer2 := allowedIPs.LookupIPv4(addr4[:])
+			peer2 := allowedIPs.Lookup(addr4[:])
 			if peer1 != peer2 {
 				t.Errorf("Trie did not match naive implementation, for %v: want %p, got %p", net.IP(addr4[:]), peer1, peer2)
 			}
@@ -116,7 +116,7 @@ func TestTrieRandom(t *testing.T) {
 			var addr6 [16]byte
 			rand.Read(addr6[:])
 			peer1 = slow6.Lookup(addr6[:])
-			peer2 = allowedIPs.LookupIPv6(addr6[:])
+			peer2 = allowedIPs.Lookup(addr6[:])
 			if peer1 != peer2 {
 				t.Errorf("Trie did not match naive implementation, for %v: want %p, got %p", net.IP(addr6[:]), peer1, peer2)
 			}
