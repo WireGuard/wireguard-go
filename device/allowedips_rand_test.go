@@ -65,9 +65,9 @@ func (r SlowRouter) Lookup(addr []byte) *Peer {
 }
 
 func TestTrieRandomIPv4(t *testing.T) {
-	var trie *trieEntry
 	var slow SlowRouter
 	var peers []*Peer
+	var allowedIPs AllowedIPs
 
 	rand.Seed(1)
 
@@ -82,7 +82,7 @@ func TestTrieRandomIPv4(t *testing.T) {
 		rand.Read(addr[:])
 		cidr := uint8(rand.Uint32() % (AddressLength * 8))
 		index := rand.Int() % NumberOfPeers
-		trie = trie.insert(addr[:], cidr, peers[index])
+		allowedIPs.Insert(addr[:], cidr, peers[index])
 		slow = slow.Insert(addr[:], cidr, peers[index])
 	}
 
@@ -90,7 +90,7 @@ func TestTrieRandomIPv4(t *testing.T) {
 		var addr [AddressLength]byte
 		rand.Read(addr[:])
 		peer1 := slow.Lookup(addr[:])
-		peer2 := trie.lookup(addr[:])
+		peer2 := allowedIPs.LookupIPv4(addr[:])
 		if peer1 != peer2 {
 			t.Error("Trie did not match naive implementation, for:", addr)
 		}
@@ -98,9 +98,9 @@ func TestTrieRandomIPv4(t *testing.T) {
 }
 
 func TestTrieRandomIPv6(t *testing.T) {
-	var trie *trieEntry
 	var slow SlowRouter
 	var peers []*Peer
+	var allowedIPs AllowedIPs
 
 	rand.Seed(1)
 
@@ -115,7 +115,7 @@ func TestTrieRandomIPv6(t *testing.T) {
 		rand.Read(addr[:])
 		cidr := uint8(rand.Uint32() % (AddressLength * 8))
 		index := rand.Int() % NumberOfPeers
-		trie = trie.insert(addr[:], cidr, peers[index])
+		allowedIPs.Insert(addr[:], cidr, peers[index])
 		slow = slow.Insert(addr[:], cidr, peers[index])
 	}
 
@@ -123,7 +123,7 @@ func TestTrieRandomIPv6(t *testing.T) {
 		var addr [AddressLength]byte
 		rand.Read(addr[:])
 		peer1 := slow.Lookup(addr[:])
-		peer2 := trie.lookup(addr[:])
+		peer2 := allowedIPs.LookupIPv6(addr[:])
 		if peer1 != peer2 {
 			t.Error("Trie did not match naive implementation, for:", addr)
 		}
