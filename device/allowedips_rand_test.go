@@ -7,6 +7,7 @@ package device
 
 import (
 	"math/rand"
+	"net"
 	"sort"
 	"testing"
 )
@@ -64,68 +65,71 @@ func (r SlowRouter) Lookup(addr []byte) *Peer {
 	return nil
 }
 
-func TestTrieRandomIPv4(t *testing.T) {
-	var slow SlowRouter
-	var peers []*Peer
-	var allowedIPs AllowedIPs
-
-	rand.Seed(1)
-
-	const AddressLength = 4
-
-	for n := 0; n < NumberOfPeers; n++ {
-		peers = append(peers, &Peer{})
-	}
-
-	for n := 0; n < NumberOfAddresses; n++ {
-		var addr [AddressLength]byte
-		rand.Read(addr[:])
-		cidr := uint8(rand.Uint32() % (AddressLength * 8))
-		index := rand.Int() % NumberOfPeers
-		allowedIPs.Insert(addr[:], cidr, peers[index])
-		slow = slow.Insert(addr[:], cidr, peers[index])
-	}
-
-	for n := 0; n < NumberOfTests; n++ {
-		var addr [AddressLength]byte
-		rand.Read(addr[:])
-		peer1 := slow.Lookup(addr[:])
-		peer2 := allowedIPs.LookupIPv4(addr[:])
-		if peer1 != peer2 {
-			t.Error("Trie did not match naive implementation, for:", addr)
+func (r SlowRouter) RemoveByPeer(peer *Peer) SlowRouter {
+	n := 0
+	for _, x := range r {
+		if x.peer != peer {
+			r[n] = x
+			n++
 		}
 	}
+	return r[:n]
 }
 
-func TestTrieRandomIPv6(t *testing.T) {
-	var slow SlowRouter
+func TestTrieRandom(t *testing.T) {
+	var slow4, slow6 SlowRouter
 	var peers []*Peer
 	var allowedIPs AllowedIPs
 
 	rand.Seed(1)
-
-	const AddressLength = 16
 
 	for n := 0; n < NumberOfPeers; n++ {
 		peers = append(peers, &Peer{})
 	}
 
 	for n := 0; n < NumberOfAddresses; n++ {
-		var addr [AddressLength]byte
-		rand.Read(addr[:])
-		cidr := uint8(rand.Uint32() % (AddressLength * 8))
-		index := rand.Int() % NumberOfPeers
-		allowedIPs.Insert(addr[:], cidr, peers[index])
-		slow = slow.Insert(addr[:], cidr, peers[index])
+		var addr4 [4]byte
+		rand.Read(addr4[:])
+		cidr := uint8(rand.Intn(32) + 1)
+		index := rand.Intn(NumberOfPeers)
+		allowedIPs.Insert(addr4[:], cidr, peers[index])
+		slow4 = slow4.Insert(addr4[:], cidr, peers[index])
+
+		var addr6 [16]byte
+		rand.Read(addr6[:])
+		cidr = uint8(rand.Intn(128) + 1)
+		index = rand.Intn(NumberOfPeers)
+		allowedIPs.Insert(addr6[:], cidr, peers[index])
+		slow6 = slow6.Insert(addr6[:], cidr, peers[index])
 	}
 
-	for n := 0; n < NumberOfTests; n++ {
-		var addr [AddressLength]byte
-		rand.Read(addr[:])
-		peer1 := slow.Lookup(addr[:])
-		peer2 := allowedIPs.LookupIPv6(addr[:])
-		if peer1 != peer2 {
-			t.Error("Trie did not match naive implementation, for:", addr)
+	for p := 0; ; p++ {
+		for n := 0; n < NumberOfTests; n++ {
+			var addr4 [4]byte
+			rand.Read(addr4[:])
+			peer1 := slow4.Lookup(addr4[:])
+			peer2 := allowedIPs.LookupIPv4(addr4[:])
+			if peer1 != peer2 {
+				t.Errorf("Trie did not match naive implementation, for %v: want %p, got %p", net.IP(addr4[:]), peer1, peer2)
+			}
+
+			var addr6 [16]byte
+			rand.Read(addr6[:])
+			peer1 = slow6.Lookup(addr6[:])
+			peer2 = allowedIPs.LookupIPv6(addr6[:])
+			if peer1 != peer2 {
+				t.Errorf("Trie did not match naive implementation, for %v: want %p, got %p", net.IP(addr6[:]), peer1, peer2)
+			}
 		}
+		if p >= len(peers) {
+			break
+		}
+		allowedIPs.RemoveByPeer(peers[p])
+		slow4 = slow4.RemoveByPeer(peers[p])
+		slow6 = slow6.RemoveByPeer(peers[p])
+	}
+
+	if allowedIPs.IPv4 != nil || allowedIPs.IPv6 != nil {
+		t.Error("Failed to remove all nodes from trie by peer")
 	}
 }
