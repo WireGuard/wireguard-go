@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	NumberOfPeers     = 100
-	NumberOfAddresses = 250
-	NumberOfTests     = 10000
+	NumberOfPeers        = 100
+	NumberOfPeerRemovals = 4
+	NumberOfAddresses    = 250
+	NumberOfTests        = 10000
 )
 
 type SlowNode struct {
@@ -103,7 +104,8 @@ func TestTrieRandom(t *testing.T) {
 		slow6 = slow6.Insert(addr6[:], cidr, peers[index])
 	}
 
-	for p := 0; ; p++ {
+	var p int
+	for p = 0; ; p++ {
 		for n := 0; n < NumberOfTests; n++ {
 			var addr4 [4]byte
 			rand.Read(addr4[:])
@@ -121,12 +123,15 @@ func TestTrieRandom(t *testing.T) {
 				t.Errorf("Trie did not match naive implementation, for %v: want %p, got %p", net.IP(addr6[:]), peer1, peer2)
 			}
 		}
-		if p >= len(peers) {
+		if p >= len(peers) || p >= NumberOfPeerRemovals {
 			break
 		}
 		allowedIPs.RemoveByPeer(peers[p])
 		slow4 = slow4.RemoveByPeer(peers[p])
 		slow6 = slow6.RemoveByPeer(peers[p])
+	}
+	for ; p < len(peers); p++ {
+		allowedIPs.RemoveByPeer(peers[p])
 	}
 
 	if allowedIPs.IPv4 != nil || allowedIPs.IPv6 != nil {
