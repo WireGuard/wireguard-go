@@ -11,13 +11,10 @@ import (
 	"testing"
 )
 
-/* Todo: More comprehensive
- */
-
 type testPairCommonBits struct {
 	s1    []byte
 	s2    []byte
-	match uint
+	match uint8
 }
 
 func TestCommonBits(t *testing.T) {
@@ -57,7 +54,7 @@ func benchmarkTrie(peerNumber int, addressNumber int, addressLength int, b *test
 	for n := 0; n < addressNumber; n++ {
 		var addr [AddressLength]byte
 		rand.Read(addr[:])
-		cidr := uint(rand.Uint32() % (AddressLength * 8))
+		cidr := uint8(rand.Uint32() % (AddressLength * 8))
 		index := rand.Int() % peerNumber
 		trie = trie.insert(addr[:], cidr, peers[index])
 	}
@@ -99,7 +96,7 @@ func TestTrieIPv4(t *testing.T) {
 
 	var trie *trieEntry
 
-	insert := func(peer *Peer, a, b, c, d byte, cidr uint) {
+	insert := func(peer *Peer, a, b, c, d byte, cidr uint8) {
 		trie = trie.insert([]byte{a, b, c, d}, cidr, peer)
 	}
 
@@ -195,7 +192,7 @@ func TestTrieIPv6(t *testing.T) {
 		return out[:]
 	}
 
-	insert := func(peer *Peer, a, b, c, d uint32, cidr uint) {
+	insert := func(peer *Peer, a, b, c, d uint32, cidr uint8) {
 		var addr []byte
 		addr = append(addr, expand(a)...)
 		addr = append(addr, expand(b)...)

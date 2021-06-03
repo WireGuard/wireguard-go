@@ -19,7 +19,7 @@ const (
 
 type SlowNode struct {
 	peer *Peer
-	cidr uint
+	cidr uint8
 	bits []byte
 }
 
@@ -37,7 +37,7 @@ func (r SlowRouter) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }
 
-func (r SlowRouter) Insert(addr []byte, cidr uint, peer *Peer) SlowRouter {
+func (r SlowRouter) Insert(addr []byte, cidr uint8, peer *Peer) SlowRouter {
 	for _, t := range r {
 		if t.cidr == cidr && commonBits(t.bits, addr) >= cidr {
 			t.peer = peer
@@ -80,7 +80,7 @@ func TestTrieRandomIPv4(t *testing.T) {
 	for n := 0; n < NumberOfAddresses; n++ {
 		var addr [AddressLength]byte
 		rand.Read(addr[:])
-		cidr := uint(rand.Uint32() % (AddressLength * 8))
+		cidr := uint8(rand.Uint32() % (AddressLength * 8))
 		index := rand.Int() % NumberOfPeers
 		trie = trie.insert(addr[:], cidr, peers[index])
 		slow = slow.Insert(addr[:], cidr, peers[index])
@@ -113,7 +113,7 @@ func TestTrieRandomIPv6(t *testing.T) {
 	for n := 0; n < NumberOfAddresses; n++ {
 		var addr [AddressLength]byte
 		rand.Read(addr[:])
-		cidr := uint(rand.Uint32() % (AddressLength * 8))
+		cidr := uint8(rand.Uint32() % (AddressLength * 8))
 		index := rand.Int() % NumberOfPeers
 		trie = trie.insert(addr[:], cidr, peers[index])
 		slow = slow.Insert(addr[:], cidr, peers[index])
