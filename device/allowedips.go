@@ -96,6 +96,14 @@ func (node *trieEntry) maskSelf() {
 	}
 }
 
+func (node *trieEntry) zeroizePointers() {
+	// Make the garbage collector's life slightly easier
+	node.peer = nil
+	node.child[0] = nil
+	node.child[1] = nil
+	node.parent.parentBit = nil
+}
+
 func (node *trieEntry) nodePlacement(ip net.IP, cidr uint8) (parent *trieEntry, exact bool) {
 	for node != nil && node.cidr <= cidr && commonBits(node.bits, ip) >= node.cidr {
 		parent = node
@@ -257,10 +265,12 @@ func (table *AllowedIPs) RemoveByPeer(peer *Peer) {
 		}
 		*node.parent.parentBit = child
 		if node.child[0] != nil || node.child[1] != nil || node.parent.parentBitType > 1 {
+			node.zeroizePointers()
 			continue
 		}
 		parent := (*trieEntry)(unsafe.Pointer(uintptr(unsafe.Pointer(node.parent.parentBit)) - unsafe.Offsetof(node.child) - unsafe.Sizeof(node.child[0])*uintptr(node.parent.parentBitType)))
 		if parent.peer != nil {
+			node.zeroizePointers()
 			continue
 		}
 		child = parent.child[node.parent.parentBitType^1]
@@ -268,6 +278,8 @@ func (table *AllowedIPs) RemoveByPeer(peer *Peer) {
 			child.parent = parent.parent
 		}
 		*parent.parent.parentBit = child
+		node.zeroizePointers()
+		parent.zeroizePointers()
 	}
 }
 

@@ -159,7 +159,16 @@ func TestTrieIPv4(t *testing.T) {
 	assertNEQ(a, 192, 0, 0, 0)
 	assertNEQ(a, 255, 0, 0, 0)
 
-	allowedIPs = AllowedIPs{}
+	allowedIPs.RemoveByPeer(a)
+	allowedIPs.RemoveByPeer(b)
+	allowedIPs.RemoveByPeer(c)
+	allowedIPs.RemoveByPeer(d)
+	allowedIPs.RemoveByPeer(e)
+	allowedIPs.RemoveByPeer(g)
+	allowedIPs.RemoveByPeer(h)
+	if allowedIPs.IPv4 != nil || allowedIPs.IPv6 != nil {
+		t.Error("Expected removing all the peers to empty trie, but it did not")
+	}
 
 	insert(a, 192, 168, 0, 0, 16)
 	insert(a, 192, 168, 0, 0, 24)
