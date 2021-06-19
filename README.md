@@ -40,6 +40,10 @@ This runs on Windows, but you should instead use it from the more [fully feature
 
 This will run on FreeBSD. It does not yet support sticky sockets. Fwmark is mapped to `SO_USER_COOKIE`.
 
+### DragonFly BSD
+
+This will run on DragonFly BSD. It does not yet support sticky sockets and Fwmark.
+
 ### OpenBSD
 
 This will run on OpenBSD. It does not yet support sticky sockets. Fwmark is mapped to `SO_RTABLE`. Since the tun driver cannot have arbitrary interface names, you must either use `tun[0-9]+` for an explicit interface name or `tun` to have the program select one for you. If you choose `tun` as the interface name, and the environment variable `WG_TUN_NAME_FILE` is defined, then the actual name of the interface chosen by the kernel is written to the file specified by that variable.
