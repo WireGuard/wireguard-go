@@ -41,12 +41,12 @@ func (module *Module) headerDirectory(idx int) *IMAGE_DATA_DIRECTORY {
 	return &module.headers.OptionalHeader.DataDirectory[idx]
 }
 
-func (module *Module) copySections(address uintptr, size uintptr, old_headers *IMAGE_NT_HEADERS) error {
+func (module *Module) copySections(address uintptr, size uintptr, oldHeaders *IMAGE_NT_HEADERS) error {
 	sections := module.headers.Sections()
 	for i := range sections {
 		if sections[i].SizeOfRawData == 0 {
 			// Section doesn't contain data in the dll itself, but may define uninitialized data.
-			sectionSize := old_headers.OptionalHeader.SectionAlignment
+			sectionSize := oldHeaders.OptionalHeader.SectionAlignment
 			if sectionSize == 0 {
 				continue
 			}
@@ -489,6 +489,15 @@ func LoadLibrary(data []byte) (module *Module, err error) {
 	if err != nil {
 		err = fmt.Errorf("Error building import table: %w", err)
 		return
+	}
+
+	// Disable protected delayed load for now. TODO: We should support this properly at some point.
+	if IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG < module.headers.OptionalHeader.NumberOfRvaAndSizes {
+		directory := module.headerDirectory(IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG)
+		if directory.Size != 0 && directory.VirtualAddress != 0 {
+			loadConfig := (*IMAGE_LOAD_CONFIG_DIRECTORY)(a2p(module.codeBase + uintptr(directory.VirtualAddress)))
+			loadConfig.GuardFlags &^= IMAGE_GUARD_PROTECT_DELAYLOAD_IAT
+		}
 	}
 
 	// Mark memory pages depending on section headers and release sections that are marked as "discardable".
