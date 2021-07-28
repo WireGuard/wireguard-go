@@ -332,6 +332,17 @@ func (imgimpdesc *IMAGE_IMPORT_DESCRIPTOR) OriginalFirstThunk() uint32 {
 	return imgimpdesc.characteristicsOrOriginalFirstThunk
 }
 
+type IMAGE_DELAYLOAD_DESCRIPTOR struct {
+	Attributes                 uint32
+	DllNameRVA                 uint32
+	ModuleHandleRVA            uint32
+	ImportAddressTableRVA      uint32
+	ImportNameTableRVA         uint32
+	BoundImportAddressTableRVA uint32
+	UnloadInformationTableRVA  uint32
+	TimeDateStamp              uint32
+}
+
 type IMAGE_LOAD_CONFIG_CODE_INTEGRITY struct {
 	Flags         uint16
 	Catalog       uint16
