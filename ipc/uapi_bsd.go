@@ -1,4 +1,4 @@
-// +build darwin freebsd openbsd
+// +build darwin freebsd dragonfly openbsd
 
 /* SPDX-License-Identifier: MIT
  *

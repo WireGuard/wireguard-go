@@ -1,4 +1,4 @@
-// +build !linux,!openbsd,!freebsd
+// +build !linux,!openbsd,!freebsd,!dragonfly
 
 /* SPDX-License-Identifier: MIT
  *
