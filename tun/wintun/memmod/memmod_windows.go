@@ -159,6 +159,16 @@ func (module *Module) finalizeSection(sectionData *sectionFinalizeData) error {
 	return nil
 }
 
+var rtlAddFunctionTable = windows.NewLazySystemDLL("ntdll.dll").NewProc("RtlAddFunctionTable")
+
+func (module *Module) registerExceptionHandlers() {
+	directory := module.headerDirectory(IMAGE_DIRECTORY_ENTRY_EXCEPTION)
+	if directory.Size == 0 || directory.VirtualAddress == 0 {
+		return
+	}
+	rtlAddFunctionTable.Call(module.codeBase+uintptr(directory.VirtualAddress), uintptr(directory.Size)/unsafe.Sizeof(IMAGE_RUNTIME_FUNCTION_ENTRY{}), module.codeBase)
+}
+
 func (module *Module) finalizeSections() error {
 	sections := module.headers.Sections()
 	imageOffset := module.headers.OptionalHeader.imageOffset()
@@ -499,6 +509,9 @@ func LoadLibrary(data []byte) (module *Module, err error) {
 		err = fmt.Errorf("Error finalizing sections: %w", err)
 		return
 	}
+
+	// Register exception tables, if they exist.
+	module.registerExceptionHandlers()
 
 	// TLS callbacks are executed BEFORE the main loading.
 	module.executeTLS()

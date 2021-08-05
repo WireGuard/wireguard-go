@@ -370,6 +370,12 @@ const (
 	IMAGE_GUARD_CF_FUNCTION_TABLE_SIZE_SHIFT       = 28
 )
 
+type IMAGE_RUNTIME_FUNCTION_ENTRY struct {
+	BeginAddress      uint32
+	EndAddress        uint32
+	UnwindInfoAddress uint32
+}
+
 const (
 	DLL_PROCESS_ATTACH = 1
 	DLL_THREAD_ATTACH  = 2
