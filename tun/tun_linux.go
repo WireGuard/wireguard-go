@@ -419,6 +419,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	var flags uint16 = unix.IFF_TUN // | unix.IFF_NO_PI (disabled for TUN status hack)
 	nameBytes := []byte(name)
 	if len(nameBytes) >= unix.IFNAMSIZ {
+		unix.Close(nfd)
 		return nil, fmt.Errorf("interface name too long: %w", unix.ENAMETOOLONG)
 	}
 	copy(ifr[:], nameBytes)
@@ -431,17 +432,19 @@ func CreateTUN(name string, mtu int) (Device, error) {
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)
 	if errno != 0 {
+		unix.Close(nfd)
 		return nil, errno
 	}
+
 	err = unix.SetNonblock(nfd, true)
+	if err != nil {
+		unix.Close(nfd)
+		return nil, err
+	}
 
 	// Note that the above -- open,ioctl,nonblock -- must happen prior to handing it to netpoll as below this line.
 
 	fd := os.NewFile(uintptr(nfd), cloneDevicePath)
-	if err != nil {
-		return nil, err
-	}
-
 	return CreateTUNFromFile(fd, mtu)
 }
 
