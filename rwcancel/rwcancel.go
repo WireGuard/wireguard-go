@@ -49,7 +49,7 @@ func (rw *RWCancel) ReadyRead() bool {
 	pollFds := []unix.PollFd{{Fd: int32(rw.fd), Events: unix.POLLIN}, {Fd: closeFd, Events: unix.POLLIN}}
 	var err error
 	for {
-		_, err = poll(pollFds, -1)
+		_, err = unix.Poll(pollFds, -1)
 		if err == nil || !RetryAfterError(err) {
 			break
 		}
@@ -68,7 +68,7 @@ func (rw *RWCancel) ReadyWrite() bool {
 	pollFds := []unix.PollFd{{Fd: int32(rw.fd), Events: unix.POLLOUT}, {Fd: closeFd, Events: unix.POLLOUT}}
 	var err error
 	for {
-		_, err = poll(pollFds, -1)
+		_, err = unix.Poll(pollFds, -1)
 		if err == nil || !RetryAfterError(err) {
 			break
 		}
