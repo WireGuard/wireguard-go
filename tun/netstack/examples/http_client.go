@@ -21,29 +21,28 @@ import (
 
 func main() {
 	tun, tnet, err := netstack.CreateNetTUN(
-		[]netip.Addr{netip.MustParseAddr("192.168.4.29")},
+		[]netip.Addr{netip.MustParseAddr("192.168.4.28")},
 		[]netip.Addr{netip.MustParseAddr("8.8.8.8")},
 		1420)
 	if err != nil {
 		log.Panic(err)
 	}
 	dev := device.NewDevice(tun, conn.NewDefaultBind(), device.NewLogger(device.LogLevelVerbose, ""))
-	dev.IpcSet(`private_key=a8dac1d8a70a751f0f699fb14ba1cff7b79cf4fbd8f09f44c6e6a90d0369604f
-public_key=25123c5dcd3328ff645e4f2a3fce0d754400d3887a0cb7c56f0267e20fbf3c5b
-endpoint=163.172.161.0:12912
+	err = dev.IpcSet(`private_key=087ec6e14bbed210e7215cdc73468dfa23f080a1bfb8665b2fd809bd99d28379
+public_key=c4c8e984c5322c8184c72265b92b250fdb63688705f504ba003c88f03393cf28
 allowed_ip=0.0.0.0/0
+endpoint=127.0.0.1:58120
 `)
 	err = dev.Up()
 	if err != nil {
 		log.Panic(err)
 	}
-
 	client := http.Client{
 		Transport: &http.Transport{
 			DialContext: tnet.DialContext,
 		},
 	}
-	resp, err := client.Get("https://www.zx2c4.com/ip")
+	resp, err := client.Get("http://192.168.4.29/")
 	if err != nil {
 		log.Panic(err)
 	}
