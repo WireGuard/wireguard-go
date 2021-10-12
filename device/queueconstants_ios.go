@@ -1,5 +1,4 @@
 //go:build ios
-// +build ios
 
 /* SPDX-License-Identifier: MIT
  *

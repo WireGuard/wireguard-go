@@ -1,5 +1,4 @@
 //go:build race
-// +build race
 
 /* SPDX-License-Identifier: MIT
  *
