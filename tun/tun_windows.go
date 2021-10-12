@@ -8,7 +8,6 @@ package tun
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -35,6 +34,7 @@ type rateJuggler struct {
 
 type NativeTun struct {
 	wt        *wintun.Adapter
+	name      string
 	handle    windows.Handle
 	rate      rateJuggler
 	session   wintun.Session
@@ -46,7 +46,7 @@ type NativeTun struct {
 	forcedMTU int
 }
 
-var WintunPool, _ = wintun.MakePool("WireGuard")
+var WintunTunnelType = "WireGuard"
 var WintunStaticRequestedGUID *windows.GUID
 
 //go:linkname procyield runtime.procyield
@@ -68,24 +68,9 @@ func CreateTUN(ifname string, mtu int) (Device, error) {
 // a requested GUID. Should a Wintun interface with the same name exist, it is reused.
 //
 func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu int) (Device, error) {
-	var err error
-	var wt *wintun.Adapter
-
-	// Does an interface with this name already exist?
-	wt, err = WintunPool.OpenAdapter(ifname)
-	if err == nil {
-		// If so, we delete it, in case it has weird residual configuration.
-		_, err = wt.Delete(true)
-		if err != nil {
-			return nil, fmt.Errorf("Error deleting already existing interface: %w", err)
-		}
-	}
-	wt, rebootRequired, err := WintunPool.CreateAdapter(ifname, requestedGUID)
+	wt, err := wintun.CreateAdapter(ifname, WintunTunnelType, requestedGUID)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating interface: %w", err)
-	}
-	if rebootRequired {
-		log.Println("Windows indicated a reboot is required.")
 	}
 
 	forcedMTU := 1420
@@ -95,6 +80,7 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu 
 
 	tun := &NativeTun{
 		wt:        wt,
+		name:      ifname,
 		handle:    windows.InvalidHandle,
 		events:    make(chan Event, 10),
 		forcedMTU: forcedMTU,
@@ -102,7 +88,7 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu 
 
 	tun.session, err = wt.StartSession(0x800000) // Ring capacity, 8 MiB
 	if err != nil {
-		tun.wt.Delete(false)
+		tun.wt.Close()
 		close(tun.events)
 		return nil, fmt.Errorf("Error starting session: %w", err)
 	}
@@ -111,12 +97,7 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu 
 }
 
 func (tun *NativeTun) Name() (string, error) {
-	tun.running.Add(1)
-	defer tun.running.Done()
-	if atomic.LoadInt32(&tun.close) == 1 {
-		return "", os.ErrClosed
-	}
-	return tun.wt.Name()
+	return tun.name, nil
 }
 
 func (tun *NativeTun) File() *os.File {
@@ -135,7 +116,7 @@ func (tun *NativeTun) Close() error {
 		tun.running.Wait()
 		tun.session.End()
 		if tun.wt != nil {
-			_, err = tun.wt.Delete(false)
+			tun.wt.Close()
 		}
 		close(tun.events)
 	})
