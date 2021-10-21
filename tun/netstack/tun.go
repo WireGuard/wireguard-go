@@ -83,6 +83,10 @@ func (e *endpoint) WritePackets(stack.RouteInfo, stack.PacketBufferList, tcpip.N
 	panic("not implemented")
 }
 
+func (e *endpoint) WriteRawPacket(*stack.PacketBuffer) tcpip.Error {
+	panic("not implemented")
+}
+
 func (*endpoint) ARPHardwareType() header.ARPHardwareType {
 	return header.ARPHardwareNone
 }
@@ -109,15 +113,23 @@ func CreateNetTUN(localAddresses, dnsServers []net.IP, mtu int) (tun.Device, *Ne
 	}
 	for _, ip := range localAddresses {
 		if ip4 := ip.To4(); ip4 != nil {
-			tcpipErr = dev.stack.AddAddress(1, ipv4.ProtocolNumber, tcpip.Address(ip4))
+			protoAddr := tcpip.ProtocolAddress{
+				Protocol:          ipv4.ProtocolNumber,
+				AddressWithPrefix: tcpip.Address(ip4).WithPrefix(),
+			}
+			tcpipErr := dev.stack.AddProtocolAddress(1, protoAddr, stack.AddressProperties{})
 			if tcpipErr != nil {
-				return nil, nil, fmt.Errorf("AddAddress(%v): %v", ip4, tcpipErr)
+				return nil, nil, fmt.Errorf("AddProtocolAddress(%v): %v", ip4, tcpipErr)
 			}
 			dev.hasV4 = true
 		} else {
-			tcpipErr = dev.stack.AddAddress(1, ipv6.ProtocolNumber, tcpip.Address(ip))
+			protoAddr := tcpip.ProtocolAddress{
+				Protocol:          ipv6.ProtocolNumber,
+				AddressWithPrefix: tcpip.Address(ip).WithPrefix(),
+			}
+			tcpipErr := dev.stack.AddProtocolAddress(1, protoAddr, stack.AddressProperties{})
 			if tcpipErr != nil {
-				return nil, nil, fmt.Errorf("AddAddress(%v): %v", ip4, tcpipErr)
+				return nil, nil, fmt.Errorf("AddProtocolAddress(%v): %v", ip, tcpipErr)
 			}
 			dev.hasV6 = true
 		}
