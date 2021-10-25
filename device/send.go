@@ -91,7 +91,7 @@ func (peer *Peer) SendKeepalive() {
 
 func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	if !isRetry {
-		atomic.StoreUint32(&peer.timers.handshakeAttempts, 0)
+		atomic.StoreUint32(&peer.timers.handshakeAttempts, 1)
 	}
 
 	peer.handshake.mutex.RLock()
@@ -195,7 +195,10 @@ func (peer *Peer) keepKeyFreshSending() {
 	}
 	nonce := atomic.LoadUint64(&keypair.sendNonce)
 	if nonce > RekeyAfterMessages || (keypair.isInitiator && time.Since(keypair.created) > RekeyAfterTime) {
-		peer.SendHandshakeInitiation(false)
+		// Do not send new HandshakeInitiation, if handshake retry is already in progress
+		if !peer.handshakeInProgress() {
+			peer.SendHandshakeInitiation(false)
+		}
 	}
 }
 
@@ -302,7 +305,10 @@ top:
 
 	keypair := peer.keypairs.Current()
 	if keypair == nil || atomic.LoadUint64(&keypair.sendNonce) >= RejectAfterMessages || time.Since(keypair.created) >= RejectAfterTime {
-		peer.SendHandshakeInitiation(false)
+		// Do not send new HandshakeInitiation, if handshake retry is already in progress
+		if !peer.handshakeInProgress() {
+			peer.SendHandshakeInitiation(false)
+		}
 		return
 	}
 

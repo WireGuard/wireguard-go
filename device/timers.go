@@ -78,6 +78,9 @@ func expiredRetransmitHandshake(peer *Peer) {
 	if atomic.LoadUint32(&peer.timers.handshakeAttempts) > MaxTimerHandshakes {
 		peer.device.log.Verbosef("%s - Handshake did not complete after %d attempts, giving up", peer, MaxTimerHandshakes+2)
 
+		// Reset attempts count
+		atomic.StoreUint32(&peer.timers.handshakeAttempts, 0)
+
 		if peer.timersActive() {
 			peer.timers.sendKeepalive.Del()
 		}
@@ -95,7 +98,7 @@ func expiredRetransmitHandshake(peer *Peer) {
 		}
 	} else {
 		atomic.AddUint32(&peer.timers.handshakeAttempts, 1)
-		peer.device.log.Verbosef("%s - Handshake did not complete after %d seconds, retrying (try %d)", peer, int(RekeyTimeout.Seconds()), atomic.LoadUint32(&peer.timers.handshakeAttempts)+1)
+		peer.device.log.Verbosef("%s - Handshake did not complete after %d seconds, retrying (try %d)", peer, int(RekeyTimeout.Seconds()), atomic.LoadUint32(&peer.timers.handshakeAttempts))
 
 		/* We clear the endpoint address src address, in case this is the cause of trouble. */
 		peer.Lock()
@@ -141,10 +144,18 @@ func expiredPersistentKeepalive(peer *Peer) {
 	}
 }
 
+/* Returns true if HandshakeInitiation is already started (and not yet finished) */
+func (peer *Peer) handshakeInProgress() bool {
+	return atomic.LoadUint32(&peer.timers.handshakeAttempts) > 0
+}
+
 /* Should be called after an authenticated data packet is sent. */
 func (peer *Peer) timersDataSent() {
 	if peer.timersActive() && !peer.timers.newHandshake.IsPending() {
-		peer.timers.newHandshake.Mod(KeepaliveTimeout + RekeyTimeout + time.Millisecond*time.Duration(rand.Int31n(RekeyTimeoutJitterMaxMs)))
+		// Do not restart handshake because of staled data traffic, if it is already in progress
+		if !peer.handshakeInProgress() {
+			peer.timers.newHandshake.Mod(KeepaliveTimeout + RekeyTimeout + time.Millisecond*time.Duration(rand.Int31n(RekeyTimeoutJitterMaxMs)))
+		}
 	}
 }
 
