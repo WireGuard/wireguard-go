@@ -53,8 +53,12 @@ func logMessage(level loggerLevel, timestamp uint64, msg *uint16) int {
 
 func setupLogger(dll *lazyDLL) {
 	var callback uintptr
-	if runtime.GOARCH == "386" || runtime.GOARCH == "arm" {
+	if runtime.GOARCH == "386" {
 		callback = windows.NewCallback(func(level loggerLevel, timestampLow, timestampHigh uint32, msg *uint16) int {
+			return logMessage(level, uint64(timestampHigh)<<32|uint64(timestampLow), msg)
+		})
+	} else if runtime.GOARCH == "arm" {
+		callback = windows.NewCallback(func(level loggerLevel, _, timestampLow, timestampHigh uint32, msg *uint16) int {
 			return logMessage(level, uint64(timestampHigh)<<32|uint64(timestampLow), msg)
 		})
 	} else if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
