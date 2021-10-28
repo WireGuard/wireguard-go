@@ -8,19 +8,14 @@
 package device
 
 import (
-	"crypto/rand"
-	unsafeRand "math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
+	_ "unsafe"
 )
 
-func init() {
-	var seed int64
-	rand.Read(unsafe.Slice((*byte)(unsafe.Pointer(&seed)), unsafe.Sizeof(seed)))
-	unsafeRand.Seed(seed)
-}
+//go:linkname fastrandn runtime.fastrandn
+func fastrandn(n uint32) uint32
 
 // A Timer manages time-based aspects of the WireGuard protocol.
 // Timer roughly copies the interface of the Linux kernel's struct timer_list.
@@ -152,7 +147,7 @@ func expiredPersistentKeepalive(peer *Peer) {
 /* Should be called after an authenticated data packet is sent. */
 func (peer *Peer) timersDataSent() {
 	if peer.timersActive() && !peer.timers.newHandshake.IsPending() {
-		peer.timers.newHandshake.Mod(KeepaliveTimeout + RekeyTimeout + time.Millisecond*time.Duration(unsafeRand.Int63n(RekeyTimeoutJitterMaxMs)))
+		peer.timers.newHandshake.Mod(KeepaliveTimeout + RekeyTimeout + time.Millisecond*time.Duration(fastrandn(RekeyTimeoutJitterMaxMs)))
 	}
 }
 
@@ -184,7 +179,7 @@ func (peer *Peer) timersAnyAuthenticatedPacketReceived() {
 /* Should be called after a handshake initiation message is sent. */
 func (peer *Peer) timersHandshakeInitiated() {
 	if peer.timersActive() {
-		peer.timers.retransmitHandshake.Mod(RekeyTimeout + time.Millisecond*time.Duration(unsafeRand.Int63n(RekeyTimeoutJitterMaxMs)))
+		peer.timers.retransmitHandshake.Mod(RekeyTimeout + time.Millisecond*time.Duration(fastrandn(RekeyTimeoutJitterMaxMs)))
 	}
 }
 
