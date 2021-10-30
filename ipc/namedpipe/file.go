@@ -1,12 +1,12 @@
+// Copyright 2021 The Go Authors. All rights reserved.
+// Copyright 2015 Microsoft
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 //go:build windows
+// +build windows
 
-/* SPDX-License-Identifier: MIT
- *
- * Copyright (C) 2005 Microsoft
- * Copyright (C) 2017-2021 WireGuard LLC. All Rights Reserved.
- */
-
-package winpipe
+package namedpipe
 
 import (
 	"io"

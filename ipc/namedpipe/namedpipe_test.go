@@ -1,12 +1,12 @@
+// Copyright 2021 The Go Authors. All rights reserved.
+// Copyright 2015 Microsoft
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 //go:build windows
+// +build windows
 
-/* SPDX-License-Identifier: MIT
- *
- * Copyright (C) 2005 Microsoft
- * Copyright (C) 2017-2021 WireGuard LLC. All Rights Reserved.
- */
-
-package winpipe_test
+package namedpipe_test
 
 import (
 	"bufio"
@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows"
-	"golang.zx2c4.com/wireguard/ipc/winpipe"
+	"golang.zx2c4.com/wireguard/ipc/namedpipe"
 )
 
 func randomPipePath() string {
@@ -30,7 +30,7 @@ func randomPipePath() string {
 	if err != nil {
 		panic(err)
 	}
-	return `\\.\PIPE\go-winpipe-test-` + guid.String()
+	return `\\.\PIPE\go-namedpipe-test-` + guid.String()
 }
 
 func TestPingPong(t *testing.T) {
@@ -39,7 +39,7 @@ func TestPingPong(t *testing.T) {
 		pong = 24
 	)
 	pipePath := randomPipePath()
-	listener, err := winpipe.Listen(pipePath, nil)
+	listener, err := namedpipe.Listen(pipePath)
 	if err != nil {
 		t.Fatalf("unable to listen on pipe: %v", err)
 	}
@@ -64,11 +64,12 @@ func TestPingPong(t *testing.T) {
 			t.Fatalf("unable to write pong to pipe: %v", err)
 		}
 	}()
-	client, err := winpipe.Dial(pipePath, nil, nil)
+	client, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
 	if err != nil {
 		t.Fatalf("unable to dial pipe: %v", err)
 	}
 	defer client.Close()
+	client.SetDeadline(time.Now().Add(time.Second * 5))
 	var data [1]byte
 	data[0] = ping
 	_, err = client.Write(data[:])
@@ -85,7 +86,7 @@ func TestPingPong(t *testing.T) {
 }
 
 func TestDialUnknownFailsImmediately(t *testing.T) {
-	_, err := winpipe.Dial(randomPipePath(), nil, nil)
+	_, err := namedpipe.DialTimeout(randomPipePath(), time.Duration(0))
 	if !errors.Is(err, syscall.ENOENT) {
 		t.Fatalf("expected ENOENT got %v", err)
 	}
@@ -93,13 +94,15 @@ func TestDialUnknownFailsImmediately(t *testing.T) {
 
 func TestDialListenerTimesOut(t *testing.T) {
 	pipePath := randomPipePath()
-	l, err := winpipe.Listen(pipePath, nil)
+	l, err := namedpipe.Listen(pipePath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer l.Close()
-	d := 10 * time.Millisecond
-	_, err = winpipe.Dial(pipePath, &d, nil)
+	pipe, err := namedpipe.DialTimeout(pipePath, 10*time.Millisecond)
+	if err == nil {
+		pipe.Close()
+	}
 	if err != os.ErrDeadlineExceeded {
 		t.Fatalf("expected os.ErrDeadlineExceeded, got %v", err)
 	}
@@ -107,14 +110,17 @@ func TestDialListenerTimesOut(t *testing.T) {
 
 func TestDialContextListenerTimesOut(t *testing.T) {
 	pipePath := randomPipePath()
-	l, err := winpipe.Listen(pipePath, nil)
+	l, err := namedpipe.Listen(pipePath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer l.Close()
 	d := 10 * time.Millisecond
 	ctx, _ := context.WithTimeout(context.Background(), d)
-	_, err = winpipe.DialContext(ctx, pipePath, nil)
+	pipe, err := namedpipe.DialContext(ctx, pipePath)
+	if err == nil {
+		pipe.Close()
+	}
 	if err != context.DeadlineExceeded {
 		t.Fatalf("expected context.DeadlineExceeded, got %v", err)
 	}
@@ -123,14 +129,14 @@ func TestDialContextListenerTimesOut(t *testing.T) {
 func TestDialListenerGetsCancelled(t *testing.T) {
 	pipePath := randomPipePath()
 	ctx, cancel := context.WithCancel(context.Background())
-	l, err := winpipe.Listen(pipePath, nil)
+	l, err := namedpipe.Listen(pipePath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ch := make(chan error)
 	defer l.Close()
+	ch := make(chan error)
 	go func(ctx context.Context, ch chan error) {
-		_, err := winpipe.DialContext(ctx, pipePath, nil)
+		_, err := namedpipe.DialContext(ctx, pipePath)
 		ch <- err
 	}(ctx, ch)
 	time.Sleep(time.Millisecond * 30)
@@ -147,23 +153,28 @@ func TestDialAccessDeniedWithRestrictedSD(t *testing.T) {
 	}
 	pipePath := randomPipePath()
 	sd, _ := windows.SecurityDescriptorFromString("D:")
-	c := winpipe.ListenConfig{
+	l, err := (&namedpipe.ListenConfig{
 		SecurityDescriptor: sd,
-	}
-	l, err := winpipe.Listen(pipePath, &c)
+	}).Listen(pipePath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer l.Close()
-	_, err = winpipe.Dial(pipePath, nil, nil)
+	pipe, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
+	if err == nil {
+		pipe.Close()
+	}
 	if !errors.Is(err, windows.ERROR_ACCESS_DENIED) {
 		t.Fatalf("expected ERROR_ACCESS_DENIED, got %v", err)
 	}
 }
 
-func getConnection(cfg *winpipe.ListenConfig) (client net.Conn, server net.Conn, err error) {
+func getConnection(cfg *namedpipe.ListenConfig) (client net.Conn, server net.Conn, err error) {
 	pipePath := randomPipePath()
-	l, err := winpipe.Listen(pipePath, cfg)
+	if cfg == nil {
+		cfg = &namedpipe.ListenConfig{}
+	}
+	l, err := cfg.Listen(pipePath)
 	if err != nil {
 		return
 	}
@@ -179,7 +190,7 @@ func getConnection(cfg *winpipe.ListenConfig) (client net.Conn, server net.Conn,
 		ch <- response{c, err}
 	}()
 
-	c, err := winpipe.Dial(pipePath, nil, nil)
+	c, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
 	if err != nil {
 		return
 	}
@@ -236,7 +247,7 @@ func server(l net.Listener, ch chan int) {
 
 func TestFullListenDialReadWrite(t *testing.T) {
 	pipePath := randomPipePath()
-	l, err := winpipe.Listen(pipePath, nil)
+	l, err := namedpipe.Listen(pipePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +256,7 @@ func TestFullListenDialReadWrite(t *testing.T) {
 	ch := make(chan int)
 	go server(l, ch)
 
-	c, err := winpipe.Dial(pipePath, nil, nil)
+	c, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +286,7 @@ func TestFullListenDialReadWrite(t *testing.T) {
 
 func TestCloseAbortsListen(t *testing.T) {
 	pipePath := randomPipePath()
-	l, err := winpipe.Listen(pipePath, nil)
+	l, err := namedpipe.Listen(pipePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +339,7 @@ func TestCloseServerEOFClient(t *testing.T) {
 }
 
 func TestCloseWriteEOF(t *testing.T) {
-	cfg := &winpipe.ListenConfig{
+	cfg := &namedpipe.ListenConfig{
 		MessageMode: true,
 	}
 	c, s, err := getConnection(cfg)
@@ -356,7 +367,7 @@ func TestCloseWriteEOF(t *testing.T) {
 
 func TestAcceptAfterCloseFails(t *testing.T) {
 	pipePath := randomPipePath()
-	l, err := winpipe.Listen(pipePath, nil)
+	l, err := namedpipe.Listen(pipePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,12 +380,15 @@ func TestAcceptAfterCloseFails(t *testing.T) {
 
 func TestDialTimesOutByDefault(t *testing.T) {
 	pipePath := randomPipePath()
-	l, err := winpipe.Listen(pipePath, nil)
+	l, err := namedpipe.Listen(pipePath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer l.Close()
-	_, err = winpipe.Dial(pipePath, nil, nil)
+	pipe, err := namedpipe.DialTimeout(pipePath, time.Duration(0)) // Should timeout after 2 seconds.
+	if err == nil {
+		pipe.Close()
+	}
 	if err != os.ErrDeadlineExceeded {
 		t.Fatalf("expected os.ErrDeadlineExceeded, got %v", err)
 	}
@@ -382,7 +396,7 @@ func TestDialTimesOutByDefault(t *testing.T) {
 
 func TestTimeoutPendingRead(t *testing.T) {
 	pipePath := randomPipePath()
-	l, err := winpipe.Listen(pipePath, nil)
+	l, err := namedpipe.Listen(pipePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -400,7 +414,7 @@ func TestTimeoutPendingRead(t *testing.T) {
 		close(serverDone)
 	}()
 
-	client, err := winpipe.Dial(pipePath, nil, nil)
+	client, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,7 +444,7 @@ func TestTimeoutPendingRead(t *testing.T) {
 
 func TestTimeoutPendingWrite(t *testing.T) {
 	pipePath := randomPipePath()
-	l, err := winpipe.Listen(pipePath, nil)
+	l, err := namedpipe.Listen(pipePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +462,7 @@ func TestTimeoutPendingWrite(t *testing.T) {
 		close(serverDone)
 	}()
 
-	client, err := winpipe.Dial(pipePath, nil, nil)
+	client, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -480,13 +494,12 @@ type CloseWriter interface {
 }
 
 func TestEchoWithMessaging(t *testing.T) {
-	c := winpipe.ListenConfig{
+	pipePath := randomPipePath()
+	l, err := (&namedpipe.ListenConfig{
 		MessageMode:      true,  // Use message mode so that CloseWrite() is supported
 		InputBufferSize:  65536, // Use 64KB buffers to improve performance
 		OutputBufferSize: 65536,
-	}
-	pipePath := randomPipePath()
-	l, err := winpipe.Listen(pipePath, &c)
+	}).Listen(pipePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -496,19 +509,21 @@ func TestEchoWithMessaging(t *testing.T) {
 	clientDone := make(chan bool)
 	go func() {
 		// server echo
-		conn, e := l.Accept()
-		if e != nil {
-			t.Fatal(e)
+		conn, err := l.Accept()
+		if err != nil {
+			t.Fatal(err)
 		}
 		defer conn.Close()
 
 		time.Sleep(500 * time.Millisecond) // make *sure* we don't begin to read before eof signal is sent
-		io.Copy(conn, conn)
+		_, err = io.Copy(conn, conn)
+		if err != nil {
+			t.Fatal(err)
+		}
 		conn.(CloseWriter).CloseWrite()
 		close(listenerDone)
 	}()
-	timeout := 1 * time.Second
-	client, err := winpipe.Dial(pipePath, &timeout, nil)
+	client, err := namedpipe.DialTimeout(pipePath, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -521,7 +536,7 @@ func TestEchoWithMessaging(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		if n != 2 {
+		if n != 2 || bytes[0] != 0 || bytes[1] != 1 {
 			t.Fatalf("expected 2 bytes, got %v", n)
 		}
 		close(clientDone)
@@ -545,7 +560,7 @@ func TestEchoWithMessaging(t *testing.T) {
 
 func TestConnectRace(t *testing.T) {
 	pipePath := randomPipePath()
-	l, err := winpipe.Listen(pipePath, nil)
+	l, err := namedpipe.Listen(pipePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -565,7 +580,7 @@ func TestConnectRace(t *testing.T) {
 	}()
 
 	for i := 0; i < 1000; i++ {
-		c, err := winpipe.Dial(pipePath, nil, nil)
+		c, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -580,7 +595,7 @@ func TestMessageReadMode(t *testing.T) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	pipePath := randomPipePath()
-	l, err := winpipe.Listen(pipePath, &winpipe.ListenConfig{MessageMode: true})
+	l, err := (&namedpipe.ListenConfig{MessageMode: true}).Listen(pipePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -602,7 +617,7 @@ func TestMessageReadMode(t *testing.T) {
 		s.Close()
 	}()
 
-	c, err := winpipe.Dial(pipePath, nil, nil)
+	c, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -643,13 +658,13 @@ func TestListenConnectRace(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
-			c, err := winpipe.Dial(pipePath, nil, nil)
+			c, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
 			if err == nil {
 				c.Close()
 			}
 			wg.Done()
 		}()
-		s, err := winpipe.Listen(pipePath, nil)
+		s, err := namedpipe.Listen(pipePath)
 		if err != nil {
 			t.Error(i, err)
 		} else {
