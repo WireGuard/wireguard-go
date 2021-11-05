@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"net"
 	"runtime"
 	"runtime/pprof"
 	"sync"
@@ -19,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"golang.zx2c4.com/go118/netip"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/conn/bindtest"
 	"golang.zx2c4.com/wireguard/tun/tuntest"
@@ -96,7 +96,7 @@ type testPair [2]testPeer
 type testPeer struct {
 	tun *tuntest.ChannelTUN
 	dev *Device
-	ip  net.IP
+	ip  netip.Addr
 }
 
 type SendDirection bool
@@ -159,7 +159,7 @@ func genTestPair(tb testing.TB, realSocket bool) (pair testPair) {
 	for i := range pair {
 		p := &pair[i]
 		p.tun = tuntest.NewChannelTUN()
-		p.ip = net.IPv4(1, 0, 0, byte(i+1))
+		p.ip = netip.AddrFrom4([4]byte{1, 0, 0, byte(i + 1)})
 		level := LogLevelVerbose
 		if _, ok := tb.(*testing.B); ok && !testing.Verbose() {
 			level = LogLevelError

@@ -9,10 +9,11 @@ package conn
 import (
 	"errors"
 	"fmt"
-	"net"
 	"reflect"
 	"runtime"
 	"strings"
+
+	"golang.zx2c4.com/go118/netip"
 )
 
 // A ReceiveFunc receives a single inbound packet from the network.
@@ -68,8 +69,8 @@ type Endpoint interface {
 	SrcToString() string // returns the local source address (ip:port)
 	DstToString() string // returns the destination address (ip:port)
 	DstToBytes() []byte  // used for mac2 cookie calculations
-	DstIP() net.IP
-	SrcIP() net.IP
+	DstIP() netip.Addr
+	SrcIP() netip.Addr
 }
 
 var (
@@ -118,34 +119,4 @@ func (fn ReceiveFunc) PrettyName() string {
 		return "v6"
 	}
 	return name
-}
-
-func parseEndpoint(s string) (*net.UDPAddr, error) {
-	// ensure that the host is an IP address
-
-	host, _, err := net.SplitHostPort(s)
-	if err != nil {
-		return nil, err
-	}
-	if i := strings.LastIndexByte(host, '%'); i > 0 && strings.IndexByte(host, ':') >= 0 {
-		// Remove the scope, if any. ResolveUDPAddr below will use it, but here we're just
-		// trying to make sure with a small sanity test that this is a real IP address and
-		// not something that's likely to incur DNS lookups.
-		host = host[:i]
-	}
-	if ip := net.ParseIP(host); ip == nil {
-		return nil, errors.New("Failed to parse IP address: " + host)
-	}
-
-	// parse address and port
-
-	addr, err := net.ResolveUDPAddr("udp", s)
-	if err != nil {
-		return nil, err
-	}
-	ip4 := addr.IP.To4()
-	if ip4 != nil {
-		addr.IP = ip4
-	}
-	return addr, err
 }

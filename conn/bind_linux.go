@@ -14,6 +14,7 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/unix"
+	"golang.zx2c4.com/go118/netip"
 )
 
 type ipv4Source struct {
@@ -70,32 +71,30 @@ var _ Bind = (*LinuxSocketBind)(nil)
 
 func (*LinuxSocketBind) ParseEndpoint(s string) (Endpoint, error) {
 	var end LinuxSocketEndpoint
-	addr, err := parseEndpoint(s)
+	e, err := netip.ParseAddrPort(s)
 	if err != nil {
 		return nil, err
 	}
 
-	ipv4 := addr.IP.To4()
-	if ipv4 != nil {
+	if e.Addr().Is4() {
 		dst := end.dst4()
 		end.isV6 = false
-		dst.Port = addr.Port
-		copy(dst.Addr[:], ipv4)
+		dst.Port = int(e.Port())
+		dst.Addr = e.Addr().As4()
 		end.ClearSrc()
 		return &end, nil
 	}
 
-	ipv6 := addr.IP.To16()
-	if ipv6 != nil {
-		zone, err := zoneToUint32(addr.Zone)
+	if e.Addr().Is6() {
+		zone, err := zoneToUint32(e.Addr().Zone())
 		if err != nil {
 			return nil, err
 		}
 		dst := end.dst6()
 		end.isV6 = true
-		dst.Port = addr.Port
+		dst.Port = int(e.Port())
 		dst.ZoneId = zone
-		copy(dst.Addr[:], ipv6[:])
+		dst.Addr = e.Addr().As16()
 		end.ClearSrc()
 		return &end, nil
 	}
@@ -266,29 +265,19 @@ func (bind *LinuxSocketBind) Send(buff []byte, end Endpoint) error {
 	}
 }
 
-func (end *LinuxSocketEndpoint) SrcIP() net.IP {
+func (end *LinuxSocketEndpoint) SrcIP() netip.Addr {
 	if !end.isV6 {
-		return net.IPv4(
-			end.src4().Src[0],
-			end.src4().Src[1],
-			end.src4().Src[2],
-			end.src4().Src[3],
-		)
+		return netip.AddrFrom4(end.src4().Src)
 	} else {
-		return end.src6().src[:]
+		return netip.AddrFrom16(end.src6().src)
 	}
 }
 
-func (end *LinuxSocketEndpoint) DstIP() net.IP {
+func (end *LinuxSocketEndpoint) DstIP() netip.Addr {
 	if !end.isV6 {
-		return net.IPv4(
-			end.dst4().Addr[0],
-			end.dst4().Addr[1],
-			end.dst4().Addr[2],
-			end.dst4().Addr[3],
-		)
+		return netip.AddrFrom4(end.dst4().Addr)
 	} else {
-		return end.dst6().Addr[:]
+		return netip.AddrFrom16(end.dst6().Addr)
 	}
 }
 
@@ -305,14 +294,13 @@ func (end *LinuxSocketEndpoint) SrcToString() string {
 }
 
 func (end *LinuxSocketEndpoint) DstToString() string {
-	var udpAddr net.UDPAddr
-	udpAddr.IP = end.DstIP()
+	var port int
 	if !end.isV6 {
-		udpAddr.Port = end.dst4().Port
+		port = end.dst4().Port
 	} else {
-		udpAddr.Port = end.dst6().Port
+		port = end.dst6().Port
 	}
-	return udpAddr.String()
+	return netip.AddrPortFrom(end.DstIP(), uint16(port)).String()
 }
 
 func (end *LinuxSocketEndpoint) ClearDst() {

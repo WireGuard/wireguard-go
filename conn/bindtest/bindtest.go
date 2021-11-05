@@ -10,8 +10,8 @@ import (
 	"math/rand"
 	"net"
 	"os"
-	"strconv"
 
+	"golang.zx2c4.com/go118/netip"
 	"golang.zx2c4.com/wireguard/conn"
 )
 
@@ -61,9 +61,9 @@ func (c ChannelEndpoint) DstToString() string { return fmt.Sprintf("127.0.0.1:%d
 
 func (c ChannelEndpoint) DstToBytes() []byte { return []byte{byte(c)} }
 
-func (c ChannelEndpoint) DstIP() net.IP { return net.IPv4(127, 0, 0, 1) }
+func (c ChannelEndpoint) DstIP() netip.Addr { return netip.AddrFrom4([4]byte{127, 0, 0, 1}) }
 
-func (c ChannelEndpoint) SrcIP() net.IP { return nil }
+func (c ChannelEndpoint) SrcIP() netip.Addr { return netip.Addr{} }
 
 func (c *ChannelBind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err error) {
 	c.closeSignal = make(chan bool)
@@ -119,13 +119,9 @@ func (c *ChannelBind) Send(b []byte, ep conn.Endpoint) error {
 }
 
 func (c *ChannelBind) ParseEndpoint(s string) (conn.Endpoint, error) {
-	_, port, err := net.SplitHostPort(s)
+	addr, err := netip.ParseAddrPort(s)
 	if err != nil {
 		return nil, err
 	}
-	i, err := strconv.ParseUint(port, 10, 16)
-	if err != nil {
-		return nil, err
-	}
-	return ChannelEndpoint(i), nil
+	return ChannelEndpoint(addr.Port()), nil
 }
