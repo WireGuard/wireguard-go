@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"net/netip"
 	"os"
 
-	"golang.zx2c4.com/go118/netip"
 	"golang.zx2c4.com/wireguard/conn"
 )
 

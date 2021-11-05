@@ -8,9 +8,8 @@ package device
 import (
 	"math/rand"
 	"net"
+	"net/netip"
 	"testing"
-
-	"golang.zx2c4.com/go118/netip"
 )
 
 type testPairCommonBits struct {

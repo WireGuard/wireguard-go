@@ -12,13 +12,13 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"golang.zx2c4.com/go118/netip"
 	"golang.zx2c4.com/wireguard/ipc"
 )
 

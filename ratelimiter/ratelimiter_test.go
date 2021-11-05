@@ -6,10 +6,9 @@
 package ratelimiter
 
 import (
+	"net/netip"
 	"testing"
 	"time"
-
-	"golang.zx2c4.com/go118/netip"
 )
 
 type result struct {

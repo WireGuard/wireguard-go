@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"net"
+	"net/netip"
 	"os"
 	"sync"
 	"sync/atomic"

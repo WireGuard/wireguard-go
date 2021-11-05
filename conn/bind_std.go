@@ -8,10 +8,9 @@ package conn
 import (
 	"errors"
 	"net"
+	"net/netip"
 	"sync"
 	"syscall"
-
-	"golang.zx2c4.com/go118/netip"
 )
 
 // StdNetBind is meant to be a temporary solution on platforms for which
@@ -28,24 +27,20 @@ type StdNetBind struct {
 
 func NewStdNetBind() Bind { return &StdNetBind{} }
 
-type StdNetEndpoint net.UDPAddr
+type StdNetEndpoint netip.AddrPort
 
 var _ Bind = (*StdNetBind)(nil)
 var _ Endpoint = (*StdNetEndpoint)(nil)
 
 func (*StdNetBind) ParseEndpoint(s string) (Endpoint, error) {
 	e, err := netip.ParseAddrPort(s)
-	return (*StdNetEndpoint)(&net.UDPAddr{
-		IP:   e.Addr().AsSlice(),
-		Port: int(e.Port()),
-		Zone: e.Addr().Zone(),
-	}), err
+	return (*StdNetEndpoint)(&e), err
 }
 
 func (*StdNetEndpoint) ClearSrc() {}
 
 func (e *StdNetEndpoint) DstIP() netip.Addr {
-	return netip.AddrFromSlice((*net.UDPAddr)(e).IP)
+	return (*netip.AddrPort)(e).Addr()
 }
 
 func (e *StdNetEndpoint) SrcIP() netip.Addr {
@@ -53,18 +48,15 @@ func (e *StdNetEndpoint) SrcIP() netip.Addr {
 }
 
 func (e *StdNetEndpoint) DstToBytes() []byte {
-	addr := (*net.UDPAddr)(e)
-	out := addr.IP.To4()
-	if out == nil {
-		out = addr.IP
-	}
-	out = append(out, byte(addr.Port&0xff))
-	out = append(out, byte((addr.Port>>8)&0xff))
+	addr := (*netip.AddrPort)(e)
+	out := addr.Addr().AsSlice()
+	out = append(out, byte(addr.Port()&0xff))
+	out = append(out, byte((addr.Port()>>8)&0xff))
 	return out
 }
 
 func (e *StdNetEndpoint) DstToString() string {
-	return (*net.UDPAddr)(e).String()
+	return (*netip.AddrPort)(e).String()
 }
 
 func (e *StdNetEndpoint) SrcToString() string {
@@ -160,18 +152,15 @@ func (bind *StdNetBind) Close() error {
 
 func (*StdNetBind) makeReceiveIPv4(conn *net.UDPConn) ReceiveFunc {
 	return func(buff []byte) (int, Endpoint, error) {
-		n, endpoint, err := conn.ReadFromUDP(buff)
-		if endpoint != nil {
-			endpoint.IP = endpoint.IP.To4()
-		}
-		return n, (*StdNetEndpoint)(endpoint), err
+		n, endpoint, err := conn.ReadFromUDPAddrPort(buff)
+		return n, (*StdNetEndpoint)(&endpoint), err
 	}
 }
 
 func (*StdNetBind) makeReceiveIPv6(conn *net.UDPConn) ReceiveFunc {
 	return func(buff []byte) (int, Endpoint, error) {
-		n, endpoint, err := conn.ReadFromUDP(buff)
-		return n, (*StdNetEndpoint)(endpoint), err
+		n, endpoint, err := conn.ReadFromUDPAddrPort(buff)
+		return n, (*StdNetEndpoint)(&endpoint), err
 	}
 }
 
@@ -181,11 +170,16 @@ func (bind *StdNetBind) Send(buff []byte, endpoint Endpoint) error {
 	if !ok {
 		return ErrWrongEndpointType
 	}
-
+	addr := (*netip.AddrPort)(nend)
 	bind.mu.Lock()
-	blackhole := bind.blackhole4
-	conn := bind.ipv4
-	if nend.IP.To4() == nil {
+	var (
+		blackhole bool
+		conn      *net.UDPConn
+	)
+	if addr.Addr().Is4() {
+		blackhole = bind.blackhole4
+		conn = bind.ipv4
+	} else if addr.Addr().Is6() {
 		blackhole = bind.blackhole6
 		conn = bind.ipv6
 	}
@@ -197,6 +191,6 @@ func (bind *StdNetBind) Send(buff []byte, endpoint Endpoint) error {
 	if conn == nil {
 		return syscall.EAFNOSUPPORT
 	}
-	_, err = conn.WriteToUDP(buff, (*net.UDPAddr)(nend))
+	_, err = conn.WriteToUDPAddrPort(buff, *addr)
 	return err
 }

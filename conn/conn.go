@@ -9,11 +9,10 @@ package conn
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"reflect"
 	"runtime"
 	"strings"
-
-	"golang.zx2c4.com/go118/netip"
 )
 
 // A ReceiveFunc receives a single inbound packet from the network.
