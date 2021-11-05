@@ -1,4 +1,5 @@
 //go:build ignore
+// +build ignore
 
 /* SPDX-License-Identifier: MIT
  *
@@ -10,9 +11,9 @@ package main
 import (
 	"io"
 	"log"
-	"net"
 	"net/http"
 
+	"golang.zx2c4.com/go118/netip"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun/netstack"
@@ -20,8 +21,8 @@ import (
 
 func main() {
 	tun, tnet, err := netstack.CreateNetTUN(
-		[]net.IP{net.ParseIP("192.168.4.29")},
-		[]net.IP{net.ParseIP("8.8.8.8")},
+		[]netip.Addr{netip.MustParseAddr("192.168.4.29")},
+		[]netip.Addr{netip.MustParseAddr("8.8.8.8")},
 		1420)
 	if err != nil {
 		log.Panic(err)

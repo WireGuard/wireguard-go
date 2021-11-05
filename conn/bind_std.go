@@ -10,6 +10,8 @@ import (
 	"net"
 	"sync"
 	"syscall"
+
+	"golang.zx2c4.com/go118/netip"
 )
 
 // StdNetBind is meant to be a temporary solution on platforms for which
@@ -32,18 +34,22 @@ var _ Bind = (*StdNetBind)(nil)
 var _ Endpoint = (*StdNetEndpoint)(nil)
 
 func (*StdNetBind) ParseEndpoint(s string) (Endpoint, error) {
-	addr, err := parseEndpoint(s)
-	return (*StdNetEndpoint)(addr), err
+	e, err := netip.ParseAddrPort(s)
+	return (*StdNetEndpoint)(&net.UDPAddr{
+		IP:   e.Addr().AsSlice(),
+		Port: int(e.Port()),
+		Zone: e.Addr().Zone(),
+	}), err
 }
 
 func (*StdNetEndpoint) ClearSrc() {}
 
-func (e *StdNetEndpoint) DstIP() net.IP {
-	return (*net.UDPAddr)(e).IP
+func (e *StdNetEndpoint) DstIP() netip.Addr {
+	return netip.AddrFromSlice((*net.UDPAddr)(e).IP)
 }
 
-func (e *StdNetEndpoint) SrcIP() net.IP {
-	return nil // not supported
+func (e *StdNetEndpoint) SrcIP() netip.Addr {
+	return netip.Addr{} // not supported
 }
 
 func (e *StdNetEndpoint) DstToBytes() []byte {

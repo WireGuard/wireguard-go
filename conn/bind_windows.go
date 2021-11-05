@@ -15,6 +15,7 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+	"golang.zx2c4.com/go118/netip"
 
 	"golang.zx2c4.com/wireguard/conn/winrio"
 )
@@ -128,18 +129,18 @@ func (*WinRingBind) ParseEndpoint(s string) (Endpoint, error) {
 
 func (*WinRingEndpoint) ClearSrc() {}
 
-func (e *WinRingEndpoint) DstIP() net.IP {
+func (e *WinRingEndpoint) DstIP() netip.Addr {
 	switch e.family {
 	case windows.AF_INET:
-		return append([]byte{}, e.data[2:6]...)
+		return netip.AddrFrom4(*(*[4]byte)(e.data[2:6]))
 	case windows.AF_INET6:
-		return append([]byte{}, e.data[6:22]...)
+		return netip.AddrFrom16(*(*[16]byte)(e.data[6:22]))
 	}
-	return nil
+	return netip.Addr{}
 }
 
-func (e *WinRingEndpoint) SrcIP() net.IP {
-	return nil // not supported
+func (e *WinRingEndpoint) SrcIP() netip.Addr {
+	return netip.Addr{} // not supported
 }
 
 func (e *WinRingEndpoint) DstToBytes() []byte {
@@ -161,15 +162,13 @@ func (e *WinRingEndpoint) DstToBytes() []byte {
 func (e *WinRingEndpoint) DstToString() string {
 	switch e.family {
 	case windows.AF_INET:
-		addr := net.UDPAddr{IP: e.data[2:6], Port: int(binary.BigEndian.Uint16(e.data[0:2]))}
-		return addr.String()
+		netip.AddrPortFrom(netip.AddrFrom4(*(*[4]byte)(e.data[2:6])), binary.BigEndian.Uint16(e.data[0:2])).String()
 	case windows.AF_INET6:
 		var zone string
 		if scope := *(*uint32)(unsafe.Pointer(&e.data[22])); scope > 0 {
 			zone = strconv.FormatUint(uint64(scope), 10)
 		}
-		addr := net.UDPAddr{IP: e.data[6:22], Zone: zone, Port: int(binary.BigEndian.Uint16(e.data[0:2]))}
-		return addr.String()
+		return netip.AddrPortFrom(netip.AddrFrom16(*(*[16]byte)(e.data[6:22])).WithZone(zone), binary.BigEndian.Uint16(e.data[0:2])).String()
 	}
 	return ""
 }

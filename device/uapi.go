@@ -18,6 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.zx2c4.com/go118/netip"
 	"golang.zx2c4.com/wireguard/ipc"
 )
 
@@ -121,8 +122,8 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 			sendf("rx_bytes=%d", atomic.LoadUint64(&peer.stats.rxBytes))
 			sendf("persistent_keepalive_interval=%d", atomic.LoadUint32(&peer.persistentKeepaliveInterval))
 
-			device.allowedips.EntriesForPeer(peer, func(ip net.IP, cidr uint8) bool {
-				sendf("allowed_ip=%s/%d", ip.String(), cidr)
+			device.allowedips.EntriesForPeer(peer, func(prefix netip.Prefix) bool {
+				sendf("allowed_ip=%s", prefix.String())
 				return true
 			})
 		}
@@ -370,16 +371,14 @@ func (device *Device) handlePeerLine(peer *ipcSetPeer, key, value string) error 
 
 	case "allowed_ip":
 		device.log.Verbosef("%v - UAPI: Adding allowedip", peer.Peer)
-
-		_, network, err := net.ParseCIDR(value)
+		prefix, err := netip.ParsePrefix(value)
 		if err != nil {
 			return ipcErrorf(ipc.IpcErrorInvalid, "failed to set allowed ip: %w", err)
 		}
 		if peer.dummy {
 			return nil
 		}
-		ones, _ := network.Mask.Size()
-		device.allowedips.Insert(network.IP, uint8(ones), peer.Peer)
+		device.allowedips.Insert(prefix, peer.Peer)
 
 	case "protocol_version":
 		if value != "1" {

@@ -10,6 +10,8 @@ import (
 	"net"
 	"sort"
 	"testing"
+
+	"golang.zx2c4.com/go118/netip"
 )
 
 const (
@@ -93,14 +95,14 @@ func TestTrieRandom(t *testing.T) {
 		rand.Read(addr4[:])
 		cidr := uint8(rand.Intn(32) + 1)
 		index := rand.Intn(NumberOfPeers)
-		allowedIPs.Insert(addr4[:], cidr, peers[index])
+		allowedIPs.Insert(netip.PrefixFrom(netip.AddrFrom4(addr4), int(cidr)), peers[index])
 		slow4 = slow4.Insert(addr4[:], cidr, peers[index])
 
 		var addr6 [16]byte
 		rand.Read(addr6[:])
 		cidr = uint8(rand.Intn(128) + 1)
 		index = rand.Intn(NumberOfPeers)
-		allowedIPs.Insert(addr6[:], cidr, peers[index])
+		allowedIPs.Insert(netip.PrefixFrom(netip.AddrFrom16(addr6), int(cidr)), peers[index])
 		slow6 = slow6.Insert(addr6[:], cidr, peers[index])
 	}
 

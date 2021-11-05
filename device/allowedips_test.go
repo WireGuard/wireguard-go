@@ -9,6 +9,8 @@ import (
 	"math/rand"
 	"net"
 	"testing"
+
+	"golang.zx2c4.com/go118/netip"
 )
 
 type testPairCommonBits struct {
@@ -98,7 +100,7 @@ func TestTrieIPv4(t *testing.T) {
 	var allowedIPs AllowedIPs
 
 	insert := func(peer *Peer, a, b, c, d byte, cidr uint8) {
-		allowedIPs.Insert([]byte{a, b, c, d}, cidr, peer)
+		allowedIPs.Insert(netip.PrefixFrom(netip.AddrFrom4([4]byte{a, b, c, d}), int(cidr)), peer)
 	}
 
 	assertEQ := func(peer *Peer, a, b, c, d byte) {
@@ -208,7 +210,7 @@ func TestTrieIPv6(t *testing.T) {
 		addr = append(addr, expand(b)...)
 		addr = append(addr, expand(c)...)
 		addr = append(addr, expand(d)...)
-		allowedIPs.Insert(addr, cidr, peer)
+		allowedIPs.Insert(netip.PrefixFrom(netip.AddrFrom16(*(*[16]byte)(addr)), int(cidr)), peer)
 	}
 
 	assertEQ := func(peer *Peer, a, b, c, d uint32) {

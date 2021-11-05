@@ -8,13 +8,13 @@ package tuntest
 import (
 	"encoding/binary"
 	"io"
-	"net"
 	"os"
 
+	"golang.zx2c4.com/go118/netip"
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-func Ping(dst, src net.IP) []byte {
+func Ping(dst, src netip.Addr) []byte {
 	localPort := uint16(1337)
 	seq := uint16(0)
 
@@ -40,7 +40,7 @@ func checksum(buf []byte, initial uint16) uint16 {
 	return ^uint16(v)
 }
 
-func genICMPv4(payload []byte, dst, src net.IP) []byte {
+func genICMPv4(payload []byte, dst, src netip.Addr) []byte {
 	const (
 		icmpv4ProtocolNumber = 1
 		icmpv4Echo           = 8
@@ -70,8 +70,8 @@ func genICMPv4(payload []byte, dst, src net.IP) []byte {
 	binary.BigEndian.PutUint16(ip[ipv4TotalLenOffset:], length)
 	ip[8] = ttl
 	ip[9] = icmpv4ProtocolNumber
-	copy(ip[12:], src.To4())
-	copy(ip[16:], dst.To4())
+	copy(ip[12:], src.AsSlice())
+	copy(ip[16:], dst.AsSlice())
 	chksum = ^checksum(ip[:], 0)
 	binary.BigEndian.PutUint16(ip[ipv4ChecksumOffset:], chksum)
 
