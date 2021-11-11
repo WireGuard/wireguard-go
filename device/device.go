@@ -44,6 +44,7 @@ type Device struct {
 		netlinkCancel *rwcancel.RWCancel
 		port          uint16 // listening port
 		fwmark        uint32 // mark value (0 = disabled)
+		brokenRoaming bool
 	}
 
 	staticIdentity struct {
