@@ -254,10 +254,18 @@ type ipcSetPeer struct {
 	*Peer        // Peer is the current peer being operated on
 	dummy   bool // dummy reports whether this peer is a temporary, placeholder peer
 	created bool // new reports whether this is a newly created peer
+	pkaOn   bool // pkaOn reports whether the peer had the persistent keepalive turn on
 }
 
 func (peer *ipcSetPeer) handlePostConfig() {
-	if peer.Peer != nil && !peer.dummy && peer.Peer.device.isUp() {
+	if peer.Peer == nil {
+		return
+	}
+	if !peer.dummy && peer.device.isUp() {
+		peer.Start()
+		if peer.pkaOn {
+			peer.SendKeepalive()
+		}
 		peer.SendStagedPackets()
 	}
 }
@@ -349,14 +357,7 @@ func (device *Device) handlePeerLine(peer *ipcSetPeer, key, value string) error 
 		old := atomic.SwapUint32(&peer.persistentKeepaliveInterval, uint32(secs))
 
 		// Send immediate keepalive if we're turning it on and before it wasn't on.
-		if old == 0 && secs != 0 {
-			if err != nil {
-				return ipcErrorf(ipc.IpcErrorIO, "failed to get tun device status: %w", err)
-			}
-			if device.isUp() && !peer.dummy {
-				peer.SendKeepalive()
-			}
-		}
+		peer.pkaOn = old == 0 && secs != 0
 
 	case "replace_allowed_ips":
 		device.log.Verbosef("%v - UAPI: Removing all allowedips", peer.Peer)

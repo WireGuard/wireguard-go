@@ -172,6 +172,11 @@ func (device *Device) upLocked() error {
 		return err
 	}
 
+	// The IPC set operation waits for peers to be created before calling Start() on them,
+	// so if there's a concurrent IPC set request happening, we should wait for it to complete.
+	device.ipcMutex.Lock()
+	defer device.ipcMutex.Unlock()
+
 	device.peers.RLock()
 	for _, peer := range device.peers.keyMap {
 		peer.Start()

@@ -107,14 +107,11 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	// reset endpoint
 	peer.endpoint = nil
 
+	// init timers
+	peer.timersInit()
+
 	// add
 	device.peers.keyMap[pk] = peer
-
-	// start peer
-	peer.timersInit()
-	if peer.device.isUp() {
-		peer.Start()
-	}
 
 	return peer, nil
 }
