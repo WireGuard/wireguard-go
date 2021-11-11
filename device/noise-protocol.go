@@ -282,7 +282,7 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	// lookup peer
 
 	peer := device.LookupPeer(peerPK)
-	if peer == nil {
+	if peer == nil || !peer.isRunning.Get() {
 		return nil
 	}
 
