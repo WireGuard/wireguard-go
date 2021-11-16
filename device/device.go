@@ -53,14 +53,15 @@ type Device struct {
 		publicKey  NoisePublicKey
 	}
 
-	rate struct {
-		underLoadUntil int64
-		limiter        ratelimiter.Ratelimiter
-	}
-
 	peers struct {
 		sync.RWMutex // protects keyMap
 		keyMap       map[NoisePublicKey]*Peer
+	}
+
+	// Keep this 8-byte aligned
+	rate struct {
+		underLoadUntil int64
+		limiter        ratelimiter.Ratelimiter
 	}
 
 	allowedips    AllowedIPs
