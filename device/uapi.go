@@ -261,7 +261,9 @@ func (peer *ipcSetPeer) handlePostConfig() {
 	if peer.Peer == nil || peer.dummy {
 		return
 	}
-	peer.disableRoaming = peer.device.net.brokenRoaming && peer.endpoint != nil
+	if peer.created {
+		peer.disableRoaming = peer.device.net.brokenRoaming && peer.endpoint != nil
+	}
 	if peer.device.isUp() {
 		peer.Start()
 		if peer.pkaOn {
