@@ -71,6 +71,8 @@ func TestNoiseHandshake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	peer1.Start()
+	peer2.Start()
 
 	assertEqual(
 		t,
