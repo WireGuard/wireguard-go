@@ -99,33 +99,35 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 			sendf("fwmark=%d", device.net.fwmark)
 		}
 
-		// serialize each peer state
-
 		for _, peer := range device.peers.keyMap {
-			peer.RLock()
-			defer peer.RUnlock()
+			// Serialize peer state.
+			// Do the work in an anonymous function so that we can use defer.
+			func() {
+				peer.RLock()
+				defer peer.RUnlock()
 
-			keyf("public_key", (*[32]byte)(&peer.handshake.remoteStatic))
-			keyf("preshared_key", (*[32]byte)(&peer.handshake.presharedKey))
-			sendf("protocol_version=1")
-			if peer.endpoint != nil {
-				sendf("endpoint=%s", peer.endpoint.DstToString())
-			}
+				keyf("public_key", (*[32]byte)(&peer.handshake.remoteStatic))
+				keyf("preshared_key", (*[32]byte)(&peer.handshake.presharedKey))
+				sendf("protocol_version=1")
+				if peer.endpoint != nil {
+					sendf("endpoint=%s", peer.endpoint.DstToString())
+				}
 
-			nano := atomic.LoadInt64(&peer.stats.lastHandshakeNano)
-			secs := nano / time.Second.Nanoseconds()
-			nano %= time.Second.Nanoseconds()
+				nano := atomic.LoadInt64(&peer.stats.lastHandshakeNano)
+				secs := nano / time.Second.Nanoseconds()
+				nano %= time.Second.Nanoseconds()
 
-			sendf("last_handshake_time_sec=%d", secs)
-			sendf("last_handshake_time_nsec=%d", nano)
-			sendf("tx_bytes=%d", atomic.LoadUint64(&peer.stats.txBytes))
-			sendf("rx_bytes=%d", atomic.LoadUint64(&peer.stats.rxBytes))
-			sendf("persistent_keepalive_interval=%d", atomic.LoadUint32(&peer.persistentKeepaliveInterval))
+				sendf("last_handshake_time_sec=%d", secs)
+				sendf("last_handshake_time_nsec=%d", nano)
+				sendf("tx_bytes=%d", atomic.LoadUint64(&peer.stats.txBytes))
+				sendf("rx_bytes=%d", atomic.LoadUint64(&peer.stats.rxBytes))
+				sendf("persistent_keepalive_interval=%d", atomic.LoadUint32(&peer.persistentKeepaliveInterval))
 
-			device.allowedips.EntriesForPeer(peer, func(prefix netip.Prefix) bool {
-				sendf("allowed_ip=%s", prefix.String())
-				return true
-			})
+				device.allowedips.EntriesForPeer(peer, func(prefix netip.Prefix) bool {
+					sendf("allowed_ip=%s", prefix.String())
+					return true
+				})
+			}()
 		}
 	}()
 
