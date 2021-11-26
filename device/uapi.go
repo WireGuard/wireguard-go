@@ -453,9 +453,9 @@ func (device *Device) IpcHandle(socket net.Conn) {
 		}
 		if status != nil {
 			device.log.Errorf("%v", status)
-			fmt.Fprintf(buffered, "errno=%d\n\n", status.ErrorCode())
+			fmt.Fprintf(buffered, "errno=%d\n\nEnd\n", status.ErrorCode())
 		} else {
-			fmt.Fprintf(buffered, "errno=0\n\n")
+			fmt.Fprintf(buffered, "errno=0\n\nEnd\n")
 		}
 		buffered.Flush()
 	}
