@@ -159,6 +159,7 @@ func (device *Device) IpcSetOperation(r io.Reader) (err error) {
 		line := scanner.Text()
 		if line == "" {
 			// Blank line means terminate operation.
+			peer.handlePostConfig()
 			return nil
 		}
 		parts := strings.Split(line, "=")
