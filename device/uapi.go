@@ -73,7 +73,6 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 	}
 
 	func() {
-
 		// lock required resources
 
 		device.net.RLock()

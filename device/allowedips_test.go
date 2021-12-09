@@ -20,7 +20,6 @@ type testPairCommonBits struct {
 }
 
 func TestCommonBits(t *testing.T) {
-
 	tests := []testPairCommonBits{
 		{s1: []byte{1, 4, 53, 128}, s2: []byte{0, 0, 0, 0}, match: 7},
 		{s1: []byte{0, 4, 53, 128}, s2: []byte{0, 0, 0, 0}, match: 13},
@@ -41,7 +40,7 @@ func TestCommonBits(t *testing.T) {
 	}
 }
 
-func benchmarkTrie(peerNumber int, addressNumber int, addressLength int, b *testing.B) {
+func benchmarkTrie(peerNumber, addressNumber, addressLength int, b *testing.B) {
 	var trie *trieEntry
 	var peers []*Peer
 	root := parentIndirection{&trie, 2}

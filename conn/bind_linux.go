@@ -66,8 +66,10 @@ type LinuxSocketBind struct {
 func NewLinuxSocketBind() Bind { return &LinuxSocketBind{sock4: -1, sock6: -1} }
 func NewDefaultBind() Bind     { return NewLinuxSocketBind() }
 
-var _ Endpoint = (*LinuxSocketEndpoint)(nil)
-var _ Bind = (*LinuxSocketBind)(nil)
+var (
+	_ Endpoint = (*LinuxSocketEndpoint)(nil)
+	_ Bind     = (*LinuxSocketBind)(nil)
+)
 
 func (*LinuxSocketBind) ParseEndpoint(s string) (Endpoint, error) {
 	var end LinuxSocketEndpoint
@@ -171,7 +173,6 @@ func (bind *LinuxSocketBind) SetMark(value uint32) error {
 			unix.SO_MARK,
 			int(value),
 		)
-
 		if err != nil {
 			return err
 		}
@@ -184,7 +185,6 @@ func (bind *LinuxSocketBind) SetMark(value uint32) error {
 			unix.SO_MARK,
 			int(value),
 		)
-
 		if err != nil {
 			return err
 		}
@@ -327,7 +327,6 @@ func zoneToUint32(zone string) (uint32, error) {
 }
 
 func create4(port uint16) (int, uint16, error) {
-
 	// create socket
 
 	fd, err := unix.Socket(
@@ -335,7 +334,6 @@ func create4(port uint16) (int, uint16, error) {
 		unix.SOCK_DGRAM,
 		0,
 	)
-
 	if err != nil {
 		return -1, 0, err
 	}
@@ -371,7 +369,6 @@ func create4(port uint16) (int, uint16, error) {
 }
 
 func create6(port uint16) (int, uint16, error) {
-
 	// create socket
 
 	fd, err := unix.Socket(
@@ -379,7 +376,6 @@ func create6(port uint16) (int, uint16, error) {
 		unix.SOCK_DGRAM,
 		0,
 	)
-
 	if err != nil {
 		return -1, 0, err
 	}
@@ -410,7 +406,6 @@ func create6(port uint16) (int, uint16, error) {
 		}
 
 		return unix.Bind(fd, &addr)
-
 	}(); err != nil {
 		unix.Close(fd)
 		return -1, 0, err
@@ -425,7 +420,6 @@ func create6(port uint16) (int, uint16, error) {
 }
 
 func send4(sock int, end *LinuxSocketEndpoint, buff []byte) error {
-
 	// construct message header
 
 	cmsg := struct {
@@ -465,7 +459,6 @@ func send4(sock int, end *LinuxSocketEndpoint, buff []byte) error {
 }
 
 func send6(sock int, end *LinuxSocketEndpoint, buff []byte) error {
-
 	// construct message header
 
 	cmsg := struct {
@@ -509,7 +502,6 @@ func send6(sock int, end *LinuxSocketEndpoint, buff []byte) error {
 }
 
 func receive4(sock int, buff []byte, end *LinuxSocketEndpoint) (int, error) {
-
 	// construct message header
 
 	var cmsg struct {
@@ -518,7 +510,6 @@ func receive4(sock int, buff []byte, end *LinuxSocketEndpoint) (int, error) {
 	}
 
 	size, _, _, newDst, err := unix.Recvmsg(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], 0)
-
 	if err != nil {
 		return 0, err
 	}
@@ -541,7 +532,6 @@ func receive4(sock int, buff []byte, end *LinuxSocketEndpoint) (int, error) {
 }
 
 func receive6(sock int, buff []byte, end *LinuxSocketEndpoint) (int, error) {
-
 	// construct message header
 
 	var cmsg struct {
@@ -550,7 +540,6 @@ func receive6(sock int, buff []byte, end *LinuxSocketEndpoint) (int, error) {
 	}
 
 	size, _, _, newDst, err := unix.Recvmsg(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], 0)
-
 	if err != nil {
 		return 0, err
 	}

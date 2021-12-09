@@ -91,8 +91,10 @@ type WinRingEndpoint struct {
 	data   [30]byte
 }
 
-var _ Bind = (*WinRingBind)(nil)
-var _ Endpoint = (*WinRingEndpoint)(nil)
+var (
+	_ Bind     = (*WinRingBind)(nil)
+	_ Endpoint = (*WinRingEndpoint)(nil)
+)
 
 func (*WinRingBind) ParseEndpoint(s string) (Endpoint, error) {
 	host, port, err := net.SplitHostPort(s)
@@ -382,7 +384,6 @@ retry:
 		count = winrio.DequeueCompletion(bind.rx.cq, results[:])
 		if count == 0 {
 			return 0, nil, io.ErrNoProgress
-
 		}
 	}
 	bind.rx.Return(1)
@@ -533,6 +534,7 @@ func (bind *StdNetBind) BindSocketToInterface6(interfaceIndex uint32, blackhole 
 	bind.blackhole6 = blackhole
 	return nil
 }
+
 func (bind *WinRingBind) BindSocketToInterface4(interfaceIndex uint32, blackhole bool) error {
 	bind.mu.RLock()
 	defer bind.mu.RUnlock()

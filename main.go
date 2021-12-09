@@ -169,7 +169,6 @@ func main() {
 
 		return os.NewFile(uintptr(fd), ""), nil
 	}()
-
 	if err != nil {
 		logger.Errorf("UAPI listen error: %v", err)
 		os.Exit(ExitSetupFailed)

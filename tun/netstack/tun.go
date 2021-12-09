@@ -42,8 +42,11 @@ type netTun struct {
 	dnsServers     []netip.Addr
 	hasV4, hasV6   bool
 }
-type endpoint netTun
-type Net netTun
+
+type (
+	endpoint netTun
+	Net      netTun
+)
 
 func (e *endpoint) Attach(dispatcher stack.NetworkDispatcher) {
 	e.dispatcher = dispatcher

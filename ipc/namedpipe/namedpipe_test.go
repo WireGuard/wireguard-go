@@ -169,7 +169,7 @@ func TestDialAccessDeniedWithRestrictedSD(t *testing.T) {
 	}
 }
 
-func getConnection(cfg *namedpipe.ListenConfig) (client net.Conn, server net.Conn, err error) {
+func getConnection(cfg *namedpipe.ListenConfig) (client, server net.Conn, err error) {
 	pipePath := randomPipePath()
 	if cfg == nil {
 		cfg = &namedpipe.ListenConfig{}

@@ -141,7 +141,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	if err == nil && name == "utun" {
 		fname := os.Getenv("WG_TUN_NAME_FILE")
 		if fname != "" {
-			os.WriteFile(fname, []byte(tun.(*NativeTun).name+"\n"), 0400)
+			os.WriteFile(fname, []byte(tun.(*NativeTun).name+"\n"), 0o400)
 		}
 	}
 
@@ -232,7 +232,6 @@ func (tun *NativeTun) Read(buff []byte, offset int) (int, error) {
 }
 
 func (tun *NativeTun) Write(buff []byte, offset int) (int, error) {
-
 	// reserve space for header
 
 	buff = buff[offset-4:]
@@ -282,7 +281,6 @@ func (tun *NativeTun) setMTU(n int) error {
 		unix.SOCK_DGRAM,
 		0,
 	)
-
 	if err != nil {
 		return err
 	}
@@ -306,7 +304,6 @@ func (tun *NativeTun) MTU() (int, error) {
 		unix.SOCK_DGRAM,
 		0,
 	)
-
 	if err != nil {
 		return 0, err
 	}

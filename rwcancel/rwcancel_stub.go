@@ -4,7 +4,6 @@
 
 package rwcancel
 
-type RWCancel struct {
-}
+type RWCancel struct{}
 
 func (*RWCancel) Cancel() {}

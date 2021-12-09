@@ -46,8 +46,10 @@ type NativeTun struct {
 	forcedMTU int
 }
 
-var WintunTunnelType = "WireGuard"
-var WintunStaticRequestedGUID *windows.GUID
+var (
+	WintunTunnelType          = "WireGuard"
+	WintunStaticRequestedGUID *windows.GUID
+)
 
 //go:linkname procyield runtime.procyield
 func procyield(cycles uint32)

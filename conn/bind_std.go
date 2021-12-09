@@ -30,8 +30,10 @@ func NewStdNetBind() Bind { return &StdNetBind{} }
 
 type StdNetEndpoint net.UDPAddr
 
-var _ Bind = (*StdNetBind)(nil)
-var _ Endpoint = (*StdNetEndpoint)(nil)
+var (
+	_ Bind     = (*StdNetBind)(nil)
+	_ Endpoint = (*StdNetEndpoint)(nil)
+)
 
 func (*StdNetBind) ParseEndpoint(s string) (Endpoint, error) {
 	e, err := netip.ParseAddrPort(s)

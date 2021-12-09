@@ -226,7 +226,6 @@ func (device *Device) RoutineReadFromTUN() {
 
 		offset := MessageTransportHeaderSize
 		size, err := device.tun.device.Read(elem.buffer[:], offset)
-
 		if err != nil {
 			if !device.isClosed() {
 				if !errors.Is(err, os.ErrClosed) {

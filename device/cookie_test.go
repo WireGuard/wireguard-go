@@ -10,7 +10,6 @@ import (
 )
 
 func TestCookieMAC1(t *testing.T) {
-
 	// setup generator / checker
 
 	var (
@@ -132,12 +131,12 @@ func TestCookieMAC1(t *testing.T) {
 
 		msg[5] ^= 0x20
 
-		srcBad1 := []byte{192, 168, 13, 37, 40, 01}
+		srcBad1 := []byte{192, 168, 13, 37, 40, 1}
 		if checker.CheckMAC2(msg, srcBad1) {
 			t.Fatal("MAC2 generation/verification failed")
 		}
 
-		srcBad2 := []byte{192, 168, 13, 38, 40, 01}
+		srcBad2 := []byte{192, 168, 13, 38, 40, 1}
 		if checker.CheckMAC2(msg, srcBad2) {
 			t.Fatal("MAC2 generation/verification failed")
 		}

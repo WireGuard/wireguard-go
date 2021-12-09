@@ -48,7 +48,7 @@ func uapiCfg(cfg ...string) string {
 
 // genConfigs generates a pair of configs that connect to each other.
 // The configs use distinct, probably-usable ports.
-func genConfigs(tb testing.TB) (cfgs [2]string, endpointCfgs [2]string) {
+func genConfigs(tb testing.TB) (cfgs, endpointCfgs [2]string) {
 	var key1, key2 NoisePrivateKey
 	_, err := rand.Read(key1[:])
 	if err != nil {

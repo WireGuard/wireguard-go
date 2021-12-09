@@ -54,7 +54,6 @@ func (l *UAPIListener) Addr() net.Addr {
 }
 
 func UAPIListen(name string, file *os.File) (net.Listener, error) {
-
 	// wrap file in listener
 
 	listener, err := net.FileListener(file)

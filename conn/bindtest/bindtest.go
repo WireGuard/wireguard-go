@@ -25,8 +25,10 @@ type ChannelBind struct {
 
 type ChannelEndpoint uint16
 
-var _ conn.Bind = (*ChannelBind)(nil)
-var _ conn.Endpoint = (*ChannelEndpoint)(nil)
+var (
+	_ conn.Bind     = (*ChannelBind)(nil)
+	_ conn.Endpoint = (*ChannelEndpoint)(nil)
+)
 
 func NewChannelBinds() [2]conn.Bind {
 	arx4 := make(chan []byte, 8192)

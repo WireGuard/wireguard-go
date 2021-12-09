@@ -20,7 +20,7 @@ type KDFTest struct {
 	t2    string
 }
 
-func assertEquals(t *testing.T, a string, b string) {
+func assertEquals(t *testing.T, a, b string) {
 	if a != b {
 		t.Fatal("expected", a, "=", b)
 	}
