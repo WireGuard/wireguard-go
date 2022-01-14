@@ -103,7 +103,7 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 				l.connErr <- err
 				return
 			}
-			if kerr != nil || n != 1 {
+			if (kerr != nil || n != 1) && kerr != unix.EINTR {
 				if kerr != nil {
 					l.connErr <- kerr
 				} else {
