@@ -17,7 +17,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.zx2c4.com/go118/netip"
@@ -294,13 +293,11 @@ func (net *Net) ListenUDP(laddr *net.UDPAddr) (*gonet.UDPConn, error) {
 }
 
 type PingConn struct {
-	laddr           PingAddr
-	raddr           PingAddr
-	wq              waiter.Queue
-	ep              tcpip.Endpoint
-	mu              sync.RWMutex
-	deadline        time.Time
-	deadlineBreaker chan struct{}
+	laddr    PingAddr
+	raddr    PingAddr
+	wq       waiter.Queue
+	ep       tcpip.Endpoint
+	deadline *time.Timer
 }
 
 type PingAddr struct{ addr netip.Addr }
@@ -348,9 +345,10 @@ func (net *Net) DialPingAddr(laddr, raddr netip.Addr) (*PingConn, error) {
 	}
 
 	pc := &PingConn{
-		laddr:           PingAddr{laddr},
-		deadlineBreaker: make(chan struct{}, 1),
+		laddr:    PingAddr{laddr},
+		deadline: time.NewTimer(time.Hour << 10),
 	}
+	pc.deadline.Stop()
 
 	ep, tcpipErr := net.stack.NewEndpoint(tn, pn, &pc.wq)
 	if tcpipErr != nil {
@@ -408,7 +406,7 @@ func (pc *PingConn) RemoteAddr() net.Addr {
 }
 
 func (pc *PingConn) Close() error {
-	close(pc.deadlineBreaker)
+	pc.deadline.Reset(0)
 	pc.ep.Close()
 	return nil
 }
@@ -454,33 +452,10 @@ func (pc *PingConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	pc.wq.EventRegister(&e, waiter.EventIn)
 	defer pc.wq.EventUnregister(&e)
 
-	ready := false
-
-	for !ready {
-		pc.mu.RLock()
-		deadlineBreaker := pc.deadlineBreaker
-		deadline := pc.deadline
-		pc.mu.RUnlock()
-
-		if deadline.IsZero() {
-			select {
-			case <-deadlineBreaker:
-			case <-notifyCh:
-				ready = true
-			}
-		} else {
-			t := time.NewTimer(deadline.Sub(time.Now()))
-			defer t.Stop()
-
-			select {
-			case <-t.C:
-				return 0, nil, os.ErrDeadlineExceeded
-
-			case <-deadlineBreaker:
-			case <-notifyCh:
-				ready = true
-			}
-		}
+	select {
+	case <-pc.deadline.C:
+		return 0, nil, os.ErrDeadlineExceeded
+	case <-notifyCh:
 	}
 
 	w := tcpip.SliceWriter(p)
@@ -508,11 +483,7 @@ func (pc *PingConn) SetDeadline(t time.Time) error {
 }
 
 func (pc *PingConn) SetReadDeadline(t time.Time) error {
-	pc.mu.Lock()
-	defer pc.mu.Unlock()
-	close(pc.deadlineBreaker)
-	pc.deadlineBreaker = make(chan struct{}, 1)
-	pc.deadline = t
+	pc.deadline.Reset(t.Sub(time.Now()))
 	return nil
 }
 
