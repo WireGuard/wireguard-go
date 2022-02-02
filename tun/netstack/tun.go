@@ -398,19 +398,7 @@ func (pc *PingConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 		return 0, fmt.Errorf("ping write: mismatched protocols")
 	}
 
-	var buf buffer.View
-	if ia.addr.Is4() {
-		buf = buffer.NewView(header.ICMPv4MinimumSize + len(p))
-		copy(buf[header.ICMPv4MinimumSize:], p)
-		icmp := header.ICMPv4(buf)
-		icmp.SetType(header.ICMPv4Echo)
-	} else if ia.addr.Is6() {
-		buf = buffer.NewView(header.ICMPv6MinimumSize + len(p))
-		copy(buf[header.ICMPv6MinimumSize:], p)
-		icmp := header.ICMPv6(buf)
-		icmp.SetType(header.ICMPv6EchoRequest)
-	}
-
+	buf := buffer.NewViewFromBytes(p)
 	rdr := buf.Reader()
 	rfa, _ := convertToFullAddr(netip.AddrPortFrom(ia.addr, 0))
 	// won't block, no deadlines
@@ -462,12 +450,7 @@ func (pc *PingConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 		}
 	}
 
-	min := header.ICMPv6MinimumSize
-	if pc.laddr.addr.Is4() {
-		min = header.ICMPv4MinimumSize
-	}
-	reply := make([]byte, min+len(p))
-	w := tcpip.SliceWriter(reply)
+	w := tcpip.SliceWriter(p)
 
 	res, tcpipErr := pc.ep.Read(&w, tcpip.ReadOptions{
 		NeedRemoteAddr: true,
@@ -477,8 +460,7 @@ func (pc *PingConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	}
 
 	addr = PingAddr{netip.AddrFromSlice([]byte(res.RemoteAddr.Addr))}
-	copy(p, reply[min:res.Count])
-	return res.Count - min, addr, nil
+	return res.Count, addr, nil
 }
 
 func (pc *PingConn) Read(p []byte) (n int, err error) {
