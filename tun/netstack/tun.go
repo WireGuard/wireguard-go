@@ -230,7 +230,8 @@ func (net *Net) DialContextTCP(ctx context.Context, addr *net.TCPAddr) (*gonet.T
 	if addr == nil {
 		return net.DialContextTCPAddrPort(ctx, netip.AddrPort{})
 	}
-	return net.DialContextTCPAddrPort(ctx, netip.AddrPortFrom(netip.AddrFromSlice(addr.IP), uint16(addr.Port)))
+	ip, _ := netip.AddrFromSlice(addr.IP)
+	return net.DialContextTCPAddrPort(ctx, netip.AddrPortFrom(ip, uint16(addr.Port)))
 }
 
 func (net *Net) DialTCPAddrPort(addr netip.AddrPort) (*gonet.TCPConn, error) {
@@ -242,7 +243,8 @@ func (net *Net) DialTCP(addr *net.TCPAddr) (*gonet.TCPConn, error) {
 	if addr == nil {
 		return net.DialTCPAddrPort(netip.AddrPort{})
 	}
-	return net.DialTCPAddrPort(netip.AddrPortFrom(netip.AddrFromSlice(addr.IP), uint16(addr.Port)))
+	ip, _ := netip.AddrFromSlice(addr.IP)
+	return net.DialTCPAddrPort(netip.AddrPortFrom(ip, uint16(addr.Port)))
 }
 
 func (net *Net) ListenTCPAddrPort(addr netip.AddrPort) (*gonet.TCPListener, error) {
@@ -254,7 +256,8 @@ func (net *Net) ListenTCP(addr *net.TCPAddr) (*gonet.TCPListener, error) {
 	if addr == nil {
 		return net.ListenTCPAddrPort(netip.AddrPort{})
 	}
-	return net.ListenTCPAddrPort(netip.AddrPortFrom(netip.AddrFromSlice(addr.IP), uint16(addr.Port)))
+	ip, _ := netip.AddrFromSlice(addr.IP)
+	return net.ListenTCPAddrPort(netip.AddrPortFrom(ip, uint16(addr.Port)))
 }
 
 func (net *Net) DialUDPAddrPort(laddr, raddr netip.AddrPort) (*gonet.UDPConn, error) {
@@ -280,10 +283,12 @@ func (net *Net) ListenUDPAddrPort(laddr netip.AddrPort) (*gonet.UDPConn, error) 
 func (net *Net) DialUDP(laddr, raddr *net.UDPAddr) (*gonet.UDPConn, error) {
 	var la, ra netip.AddrPort
 	if laddr != nil {
-		la = netip.AddrPortFrom(netip.AddrFromSlice(laddr.IP), uint16(laddr.Port))
+		ip, _ := netip.AddrFromSlice(laddr.IP)
+		la = netip.AddrPortFrom(ip, uint16(laddr.Port))
 	}
 	if raddr != nil {
-		ra = netip.AddrPortFrom(netip.AddrFromSlice(raddr.IP), uint16(raddr.Port))
+		ip, _ := netip.AddrFromSlice(raddr.IP)
+		ra = netip.AddrPortFrom(ip, uint16(raddr.Port))
 	}
 	return net.DialUDPAddrPort(la, ra)
 }
@@ -421,7 +426,7 @@ func (pc *PingConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	case *PingAddr:
 		na = v.addr
 	case *net.IPAddr:
-		na = netip.AddrFromSlice(v.IP)
+		na, _ = netip.AddrFromSlice(v.IP)
 	default:
 		return 0, fmt.Errorf("ping write: wrong net.Addr type")
 	}
@@ -467,8 +472,8 @@ func (pc *PingConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 		return 0, nil, fmt.Errorf("ping read: %s", tcpipErr)
 	}
 
-	addr = &PingAddr{netip.AddrFromSlice([]byte(res.RemoteAddr.Addr))}
-	return res.Count, addr, nil
+	remoteAddr, _ := netip.AddrFromSlice([]byte(res.RemoteAddr.Addr))
+	return res.Count, &PingAddr{remoteAddr}, nil
 }
 
 func (pc *PingConn) Read(p []byte) (n int, err error) {
