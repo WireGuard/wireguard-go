@@ -690,7 +690,10 @@ func (tnet *Net) exchange(ctx context.Context, server netip.Addr, q dnsmessage.Q
 			return dnsmessage.Parser{}, dnsmessage.Header{}, err
 		}
 		if d, ok := ctx.Deadline(); ok && !d.IsZero() {
-			c.SetDeadline(d)
+			err := c.SetDeadline(d)
+			if err != nil {
+				return dnsmessage.Parser{}, dnsmessage.Header{}, err
+			}
 		}
 		var p dnsmessage.Parser
 		var h dnsmessage.Header
