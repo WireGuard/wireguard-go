@@ -8,9 +8,9 @@ package tuntest
 import (
 	"encoding/binary"
 	"io"
+	"net/netip"
 	"os"
 
-	"golang.zx2c4.com/go118/netip"
 	"golang.zx2c4.com/wireguard/tun"
 )
 

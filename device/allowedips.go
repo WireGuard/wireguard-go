@@ -11,10 +11,9 @@ import (
 	"errors"
 	"math/bits"
 	"net"
+	"net/netip"
 	"sync"
 	"unsafe"
-
-	"golang.zx2c4.com/go118/netip"
 )
 
 type parentIndirection struct {

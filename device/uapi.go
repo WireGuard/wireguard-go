@@ -12,13 +12,13 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"golang.zx2c4.com/go118/netip"
 	"golang.zx2c4.com/wireguard/ipc"
 )
 
@@ -161,12 +161,10 @@ func (device *Device) IpcSetOperation(r io.Reader) (err error) {
 			peer.handlePostConfig()
 			return nil
 		}
-		parts := strings.Split(line, "=")
-		if len(parts) != 2 {
-			return ipcErrorf(ipc.IpcErrorProtocol, "failed to parse line %q, found %d =-separated parts, want 2", line, len(parts))
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			return ipcErrorf(ipc.IpcErrorProtocol, "failed to parse line %q", line)
 		}
-		key := parts[0]
-		value := parts[1]
 
 		if key == "public_key" {
 			if deviceConfig {

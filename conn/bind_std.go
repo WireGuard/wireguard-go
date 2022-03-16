@@ -8,10 +8,9 @@ package conn
 import (
 	"errors"
 	"net"
+	"net/netip"
 	"sync"
 	"syscall"
-
-	"golang.zx2c4.com/go118/netip"
 )
 
 // StdNetBind is meant to be a temporary solution on platforms for which

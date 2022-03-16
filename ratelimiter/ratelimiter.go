@@ -6,10 +6,9 @@
 package ratelimiter
 
 import (
+	"net/netip"
 	"sync"
 	"time"
-
-	"golang.zx2c4.com/go118/netip"
 )
 
 const (

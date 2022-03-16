@@ -7,8 +7,7 @@ package device
 
 import (
 	"math/rand"
-
-	"golang.zx2c4.com/go118/netip"
+	"net/netip"
 )
 
 type DummyEndpoint struct {

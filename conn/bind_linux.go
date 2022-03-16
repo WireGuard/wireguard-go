@@ -8,13 +8,13 @@ package conn
 import (
 	"errors"
 	"net"
+	"net/netip"
 	"strconv"
 	"sync"
 	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
-	"golang.zx2c4.com/go118/netip"
 )
 
 type ipv4Source struct {

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net/netip"
 	"runtime"
 	"runtime/pprof"
 	"sync"
@@ -18,7 +19,6 @@ import (
 	"testing"
 	"time"
 
-	"golang.zx2c4.com/go118/netip"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/conn/bindtest"
 	"golang.zx2c4.com/wireguard/tun/tuntest"
