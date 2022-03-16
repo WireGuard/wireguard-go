@@ -39,12 +39,12 @@ func (s IPCError) ErrorCode() int64 {
 	return s.code
 }
 
-func ipcErrorf(code int64, msg string, args ...interface{}) *IPCError {
+func ipcErrorf(code int64, msg string, args ...any) *IPCError {
 	return &IPCError{code: code, err: fmt.Errorf(msg, args...)}
 }
 
 var byteBufferPool = &sync.Pool{
-	New: func() interface{} { return new(bytes.Buffer) },
+	New: func() any { return new(bytes.Buffer) },
 }
 
 // IpcGetOperation implements the WireGuard configuration protocol "get" operation.
@@ -56,7 +56,7 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 	buf := byteBufferPool.Get().(*bytes.Buffer)
 	buf.Reset()
 	defer byteBufferPool.Put(buf)
-	sendf := func(format string, args ...interface{}) {
+	sendf := func(format string, args ...any) {
 		fmt.Fprintf(buf, format, args...)
 		buf.WriteByte('\n')
 	}

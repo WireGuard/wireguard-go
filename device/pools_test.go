@@ -26,7 +26,7 @@ func TestWaitPool(t *testing.T) {
 	if workers-4 <= 0 {
 		t.Skip("Not enough cores")
 	}
-	p := NewWaitPool(uint32(workers-4), func() interface{} { return make([]byte, 16) })
+	p := NewWaitPool(uint32(workers-4), func() any { return make([]byte, 16) })
 	wg.Add(workers)
 	max := uint32(0)
 	updateMax := func() {
@@ -71,7 +71,7 @@ func BenchmarkWaitPool(b *testing.B) {
 	if workers-4 <= 0 {
 		b.Skip("Not enough cores")
 	}
-	p := NewWaitPool(uint32(workers-4), func() interface{} { return make([]byte, 16) })
+	p := NewWaitPool(uint32(workers-4), func() any { return make([]byte, 16) })
 	wg.Add(workers)
 	b.ResetTimer()
 	for i := 0; i < workers; i++ {
