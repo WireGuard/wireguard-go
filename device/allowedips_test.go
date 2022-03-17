@@ -7,28 +7,28 @@ package device
 
 import (
 	"math/rand"
-	"net"
 	"net/netip"
 	"testing"
+	"unsafe"
 )
 
-type testPairCommonBits struct {
-	s1    []byte
-	s2    []byte
+type testPairCommonBits4 struct {
+	s1    [4]byte
+	s2    [4]byte
 	match uint8
 }
 
-func TestCommonBits(t *testing.T) {
-	tests := []testPairCommonBits{
-		{s1: []byte{1, 4, 53, 128}, s2: []byte{0, 0, 0, 0}, match: 7},
-		{s1: []byte{0, 4, 53, 128}, s2: []byte{0, 0, 0, 0}, match: 13},
-		{s1: []byte{0, 4, 53, 253}, s2: []byte{0, 4, 53, 252}, match: 31},
-		{s1: []byte{192, 168, 1, 1}, s2: []byte{192, 169, 1, 1}, match: 15},
-		{s1: []byte{65, 168, 1, 1}, s2: []byte{192, 169, 1, 1}, match: 0},
+func TestCommonBits4(t *testing.T) {
+	tests := []testPairCommonBits4{
+		{s1: [4]byte{1, 4, 53, 128}, s2: [4]byte{0, 0, 0, 0}, match: 7},
+		{s1: [4]byte{0, 4, 53, 128}, s2: [4]byte{0, 0, 0, 0}, match: 13},
+		{s1: [4]byte{0, 4, 53, 253}, s2: [4]byte{0, 4, 53, 252}, match: 31},
+		{s1: [4]byte{192, 168, 1, 1}, s2: [4]byte{192, 169, 1, 1}, match: 15},
+		{s1: [4]byte{65, 168, 1, 1}, s2: [4]byte{192, 169, 1, 1}, match: 0},
 	}
 
 	for _, p := range tests {
-		v := commonBits(p.s1, p.s2)
+		v := commonBits4(p.s1, p.s2)
 		if v != p.match {
 			t.Error(
 				"For slice", p.s1, p.s2,
@@ -39,48 +39,46 @@ func TestCommonBits(t *testing.T) {
 	}
 }
 
-func benchmarkTrie(peerNumber, addressNumber, addressLength int, b *testing.B) {
-	var trie *trieEntry
+func benchmarkTrie[B ipArray](peerNumber, addressNumber int, b *testing.B) {
+	var trie *trieEntry[B]
 	var peers []*Peer
-	root := parentIndirection{&trie, 2}
+	root := parentIndirection[B]{&trie, 2}
 
 	rand.Seed(1)
-
-	const AddressLength = 4
 
 	for n := 0; n < peerNumber; n++ {
 		peers = append(peers, &Peer{})
 	}
 
 	for n := 0; n < addressNumber; n++ {
-		var addr [AddressLength]byte
-		rand.Read(addr[:])
-		cidr := uint8(rand.Uint32() % (AddressLength * 8))
+		var addr B
+		rand.Read(unsafe.Slice(&addr[0], len(addr)))
+		cidr := uint8(rand.Uint32() % uint32(len(addr)*8))
 		index := rand.Int() % peerNumber
-		root.insert(addr[:], cidr, peers[index])
+		root.insert(addr, cidr, peers[index])
 	}
 
 	for n := 0; n < b.N; n++ {
-		var addr [AddressLength]byte
-		rand.Read(addr[:])
-		trie.lookup(addr[:])
+		var addr B
+		rand.Read(unsafe.Slice(&addr[0], len(addr)))
+		trie.lookup(addr)
 	}
 }
 
 func BenchmarkTrieIPv4Peers100Addresses1000(b *testing.B) {
-	benchmarkTrie(100, 1000, net.IPv4len, b)
+	benchmarkTrie[[4]byte](100, 1000, b)
 }
 
 func BenchmarkTrieIPv4Peers10Addresses10(b *testing.B) {
-	benchmarkTrie(10, 10, net.IPv4len, b)
+	benchmarkTrie[[4]byte](10, 10, b)
 }
 
 func BenchmarkTrieIPv6Peers100Addresses1000(b *testing.B) {
-	benchmarkTrie(100, 1000, net.IPv6len, b)
+	benchmarkTrie[[16]byte](100, 1000, b)
 }
 
 func BenchmarkTrieIPv6Peers10Addresses10(b *testing.B) {
-	benchmarkTrie(10, 10, net.IPv6len, b)
+	benchmarkTrie[[16]byte](10, 10, b)
 }
 
 /* Test ported from kernel implementation:

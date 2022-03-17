@@ -40,9 +40,18 @@ func (r SlowRouter) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }
 
+func commonBitsSlice(addr1, addr2 []byte) uint8 {
+	if len(addr1) == 4 {
+		return commonBits4(*(*[4]byte)(addr1), *(*[4]byte)(addr2))
+	} else if len(addr1) == 16 {
+		return commonBits16(*(*[16]byte)(addr1), *(*[16]byte)(addr2))
+	}
+	return 0
+}
+
 func (r SlowRouter) Insert(addr []byte, cidr uint8, peer *Peer) SlowRouter {
 	for _, t := range r {
-		if t.cidr == cidr && commonBits(t.bits, addr) >= cidr {
+		if t.cidr == cidr && commonBitsSlice(t.bits, addr) >= cidr {
 			t.peer = peer
 			t.bits = addr
 			return r
@@ -59,7 +68,7 @@ func (r SlowRouter) Insert(addr []byte, cidr uint8, peer *Peer) SlowRouter {
 
 func (r SlowRouter) Lookup(addr []byte) *Peer {
 	for _, t := range r {
-		common := commonBits(t.bits, addr)
+		common := commonBitsSlice(t.bits, addr)
 		if common >= t.cidr {
 			return t.peer
 		}
