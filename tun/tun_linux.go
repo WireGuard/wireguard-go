@@ -9,7 +9,6 @@ package tun
  */
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -321,11 +320,7 @@ func (tun *NativeTun) nameSlow() (string, error) {
 	if errno != 0 {
 		return "", fmt.Errorf("failed to get name of TUN device: %w", errno)
 	}
-	name := ifr[:]
-	if i := bytes.IndexByte(name, 0); i != -1 {
-		name = name[:i]
-	}
-	return string(name), nil
+	return unix.ByteSliceToString(ifr[:]), nil
 }
 
 func (tun *NativeTun) Write(buf []byte, offset int) (int, error) {
