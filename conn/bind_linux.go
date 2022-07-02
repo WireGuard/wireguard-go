@@ -331,7 +331,7 @@ func create4(port uint16) (int, uint16, error) {
 
 	fd, err := unix.Socket(
 		unix.AF_INET,
-		unix.SOCK_DGRAM,
+		unix.SOCK_DGRAM|unix.SOCK_CLOEXEC,
 		0,
 	)
 	if err != nil {
@@ -373,7 +373,7 @@ func create6(port uint16) (int, uint16, error) {
 
 	fd, err := unix.Socket(
 		unix.AF_INET6,
-		unix.SOCK_DGRAM,
+		unix.SOCK_DGRAM|unix.SOCK_CLOEXEC,
 		0,
 	)
 	if err != nil {

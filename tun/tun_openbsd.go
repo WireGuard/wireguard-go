@@ -114,10 +114,10 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	var err error
 
 	if ifIndex != -1 {
-		tunfile, err = os.OpenFile(fmt.Sprintf("/dev/tun%d", ifIndex), unix.O_RDWR, 0)
+		tunfile, err = os.OpenFile(fmt.Sprintf("/dev/tun%d", ifIndex), unix.O_RDWR|unix.O_CLOEXEC, 0)
 	} else {
 		for ifIndex = 0; ifIndex < 256; ifIndex++ {
-			tunfile, err = os.OpenFile(fmt.Sprintf("/dev/tun%d", ifIndex), unix.O_RDWR, 0)
+			tunfile, err = os.OpenFile(fmt.Sprintf("/dev/tun%d", ifIndex), unix.O_RDWR|unix.O_CLOEXEC, 0)
 			if err == nil || !errors.Is(err, syscall.EBUSY) {
 				break
 			}
@@ -165,7 +165,7 @@ func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 		return nil, err
 	}
 
-	tun.routeSocket, err = unix.Socket(unix.AF_ROUTE, unix.SOCK_RAW, unix.AF_UNSPEC)
+	tun.routeSocket, err = unix.Socket(unix.AF_ROUTE, unix.SOCK_RAW|unix.SOCK_CLOEXEC, unix.AF_UNSPEC)
 	if err != nil {
 		tun.tunFile.Close()
 		return nil, err
@@ -270,7 +270,7 @@ func (tun *NativeTun) setMTU(n int) error {
 
 	fd, err := unix.Socket(
 		unix.AF_INET,
-		unix.SOCK_DGRAM,
+		unix.SOCK_DGRAM|unix.SOCK_CLOEXEC,
 		0,
 	)
 	if err != nil {
@@ -304,7 +304,7 @@ func (tun *NativeTun) MTU() (int, error) {
 
 	fd, err := unix.Socket(
 		unix.AF_INET,
-		unix.SOCK_DGRAM,
+		unix.SOCK_DGRAM|unix.SOCK_CLOEXEC,
 		0,
 	)
 	if err != nil {

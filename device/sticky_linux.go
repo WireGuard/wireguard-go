@@ -204,7 +204,7 @@ func (device *Device) routineRouteListener(bind conn.Bind, netlinkSock int, netl
 }
 
 func createNetlinkRouteSocket() (int, error) {
-	sock, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW, unix.NETLINK_ROUTE)
+	sock, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW|unix.SOCK_CLOEXEC, unix.NETLINK_ROUTE)
 	if err != nil {
 		return -1, err
 	}

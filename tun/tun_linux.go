@@ -99,7 +99,7 @@ func (tun *NativeTun) routineHackListener() {
 }
 
 func createNetlinkSocket() (int, error) {
-	sock, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW, unix.NETLINK_ROUTE)
+	sock, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW|unix.SOCK_CLOEXEC, unix.NETLINK_ROUTE)
 	if err != nil {
 		return -1, err
 	}
@@ -194,7 +194,7 @@ func (tun *NativeTun) routineNetlinkListener() {
 func getIFIndex(name string) (int32, error) {
 	fd, err := unix.Socket(
 		unix.AF_INET,
-		unix.SOCK_DGRAM,
+		unix.SOCK_DGRAM|unix.SOCK_CLOEXEC,
 		0,
 	)
 	if err != nil {
@@ -228,7 +228,7 @@ func (tun *NativeTun) setMTU(n int) error {
 	// open datagram socket
 	fd, err := unix.Socket(
 		unix.AF_INET,
-		unix.SOCK_DGRAM,
+		unix.SOCK_DGRAM|unix.SOCK_CLOEXEC,
 		0,
 	)
 	if err != nil {
@@ -264,7 +264,7 @@ func (tun *NativeTun) MTU() (int, error) {
 	// open datagram socket
 	fd, err := unix.Socket(
 		unix.AF_INET,
-		unix.SOCK_DGRAM,
+		unix.SOCK_DGRAM|unix.SOCK_CLOEXEC,
 		0,
 	)
 	if err != nil {
@@ -400,7 +400,7 @@ func (tun *NativeTun) Close() error {
 }
 
 func CreateTUN(name string, mtu int) (Device, error) {
-	nfd, err := unix.Open(cloneDevicePath, os.O_RDWR, 0)
+	nfd, err := unix.Open(cloneDevicePath, unix.O_RDWR|unix.O_CLOEXEC, 0)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("CreateTUN(%q) failed; %s does not exist", name, cloneDevicePath)
