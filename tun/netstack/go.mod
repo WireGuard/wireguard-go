@@ -5,7 +5,7 @@ go 1.18
 require (
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
 	golang.zx2c4.com/wireguard v0.0.0-20220316235147-5aff28b14c24
-	gvisor.dev/gvisor v0.0.0-20211020211948-f76a604701b6
+	gvisor.dev/gvisor v0.0.0-20220817001344-846276b3dbc5
 )
 
 require (
