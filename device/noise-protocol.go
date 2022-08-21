@@ -243,6 +243,11 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 
 	handshake.mixHash(msg.Timestamp[:])
 	handshake.state = handshakeInitiationCreated
+
+	if device.keyLogHandler != nil {
+		go device.keyLogHandler(handshake.lastTimestamp.Time(), device.staticIdentity.privateKey, handshake.remoteStatic, handshake.localEphemeral, handshake.presharedKey)
+	}
+
 	return &msg, nil
 }
 
@@ -413,6 +418,10 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 	}()
 
 	handshake.state = handshakeResponseCreated
+
+	if device.keyLogHandler != nil {
+		go device.keyLogHandler(handshake.lastTimestamp.Time(), device.staticIdentity.privateKey, handshake.remoteStatic, handshake.localEphemeral, handshake.presharedKey)
+	}
 
 	return &msg, nil
 }

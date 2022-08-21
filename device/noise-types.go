@@ -76,3 +76,12 @@ func (key NoisePublicKey) Equals(tar NoisePublicKey) bool {
 func (key *NoisePresharedKey) FromHex(src string) error {
 	return loadExactHex(key[:], src)
 }
+
+func (key NoisePresharedKey) Equals(tar NoisePresharedKey) bool {
+	return subtle.ConstantTimeCompare(key[:], tar[:]) == 1
+}
+
+func (key NoisePresharedKey) IsZero() bool {
+	var zero NoisePresharedKey
+	return key.Equals(zero)
+}
