@@ -275,3 +275,19 @@ func (peer *Peer) SetEndpointFromPacket(endpoint conn.Endpoint) {
 	peer.endpoint = endpoint
 	peer.Unlock()
 }
+
+// LastHandshakeNano returns the last handshake time in nanoseconds since the
+// unix epoch.
+func (peer *Peer) LastHandshakeNano() int64 {
+	return atomic.LoadInt64(&peer.stats.lastHandshakeNano)
+}
+
+// RxBytes returns the number of bytes received from this peer.
+func (peer *Peer) RxBytes() uint64 {
+	return atomic.LoadUint64(&peer.stats.rxBytes)
+}
+
+// TxBytes returns the number of bytes sent to this peer.
+func (peer *Peer) TxBytes() uint64 {
+	return atomic.LoadUint64(&peer.stats.txBytes)
+}
