@@ -1,6 +1,6 @@
 module golang.zx2c4.com/wireguard
 
-go 1.18
+go 1.19
 
 require (
 	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd

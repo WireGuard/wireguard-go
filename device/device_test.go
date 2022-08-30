@@ -333,7 +333,7 @@ func BenchmarkThroughput(b *testing.B) {
 
 	// Measure how long it takes to receive b.N packets,
 	// starting when we receive the first packet.
-	var recv uint64
+	var recv atomic.Uint64
 	var elapsed time.Duration
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -342,7 +342,7 @@ func BenchmarkThroughput(b *testing.B) {
 		var start time.Time
 		for {
 			<-pair[0].tun.Inbound
-			new := atomic.AddUint64(&recv, 1)
+			new := recv.Add(1)
 			if new == 1 {
 				start = time.Now()
 			}
@@ -358,7 +358,7 @@ func BenchmarkThroughput(b *testing.B) {
 	ping := tuntest.Ping(pair[0].ip, pair[1].ip)
 	pingc := pair[1].tun.Outbound
 	var sent uint64
-	for atomic.LoadUint64(&recv) != uint64(b.N) {
+	for recv.Load() != uint64(b.N) {
 		sent++
 		pingc <- ping
 	}
