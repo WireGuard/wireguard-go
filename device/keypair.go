@@ -36,7 +36,7 @@ type Keypairs struct {
 	sync.RWMutex
 	current  *Keypair
 	previous *Keypair
-	next     atomic.Pointer[Keypair]
+	next     *Keypair
 }
 
 func (kp *Keypairs) Current() *Keypair {
