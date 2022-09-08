@@ -33,15 +33,15 @@ type Keypair struct {
 }
 
 type Keypairs struct {
-	sync.RWMutex
+	sync.Mutex
 	current  *Keypair
 	previous *Keypair
 	next     *Keypair
 }
 
 func (kp *Keypairs) Current() *Keypair {
-	kp.RLock()
-	defer kp.RUnlock()
+	kp.Lock()
+	defer kp.Unlock()
 	return kp.current
 }
 
