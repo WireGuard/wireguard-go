@@ -164,6 +164,10 @@ func (tun *netTun) Close() error {
 
 	tun.ep.Close()
 
+	if tun.incomingPacket != nil {
+		close(tun.incomingPacket)
+	}
+
 	return nil
 }
 
