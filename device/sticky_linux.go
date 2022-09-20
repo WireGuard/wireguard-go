@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  *
- * Copyright (C) 2017-2021 WireGuard LLC. All Rights Reserved.
+ * Copyright (C) 2017-2022 WireGuard LLC. All Rights Reserved.
  *
  * This implements userspace semantics of "sticky sockets", modeled after
  * WireGuard's kernelspace implementation. This is more or less a straight port
