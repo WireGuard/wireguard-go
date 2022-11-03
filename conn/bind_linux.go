@@ -420,84 +420,26 @@ func create6(port uint16) (int, uint16, error) {
 }
 
 func send4(sock int, end *LinuxSocketEndpoint, buff []byte) error {
-	// construct message header
-
-	cmsg := struct {
-		cmsghdr unix.Cmsghdr
-		pktinfo unix.Inet4Pktinfo
-	}{
-		unix.Cmsghdr{
-			Level: unix.IPPROTO_IP,
-			Type:  unix.IP_PKTINFO,
-			Len:   unix.SizeofInet4Pktinfo + unix.SizeofCmsghdr,
-		},
-		unix.Inet4Pktinfo{
-			Spec_dst: end.src4().Src,
-			Ifindex:  end.src4().Ifindex,
-		},
-	}
-
+	// NOTE(kallen): override upstream functionality of overriding source address
+	// of wireguard packets to be dst address of last received packet, instead
+	// using basic SendTo call where source address will be automaticaly determined
+	// by routing table. This is support instantanous switching between network interfaces
+	// to match functionality in kmod implementaiton
 	end.mu.Lock()
-	_, err := unix.SendmsgN(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], end.dst4(), 0)
+	err := unix.Sendto(sock, buff, 0, end.dst4())
 	end.mu.Unlock()
-
-	if err == nil {
-		return nil
-	}
-
-	// clear src and retry
-
-	if err == unix.EINVAL {
-		end.ClearSrc()
-		cmsg.pktinfo = unix.Inet4Pktinfo{}
-		end.mu.Lock()
-		_, err = unix.SendmsgN(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], end.dst4(), 0)
-		end.mu.Unlock()
-	}
-
 	return err
 }
 
 func send6(sock int, end *LinuxSocketEndpoint, buff []byte) error {
-	// construct message header
-
-	cmsg := struct {
-		cmsghdr unix.Cmsghdr
-		pktinfo unix.Inet6Pktinfo
-	}{
-		unix.Cmsghdr{
-			Level: unix.IPPROTO_IPV6,
-			Type:  unix.IPV6_PKTINFO,
-			Len:   unix.SizeofInet6Pktinfo + unix.SizeofCmsghdr,
-		},
-		unix.Inet6Pktinfo{
-			Addr:    end.src6().src,
-			Ifindex: end.dst6().ZoneId,
-		},
-	}
-
-	if cmsg.pktinfo.Addr == [16]byte{} {
-		cmsg.pktinfo.Ifindex = 0
-	}
-
+	// NOTE(kallen): override upstream functionality of overriding source address
+	// of wireguard packets to be dst address of last received packet, instead
+	// using basic SendTo call where source address will be automaticaly determined
+	// by routing table. This is support instantanous switching between network interfaces
+	// to match functionality in kmod implementaiton
 	end.mu.Lock()
-	_, err := unix.SendmsgN(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], end.dst6(), 0)
+	err := unix.Sendto(sock, buff, 0, end.dst6())
 	end.mu.Unlock()
-
-	if err == nil {
-		return nil
-	}
-
-	// clear src and retry
-
-	if err == unix.EINVAL {
-		end.ClearSrc()
-		cmsg.pktinfo = unix.Inet6Pktinfo{}
-		end.mu.Lock()
-		_, err = unix.SendmsgN(sock, buff, (*[unsafe.Sizeof(cmsg)]byte)(unsafe.Pointer(&cmsg))[:], end.dst6(), 0)
-		end.mu.Unlock()
-	}
-
 	return err
 }
 
