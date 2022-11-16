@@ -1,3 +1,5 @@
+//go:build openbsd || dragonfly
+
 /* SPDX-License-Identifier: MIT
  *
  * Copyright (C) 2017-2022 WireGuard LLC. All Rights Reserved.
