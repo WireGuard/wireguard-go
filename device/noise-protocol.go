@@ -188,7 +188,7 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 	var err error
 	handshake.hash = InitialHash
 	handshake.chainKey = InitialChainKey
-	handshake.localEphemeral, err = newPrivateKey()
+	handshake.localEphemeral, err = NewPrivateKey()
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 
 	msg := MessageInitiation{
 		Type:      MessageInitiationType,
-		Ephemeral: handshake.localEphemeral.publicKey(),
+		Ephemeral: handshake.localEphemeral.PublicKey(),
 	}
 
 	handshake.mixKey(msg.Ephemeral[:])
@@ -376,11 +376,11 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 
 	// create ephemeral key
 
-	handshake.localEphemeral, err = newPrivateKey()
+	handshake.localEphemeral, err = NewPrivateKey()
 	if err != nil {
 		return nil, err
 	}
-	msg.Ephemeral = handshake.localEphemeral.publicKey()
+	msg.Ephemeral = handshake.localEphemeral.PublicKey()
 	handshake.mixHash(msg.Ephemeral[:])
 	handshake.mixKey(msg.Ephemeral[:])
 

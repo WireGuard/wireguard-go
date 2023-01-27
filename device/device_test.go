@@ -58,7 +58,7 @@ func genConfigs(tb testing.TB) (cfgs, endpointCfgs [2]string) {
 	if err != nil {
 		tb.Errorf("unable to generate private key random bytes: %v", err)
 	}
-	pub1, pub2 := key1.publicKey(), key2.publicKey()
+	pub1, pub2 := key1.PublicKey(), key2.PublicKey()
 
 	cfgs[0] = uapiCfg(
 		"private_key", hex.EncodeToString(key1[:]),

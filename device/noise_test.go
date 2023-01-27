@@ -15,14 +15,14 @@ import (
 )
 
 func TestCurveWrappers(t *testing.T) {
-	sk1, err := newPrivateKey()
+	sk1, err := NewPrivateKey()
 	assertNil(t, err)
 
-	sk2, err := newPrivateKey()
+	sk2, err := NewPrivateKey()
 	assertNil(t, err)
 
-	pk1 := sk1.publicKey()
-	pk2 := sk2.publicKey()
+	pk1 := sk1.PublicKey()
+	pk2 := sk2.PublicKey()
 
 	ss1 := sk1.sharedSecret(pk2)
 	ss2 := sk2.sharedSecret(pk1)
@@ -33,7 +33,7 @@ func TestCurveWrappers(t *testing.T) {
 }
 
 func randDevice(t *testing.T) *Device {
-	sk, err := newPrivateKey()
+	sk, err := NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,11 +63,11 @@ func TestNoiseHandshake(t *testing.T) {
 	defer dev1.Close()
 	defer dev2.Close()
 
-	peer1, err := dev2.NewPeer(dev1.staticIdentity.privateKey.publicKey())
+	peer1, err := dev2.NewPeer(dev1.staticIdentity.privateKey.PublicKey())
 	if err != nil {
 		t.Fatal(err)
 	}
-	peer2, err := dev1.NewPeer(dev2.staticIdentity.privateKey.publicKey())
+	peer2, err := dev1.NewPeer(dev2.staticIdentity.privateKey.PublicKey())
 	if err != nil {
 		t.Fatal(err)
 	}
