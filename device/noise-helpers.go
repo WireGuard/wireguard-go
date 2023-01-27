@@ -81,13 +81,13 @@ func (sk *NoisePrivateKey) clamp() {
 	sk[31] = (sk[31] & 127) | 64
 }
 
-func newPrivateKey() (sk NoisePrivateKey, err error) {
+func NewPrivateKey() (sk NoisePrivateKey, err error) {
 	_, err = rand.Read(sk[:])
 	sk.clamp()
 	return
 }
 
-func (sk *NoisePrivateKey) publicKey() (pk NoisePublicKey) {
+func (sk *NoisePrivateKey) PublicKey() (pk NoisePublicKey) {
 	apk := (*[NoisePublicKeySize]byte)(&pk)
 	ask := (*[NoisePrivateKeySize]byte)(sk)
 	curve25519.ScalarBaseMult(apk, ask)

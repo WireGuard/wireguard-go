@@ -17,11 +17,11 @@ func TestCookieMAC1(t *testing.T) {
 		checker   CookieChecker
 	)
 
-	sk, err := newPrivateKey()
+	sk, err := NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	pk := sk.publicKey()
+	pk := sk.PublicKey()
 
 	generator.Init(pk)
 	checker.Init(pk)
