@@ -36,7 +36,7 @@ func DiscardLogf(format string, args ...any) {}
 func NewLogger(level int, prepend string) *Logger {
 	logger := &Logger{DiscardLogf, DiscardLogf}
 	logf := func(prefix string) func(string, ...any) {
-		return log.New(os.Stdout, prefix+": "+prepend, log.Ldate|log.Ltime).Printf
+		return log.New(os.Stdout, prefix+": "+prepend, log.Ldate|log.Ltime|log.Lmsgprefix).Printf
 	}
 	if level >= LogLevelVerbose {
 		logger.Verbosef = logf("DEBUG")

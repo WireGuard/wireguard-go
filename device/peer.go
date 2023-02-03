@@ -8,6 +8,8 @@ package device
 import (
 	"container/list"
 	"errors"
+	"fmt"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -265,4 +267,36 @@ func (peer *Peer) SetEndpointFromPacket(endpoint conn.Endpoint) {
 	peer.Lock()
 	peer.endpoint = endpoint
 	peer.Unlock()
+}
+
+func (peer *Peer) AddAllowedIPString(value string) error {
+	prefix, err := netip.ParsePrefix(value)
+	if err != nil {
+		return fmt.Errorf("failed to add allowed ip %s to peer %s: %w", value, peer.String(), err)
+	}
+	return peer.AddAllowedIP(prefix)
+}
+
+func (peer *Peer) AddAllowedIP(prefix netip.Prefix) error {
+	// Insert handles locking
+	peer.device.allowedips.Insert(prefix, peer)
+	return nil
+}
+
+func (peer *Peer) ClearAllowedIPs() {
+	// RemoveByPeer handles locking
+	peer.device.allowedips.RemoveByPeer(peer)
+}
+
+func (peer *Peer) GetAllowedIPs() []netip.Prefix {
+	peer.RLock()
+	defer peer.RUnlock()
+
+	rv := []netip.Prefix{}
+	peer.device.allowedips.EntriesForPeer(peer,
+		func(prefix netip.Prefix) bool {
+			rv = append(rv, prefix)
+			return true
+		})
+	return rv
 }

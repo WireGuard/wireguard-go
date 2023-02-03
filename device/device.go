@@ -521,3 +521,7 @@ func (device *Device) BindClose() error {
 	device.net.Unlock()
 	return err
 }
+
+func (device *Device) GetListeningPort() uint16 {
+	return device.net.port
+}
