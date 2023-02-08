@@ -138,10 +138,10 @@ func (t *chTun) Write(data []byte, offset int) (int, error) {
 
 const DefaultMTU = 1420
 
-func (t *chTun) Flush() error           { return nil }
-func (t *chTun) MTU() (int, error)      { return DefaultMTU, nil }
-func (t *chTun) Name() (string, error)  { return "loopbackTun1", nil }
-func (t *chTun) Events() chan tun.Event { return t.c.events }
+func (t *chTun) Flush() error             { return nil }
+func (t *chTun) MTU() (int, error)        { return DefaultMTU, nil }
+func (t *chTun) Name() (string, error)    { return "loopbackTun1", nil }
+func (t *chTun) Events() <-chan tun.Event { return t.c.events }
 func (t *chTun) Close() error {
 	t.Write(nil, -1)
 	return nil

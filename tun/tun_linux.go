@@ -376,7 +376,7 @@ func (tun *NativeTun) Read(buf []byte, offset int) (n int, err error) {
 	return
 }
 
-func (tun *NativeTun) Events() chan Event {
+func (tun *NativeTun) Events() <-chan Event {
 	return tun.events
 }
 
