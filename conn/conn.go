@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	DefaultBatchSize = 1 // maximum number of packets handled per read and write
+	DefaultBatchSize = 128 // maximum number of packets handled per read and write
 )
 
 // A ReceiveFunc receives at least one packet from the network and writes them
