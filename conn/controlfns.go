@@ -10,6 +10,13 @@ import (
 	"syscall"
 )
 
+// UDP socket read/write buffer size (7MB). The value of 7MB is chosen as it is
+// the max supported by a default configuration of macOS. Some platforms will
+// silently clamp the value to other maximums, such as linux clamping to
+// net.core.{r,w}mem_max (see _linux.go for additional implementation that works
+// around this limitation)
+const socketBufferSize = 7 << 20
+
 // controlFn is the callback function signature from net.ListenConfig.Control.
 // It is used to apply platform specific configuration to the socket prior to
 // bind.
