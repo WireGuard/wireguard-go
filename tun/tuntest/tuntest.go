@@ -110,35 +110,42 @@ type chTun struct {
 
 func (t *chTun) File() *os.File { return nil }
 
-func (t *chTun) Read(data []byte, offset int) (int, error) {
+func (t *chTun) Read(packets [][]byte, sizes []int, offset int) (int, error) {
 	select {
 	case <-t.c.closed:
 		return 0, os.ErrClosed
 	case msg := <-t.c.Outbound:
-		return copy(data[offset:], msg), nil
+		n := copy(packets[0][offset:], msg)
+		sizes[0] = n
+		return 1, nil
 	}
 }
 
 // Write is called by the wireguard device to deliver a packet for routing.
-func (t *chTun) Write(data []byte, offset int) (int, error) {
+func (t *chTun) Write(packets [][]byte, offset int) (int, error) {
 	if offset == -1 {
 		close(t.c.closed)
 		close(t.c.events)
 		return 0, io.EOF
 	}
-	msg := make([]byte, len(data)-offset)
-	copy(msg, data[offset:])
-	select {
-	case <-t.c.closed:
-		return 0, os.ErrClosed
-	case t.c.Inbound <- msg:
-		return len(data) - offset, nil
+	for i, data := range packets {
+		msg := make([]byte, len(data)-offset)
+		copy(msg, data[offset:])
+		select {
+		case <-t.c.closed:
+			return i, os.ErrClosed
+		case t.c.Inbound <- msg:
+		}
 	}
+	return len(packets), nil
+}
+
+func (t *chTun) BatchSize() int {
+	return 1
 }
 
 const DefaultMTU = 1420
 
-func (t *chTun) Flush() error             { return nil }
 func (t *chTun) MTU() (int, error)        { return DefaultMTU, nil }
 func (t *chTun) Name() (string, error)    { return "loopbackTun1", nil }
 func (t *chTun) Events() <-chan tun.Event { return t.c.events }

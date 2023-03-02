@@ -193,6 +193,10 @@ func (bind *LinuxSocketBind) SetMark(value uint32) error {
 	return nil
 }
 
+func (bind *LinuxSocketBind) BatchSize() int {
+	return 1
+}
+
 func (bind *LinuxSocketBind) Close() error {
 	// Take a readlock to shut down the sockets...
 	bind.mu.RLock()
@@ -223,29 +227,39 @@ func (bind *LinuxSocketBind) Close() error {
 	return err2
 }
 
-func (bind *LinuxSocketBind) receiveIPv4(buf []byte) (int, Endpoint, error) {
+func (bind *LinuxSocketBind) receiveIPv4(buffs [][]byte, sizes []int, eps []Endpoint) (int, error) {
 	bind.mu.RLock()
 	defer bind.mu.RUnlock()
 	if bind.sock4 == -1 {
-		return 0, nil, net.ErrClosed
+		return 0, net.ErrClosed
 	}
 	var end LinuxSocketEndpoint
-	n, err := receive4(bind.sock4, buf, &end)
-	return n, &end, err
+	n, err := receive4(bind.sock4, buffs[0], &end)
+	if err != nil {
+		return 0, err
+	}
+	eps[0] = &end
+	sizes[0] = n
+	return 1, nil
 }
 
-func (bind *LinuxSocketBind) receiveIPv6(buf []byte) (int, Endpoint, error) {
+func (bind *LinuxSocketBind) receiveIPv6(buffs [][]byte, sizes []int, eps []Endpoint) (int, error) {
 	bind.mu.RLock()
 	defer bind.mu.RUnlock()
 	if bind.sock6 == -1 {
-		return 0, nil, net.ErrClosed
+		return 0, net.ErrClosed
 	}
 	var end LinuxSocketEndpoint
-	n, err := receive6(bind.sock6, buf, &end)
-	return n, &end, err
+	n, err := receive6(bind.sock6, buffs[0], &end)
+	if err != nil {
+		return 0, err
+	}
+	eps[0] = &end
+	sizes[0] = n
+	return 1, nil
 }
 
-func (bind *LinuxSocketBind) Send(buff []byte, end Endpoint) error {
+func (bind *LinuxSocketBind) Send(buffs [][]byte, end Endpoint) error {
 	nend, ok := end.(*LinuxSocketEndpoint)
 	if !ok {
 		return ErrWrongEndpointType
@@ -256,13 +270,24 @@ func (bind *LinuxSocketBind) Send(buff []byte, end Endpoint) error {
 		if bind.sock4 == -1 {
 			return net.ErrClosed
 		}
-		return send4(bind.sock4, nend, buff)
+		for _, buff := range buffs {
+			err := send4(bind.sock4, nend, buff)
+			if err != nil {
+				return err
+			}
+		}
 	} else {
 		if bind.sock6 == -1 {
 			return net.ErrClosed
 		}
-		return send6(bind.sock6, nend, buff)
+		for _, buff := range buffs {
+			err := send6(bind.sock6, nend, buff)
+			if err != nil {
+				return err
+			}
+		}
 	}
+	return nil
 }
 
 func (end *LinuxSocketEndpoint) SrcIP() netip.Addr {

@@ -13,8 +13,8 @@ import (
 	"os/signal"
 	"runtime"
 	"strconv"
-	"syscall"
 
+	"golang.org/x/sys/unix"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/ipc"
@@ -111,7 +111,7 @@ func main() {
 
 	// open TUN device (or use supplied fd)
 
-	tun, err := func() (tun.Device, error) {
+	tdev, err := func() (tun.Device, error) {
 		tunFdStr := os.Getenv(ENV_WG_TUN_FD)
 		if tunFdStr == "" {
 			return tun.CreateTUN(interfaceName, device.DefaultMTU)
@@ -124,7 +124,7 @@ func main() {
 			return nil, err
 		}
 
-		err = syscall.SetNonblock(int(fd), true)
+		err = unix.SetNonblock(int(fd), true)
 		if err != nil {
 			return nil, err
 		}
@@ -134,7 +134,7 @@ func main() {
 	}()
 
 	if err == nil {
-		realInterfaceName, err2 := tun.Name()
+		realInterfaceName, err2 := tdev.Name()
 		if err2 == nil {
 			interfaceName = realInterfaceName
 		}
@@ -196,7 +196,7 @@ func main() {
 				files[0], // stdin
 				files[1], // stdout
 				files[2], // stderr
-				tun.File(),
+				tdev.File(),
 				fileUAPI,
 			},
 			Dir: ".",
@@ -222,7 +222,7 @@ func main() {
 		return
 	}
 
-	device := device.NewDevice(tun, conn.NewDefaultBind(), logger)
+	device := device.NewDevice(tdev, conn.NewDefaultBind(), logger)
 
 	logger.Verbosef("Device started")
 
@@ -250,7 +250,7 @@ func main() {
 
 	// wait for program to terminate
 
-	signal.Notify(term, syscall.SIGTERM)
+	signal.Notify(term, unix.SIGTERM)
 	signal.Notify(term, os.Interrupt)
 
 	select {
