@@ -9,7 +9,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"syscall"
+
+	"golang.org/x/sys/windows"
 
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
@@ -81,7 +82,7 @@ func main() {
 
 	signal.Notify(term, os.Interrupt)
 	signal.Notify(term, os.Kill)
-	signal.Notify(term, syscall.SIGTERM)
+	signal.Notify(term, windows.SIGTERM)
 
 	select {
 	case <-term:

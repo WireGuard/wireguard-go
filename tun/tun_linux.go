@@ -323,12 +323,13 @@ func (tun *NativeTun) nameSlow() (string, error) {
 	return unix.ByteSliceToString(ifr[:]), nil
 }
 
-func (tun *NativeTun) Write(buf []byte, offset int) (int, error) {
+func (tun *NativeTun) Write(buffs [][]byte, offset int) (n int, err error) {
+	var buf []byte
 	if tun.nopi {
-		buf = buf[offset:]
+		buf = buffs[0][offset:]
 	} else {
 		// reserve space for header
-		buf = buf[offset-4:]
+		buf = buffs[0][offset-4:]
 
 		// add packet information header
 		buf[0] = 0x00
@@ -342,34 +343,36 @@ func (tun *NativeTun) Write(buf []byte, offset int) (int, error) {
 		}
 	}
 
-	n, err := tun.tunFile.Write(buf)
+	_, err = tun.tunFile.Write(buf)
 	if errors.Is(err, syscall.EBADFD) {
 		err = os.ErrClosed
+	} else if err == nil {
+		n = 1
 	}
 	return n, err
 }
 
-func (tun *NativeTun) Flush() error {
-	// TODO: can flushing be implemented by buffering and using sendmmsg?
-	return nil
-}
-
-func (tun *NativeTun) Read(buf []byte, offset int) (n int, err error) {
+func (tun *NativeTun) Read(buffs [][]byte, sizes []int, offset int) (n int, err error) {
 	select {
 	case err = <-tun.errors:
 	default:
 		if tun.nopi {
-			n, err = tun.tunFile.Read(buf[offset:])
+			sizes[0], err = tun.tunFile.Read(buffs[0][offset:])
+			if err == nil {
+				n = 1
+			}
 		} else {
-			buff := buf[offset-4:]
-			n, err = tun.tunFile.Read(buff[:])
+			buff := buffs[0][offset-4:]
+			sizes[0], err = tun.tunFile.Read(buff[:])
 			if errors.Is(err, syscall.EBADFD) {
 				err = os.ErrClosed
+			} else if err == nil {
+				n = 1
 			}
-			if n < 4 {
-				n = 0
+			if sizes[0] < 4 {
+				sizes[0] = 0
 			} else {
-				n -= 4
+				sizes[0] -= 4
 			}
 		}
 	}
@@ -397,6 +400,10 @@ func (tun *NativeTun) Close() error {
 		return err1
 	}
 	return err2
+}
+
+func (tun *NativeTun) BatchSize() int {
+	return 1
 }
 
 func CreateTUN(name string, mtu int) (Device, error) {

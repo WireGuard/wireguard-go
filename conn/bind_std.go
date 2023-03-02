@@ -128,6 +128,10 @@ again:
 	return fns, uint16(port), nil
 }
 
+func (bind *StdNetBind) BatchSize() int {
+	return 1
+}
+
 func (bind *StdNetBind) Close() error {
 	bind.mu.Lock()
 	defer bind.mu.Unlock()
@@ -150,20 +154,30 @@ func (bind *StdNetBind) Close() error {
 }
 
 func (*StdNetBind) makeReceiveIPv4(conn *net.UDPConn) ReceiveFunc {
-	return func(buff []byte) (int, Endpoint, error) {
-		n, endpoint, err := conn.ReadFromUDPAddrPort(buff)
-		return n, asEndpoint(endpoint), err
+	return func(buffs [][]byte, sizes []int, eps []Endpoint) (n int, err error) {
+		size, endpoint, err := conn.ReadFromUDPAddrPort(buffs[0])
+		if err == nil {
+			sizes[0] = size
+			eps[0] = asEndpoint(endpoint)
+			return 1, nil
+		}
+		return 0, err
 	}
 }
 
 func (*StdNetBind) makeReceiveIPv6(conn *net.UDPConn) ReceiveFunc {
-	return func(buff []byte) (int, Endpoint, error) {
-		n, endpoint, err := conn.ReadFromUDPAddrPort(buff)
-		return n, asEndpoint(endpoint), err
+	return func(buffs [][]byte, sizes []int, eps []Endpoint) (n int, err error) {
+		size, endpoint, err := conn.ReadFromUDPAddrPort(buffs[0])
+		if err == nil {
+			sizes[0] = size
+			eps[0] = asEndpoint(endpoint)
+			return 1, nil
+		}
+		return 0, err
 	}
 }
 
-func (bind *StdNetBind) Send(buff []byte, endpoint Endpoint) error {
+func (bind *StdNetBind) Send(buffs [][]byte, endpoint Endpoint) error {
 	var err error
 	nend, ok := endpoint.(StdNetEndpoint)
 	if !ok {
@@ -186,8 +200,13 @@ func (bind *StdNetBind) Send(buff []byte, endpoint Endpoint) error {
 	if conn == nil {
 		return syscall.EAFNOSUPPORT
 	}
-	_, err = conn.WriteToUDPAddrPort(buff, addrPort)
-	return err
+	for _, buff := range buffs {
+		_, err = conn.WriteToUDPAddrPort(buff, addrPort)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // endpointPool contains a re-usable set of mapping from netip.AddrPort to Endpoint.
