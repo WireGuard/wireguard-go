@@ -321,6 +321,8 @@ func (bind *WinRingBind) Close() error {
 	return nil
 }
 
+// TODO: When all Binds handle IdealBatchSize, remove this dynamic function and
+// rename the IdealBatchSize constant to BatchSize.
 func (bind *WinRingBind) BatchSize() int {
 	// TODO: implement batching in and out of the ring
 	return 1

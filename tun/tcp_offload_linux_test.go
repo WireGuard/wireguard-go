@@ -125,8 +125,8 @@ func Test_handleVirtioRead(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out := make([][]byte, conn.DefaultBatchSize)
-			sizes := make([]int, conn.DefaultBatchSize)
+			out := make([][]byte, conn.IdealBatchSize)
+			sizes := make([]int, conn.IdealBatchSize)
 			for i := range out {
 				out[i] = make([]byte, 65535)
 			}

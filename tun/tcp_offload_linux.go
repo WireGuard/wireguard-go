@@ -72,11 +72,11 @@ type tcpGROTable struct {
 
 func newTCPGROTable() *tcpGROTable {
 	t := &tcpGROTable{
-		itemsByFlow: make(map[flowKey][]tcpGROItem, conn.DefaultBatchSize),
-		itemsPool:   make([][]tcpGROItem, conn.DefaultBatchSize),
+		itemsByFlow: make(map[flowKey][]tcpGROItem, conn.IdealBatchSize),
+		itemsPool:   make([][]tcpGROItem, conn.IdealBatchSize),
 	}
 	for i := range t.itemsPool {
-		t.itemsPool[i] = make([]tcpGROItem, 0, conn.DefaultBatchSize)
+		t.itemsPool[i] = make([]tcpGROItem, 0, conn.IdealBatchSize)
 	}
 	return t
 }
