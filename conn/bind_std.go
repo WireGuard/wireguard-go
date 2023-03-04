@@ -31,21 +31,13 @@ type StdNetBind struct {
 	blackhole6   bool
 	ipv4PC       *ipv4.PacketConn
 	ipv6PC       *ipv6.PacketConn
-	batchSize    int
 	udpAddrPool  sync.Pool
 	ipv4MsgsPool sync.Pool
 	ipv6MsgsPool sync.Pool
 }
 
-func NewStdNetBind() Bind { return NewStdNetBindBatch(DefaultBatchSize) }
-
-func NewStdNetBindBatch(maxBatchSize int) Bind {
-	if maxBatchSize == 0 {
-		maxBatchSize = DefaultBatchSize
-	}
+func NewStdNetBind() Bind {
 	return &StdNetBind{
-		batchSize: maxBatchSize,
-
 		udpAddrPool: sync.Pool{
 			New: func() any {
 				return &net.UDPAddr{
@@ -56,7 +48,7 @@ func NewStdNetBindBatch(maxBatchSize int) Bind {
 
 		ipv4MsgsPool: sync.Pool{
 			New: func() any {
-				msgs := make([]ipv4.Message, maxBatchSize)
+				msgs := make([]ipv4.Message, IdealBatchSize)
 				for i := range msgs {
 					msgs[i].Buffers = make(net.Buffers, 1)
 					msgs[i].OOB = make([]byte, srcControlSize)
@@ -67,7 +59,7 @@ func NewStdNetBindBatch(maxBatchSize int) Bind {
 
 		ipv6MsgsPool: sync.Pool{
 			New: func() any {
-				msgs := make([]ipv6.Message, maxBatchSize)
+				msgs := make([]ipv6.Message, IdealBatchSize)
 				for i := range msgs {
 					msgs[i].Buffers = make(net.Buffers, 1)
 					msgs[i].OOB = make([]byte, srcControlSize)
@@ -240,8 +232,10 @@ func (s *StdNetBind) receiveIPv6(buffs [][]byte, sizes []int, eps []Endpoint) (n
 	return numMsgs, nil
 }
 
+// TODO: When all Binds handle IdealBatchSize, remove this dynamic function and
+// rename the IdealBatchSize constant to BatchSize.
 func (s *StdNetBind) BatchSize() int {
-	return s.batchSize
+	return IdealBatchSize
 }
 
 func (s *StdNetBind) Close() error {

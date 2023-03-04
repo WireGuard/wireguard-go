@@ -524,7 +524,7 @@ func (tun *NativeTun) initFromFlags(name string) error {
 				return
 			}
 			tun.vnetHdr = true
-			tun.batchSize = conn.DefaultBatchSize
+			tun.batchSize = conn.IdealBatchSize
 		} else {
 			tun.batchSize = 1
 		}
@@ -577,7 +577,7 @@ func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 		statusListenersShutdown: make(chan struct{}),
 		tcp4GROTable:            newTCPGROTable(),
 		tcp6GROTable:            newTCPGROTable(),
-		toWrite:                 make([]int, 0, conn.DefaultBatchSize),
+		toWrite:                 make([]int, 0, conn.IdealBatchSize),
 	}
 
 	name, err := tun.Name()
@@ -633,7 +633,7 @@ func CreateUnmonitoredTUNFromFD(fd int) (Device, string, error) {
 		errors:       make(chan error, 5),
 		tcp4GROTable: newTCPGROTable(),
 		tcp6GROTable: newTCPGROTable(),
-		toWrite:      make([]int, 0, conn.DefaultBatchSize),
+		toWrite:      make([]int, 0, conn.IdealBatchSize),
 	}
 	name, err := tun.Name()
 	if err != nil {
