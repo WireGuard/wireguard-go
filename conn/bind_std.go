@@ -229,7 +229,7 @@ func (s *StdNetBind) makeReceiveIPv4(pc *ipv4.PacketConn, conn *net.UDPConn) Rec
 			sizes[i] = msg.N
 			addrPort := msg.Addr.(*net.UDPAddr).AddrPort()
 			ep := asEndpoint(addrPort)
-			getSrcFromControl(msg.OOB, ep)
+			getSrcFromControl(msg.OOB[:msg.NN], ep)
 			eps[i] = ep
 		}
 		return numMsgs, nil
@@ -262,7 +262,7 @@ func (s *StdNetBind) makeReceiveIPv6(pc *ipv6.PacketConn, conn *net.UDPConn) Rec
 			sizes[i] = msg.N
 			addrPort := msg.Addr.(*net.UDPAddr).AddrPort()
 			ep := asEndpoint(addrPort)
-			getSrcFromControl(msg.OOB, ep)
+			getSrcFromControl(msg.OOB[:msg.NN], ep)
 			eps[i] = ep
 		}
 		return numMsgs, nil
