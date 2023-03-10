@@ -38,7 +38,7 @@ func Test_setSrcControl(t *testing.T) {
 		if hdr.Type != unix.IP_PKTINFO {
 			t.Errorf("unexpected type: %d", hdr.Type)
 		}
-		if hdr.Len != uint64(unix.CmsgLen(int(unsafe.Sizeof(unix.Inet4Pktinfo{})))) {
+		if uint(hdr.Len) != uint(unix.CmsgLen(int(unsafe.Sizeof(unix.Inet4Pktinfo{})))) {
 			t.Errorf("unexpected length: %d", hdr.Len)
 		}
 		info := (*unix.Inet4Pktinfo)(unsafe.Pointer(&control[unix.CmsgLen(0)]))
@@ -68,7 +68,7 @@ func Test_setSrcControl(t *testing.T) {
 		if hdr.Type != unix.IPV6_PKTINFO {
 			t.Errorf("unexpected type: %d", hdr.Type)
 		}
-		if hdr.Len != uint64(unix.CmsgLen(int(unsafe.Sizeof(unix.Inet6Pktinfo{})))) {
+		if uint(hdr.Len) != uint(unix.CmsgLen(int(unsafe.Sizeof(unix.Inet6Pktinfo{})))) {
 			t.Errorf("unexpected length: %d", hdr.Len)
 		}
 		info := (*unix.Inet6Pktinfo)(unsafe.Pointer(&control[unix.CmsgLen(0)]))
@@ -101,7 +101,7 @@ func Test_getSrcFromControl(t *testing.T) {
 		hdr := (*unix.Cmsghdr)(unsafe.Pointer(&control[0]))
 		hdr.Level = unix.IPPROTO_IP
 		hdr.Type = unix.IP_PKTINFO
-		hdr.Len = uint64(unix.CmsgLen(int(unsafe.Sizeof(unix.Inet4Pktinfo{}))))
+		hdr.SetLen(unix.CmsgLen(int(unsafe.Sizeof(unix.Inet4Pktinfo{}))))
 		info := (*unix.Inet4Pktinfo)(unsafe.Pointer(&control[unix.CmsgLen(0)]))
 		info.Spec_dst = [4]byte{127, 0, 0, 1}
 		info.Ifindex = 5
@@ -121,7 +121,7 @@ func Test_getSrcFromControl(t *testing.T) {
 		hdr := (*unix.Cmsghdr)(unsafe.Pointer(&control[0]))
 		hdr.Level = unix.IPPROTO_IPV6
 		hdr.Type = unix.IPV6_PKTINFO
-		hdr.Len = uint64(unix.CmsgLen(int(unsafe.Sizeof(unix.Inet6Pktinfo{}))))
+		hdr.SetLen(unix.CmsgLen(int(unsafe.Sizeof(unix.Inet6Pktinfo{}))))
 		info := (*unix.Inet6Pktinfo)(unsafe.Pointer(&control[unix.CmsgLen(0)]))
 		info.Addr = [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
 		info.Ifindex = 5
