@@ -95,28 +95,28 @@ func newFlowKey(pkt []byte, srcAddr, dstAddr, tcphOffset int) flowKey {
 // lookupOrInsert looks up a flow for the provided packet and metadata,
 // returning the packets found for the flow, or inserting a new one if none
 // is found.
-func (t *tcpGROTable) lookupOrInsert(pkt []byte, srcAddrOffset, dstAddrOffset, tcphOffset, tcphLen, buffsIndex int) ([]tcpGROItem, bool) {
+func (t *tcpGROTable) lookupOrInsert(pkt []byte, srcAddrOffset, dstAddrOffset, tcphOffset, tcphLen, bufsIndex int) ([]tcpGROItem, bool) {
 	key := newFlowKey(pkt, srcAddrOffset, dstAddrOffset, tcphOffset)
 	items, ok := t.itemsByFlow[key]
 	if ok {
 		return items, ok
 	}
 	// TODO: insert() performs another map lookup. This could be rearranged to avoid.
-	t.insert(pkt, srcAddrOffset, dstAddrOffset, tcphOffset, tcphLen, buffsIndex)
+	t.insert(pkt, srcAddrOffset, dstAddrOffset, tcphOffset, tcphLen, bufsIndex)
 	return nil, false
 }
 
 // insert an item in the table for the provided packet and packet metadata.
-func (t *tcpGROTable) insert(pkt []byte, srcAddrOffset, dstAddrOffset, tcphOffset, tcphLen, buffsIndex int) {
+func (t *tcpGROTable) insert(pkt []byte, srcAddrOffset, dstAddrOffset, tcphOffset, tcphLen, bufsIndex int) {
 	key := newFlowKey(pkt, srcAddrOffset, dstAddrOffset, tcphOffset)
 	item := tcpGROItem{
-		key:        key,
-		buffsIndex: uint16(buffsIndex),
-		gsoSize:    uint16(len(pkt[tcphOffset+tcphLen:])),
-		iphLen:     uint8(tcphOffset),
-		tcphLen:    uint8(tcphLen),
-		sentSeq:    binary.BigEndian.Uint32(pkt[tcphOffset+4:]),
-		pshSet:     pkt[tcphOffset+tcpFlagsOffset]&tcpFlagPSH != 0,
+		key:       key,
+		bufsIndex: uint16(bufsIndex),
+		gsoSize:   uint16(len(pkt[tcphOffset+tcphLen:])),
+		iphLen:    uint8(tcphOffset),
+		tcphLen:   uint8(tcphLen),
+		sentSeq:   binary.BigEndian.Uint32(pkt[tcphOffset+4:]),
+		pshSet:    pkt[tcphOffset+tcpFlagsOffset]&tcpFlagPSH != 0,
 	}
 	items, ok := t.itemsByFlow[key]
 	if !ok {
@@ -140,14 +140,14 @@ func (t *tcpGROTable) deleteAt(key flowKey, i int) {
 // tcpGROItem represents bookkeeping data for a TCP packet during the lifetime
 // of a GRO evaluation across a vector of packets.
 type tcpGROItem struct {
-	key        flowKey
-	sentSeq    uint32 // the sequence number
-	buffsIndex uint16 // the index into the original buffs slice
-	numMerged  uint16 // the number of packets merged into this item
-	gsoSize    uint16 // payload size
-	iphLen     uint8  // ip header len
-	tcphLen    uint8  // tcp header len
-	pshSet     bool   // psh flag is set
+	key       flowKey
+	sentSeq   uint32 // the sequence number
+	bufsIndex uint16 // the index into the original bufs slice
+	numMerged uint16 // the number of packets merged into this item
+	gsoSize   uint16 // payload size
+	iphLen    uint8  // ip header len
+	tcphLen   uint8  // tcp header len
+	pshSet    bool   // psh flag is set
 }
 
 func (t *tcpGROTable) newItems() []tcpGROItem {
@@ -177,8 +177,8 @@ const (
 // tcpPacketsCanCoalesce evaluates if pkt can be coalesced with the packet
 // described by item. This function makes considerations that match the kernel's
 // GRO self tests, which can be found in tools/testing/selftests/net/gro.c.
-func tcpPacketsCanCoalesce(pkt []byte, iphLen, tcphLen uint8, seq uint32, pshSet bool, gsoSize uint16, item tcpGROItem, buffs [][]byte, buffsOffset int) canCoalesce {
-	pktTarget := buffs[item.buffsIndex][buffsOffset:]
+func tcpPacketsCanCoalesce(pkt []byte, iphLen, tcphLen uint8, seq uint32, pshSet bool, gsoSize uint16, item tcpGROItem, bufs [][]byte, bufsOffset int) canCoalesce {
+	pktTarget := bufs[item.bufsIndex][bufsOffset:]
 	if tcphLen != item.tcphLen {
 		// cannot coalesce with unequal tcp options len
 		return coalesceUnavailable
@@ -262,18 +262,18 @@ const (
 )
 
 // coalesceTCPPackets attempts to coalesce pkt with the packet described by
-// item, returning the outcome. This function may swap buffs elements in the
-// event of a prepend as item's buffs index is already being tracked for writing
+// item, returning the outcome. This function may swap bufs elements in the
+// event of a prepend as item's bufs index is already being tracked for writing
 // to a Device.
-func coalesceTCPPackets(mode canCoalesce, pkt []byte, pktBuffsIndex int, gsoSize uint16, seq uint32, pshSet bool, item *tcpGROItem, buffs [][]byte, buffsOffset int, isV6 bool) coalesceResult {
+func coalesceTCPPackets(mode canCoalesce, pkt []byte, pktBuffsIndex int, gsoSize uint16, seq uint32, pshSet bool, item *tcpGROItem, bufs [][]byte, bufsOffset int, isV6 bool) coalesceResult {
 	var pktHead []byte // the packet that will end up at the front
 	headersLen := item.iphLen + item.tcphLen
-	coalescedLen := len(buffs[item.buffsIndex][buffsOffset:]) + len(pkt) - int(headersLen)
+	coalescedLen := len(bufs[item.bufsIndex][bufsOffset:]) + len(pkt) - int(headersLen)
 
 	// Copy data
 	if mode == coalescePrepend {
 		pktHead = pkt
-		if cap(pkt)-buffsOffset < coalescedLen {
+		if cap(pkt)-bufsOffset < coalescedLen {
 			// We don't want to allocate a new underlying array if capacity is
 			// too small.
 			return coalesceInsufficientCap
@@ -282,7 +282,7 @@ func coalesceTCPPackets(mode canCoalesce, pkt []byte, pktBuffsIndex int, gsoSize
 			return coalescePSHEnding
 		}
 		if item.numMerged == 0 {
-			if !tcpChecksumValid(buffs[item.buffsIndex][buffsOffset:], item.iphLen, isV6) {
+			if !tcpChecksumValid(bufs[item.bufsIndex][bufsOffset:], item.iphLen, isV6) {
 				return coalesceItemInvalidCSum
 			}
 		}
@@ -291,20 +291,20 @@ func coalesceTCPPackets(mode canCoalesce, pkt []byte, pktBuffsIndex int, gsoSize
 		}
 		item.sentSeq = seq
 		extendBy := coalescedLen - len(pktHead)
-		buffs[pktBuffsIndex] = append(buffs[pktBuffsIndex], make([]byte, extendBy)...)
-		copy(buffs[pktBuffsIndex][buffsOffset+len(pkt):], buffs[item.buffsIndex][buffsOffset+int(headersLen):])
-		// Flip the slice headers in buffs as part of prepend. The index of item
+		bufs[pktBuffsIndex] = append(bufs[pktBuffsIndex], make([]byte, extendBy)...)
+		copy(bufs[pktBuffsIndex][bufsOffset+len(pkt):], bufs[item.bufsIndex][bufsOffset+int(headersLen):])
+		// Flip the slice headers in bufs as part of prepend. The index of item
 		// is already being tracked for writing.
-		buffs[item.buffsIndex], buffs[pktBuffsIndex] = buffs[pktBuffsIndex], buffs[item.buffsIndex]
+		bufs[item.bufsIndex], bufs[pktBuffsIndex] = bufs[pktBuffsIndex], bufs[item.bufsIndex]
 	} else {
-		pktHead = buffs[item.buffsIndex][buffsOffset:]
-		if cap(pktHead)-buffsOffset < coalescedLen {
+		pktHead = bufs[item.bufsIndex][bufsOffset:]
+		if cap(pktHead)-bufsOffset < coalescedLen {
 			// We don't want to allocate a new underlying array if capacity is
 			// too small.
 			return coalesceInsufficientCap
 		}
 		if item.numMerged == 0 {
-			if !tcpChecksumValid(buffs[item.buffsIndex][buffsOffset:], item.iphLen, isV6) {
+			if !tcpChecksumValid(bufs[item.bufsIndex][bufsOffset:], item.iphLen, isV6) {
 				return coalesceItemInvalidCSum
 			}
 		}
@@ -317,8 +317,8 @@ func coalesceTCPPackets(mode canCoalesce, pkt []byte, pktBuffsIndex int, gsoSize
 			pktHead[item.iphLen+tcpFlagsOffset] |= tcpFlagPSH
 		}
 		extendBy := len(pkt) - int(headersLen)
-		buffs[item.buffsIndex] = append(buffs[item.buffsIndex], make([]byte, extendBy)...)
-		copy(buffs[item.buffsIndex][buffsOffset+len(pktHead):], pkt[headersLen:])
+		bufs[item.bufsIndex] = append(bufs[item.bufsIndex], make([]byte, extendBy)...)
+		copy(bufs[item.bufsIndex][bufsOffset+len(pktHead):], pkt[headersLen:])
 	}
 
 	if gsoSize > item.gsoSize {
@@ -344,7 +344,7 @@ func coalesceTCPPackets(mode canCoalesce, pkt []byte, pktBuffsIndex int, gsoSize
 		iphCSum := ^checksum(pktHead[:item.iphLen], 0)                // compute checksum
 		binary.BigEndian.PutUint16(pktHead[10:], iphCSum)             // set checksum field
 	}
-	hdr.encode(buffs[item.buffsIndex][buffsOffset-virtioNetHdrLen:])
+	hdr.encode(bufs[item.bufsIndex][bufsOffset-virtioNetHdrLen:])
 
 	// Calculate the pseudo header checksum and place it at the TCP checksum
 	// offset. Downstream checksum offloading will combine this with computation
@@ -355,9 +355,9 @@ func coalesceTCPPackets(mode canCoalesce, pkt []byte, pktBuffsIndex int, gsoSize
 		addrLen = 16
 		addrOffset = ipv6SrcAddrOffset
 	}
-	srcAddrAt := buffsOffset + addrOffset
-	srcAddr := buffs[item.buffsIndex][srcAddrAt : srcAddrAt+addrLen]
-	dstAddr := buffs[item.buffsIndex][srcAddrAt+addrLen : srcAddrAt+addrLen*2]
+	srcAddrAt := bufsOffset + addrOffset
+	srcAddr := bufs[item.bufsIndex][srcAddrAt : srcAddrAt+addrLen]
+	dstAddr := bufs[item.bufsIndex][srcAddrAt+addrLen : srcAddrAt+addrLen*2]
 	psum := pseudoHeaderChecksumNoFold(unix.IPPROTO_TCP, srcAddr, dstAddr, uint16(coalescedLen-int(item.iphLen)))
 	binary.BigEndian.PutUint16(pktHead[hdr.csumStart+hdr.csumOffset:], checksum([]byte{}, psum))
 
@@ -375,12 +375,12 @@ const (
 	maxUint16         = 1<<16 - 1
 )
 
-// tcpGRO evaluates the TCP packet at pktI in buffs for coalescing with
+// tcpGRO evaluates the TCP packet at pktI in bufs for coalescing with
 // existing packets tracked in table. It will return false when pktI is not
-// coalesced, otherwise true. This indicates to the caller if buffs[pktI]
+// coalesced, otherwise true. This indicates to the caller if bufs[pktI]
 // should be written to the Device.
-func tcpGRO(buffs [][]byte, offset int, pktI int, table *tcpGROTable, isV6 bool) (pktCoalesced bool) {
-	pkt := buffs[pktI][offset:]
+func tcpGRO(bufs [][]byte, offset int, pktI int, table *tcpGROTable, isV6 bool) (pktCoalesced bool) {
+	pkt := bufs[pktI][offset:]
 	if len(pkt) > maxUint16 {
 		// A valid IPv4 or IPv6 packet will never exceed this.
 		return false
@@ -452,9 +452,9 @@ func tcpGRO(buffs [][]byte, offset int, pktI int, table *tcpGROTable, isV6 bool)
 		// sequence number perspective, however once an item is inserted into
 		// the table it is never compared across other items later.
 		item := items[i]
-		can := tcpPacketsCanCoalesce(pkt, uint8(iphLen), uint8(tcphLen), seq, pshSet, gsoSize, item, buffs, offset)
+		can := tcpPacketsCanCoalesce(pkt, uint8(iphLen), uint8(tcphLen), seq, pshSet, gsoSize, item, bufs, offset)
 		if can != coalesceUnavailable {
-			result := coalesceTCPPackets(can, pkt, pktI, gsoSize, seq, pshSet, &item, buffs, offset, isV6)
+			result := coalesceTCPPackets(can, pkt, pktI, gsoSize, seq, pshSet, &item, bufs, offset, isV6)
 			switch result {
 			case coalesceSuccess:
 				table.updateAt(item, i)
@@ -500,25 +500,25 @@ func isTCP6NoEH(b []byte) bool {
 	return true
 }
 
-// handleGRO evaluates buffs for GRO, and writes the indices of the resulting
+// handleGRO evaluates bufs for GRO, and writes the indices of the resulting
 // packets into toWrite. toWrite, tcp4Table, and tcp6Table should initially be
 // empty (but non-nil), and are passed in to save allocs as the caller may reset
 // and recycle them across vectors of packets.
-func handleGRO(buffs [][]byte, offset int, tcp4Table, tcp6Table *tcpGROTable, toWrite *[]int) error {
-	for i := range buffs {
-		if offset < virtioNetHdrLen || offset > len(buffs[i])-1 {
+func handleGRO(bufs [][]byte, offset int, tcp4Table, tcp6Table *tcpGROTable, toWrite *[]int) error {
+	for i := range bufs {
+		if offset < virtioNetHdrLen || offset > len(bufs[i])-1 {
 			return errors.New("invalid offset")
 		}
 		var coalesced bool
 		switch {
-		case isTCP4(buffs[i][offset:]):
-			coalesced = tcpGRO(buffs, offset, i, tcp4Table, false)
-		case isTCP6NoEH(buffs[i][offset:]): // ipv6 packets w/extension headers do not coalesce
-			coalesced = tcpGRO(buffs, offset, i, tcp6Table, true)
+		case isTCP4(bufs[i][offset:]):
+			coalesced = tcpGRO(bufs, offset, i, tcp4Table, false)
+		case isTCP6NoEH(bufs[i][offset:]): // ipv6 packets w/extension headers do not coalesce
+			coalesced = tcpGRO(bufs, offset, i, tcp6Table, true)
 		}
 		if !coalesced {
 			hdr := virtioNetHdr{}
-			err := hdr.encode(buffs[i][offset-virtioNetHdrLen:])
+			err := hdr.encode(bufs[i][offset-virtioNetHdrLen:])
 			if err != nil {
 				return err
 			}

@@ -428,7 +428,7 @@ func (b *fakeBindSized) Open(port uint16) (fns []conn.ReceiveFunc, actualPort ui
 }
 func (b *fakeBindSized) Close() error                                  { return nil }
 func (b *fakeBindSized) SetMark(mark uint32) error                     { return nil }
-func (b *fakeBindSized) Send(buffs [][]byte, ep conn.Endpoint) error   { return nil }
+func (b *fakeBindSized) Send(bufs [][]byte, ep conn.Endpoint) error    { return nil }
 func (b *fakeBindSized) ParseEndpoint(s string) (conn.Endpoint, error) { return nil, nil }
 func (b *fakeBindSized) BatchSize() int                                { return b.size }
 
@@ -437,15 +437,15 @@ type fakeTUNDeviceSized struct {
 }
 
 func (t *fakeTUNDeviceSized) File() *os.File { return nil }
-func (t *fakeTUNDeviceSized) Read(buffs [][]byte, sizes []int, offset int) (n int, err error) {
+func (t *fakeTUNDeviceSized) Read(bufs [][]byte, sizes []int, offset int) (n int, err error) {
 	return 0, nil
 }
-func (t *fakeTUNDeviceSized) Write(buffs [][]byte, offset int) (int, error) { return 0, nil }
-func (t *fakeTUNDeviceSized) MTU() (int, error)                             { return 0, nil }
-func (t *fakeTUNDeviceSized) Name() (string, error)                         { return "", nil }
-func (t *fakeTUNDeviceSized) Events() <-chan tun.Event                      { return nil }
-func (t *fakeTUNDeviceSized) Close() error                                  { return nil }
-func (t *fakeTUNDeviceSized) BatchSize() int                                { return t.size }
+func (t *fakeTUNDeviceSized) Write(bufs [][]byte, offset int) (int, error) { return 0, nil }
+func (t *fakeTUNDeviceSized) MTU() (int, error)                            { return 0, nil }
+func (t *fakeTUNDeviceSized) Name() (string, error)                        { return "", nil }
+func (t *fakeTUNDeviceSized) Events() <-chan tun.Event                     { return nil }
+func (t *fakeTUNDeviceSized) Close() error                                 { return nil }
+func (t *fakeTUNDeviceSized) BatchSize() int                               { return t.size }
 
 func TestBatchSize(t *testing.T) {
 	d := Device{}

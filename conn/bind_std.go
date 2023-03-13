@@ -204,11 +204,11 @@ again:
 }
 
 func (s *StdNetBind) makeReceiveIPv4(pc *ipv4.PacketConn, conn *net.UDPConn) ReceiveFunc {
-	return func(buffs [][]byte, sizes []int, eps []Endpoint) (n int, err error) {
+	return func(bufs [][]byte, sizes []int, eps []Endpoint) (n int, err error) {
 		msgs := s.ipv4MsgsPool.Get().(*[]ipv4.Message)
 		defer s.ipv4MsgsPool.Put(msgs)
-		for i := range buffs {
-			(*msgs)[i].Buffers[0] = buffs[i]
+		for i := range bufs {
+			(*msgs)[i].Buffers[0] = bufs[i]
 		}
 		var numMsgs int
 		if runtime.GOOS == "linux" {
@@ -237,11 +237,11 @@ func (s *StdNetBind) makeReceiveIPv4(pc *ipv4.PacketConn, conn *net.UDPConn) Rec
 }
 
 func (s *StdNetBind) makeReceiveIPv6(pc *ipv6.PacketConn, conn *net.UDPConn) ReceiveFunc {
-	return func(buffs [][]byte, sizes []int, eps []Endpoint) (n int, err error) {
+	return func(bufs [][]byte, sizes []int, eps []Endpoint) (n int, err error) {
 		msgs := s.ipv4MsgsPool.Get().(*[]ipv6.Message)
 		defer s.ipv4MsgsPool.Put(msgs)
-		for i := range buffs {
-			(*msgs)[i].Buffers[0] = buffs[i]
+		for i := range bufs {
+			(*msgs)[i].Buffers[0] = bufs[i]
 		}
 		var numMsgs int
 		if runtime.GOOS == "linux" {
@@ -301,7 +301,7 @@ func (s *StdNetBind) Close() error {
 	return err2
 }
 
-func (s *StdNetBind) Send(buffs [][]byte, endpoint Endpoint) error {
+func (s *StdNetBind) Send(bufs [][]byte, endpoint Endpoint) error {
 	s.mu.Lock()
 	blackhole := s.blackhole4
 	conn := s.ipv4
@@ -327,21 +327,21 @@ func (s *StdNetBind) Send(buffs [][]byte, endpoint Endpoint) error {
 		return syscall.EAFNOSUPPORT
 	}
 	if is6 {
-		return s.send6(conn, pc6, endpoint, buffs)
+		return s.send6(conn, pc6, endpoint, bufs)
 	} else {
-		return s.send4(conn, pc4, endpoint, buffs)
+		return s.send4(conn, pc4, endpoint, bufs)
 	}
 }
 
-func (s *StdNetBind) send4(conn *net.UDPConn, pc *ipv4.PacketConn, ep Endpoint, buffs [][]byte) error {
+func (s *StdNetBind) send4(conn *net.UDPConn, pc *ipv4.PacketConn, ep Endpoint, bufs [][]byte) error {
 	ua := s.udpAddrPool.Get().(*net.UDPAddr)
 	as4 := ep.DstIP().As4()
 	copy(ua.IP, as4[:])
 	ua.IP = ua.IP[:4]
 	ua.Port = int(ep.(*StdNetEndpoint).Port())
 	msgs := s.ipv4MsgsPool.Get().(*[]ipv4.Message)
-	for i, buff := range buffs {
-		(*msgs)[i].Buffers[0] = buff
+	for i, buf := range bufs {
+		(*msgs)[i].Buffers[0] = buf
 		(*msgs)[i].Addr = ua
 		setSrcControl(&(*msgs)[i].OOB, ep.(*StdNetEndpoint))
 	}
@@ -352,15 +352,15 @@ func (s *StdNetBind) send4(conn *net.UDPConn, pc *ipv4.PacketConn, ep Endpoint, 
 	)
 	if runtime.GOOS == "linux" {
 		for {
-			n, err = pc.WriteBatch((*msgs)[start:len(buffs)], 0)
-			if err != nil || n == len((*msgs)[start:len(buffs)]) {
+			n, err = pc.WriteBatch((*msgs)[start:len(bufs)], 0)
+			if err != nil || n == len((*msgs)[start:len(bufs)]) {
 				break
 			}
 			start += n
 		}
 	} else {
-		for i, buff := range buffs {
-			_, _, err = conn.WriteMsgUDP(buff, (*msgs)[i].OOB, ua)
+		for i, buf := range bufs {
+			_, _, err = conn.WriteMsgUDP(buf, (*msgs)[i].OOB, ua)
 			if err != nil {
 				break
 			}
@@ -371,15 +371,15 @@ func (s *StdNetBind) send4(conn *net.UDPConn, pc *ipv4.PacketConn, ep Endpoint, 
 	return err
 }
 
-func (s *StdNetBind) send6(conn *net.UDPConn, pc *ipv6.PacketConn, ep Endpoint, buffs [][]byte) error {
+func (s *StdNetBind) send6(conn *net.UDPConn, pc *ipv6.PacketConn, ep Endpoint, bufs [][]byte) error {
 	ua := s.udpAddrPool.Get().(*net.UDPAddr)
 	as16 := ep.DstIP().As16()
 	copy(ua.IP, as16[:])
 	ua.IP = ua.IP[:16]
 	ua.Port = int(ep.(*StdNetEndpoint).Port())
 	msgs := s.ipv6MsgsPool.Get().(*[]ipv6.Message)
-	for i, buff := range buffs {
-		(*msgs)[i].Buffers[0] = buff
+	for i, buf := range bufs {
+		(*msgs)[i].Buffers[0] = buf
 		(*msgs)[i].Addr = ua
 		setSrcControl(&(*msgs)[i].OOB, ep.(*StdNetEndpoint))
 	}
@@ -390,15 +390,15 @@ func (s *StdNetBind) send6(conn *net.UDPConn, pc *ipv6.PacketConn, ep Endpoint, 
 	)
 	if runtime.GOOS == "linux" {
 		for {
-			n, err = pc.WriteBatch((*msgs)[start:len(buffs)], 0)
-			if err != nil || n == len((*msgs)[start:len(buffs)]) {
+			n, err = pc.WriteBatch((*msgs)[start:len(bufs)], 0)
+			if err != nil || n == len((*msgs)[start:len(bufs)]) {
 				break
 			}
 			start += n
 		}
 	} else {
-		for i, buff := range buffs {
-			_, _, err = conn.WriteMsgUDP(buff, (*msgs)[i].OOB, ua)
+		for i, buf := range bufs {
+			_, _, err = conn.WriteMsgUDP(buf, (*msgs)[i].OOB, ua)
 			if err != nil {
 				break
 			}

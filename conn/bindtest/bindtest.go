@@ -94,12 +94,12 @@ func (c *ChannelBind) BatchSize() int { return 1 }
 func (c *ChannelBind) SetMark(mark uint32) error { return nil }
 
 func (c *ChannelBind) makeReceiveFunc(ch chan []byte) conn.ReceiveFunc {
-	return func(buffs [][]byte, sizes []int, eps []conn.Endpoint) (n int, err error) {
+	return func(bufs [][]byte, sizes []int, eps []conn.Endpoint) (n int, err error) {
 		select {
 		case <-c.closeSignal:
 			return 0, net.ErrClosed
 		case rx := <-ch:
-			copied := copy(buffs[0], rx)
+			copied := copy(bufs[0], rx)
 			sizes[0] = copied
 			eps[0] = c.target6
 			return 1, nil
@@ -107,8 +107,8 @@ func (c *ChannelBind) makeReceiveFunc(ch chan []byte) conn.ReceiveFunc {
 	}
 }
 
-func (c *ChannelBind) Send(buffs [][]byte, ep conn.Endpoint) error {
-	for _, b := range buffs {
+func (c *ChannelBind) Send(bufs [][]byte, ep conn.Endpoint) error {
+	for _, b := range bufs {
 		select {
 		case <-c.closeSignal:
 			return net.ErrClosed

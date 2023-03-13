@@ -330,7 +330,7 @@ func (tun *NativeTun) nameSlow() (string, error) {
 	return unix.ByteSliceToString(ifr[:]), nil
 }
 
-func (tun *NativeTun) Write(buffs [][]byte, offset int) (int, error) {
+func (tun *NativeTun) Write(bufs [][]byte, offset int) (int, error) {
 	tun.writeOpMu.Lock()
 	defer func() {
 		tun.tcp4GROTable.reset()
@@ -343,18 +343,18 @@ func (tun *NativeTun) Write(buffs [][]byte, offset int) (int, error) {
 	)
 	tun.toWrite = tun.toWrite[:0]
 	if tun.vnetHdr {
-		err := handleGRO(buffs, offset, tun.tcp4GROTable, tun.tcp6GROTable, &tun.toWrite)
+		err := handleGRO(bufs, offset, tun.tcp4GROTable, tun.tcp6GROTable, &tun.toWrite)
 		if err != nil {
 			return 0, err
 		}
 		offset -= virtioNetHdrLen
 	} else {
-		for i := range buffs {
+		for i := range bufs {
 			tun.toWrite = append(tun.toWrite, i)
 		}
 	}
-	for _, buffsI := range tun.toWrite {
-		n, err := tun.tunFile.Write(buffs[buffsI][offset:])
+	for _, bufsI := range tun.toWrite {
+		n, err := tun.tunFile.Write(bufs[bufsI][offset:])
 		if errors.Is(err, syscall.EBADFD) {
 			return total, os.ErrClosed
 		}
@@ -367,10 +367,10 @@ func (tun *NativeTun) Write(buffs [][]byte, offset int) (int, error) {
 	return total, ErrorBatch(errs)
 }
 
-// handleVirtioRead splits in into buffs, leaving offset bytes at the front of
-// each buffer. It mutates sizes to reflect the size of each element of buffs,
+// handleVirtioRead splits in into bufs, leaving offset bytes at the front of
+// each buffer. It mutates sizes to reflect the size of each element of bufs,
 // and returns the number of packets read.
-func handleVirtioRead(in []byte, buffs [][]byte, sizes []int, offset int) (int, error) {
+func handleVirtioRead(in []byte, bufs [][]byte, sizes []int, offset int) (int, error) {
 	var hdr virtioNetHdr
 	err := hdr.decode(in)
 	if err != nil {
@@ -387,10 +387,10 @@ func handleVirtioRead(in []byte, buffs [][]byte, sizes []int, offset int) (int, 
 				return 0, err
 			}
 		}
-		if len(in) > len(buffs[0][offset:]) {
-			return 0, fmt.Errorf("read len %d overflows buffs element len %d", len(in), len(buffs[0][offset:]))
+		if len(in) > len(bufs[0][offset:]) {
+			return 0, fmt.Errorf("read len %d overflows bufs element len %d", len(in), len(bufs[0][offset:]))
 		}
-		n := copy(buffs[0][offset:], in)
+		n := copy(bufs[0][offset:], in)
 		sizes[0] = n
 		return 1, nil
 	}
@@ -438,17 +438,17 @@ func handleVirtioRead(in []byte, buffs [][]byte, sizes []int, offset int) (int, 
 		return 0, fmt.Errorf("end of checksum offset (%d) exceeds packet length (%d)", cSumAt+1, len(in))
 	}
 
-	return tcpTSO(in, hdr, buffs, sizes, offset)
+	return tcpTSO(in, hdr, bufs, sizes, offset)
 }
 
-func (tun *NativeTun) Read(buffs [][]byte, sizes []int, offset int) (int, error) {
+func (tun *NativeTun) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 	tun.readOpMu.Lock()
 	defer tun.readOpMu.Unlock()
 	select {
 	case err := <-tun.errors:
 		return 0, err
 	default:
-		readInto := buffs[0][offset:]
+		readInto := bufs[0][offset:]
 		if tun.vnetHdr {
 			readInto = tun.readBuff[:]
 		}
@@ -460,7 +460,7 @@ func (tun *NativeTun) Read(buffs [][]byte, sizes []int, offset int) (int, error)
 			return 0, err
 		}
 		if tun.vnetHdr {
-			return handleVirtioRead(readInto[:n], buffs, sizes, offset)
+			return handleVirtioRead(readInto[:n], bufs, sizes, offset)
 		} else {
 			sizes[0] = n
 			return 1, nil

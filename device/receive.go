@@ -80,8 +80,8 @@ func (device *Device) RoutineReceiveIncoming(maxBatchSize int, recv conn.Receive
 	// receive datagrams until conn is closed
 
 	var (
-		buffsArrs   = make([]*[MaxMessageSize]byte, maxBatchSize)
-		buffs       = make([][]byte, maxBatchSize)
+		bufsArrs    = make([]*[MaxMessageSize]byte, maxBatchSize)
+		bufs        = make([][]byte, maxBatchSize)
 		err         error
 		sizes       = make([]int, maxBatchSize)
 		count       int
@@ -90,21 +90,21 @@ func (device *Device) RoutineReceiveIncoming(maxBatchSize int, recv conn.Receive
 		elemsByPeer = make(map[*Peer]*[]*QueueInboundElement, maxBatchSize)
 	)
 
-	for i := range buffsArrs {
-		buffsArrs[i] = device.GetMessageBuffer()
-		buffs[i] = buffsArrs[i][:]
+	for i := range bufsArrs {
+		bufsArrs[i] = device.GetMessageBuffer()
+		bufs[i] = bufsArrs[i][:]
 	}
 
 	defer func() {
 		for i := 0; i < maxBatchSize; i++ {
-			if buffsArrs[i] != nil {
-				device.PutMessageBuffer(buffsArrs[i])
+			if bufsArrs[i] != nil {
+				device.PutMessageBuffer(bufsArrs[i])
 			}
 		}
 	}()
 
 	for {
-		count, err = recv(buffs, sizes, endpoints)
+		count, err = recv(bufs, sizes, endpoints)
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				return
@@ -130,7 +130,7 @@ func (device *Device) RoutineReceiveIncoming(maxBatchSize int, recv conn.Receive
 
 			// check size of packet
 
-			packet := buffsArrs[i][:size]
+			packet := bufsArrs[i][:size]
 			msgType := binary.LittleEndian.Uint32(packet[:4])
 
 			switch msgType {
@@ -166,7 +166,7 @@ func (device *Device) RoutineReceiveIncoming(maxBatchSize int, recv conn.Receive
 				peer := value.peer
 				elem := device.GetInboundElement()
 				elem.packet = packet
-				elem.buffer = buffsArrs[i]
+				elem.buffer = bufsArrs[i]
 				elem.keypair = keypair
 				elem.endpoint = endpoints[i]
 				elem.counter = 0
@@ -179,8 +179,8 @@ func (device *Device) RoutineReceiveIncoming(maxBatchSize int, recv conn.Receive
 					elemsByPeer[peer] = elemsForPeer
 				}
 				*elemsForPeer = append(*elemsForPeer, elem)
-				buffsArrs[i] = device.GetMessageBuffer()
-				buffs[i] = buffsArrs[i][:]
+				bufsArrs[i] = device.GetMessageBuffer()
+				bufs[i] = bufsArrs[i][:]
 				continue
 
 			// otherwise it is a fixed size & handshake related packet
@@ -208,12 +208,12 @@ func (device *Device) RoutineReceiveIncoming(maxBatchSize int, recv conn.Receive
 			select {
 			case device.queue.handshake.c <- QueueHandshakeElement{
 				msgType:  msgType,
-				buffer:   buffsArrs[i],
+				buffer:   bufsArrs[i],
 				packet:   packet,
 				endpoint: endpoints[i],
 			}:
-				buffsArrs[i] = device.GetMessageBuffer()
-				buffs[i] = buffsArrs[i][:]
+				bufsArrs[i] = device.GetMessageBuffer()
+				bufs[i] = bufsArrs[i][:]
 			default:
 			}
 		}
@@ -435,7 +435,7 @@ func (peer *Peer) RoutineSequentialReceiver(maxBatchSize int) {
 	}()
 	device.log.Verbosef("%v - Routine: sequential receiver - started", peer)
 
-	buffs := make([][]byte, 0, maxBatchSize)
+	bufs := make([][]byte, 0, maxBatchSize)
 
 	for elems := range peer.queue.inbound.c {
 		if elems == nil {
@@ -507,10 +507,10 @@ func (peer *Peer) RoutineSequentialReceiver(maxBatchSize int) {
 				continue
 			}
 
-			buffs = append(buffs, elem.buffer[:MessageTransportOffsetContent+len(elem.packet)])
+			bufs = append(bufs, elem.buffer[:MessageTransportOffsetContent+len(elem.packet)])
 		}
-		if len(buffs) > 0 {
-			_, err := device.tun.device.Write(buffs, MessageTransportOffsetContent)
+		if len(bufs) > 0 {
+			_, err := device.tun.device.Write(bufs, MessageTransportOffsetContent)
 			if err != nil && !device.isClosed() {
 				device.log.Errorf("Failed to write packets to TUN device: %v", err)
 			}
@@ -519,7 +519,7 @@ func (peer *Peer) RoutineSequentialReceiver(maxBatchSize int) {
 			device.PutMessageBuffer(elem.buffer)
 			device.PutInboundElement(elem)
 		}
-		buffs = buffs[:0]
+		bufs = bufs[:0]
 		device.PutInboundElementsSlice(elems)
 	}
 }

@@ -333,13 +333,13 @@ func (tun *NativeTun) Events() <-chan Event {
 	return tun.events
 }
 
-func (tun *NativeTun) Read(buffs [][]byte, sizes []int, offset int) (int, error) {
+func (tun *NativeTun) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 	select {
 	case err := <-tun.errors:
 		return 0, err
 	default:
-		buff := buffs[0][offset-4:]
-		n, err := tun.tunFile.Read(buff[:])
+		buf := bufs[0][offset-4:]
+		n, err := tun.tunFile.Read(buf[:])
 		if n < 4 {
 			return 0, err
 		}
@@ -348,11 +348,11 @@ func (tun *NativeTun) Read(buffs [][]byte, sizes []int, offset int) (int, error)
 	}
 }
 
-func (tun *NativeTun) Write(buffs [][]byte, offset int) (int, error) {
+func (tun *NativeTun) Write(bufs [][]byte, offset int) (int, error) {
 	if offset < 4 {
 		return 0, io.ErrShortBuffer
 	}
-	for i, buf := range buffs {
+	for i, buf := range bufs {
 		buf = buf[offset-4:]
 		if len(buf) < 5 {
 			return i, io.ErrShortBuffer
@@ -372,7 +372,7 @@ func (tun *NativeTun) Write(buffs [][]byte, offset int) (int, error) {
 			return i, err
 		}
 	}
-	return len(buffs), nil
+	return len(bufs), nil
 }
 
 func (tun *NativeTun) Close() error {

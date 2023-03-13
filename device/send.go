@@ -120,8 +120,8 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 		return err
 	}
 
-	var buff [MessageInitiationSize]byte
-	writer := bytes.NewBuffer(buff[:0])
+	var buf [MessageInitiationSize]byte
+	writer := bytes.NewBuffer(buf[:0])
 	binary.Write(writer, binary.LittleEndian, msg)
 	packet := writer.Bytes()
 	peer.cookieGenerator.AddMacs(packet)
@@ -151,8 +151,8 @@ func (peer *Peer) SendHandshakeResponse() error {
 		return err
 	}
 
-	var buff [MessageResponseSize]byte
-	writer := bytes.NewBuffer(buff[:0])
+	var buf [MessageResponseSize]byte
+	writer := bytes.NewBuffer(buf[:0])
 	binary.Write(writer, binary.LittleEndian, response)
 	packet := writer.Bytes()
 	peer.cookieGenerator.AddMacs(packet)
@@ -185,8 +185,8 @@ func (device *Device) SendHandshakeCookie(initiatingElem *QueueHandshakeElement)
 		return err
 	}
 
-	var buff [MessageCookieReplySize]byte
-	writer := bytes.NewBuffer(buff[:0])
+	var buf [MessageCookieReplySize]byte
+	writer := bytes.NewBuffer(buf[:0])
 	binary.Write(writer, binary.LittleEndian, reply)
 	// TODO: allocation could be avoided
 	device.net.bind.Send([][]byte{writer.Bytes()}, initiatingElem.endpoint)
@@ -217,7 +217,7 @@ func (device *Device) RoutineReadFromTUN() {
 		batchSize   = device.BatchSize()
 		readErr     error
 		elems       = make([]*QueueOutboundElement, batchSize)
-		buffs       = make([][]byte, batchSize)
+		bufs        = make([][]byte, batchSize)
 		elemsByPeer = make(map[*Peer]*[]*QueueOutboundElement, batchSize)
 		count       = 0
 		sizes       = make([]int, batchSize)
@@ -226,7 +226,7 @@ func (device *Device) RoutineReadFromTUN() {
 
 	for i := range elems {
 		elems[i] = device.NewOutboundElement()
-		buffs[i] = elems[i].buffer[:]
+		bufs[i] = elems[i].buffer[:]
 	}
 
 	defer func() {
@@ -240,14 +240,14 @@ func (device *Device) RoutineReadFromTUN() {
 
 	for {
 		// read packets
-		count, readErr = device.tun.device.Read(buffs, sizes, offset)
+		count, readErr = device.tun.device.Read(bufs, sizes, offset)
 		for i := 0; i < count; i++ {
 			if sizes[i] < 1 {
 				continue
 			}
 
 			elem := elems[i]
-			elem.packet = buffs[i][offset : offset+sizes[i]]
+			elem.packet = bufs[i][offset : offset+sizes[i]]
 
 			// lookup peer
 			var peer *Peer
@@ -280,7 +280,7 @@ func (device *Device) RoutineReadFromTUN() {
 			}
 			*elemsForPeer = append(*elemsForPeer, elem)
 			elems[i] = device.NewOutboundElement()
-			buffs[i] = elems[i].buffer[:]
+			bufs[i] = elems[i].buffer[:]
 		}
 
 		for peer, elemsForPeer := range elemsByPeer {
@@ -483,10 +483,10 @@ func (peer *Peer) RoutineSequentialSender(maxBatchSize int) {
 	}()
 	device.log.Verbosef("%v - Routine: sequential sender - started", peer)
 
-	buffs := make([][]byte, 0, maxBatchSize)
+	bufs := make([][]byte, 0, maxBatchSize)
 
 	for elems := range peer.queue.outbound.c {
-		buffs = buffs[:0]
+		bufs = bufs[:0]
 		if elems == nil {
 			return
 		}
@@ -510,13 +510,13 @@ func (peer *Peer) RoutineSequentialSender(maxBatchSize int) {
 			if len(elem.packet) != MessageKeepaliveSize {
 				dataSent = true
 			}
-			buffs = append(buffs, elem.packet)
+			bufs = append(bufs, elem.packet)
 		}
 
 		peer.timersAnyAuthenticatedPacketTraversal()
 		peer.timersAnyAuthenticatedPacketSent()
 
-		err := peer.SendBuffers(buffs)
+		err := peer.SendBuffers(bufs)
 		if dataSent {
 			peer.timersDataSent()
 		}

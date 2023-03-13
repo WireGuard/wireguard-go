@@ -9,14 +9,14 @@ func TestStdNetBindReceiveFuncAfterClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	bind.Close()
-	buffs := make([][]byte, 1)
-	buffs[0] = make([]byte, 1)
+	bufs := make([][]byte, 1)
+	bufs[0] = make([]byte, 1)
 	sizes := make([]int, 1)
 	eps := make([]Endpoint, 1)
 	for _, fn := range fns {
 		// The ReceiveFuncs must not access conn-related fields on StdNetBind
 		// unguarded. Close() nils the conn-related fields resulting in a panic
 		// if they violate the mutex.
-		fn(buffs, sizes, eps)
+		fn(bufs, sizes, eps)
 	}
 }
