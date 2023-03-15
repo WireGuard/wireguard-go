@@ -25,7 +25,7 @@ func getSrcFromControl(control []byte, ep *StdNetEndpoint) {
 	)
 
 	for len(rem) > unix.SizeofCmsghdr {
-		hdr, data, rem, err = unix.ParseOneSocketControlMessage(control)
+		hdr, data, rem, err = unix.ParseOneSocketControlMessage(rem)
 		if err != nil {
 			return
 		}

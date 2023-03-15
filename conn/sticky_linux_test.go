@@ -150,6 +150,34 @@ func Test_getSrcFromControl(t *testing.T) {
 			t.Errorf("unexpected ifindex: %d", ep.src.ifidx)
 		}
 	})
+	t.Run("Multiple", func(t *testing.T) {
+		zeroControl := make([]byte, unix.CmsgSpace(0))
+		zeroHdr := (*unix.Cmsghdr)(unsafe.Pointer(&zeroControl[0]))
+		zeroHdr.SetLen(unix.CmsgLen(0))
+
+		control := make([]byte, srcControlSize)
+		hdr := (*unix.Cmsghdr)(unsafe.Pointer(&control[0]))
+		hdr.Level = unix.IPPROTO_IP
+		hdr.Type = unix.IP_PKTINFO
+		hdr.SetLen(unix.CmsgLen(int(unsafe.Sizeof(unix.Inet4Pktinfo{}))))
+		info := (*unix.Inet4Pktinfo)(unsafe.Pointer(&control[unix.CmsgLen(0)]))
+		info.Spec_dst = [4]byte{127, 0, 0, 1}
+		info.Ifindex = 5
+
+		combined := make([]byte, 0)
+		combined = append(combined, zeroControl...)
+		combined = append(combined, control...)
+
+		ep := &StdNetEndpoint{}
+		getSrcFromControl(combined, ep)
+
+		if ep.src.Addr != netip.MustParseAddr("127.0.0.1") {
+			t.Errorf("unexpected address: %v", ep.src.Addr)
+		}
+		if ep.src.ifidx != 5 {
+			t.Errorf("unexpected ifindex: %d", ep.src.ifidx)
+		}
+	})
 }
 
 func Test_listenConfig(t *testing.T) {
