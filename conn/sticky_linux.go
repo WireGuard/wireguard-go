@@ -63,8 +63,9 @@ func pktInfoFromBuf[T unix.Inet4Pktinfo | unix.Inet6Pktinfo](buf []byte) (t T) {
 	return t
 }
 
-// setSrcControl parses the control for PKTINFO and if found updates ep with
-// the source information found.
+// setSrcControl sets an IP{V6}_PKTINFO in control based on the source address
+// and source ifindex found in ep. control's len will be set to 0 in the event
+// that ep is a default value.
 func setSrcControl(control *[]byte, ep *StdNetEndpoint) {
 	*control = (*control)[:cap(*control)]
 	if len(*control) < int(unsafe.Sizeof(unix.Cmsghdr{})) {
@@ -93,19 +94,20 @@ func setSrcControl(control *[]byte, ep *StdNetEndpoint) {
 		if ep.SrcIP().IsValid() {
 			info.Spec_dst = ep.SrcIP().As4()
 		}
+		*control = (*control)[:unix.CmsgSpace(unix.SizeofInet4Pktinfo)]
 	} else {
 		hdr.Level = unix.IPPROTO_IPV6
 		hdr.Type = unix.IPV6_PKTINFO
-		hdr.Len = unix.SizeofCmsghdr + unix.SizeofInet6Pktinfo
+		hdr.SetLen(unix.CmsgLen(unix.SizeofInet6Pktinfo))
 
 		info := (*unix.Inet6Pktinfo)(unsafe.Pointer(&(*control)[unix.SizeofCmsghdr]))
 		info.Ifindex = uint32(ep.src.ifidx)
 		if ep.SrcIP().IsValid() {
 			info.Addr = ep.SrcIP().As16()
 		}
+		*control = (*control)[:unix.CmsgSpace(unix.SizeofInet6Pktinfo)]
 	}
 
-	*control = (*control)[:hdr.Len]
 }
 
-var srcControlSize = unix.CmsgLen(unix.SizeofInet6Pktinfo)
+var srcControlSize = unix.CmsgSpace(unix.SizeofInet6Pktinfo)
