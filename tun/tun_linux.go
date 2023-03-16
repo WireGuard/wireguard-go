@@ -338,7 +338,7 @@ func (tun *NativeTun) Write(bufs [][]byte, offset int) (int, error) {
 		tun.writeOpMu.Unlock()
 	}()
 	var (
-		errs  []error
+		errs  error
 		total int
 	)
 	tun.toWrite = tun.toWrite[:0]
@@ -359,12 +359,12 @@ func (tun *NativeTun) Write(bufs [][]byte, offset int) (int, error) {
 			return total, os.ErrClosed
 		}
 		if err != nil {
-			errs = append(errs, err)
+			errs = errors.Join(errs, err)
 		} else {
 			total += n
 		}
 	}
-	return total, ErrorBatch(errs)
+	return total, errs
 }
 
 // handleVirtioRead splits in into bufs, leaving offset bytes at the front of
