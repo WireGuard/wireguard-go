@@ -93,7 +93,12 @@ var (
 
 func (*StdNetBind) ParseEndpoint(s string) (Endpoint, error) {
 	e, err := netip.ParseAddrPort(s)
-	return asEndpoint(e), err
+	if err != nil {
+		return nil, err
+	}
+	return &StdNetEndpoint{
+		AddrPort: e,
+	}, nil
 }
 
 func (e *StdNetEndpoint) ClearSrc() {
@@ -228,7 +233,7 @@ func (s *StdNetBind) makeReceiveIPv4(pc *ipv4.PacketConn, conn *net.UDPConn) Rec
 			msg := &(*msgs)[i]
 			sizes[i] = msg.N
 			addrPort := msg.Addr.(*net.UDPAddr).AddrPort()
-			ep := asEndpoint(addrPort)
+			ep := &StdNetEndpoint{AddrPort: addrPort} // TODO: remove allocation
 			getSrcFromControl(msg.OOB[:msg.NN], ep)
 			eps[i] = ep
 		}
@@ -261,7 +266,7 @@ func (s *StdNetBind) makeReceiveIPv6(pc *ipv6.PacketConn, conn *net.UDPConn) Rec
 			msg := &(*msgs)[i]
 			sizes[i] = msg.N
 			addrPort := msg.Addr.(*net.UDPAddr).AddrPort()
-			ep := asEndpoint(addrPort)
+			ep := &StdNetEndpoint{AddrPort: addrPort} // TODO: remove allocation
 			getSrcFromControl(msg.OOB[:msg.NN], ep)
 			eps[i] = ep
 		}
@@ -407,25 +412,4 @@ func (s *StdNetBind) send6(conn *net.UDPConn, pc *ipv6.PacketConn, ep Endpoint, 
 	s.udpAddrPool.Put(ua)
 	s.ipv6MsgsPool.Put(msgs)
 	return err
-}
-
-// endpointPool contains a re-usable set of mapping from netip.AddrPort to Endpoint.
-// This exists to reduce allocations: Putting a netip.AddrPort in an Endpoint allocates,
-// but Endpoints are immutable, so we can re-use them.
-var endpointPool = sync.Pool{
-	New: func() any {
-		return make(map[netip.AddrPort]*StdNetEndpoint)
-	},
-}
-
-// asEndpoint returns an Endpoint containing ap.
-func asEndpoint(ap netip.AddrPort) *StdNetEndpoint {
-	m := endpointPool.Get().(map[netip.AddrPort]*StdNetEndpoint)
-	defer endpointPool.Put(m)
-	e, ok := m[ap]
-	if !ok {
-		e = &StdNetEndpoint{AddrPort: ap}
-		m[ap] = e
-	}
-	return e
 }
