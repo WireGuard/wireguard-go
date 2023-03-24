@@ -29,17 +29,19 @@ var (
 // methods for sending and receiving multiple datagrams per-syscall. See the
 // proposal in https://github.com/golang/go/issues/45886#issuecomment-1218301564.
 type StdNetBind struct {
-	mu         sync.Mutex // protects following fields
-	ipv4       *net.UDPConn
-	ipv6       *net.UDPConn
-	blackhole4 bool
-	blackhole6 bool
-	ipv4PC     *ipv4.PacketConn // will be nil on non-Linux
-	ipv6PC     *ipv6.PacketConn // will be nil on non-Linux
+	mu     sync.Mutex // protects all fields except as specified
+	ipv4   *net.UDPConn
+	ipv6   *net.UDPConn
+	ipv4PC *ipv4.PacketConn // will be nil on non-Linux
+	ipv6PC *ipv6.PacketConn // will be nil on non-Linux
 
-	udpAddrPool  sync.Pool // following fields are not guarded by mu
+	// these three fields are not guarded by mu
+	udpAddrPool  sync.Pool
 	ipv4MsgsPool sync.Pool
 	ipv6MsgsPool sync.Pool
+
+	blackhole4 bool
+	blackhole6 bool
 }
 
 func NewStdNetBind() Bind {
