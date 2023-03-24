@@ -271,3 +271,53 @@ func Test_handleGRO(t *testing.T) {
 		})
 	}
 }
+
+func Test_isTCP4NoIPOptions(t *testing.T) {
+	valid := tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1)[virtioNetHdrLen:]
+	invalidLen := valid[:39]
+	invalidHeaderLen := make([]byte, len(valid))
+	copy(invalidHeaderLen, valid)
+	invalidHeaderLen[0] = 0x46
+	invalidProtocol := make([]byte, len(valid))
+	copy(invalidProtocol, valid)
+	invalidProtocol[9] = unix.IPPROTO_TCP + 1
+
+	tests := []struct {
+		name string
+		b    []byte
+		want bool
+	}{
+		{
+			"valid",
+			valid,
+			true,
+		},
+		{
+			"invalid length",
+			invalidLen,
+			false,
+		},
+		{
+			"invalid version",
+			[]byte{0x00},
+			false,
+		},
+		{
+			"invalid header len",
+			invalidHeaderLen,
+			false,
+		},
+		{
+			"invalid protocol",
+			invalidProtocol,
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isTCP4NoIPOptions(tt.b); got != tt.want {
+				t.Errorf("isTCP4NoIPOptions() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
