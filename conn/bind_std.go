@@ -243,8 +243,8 @@ func (s *StdNetBind) makeReceiveIPv4(pc *ipv4.PacketConn, conn *net.UDPConn) Rec
 
 func (s *StdNetBind) makeReceiveIPv6(pc *ipv6.PacketConn, conn *net.UDPConn) ReceiveFunc {
 	return func(bufs [][]byte, sizes []int, eps []Endpoint) (n int, err error) {
-		msgs := s.ipv4MsgsPool.Get().(*[]ipv6.Message)
-		defer s.ipv4MsgsPool.Put(msgs)
+		msgs := s.ipv6MsgsPool.Get().(*[]ipv6.Message)
+		defer s.ipv6MsgsPool.Put(msgs)
 		for i := range bufs {
 			(*msgs)[i].Buffers[0] = bufs[i]
 		}
