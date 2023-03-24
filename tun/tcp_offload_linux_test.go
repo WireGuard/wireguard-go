@@ -28,19 +28,23 @@ var (
 	ip6PortC = netip.MustParseAddrPort("[2001:db8::3]:1")
 )
 
-func tcp4Packet(srcIPPort, dstIPPort netip.AddrPort, flags header.TCPFlags, segmentSize, seq uint32) []byte {
+func tcp4PacketMutateIPFields(srcIPPort, dstIPPort netip.AddrPort, flags header.TCPFlags, segmentSize, seq uint32, ipFn func(*header.IPv4Fields)) []byte {
 	totalLen := 40 + segmentSize
 	b := make([]byte, offset+int(totalLen), 65535)
 	ipv4H := header.IPv4(b[offset:])
 	srcAs4 := srcIPPort.Addr().As4()
 	dstAs4 := dstIPPort.Addr().As4()
-	ipv4H.Encode(&header.IPv4Fields{
+	ipFields := &header.IPv4Fields{
 		SrcAddr:     tcpip.Address(srcAs4[:]),
 		DstAddr:     tcpip.Address(dstAs4[:]),
 		Protocol:    unix.IPPROTO_TCP,
 		TTL:         64,
 		TotalLength: uint16(totalLen),
-	})
+	}
+	if ipFn != nil {
+		ipFn(ipFields)
+	}
+	ipv4H.Encode(ipFields)
 	tcpH := header.TCP(b[offset+20:])
 	tcpH.Encode(&header.TCPFields{
 		SrcPort:    srcIPPort.Port(),
@@ -57,19 +61,27 @@ func tcp4Packet(srcIPPort, dstIPPort netip.AddrPort, flags header.TCPFlags, segm
 	return b
 }
 
-func tcp6Packet(srcIPPort, dstIPPort netip.AddrPort, flags header.TCPFlags, segmentSize, seq uint32) []byte {
+func tcp4Packet(srcIPPort, dstIPPort netip.AddrPort, flags header.TCPFlags, segmentSize, seq uint32) []byte {
+	return tcp4PacketMutateIPFields(srcIPPort, dstIPPort, flags, segmentSize, seq, nil)
+}
+
+func tcp6PacketMutateIPFields(srcIPPort, dstIPPort netip.AddrPort, flags header.TCPFlags, segmentSize, seq uint32, ipFn func(*header.IPv6Fields)) []byte {
 	totalLen := 60 + segmentSize
 	b := make([]byte, offset+int(totalLen), 65535)
 	ipv6H := header.IPv6(b[offset:])
 	srcAs16 := srcIPPort.Addr().As16()
 	dstAs16 := dstIPPort.Addr().As16()
-	ipv6H.Encode(&header.IPv6Fields{
+	ipFields := &header.IPv6Fields{
 		SrcAddr:           tcpip.Address(srcAs16[:]),
 		DstAddr:           tcpip.Address(dstAs16[:]),
 		TransportProtocol: unix.IPPROTO_TCP,
 		HopLimit:          64,
 		PayloadLength:     uint16(segmentSize + 20),
-	})
+	}
+	if ipFn != nil {
+		ipFn(ipFields)
+	}
+	ipv6H.Encode(ipFields)
 	tcpH := header.TCP(b[offset+40:])
 	tcpH.Encode(&header.TCPFields{
 		SrcPort:    srcIPPort.Port(),
@@ -83,6 +95,10 @@ func tcp6Packet(srcIPPort, dstIPPort netip.AddrPort, flags header.TCPFlags, segm
 	pseudoCsum := header.PseudoHeaderChecksum(unix.IPPROTO_TCP, ipv6H.SourceAddress(), ipv6H.DestinationAddress(), uint16(20+segmentSize))
 	tcpH.SetChecksum(^tcpH.CalculateChecksum(pseudoCsum))
 	return b
+}
+
+func tcp6Packet(srcIPPort, dstIPPort netip.AddrPort, flags header.TCPFlags, segmentSize, seq uint32) []byte {
+	return tcp6PacketMutateIPFields(srcIPPort, dstIPPort, flags, segmentSize, seq, nil)
 }
 
 func Test_handleVirtioRead(t *testing.T) {
@@ -243,6 +259,78 @@ func Test_handleGRO(t *testing.T) {
 			},
 			[]int{0},
 			[]int{340},
+			false,
+		},
+		{
+			"tcp4 unequal TTL",
+			[][]byte{
+				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),
+				tcp4PacketMutateIPFields(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv4Fields) {
+					fields.TTL++
+				}),
+			},
+			[]int{0, 1},
+			[]int{140, 140},
+			false,
+		},
+		{
+			"tcp4 unequal ToS",
+			[][]byte{
+				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),
+				tcp4PacketMutateIPFields(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv4Fields) {
+					fields.TOS++
+				}),
+			},
+			[]int{0, 1},
+			[]int{140, 140},
+			false,
+		},
+		{
+			"tcp4 unequal flags more fragments set",
+			[][]byte{
+				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),
+				tcp4PacketMutateIPFields(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv4Fields) {
+					fields.Flags = 1
+				}),
+			},
+			[]int{0, 1},
+			[]int{140, 140},
+			false,
+		},
+		{
+			"tcp4 unequal flags DF set",
+			[][]byte{
+				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),
+				tcp4PacketMutateIPFields(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv4Fields) {
+					fields.Flags = 2
+				}),
+			},
+			[]int{0, 1},
+			[]int{140, 140},
+			false,
+		},
+		{
+			"tcp6 unequal hop limit",
+			[][]byte{
+				tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 1),
+				tcp6PacketMutateIPFields(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv6Fields) {
+					fields.HopLimit++
+				}),
+			},
+			[]int{0, 1},
+			[]int{160, 160},
+			false,
+		},
+		{
+			"tcp6 unequal traffic class",
+			[][]byte{
+				tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 1),
+				tcp6PacketMutateIPFields(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv6Fields) {
+					fields.TrafficClass++
+				}),
+			},
+			[]int{0, 1},
+			[]int{160, 160},
 			false,
 		},
 	}
