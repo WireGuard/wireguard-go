@@ -18,7 +18,7 @@ import (
 type archChecksumDetails struct {
 	name      string
 	available bool
-	f         func([]byte, uint64) uint16
+	f         func([]byte, uint16) uint16
 }
 
 func deterministicRandomBytes(seed int64, length int) []byte {
@@ -402,7 +402,7 @@ func TestChecksum(t *testing.T) {
 					if !fd.available {
 						t.Skip("can not run on this system")
 					}
-					if got := fd.f(tt.data, uint64(tt.initial)); got != tt.want {
+					if got := fd.f(tt.data, tt.initial); got != tt.want {
 						t.Errorf("%s checksum = %04x, want %04x", fd.name, got, tt.want)
 					}
 				})
@@ -444,20 +444,28 @@ func TestPseudoHeaderChecksumNoFold(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotNoFold := pseudoHeaderChecksumNoFold(tt.protocol, tt.srcAddr, tt.dstAddr, tt.totalLen)
-			got := checksum([]byte{}, gotNoFold)
-			if got != tt.want {
-				t.Errorf("pseudoHeaderChecksumNoFold() = %x, folds to %04x, want %04x", gotNoFold, got, tt.want)
-			}
-
-			got = header.PseudoHeaderChecksum(
-				tcpip.TransportProtocolNumber(tt.protocol),
-				tcpip.Address(tt.srcAddr),
-				tcpip.Address(tt.dstAddr),
-				tt.totalLen)
-			if got != tt.want {
-				t.Errorf("header.PseudoHeaderChecksum() = %04x, want %04x", got, tt.want)
-			}
+			t.Run("pseudoHeaderChecksum32", func(t *testing.T) {
+				got := pseudoHeaderChecksum32(tt.protocol, tt.srcAddr, tt.dstAddr, tt.totalLen)
+				if got != tt.want {
+					t.Errorf("got %04x, want %04x", got, tt.want)
+				}
+			})
+			t.Run("pseudoHeaderChecksum64", func(t *testing.T) {
+				got := pseudoHeaderChecksum64(tt.protocol, tt.srcAddr, tt.dstAddr, tt.totalLen)
+				if got != tt.want {
+					t.Errorf("got %04x, want %04x", got, tt.want)
+				}
+			})
+			t.Run("reference", func(t *testing.T) {
+				got := header.PseudoHeaderChecksum(
+					tcpip.TransportProtocolNumber(tt.protocol),
+					tcpip.Address(tt.srcAddr),
+					tcpip.Address(tt.dstAddr),
+					tt.totalLen)
+				if got != tt.want {
+					t.Errorf("got %04x, want %04x", got, tt.want)
+				}
+			})
 		})
 	}
 }
@@ -482,7 +490,7 @@ func FuzzChecksum(f *testing.F) {
 				if !fd.available {
 					t.Skip("can not run on this system")
 				}
-				if got := fd.f(data, uint64(initial)); got != want {
+				if got := fd.f(data, initial); got != want {
 					t.Errorf("%s checksum = %04x, want %04x", fd.name, got, want)
 				}
 			})
@@ -491,7 +499,6 @@ func FuzzChecksum(f *testing.F) {
 }
 
 var result uint16
-var result64 uint64
 
 func BenchmarkChecksum(b *testing.B) {
 	offsets := []int{ // offsets from page alignment
@@ -590,9 +597,16 @@ func BenchmarkPseudoHeaderChecksum(b *testing.B) {
 	}
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				result64 += pseudoHeaderChecksumNoFold(tt.protocol, tt.srcAddr, tt.dstAddr, tt.totalLen)
-			}
+			b.Run("pseudoHeaderChecksum32", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					result += pseudoHeaderChecksum32(tt.protocol, tt.srcAddr, tt.dstAddr, tt.totalLen)
+				}
+			})
+			b.Run("pseudoHeaderChecksum64", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					result += pseudoHeaderChecksum64(tt.protocol, tt.srcAddr, tt.dstAddr, tt.totalLen)
+				}
+			})
 		})
 	}
 }
