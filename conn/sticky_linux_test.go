@@ -60,7 +60,7 @@ func Test_setSrcControl(t *testing.T) {
 		}
 		setSrc(ep, netip.MustParseAddr("127.0.0.1"), 5)
 
-		control := make([]byte, stickyControlSize)
+		control := make([]byte, StickyControlSize)
 
 		setSrcControl(&control, ep)
 
@@ -89,7 +89,7 @@ func Test_setSrcControl(t *testing.T) {
 		}
 		setSrc(ep, netip.MustParseAddr("::1"), 5)
 
-		control := make([]byte, stickyControlSize)
+		control := make([]byte, StickyControlSize)
 
 		setSrcControl(&control, ep)
 
@@ -113,7 +113,7 @@ func Test_setSrcControl(t *testing.T) {
 	})
 
 	t.Run("ClearOnNoSrc", func(t *testing.T) {
-		control := make([]byte, stickyControlSize)
+		control := make([]byte, StickyControlSize)
 		hdr := (*unix.Cmsghdr)(unsafe.Pointer(&control[0]))
 		hdr.Level = 1
 		hdr.Type = 2
@@ -129,7 +129,7 @@ func Test_setSrcControl(t *testing.T) {
 
 func Test_getSrcFromControl(t *testing.T) {
 	t.Run("IPv4", func(t *testing.T) {
-		control := make([]byte, stickyControlSize)
+		control := make([]byte, StickyControlSize)
 		hdr := (*unix.Cmsghdr)(unsafe.Pointer(&control[0]))
 		hdr.Level = unix.IPPROTO_IP
 		hdr.Type = unix.IP_PKTINFO
@@ -139,7 +139,7 @@ func Test_getSrcFromControl(t *testing.T) {
 		info.Ifindex = 5
 
 		ep := &StdNetEndpoint{}
-		getSrcFromControl(control, ep)
+		GetSrcFromControl(control, ep)
 
 		if ep.SrcIP() != netip.MustParseAddr("127.0.0.1") {
 			t.Errorf("unexpected address: %v", ep.SrcIP())
@@ -149,7 +149,7 @@ func Test_getSrcFromControl(t *testing.T) {
 		}
 	})
 	t.Run("IPv6", func(t *testing.T) {
-		control := make([]byte, stickyControlSize)
+		control := make([]byte, StickyControlSize)
 		hdr := (*unix.Cmsghdr)(unsafe.Pointer(&control[0]))
 		hdr.Level = unix.IPPROTO_IPV6
 		hdr.Type = unix.IPV6_PKTINFO
@@ -159,7 +159,7 @@ func Test_getSrcFromControl(t *testing.T) {
 		info.Ifindex = 5
 
 		ep := &StdNetEndpoint{}
-		getSrcFromControl(control, ep)
+		GetSrcFromControl(control, ep)
 
 		if ep.SrcIP() != netip.MustParseAddr("::1") {
 			t.Errorf("unexpected address: %v", ep.SrcIP())
@@ -173,7 +173,7 @@ func Test_getSrcFromControl(t *testing.T) {
 		ep := &StdNetEndpoint{}
 		setSrc(ep, netip.MustParseAddr("::1"), 5)
 
-		getSrcFromControl(control, ep)
+		GetSrcFromControl(control, ep)
 		if ep.SrcIP().IsValid() {
 			t.Errorf("unexpected address: %v", ep.SrcIP())
 		}
@@ -200,7 +200,7 @@ func Test_getSrcFromControl(t *testing.T) {
 		combined = append(combined, control...)
 
 		ep := &StdNetEndpoint{}
-		getSrcFromControl(combined, ep)
+		GetSrcFromControl(combined, ep)
 
 		if ep.SrcIP() != netip.MustParseAddr("127.0.0.1") {
 			t.Errorf("unexpected address: %v", ep.SrcIP())
