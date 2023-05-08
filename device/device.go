@@ -376,12 +376,15 @@ func (device *Device) Close() {
 	device.state.state.Store(uint32(deviceStateClosed))
 	device.log.Verbosef("Device closing")
 
-	device.tun.device.Close()
 	device.downLocked()
 
 	// Remove peers before closing queues,
 	// because peers assume that queues are active.
 	device.RemoveAllPeers()
+
+	// call Close() here, so that app peer-related operations are finished
+	// before Close(), as it removes nic dispatcher used by peer receiver go-routine
+	device.tun.device.Close()
 
 	// We kept a reference to the encryption and decryption queues,
 	// in case we started any new peers that might write to them.
