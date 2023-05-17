@@ -912,7 +912,7 @@ func (tnet *Net) LookupContextHost(ctx context.Context, host string) ([]string, 
 			}
 		}
 	}
-	// We don't do RFC6724. Instead just put V6 addresess first if an IPv6 address is enabled
+	// We don't do RFC6724. Instead just put V6 addresses first if an IPv6 address is enabled
 	var addrs []netip.Addr
 	if tnet.hasV6 {
 		addrs = append(addrsV6, addrsV4...)
