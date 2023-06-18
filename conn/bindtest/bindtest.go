@@ -89,32 +89,39 @@ func (c *ChannelBind) Close() error {
 	return nil
 }
 
+func (c *ChannelBind) BatchSize() int { return 1 }
+
 func (c *ChannelBind) SetMark(mark uint32) error { return nil }
 
 func (c *ChannelBind) makeReceiveFunc(ch chan []byte) conn.ReceiveFunc {
-	return func(b []byte) (n int, ep conn.Endpoint, err error) {
+	return func(bufs [][]byte, sizes []int, eps []conn.Endpoint) (n int, err error) {
 		select {
 		case <-c.closeSignal:
-			return 0, nil, net.ErrClosed
+			return 0, net.ErrClosed
 		case rx := <-ch:
-			return copy(b, rx), c.target6, nil
+			copied := copy(bufs[0], rx)
+			sizes[0] = copied
+			eps[0] = c.target6
+			return 1, nil
 		}
 	}
 }
 
-func (c *ChannelBind) Send(b []byte, ep conn.Endpoint) error {
-	select {
-	case <-c.closeSignal:
-		return net.ErrClosed
-	default:
-		bc := make([]byte, len(b))
-		copy(bc, b)
-		if ep.(ChannelEndpoint) == c.target4 {
-			*c.tx4 <- bc
-		} else if ep.(ChannelEndpoint) == c.target6 {
-			*c.tx6 <- bc
-		} else {
-			return os.ErrInvalid
+func (c *ChannelBind) Send(bufs [][]byte, ep conn.Endpoint) error {
+	for _, b := range bufs {
+		select {
+		case <-c.closeSignal:
+			return net.ErrClosed
+		default:
+			bc := make([]byte, len(b))
+			copy(bc, b)
+			if ep.(ChannelEndpoint) == c.target4 {
+				*c.tx4 <- bc
+			} else if ep.(ChannelEndpoint) == c.target6 {
+				*c.tx6 <- bc
+			} else {
+				return os.ErrInvalid
+			}
 		}
 	}
 	return nil
