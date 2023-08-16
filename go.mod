@@ -1,4 +1,4 @@
-module golang.zx2c4.com/wireguard
+module golang.zx2c4.com/wireguard-go
 
 go 1.20
 
