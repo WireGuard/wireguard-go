@@ -1,4 +1,4 @@
-module golang.zx2c4.com/wireguard
+module github.com/zeronetworks/zn-wireguard-go
 
 go 1.20
 
