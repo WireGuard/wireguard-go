@@ -1,1 +1,4 @@
 wireguard-go
+cfg/cfg_values.go
+generator.exe
+generator

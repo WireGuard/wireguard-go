@@ -1,0 +1,11 @@
+junk_packet_count: 5
+junk_packet_min_size: 10
+junk_packet_max_size: 30
+init_packet_junk_size: 30
+response_packet_junk_size: 50
+underload_packet_junk_size: 0
+transport_packet_junk_size: 0
+init_packet_magic_header: 1234567
+response_packet_magic_header : 7654321
+underload_packet_magic_header : 12345687
+transport_packet_magic_header : 146810

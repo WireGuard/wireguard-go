@@ -1,0 +1,15 @@
+// THIS IS A GENERATED FILE; ANY MODIFICATION WILL BE LOST
+
+package cfg
+
+const JunkPacketCount            int = {{.JunkPacketCount}}
+const JunkPacketMinSize          int = {{.JunkPacketMinSize}}
+const JunkPacketMaxSize          int = {{.JunkPacketMaxSize}}
+const InitPacketJunkSize         int = {{.InitPacketJunkSize}}
+const ResponsePacketJunkSize     int = {{.ResponsePacketJunkSize}}
+const UnderLoadPacketJunkSize    int = {{.UnderLoadPacketJunkSize}}
+const TransportPacketJunkSize    int = {{.TransportPacketJunkSize}}
+const InitPacketMagicHeader      uint32 = {{.InitPacketMagicHeader}}
+const ResponsePacketMagicHeader  uint32 = {{.ResponsePacketMagicHeader}}
+const UnderloadPacketMagicHeader uint32 = {{.UnderloadPacketMagicHeader}}
+const TransportPacketMagicHeader uint32 = {{.TransportPacketMagicHeader}}
