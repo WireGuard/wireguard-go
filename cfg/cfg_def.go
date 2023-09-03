@@ -50,6 +50,12 @@ func init() {
 				MaxSegmentSize,
 			)
 		}
+		if UnderLoadPacketJunkSize != 0 || TransportPacketJunkSize != 0 {
+			log.Fatal(
+				`UnderLoadPacketJunkSize and TransportPacketJunkSize; 
+				are currently unimplemented and should be left 0`,
+			)
+		}
 	} else {
 		if InitPacketJunkSize != 0 ||
 			ResponsePacketJunkSize != 0 ||
