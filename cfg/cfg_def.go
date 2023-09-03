@@ -4,6 +4,9 @@ import "log"
 
 func init() {
 	if IsAdvancedSecurityOn() {
+		if JunkPacketCount < 0 {
+			log.Fatalf("JunkPacketCount should be non negative")
+		}
 		if JunkPacketMaxSize <= JunkPacketMinSize {
 			log.Fatalf(
 				"MaxSize: %d; should be greater than MinSize: %d",
@@ -11,31 +14,39 @@ func init() {
 				JunkPacketMinSize,
 			)
 		}
-		if JunkPacketCount < 0 {
-			log.Fatalf("JunkPacketCount should be non negative")
-		}
 		const MaxSegmentSize = 2048 - 32
+		if JunkPacketMaxSize >= MaxSegmentSize {
+			log.Fatalf(
+				"JunkPacketMaxSize: %d; should be smaller than maxSegmentSize: %d",
+				JunkPacketMaxSize,
+				MaxSegmentSize,
+			)
+		}
 		if 148+InitPacketJunkSize >= MaxSegmentSize {
 			log.Fatalf(
-				"init packets should be smaller than maxSegmentSize: %d",
+				"init header size(148) + junkSize:%d; should be smaller than maxSegmentSize: %d",
+				InitPacketJunkSize,
 				MaxSegmentSize,
 			)
 		}
 		if 92+ResponsePacketJunkSize >= MaxSegmentSize {
 			log.Fatalf(
-				"response packets should be smaller than maxSegmentSize: %d",
+				"response header size(92) + junkSize:%d; should be smaller than maxSegmentSize: %d",
+				ResponsePacketJunkSize,
 				MaxSegmentSize,
 			)
 		}
 		if 64+UnderLoadPacketJunkSize >= MaxSegmentSize {
 			log.Fatalf(
-				"underload packets should be smaller than maxSegmentSize: %d",
+				"underload packet size(64) + junkSize:%d; should be smaller than maxSegmentSize: %d",
+				UnderLoadPacketJunkSize,
 				MaxSegmentSize,
 			)
 		}
 		if 32+TransportPacketJunkSize >= MaxSegmentSize {
 			log.Fatalf(
-				"transport packets should be smaller than maxSegmentSize: %d",
+				"transport packet size(32) + junkSize:%d should be smaller than maxSegmentSize: %d",
+				TransportPacketJunkSize,
 				MaxSegmentSize,
 			)
 		}
