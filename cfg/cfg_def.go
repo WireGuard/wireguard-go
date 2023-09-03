@@ -51,5 +51,8 @@ func init() {
 }
 
 func IsAdvancedSecurityOn() bool {
-	return InitPacketMagicHeader != 1
+	return InitPacketMagicHeader != 1 ||
+		ResponsePacketMagicHeader != 2 ||
+		UnderloadPacketMagicHeader != 3 ||
+		TransportPacketMagicHeader != 4
 }
