@@ -91,6 +91,65 @@ func genConfigs(tb testing.TB) (cfgs, endpointCfgs [2]string) {
 	return
 }
 
+func genASecurityConfigs(tb testing.TB) (cfgs, endpointCfgs [2]string) {
+	var key1, key2 NoisePrivateKey
+	_, err := rand.Read(key1[:])
+	if err != nil {
+		tb.Errorf("unable to generate private key random bytes: %v", err)
+	}
+	_, err = rand.Read(key2[:])
+	if err != nil {
+		tb.Errorf("unable to generate private key random bytes: %v", err)
+	}
+	pub1, pub2 := key1.publicKey(), key2.publicKey()
+
+	cfgs[0] = uapiCfg(
+		"private_key", hex.EncodeToString(key1[:]),
+		"listen_port", "0",
+		"replace_peers", "true",
+		"jc", "5",
+		"jmin", "500",
+		"jmax", "501",
+		"s1", "30",
+		"s2", "40",
+		"h1", "123456",
+		"h2", "67543",
+		"h4", "32345",
+		"h3", "123123",
+		"public_key", hex.EncodeToString(pub2[:]),
+		"protocol_version", "1",
+		"replace_allowed_ips", "true",
+		"allowed_ip", "1.0.0.2/32",
+	)
+	endpointCfgs[0] = uapiCfg(
+		"public_key", hex.EncodeToString(pub2[:]),
+		"endpoint", "127.0.0.1:%d",
+	)
+	cfgs[1] = uapiCfg(
+		"private_key", hex.EncodeToString(key2[:]),
+		"listen_port", "0",
+		"replace_peers", "true",
+		"jc", "5",
+		"jmin", "500",
+		"jmax", "501",
+		"s1", "30",
+		"s2", "40",
+		"h1", "123456",
+		"h2", "67543",
+		"h4", "32345",
+		"h3", "123123",
+		"public_key", hex.EncodeToString(pub1[:]),
+		"protocol_version", "1",
+		"replace_allowed_ips", "true",
+		"allowed_ip", "1.0.0.1/32",
+	)
+	endpointCfgs[1] = uapiCfg(
+		"public_key", hex.EncodeToString(pub1[:]),
+		"endpoint", "127.0.0.1:%d",
+	)
+	return
+}
+
 // A testPair is a pair of testPeers.
 type testPair [2]testPeer
 
@@ -115,7 +174,11 @@ func (d SendDirection) String() string {
 	return "pong"
 }
 
-func (pair *testPair) Send(tb testing.TB, ping SendDirection, done chan struct{}) {
+func (pair *testPair) Send(
+	tb testing.TB,
+	ping SendDirection,
+	done chan struct{},
+) {
 	tb.Helper()
 	p0, p1 := pair[0], pair[1]
 	if !ping {
@@ -149,8 +212,16 @@ func (pair *testPair) Send(tb testing.TB, ping SendDirection, done chan struct{}
 }
 
 // genTestPair creates a testPair.
-func genTestPair(tb testing.TB, realSocket bool) (pair testPair) {
-	cfg, endpointCfg := genConfigs(tb)
+func genTestPair(
+	tb testing.TB,
+	realSocket, withASecurity bool,
+) (pair testPair) {
+	var cfg, endpointCfg [2]string
+	if withASecurity {
+		cfg, endpointCfg = genASecurityConfigs(tb)
+	} else {
+		cfg, endpointCfg = genConfigs(tb)
+	}
 	var binds [2]conn.Bind
 	if realSocket {
 		binds[0], binds[1] = conn.NewDefaultBind(), conn.NewDefaultBind()
@@ -166,7 +237,11 @@ func genTestPair(tb testing.TB, realSocket bool) (pair testPair) {
 		if _, ok := tb.(*testing.B); ok && !testing.Verbose() {
 			level = LogLevelError
 		}
-		p.dev = NewDevice(p.tun.TUN(), binds[i], NewLogger(level, fmt.Sprintf("dev%d: ", i)))
+		p.dev = NewDevice(
+			p.tun.TUN(),
+			binds[i],
+			NewLogger(level, fmt.Sprintf("dev%d: ", i)),
+		)
 		if err := p.dev.IpcSet(cfg[i]); err != nil {
 			tb.Errorf("failed to configure device %d: %v", i, err)
 			p.dev.Close()
@@ -194,7 +269,18 @@ func genTestPair(tb testing.TB, realSocket bool) (pair testPair) {
 
 func TestTwoDevicePing(t *testing.T) {
 	goroutineLeakCheck(t)
-	pair := genTestPair(t, true)
+	pair := genTestPair(t, true, false)
+	t.Run("ping 1.0.0.1", func(t *testing.T) {
+		pair.Send(t, Ping, nil)
+	})
+	t.Run("ping 1.0.0.2", func(t *testing.T) {
+		pair.Send(t, Pong, nil)
+	})
+}
+
+func TestTwoDevicePingASecurity(t *testing.T) {
+	goroutineLeakCheck(t)
+	pair := genTestPair(t, true, true)
 	t.Run("ping 1.0.0.1", func(t *testing.T) {
 		pair.Send(t, Ping, nil)
 	})
@@ -209,10 +295,15 @@ func TestUpDown(t *testing.T) {
 	const otrials = 10
 
 	for n := 0; n < otrials; n++ {
-		pair := genTestPair(t, false)
+		pair := genTestPair(t, false, false)
 		for i := range pair {
 			for k := range pair[i].dev.peers.keyMap {
-				pair[i].dev.IpcSet(fmt.Sprintf("public_key=%s\npersistent_keepalive_interval=1\n", hex.EncodeToString(k[:])))
+				pair[i].dev.IpcSet(
+					fmt.Sprintf(
+						"public_key=%s\npersistent_keepalive_interval=1\n",
+						hex.EncodeToString(k[:]),
+					),
+				)
 			}
 		}
 		var wg sync.WaitGroup
@@ -224,11 +315,19 @@ func TestUpDown(t *testing.T) {
 					if err := d.Up(); err != nil {
 						t.Errorf("failed up bring up device: %v", err)
 					}
-					time.Sleep(time.Duration(rand.Intn(int(time.Nanosecond * (0x10000 - 1)))))
+					time.Sleep(
+						time.Duration(
+							rand.Intn(int(time.Nanosecond * (0x10000 - 1))),
+						),
+					)
 					if err := d.Down(); err != nil {
 						t.Errorf("failed to bring down device: %v", err)
 					}
-					time.Sleep(time.Duration(rand.Intn(int(time.Nanosecond * (0x10000 - 1)))))
+					time.Sleep(
+						time.Duration(
+							rand.Intn(int(time.Nanosecond * (0x10000 - 1))),
+						),
+					)
 				}
 			}(pair[i].dev)
 		}
@@ -243,7 +342,7 @@ func TestUpDown(t *testing.T) {
 // TestConcurrencySafety does other things concurrently with tunnel use.
 // It is intended to be used with the race detector to catch data races.
 func TestConcurrencySafety(t *testing.T) {
-	pair := genTestPair(t, true)
+	pair := genTestPair(t, true, false)
 	done := make(chan struct{})
 
 	const warmupIters = 10
@@ -294,8 +393,14 @@ func TestConcurrencySafety(t *testing.T) {
 
 	// Change private keys concurrently with tunnel use.
 	t.Run("privateKey", func(t *testing.T) {
-		bad := uapiCfg("private_key", "7777777777777777777777777777777777777777777777777777777777777777")
-		good := uapiCfg("private_key", hex.EncodeToString(pair[0].dev.staticIdentity.privateKey[:]))
+		bad := uapiCfg(
+			"private_key",
+			"7777777777777777777777777777777777777777777777777777777777777777",
+		)
+		good := uapiCfg(
+			"private_key",
+			hex.EncodeToString(pair[0].dev.staticIdentity.privateKey[:]),
+		)
 		// Set iters to a large number like 1000 to flush out data races quickly.
 		// Don't leave it large. That can cause logical races
 		// in which the handshake is interleaved with key changes
@@ -324,7 +429,7 @@ func TestConcurrencySafety(t *testing.T) {
 }
 
 func BenchmarkLatency(b *testing.B) {
-	pair := genTestPair(b, true)
+	pair := genTestPair(b, true, false)
 
 	// Establish a connection.
 	pair.Send(b, Ping, nil)
@@ -338,7 +443,7 @@ func BenchmarkLatency(b *testing.B) {
 }
 
 func BenchmarkThroughput(b *testing.B) {
-	pair := genTestPair(b, true)
+	pair := genTestPair(b, true, false)
 
 	// Establish a connection.
 	pair.Send(b, Ping, nil)
@@ -382,7 +487,7 @@ func BenchmarkThroughput(b *testing.B) {
 }
 
 func BenchmarkUAPIGet(b *testing.B) {
-	pair := genTestPair(b, true)
+	pair := genTestPair(b, true, false)
 	pair.Send(b, Ping, nil)
 	pair.Send(b, Pong, nil)
 	b.ReportAllocs()
@@ -415,7 +520,11 @@ func goroutineLeakCheck(t *testing.T) {
 		endGoroutines, endStacks := goroutines()
 		t.Logf("starting stacks:\n%s\n", startStacks)
 		t.Logf("ending stacks:\n%s\n", endStacks)
-		t.Fatalf("expected %d goroutines, got %d, leak?", startGoroutines, endGoroutines)
+		t.Fatalf(
+			"expected %d goroutines, got %d, leak?",
+			startGoroutines,
+			endGoroutines,
+		)
 	})
 }
 
@@ -423,29 +532,65 @@ type fakeBindSized struct {
 	size int
 }
 
-func (b *fakeBindSized) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint16, err error) {
+func (b *fakeBindSized) Open(
+	port uint16,
+) (fns []conn.ReceiveFunc, actualPort uint16, err error) {
 	return nil, 0, nil
 }
-func (b *fakeBindSized) Close() error                                  { return nil }
-func (b *fakeBindSized) SetMark(mark uint32) error                     { return nil }
-func (b *fakeBindSized) Send(bufs [][]byte, ep conn.Endpoint) error    { return nil }
-func (b *fakeBindSized) ParseEndpoint(s string) (conn.Endpoint, error) { return nil, nil }
-func (b *fakeBindSized) BatchSize() int                                { return b.size }
+
+func (b *fakeBindSized) Close() error { return nil }
+
+func (b *fakeBindSized) SetMark(
+	mark uint32,
+) error {
+	return nil
+}
+
+func (b *fakeBindSized) Send(
+	bufs [][]byte,
+	ep conn.Endpoint,
+) error {
+	return nil
+}
+
+func (b *fakeBindSized) ParseEndpoint(
+	s string,
+) (conn.Endpoint, error) {
+	return nil, nil
+}
+
+func (b *fakeBindSized) BatchSize() int { return b.size }
 
 type fakeTUNDeviceSized struct {
 	size int
 }
 
 func (t *fakeTUNDeviceSized) File() *os.File { return nil }
-func (t *fakeTUNDeviceSized) Read(bufs [][]byte, sizes []int, offset int) (n int, err error) {
+
+func (t *fakeTUNDeviceSized) Read(
+	bufs [][]byte,
+	sizes []int,
+	offset int,
+) (n int, err error) {
 	return 0, nil
 }
-func (t *fakeTUNDeviceSized) Write(bufs [][]byte, offset int) (int, error) { return 0, nil }
-func (t *fakeTUNDeviceSized) MTU() (int, error)                            { return 0, nil }
-func (t *fakeTUNDeviceSized) Name() (string, error)                        { return "", nil }
-func (t *fakeTUNDeviceSized) Events() <-chan tun.Event                     { return nil }
-func (t *fakeTUNDeviceSized) Close() error                                 { return nil }
-func (t *fakeTUNDeviceSized) BatchSize() int                               { return t.size }
+
+func (t *fakeTUNDeviceSized) Write(
+	bufs [][]byte,
+	offset int,
+) (int, error) {
+	return 0, nil
+}
+
+func (t *fakeTUNDeviceSized) MTU() (int, error) { return 0, nil }
+
+func (t *fakeTUNDeviceSized) Name() (string, error) { return "", nil }
+
+func (t *fakeTUNDeviceSized) Events() <-chan tun.Event { return nil }
+
+func (t *fakeTUNDeviceSized) Close() error { return nil }
+
+func (t *fakeTUNDeviceSized) BatchSize() int { return t.size }
 
 func TestBatchSize(t *testing.T) {
 	d := Device{}

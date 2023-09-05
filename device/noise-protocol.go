@@ -15,7 +15,6 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/poly1305"
 
-	"golang.zx2c4.com/wireguard/cfg"
 	"golang.zx2c4.com/wireguard/tai64n"
 )
 
@@ -53,11 +52,11 @@ const (
 	WGLabelCookie     = "cookie--"
 )
 
-const (
-	MessageInitiationType  = cfg.InitPacketMagicHeader
-	MessageResponseType    = cfg.ResponsePacketMagicHeader
-	MessageCookieReplyType = cfg.UnderloadPacketMagicHeader
-	MessageTransportType   = cfg.TransportPacketMagicHeader
+var (
+	MessageInitiationType  uint32 = 1
+	MessageResponseType    uint32 = 2
+	MessageCookieReplyType uint32 = 3
+	MessageTransportType   uint32 = 4
 )
 
 const (
@@ -76,19 +75,9 @@ const (
 	MessageTransportOffsetContent  = 16
 )
 
-var packetSizeToMsgType = map[int]uint32{
-	MessageInitiationSize + cfg.InitPacketJunkSize:       MessageInitiationType,
-	MessageResponseSize + cfg.ResponsePacketJunkSize:     MessageResponseType,
-	MessageCookieReplySize + cfg.UnderLoadPacketJunkSize: MessageCookieReplyType,
-	MessageTransportSize + cfg.TransportPacketJunkSize:   MessageTransportType,
-}
+var packetSizeToMsgType map[int]uint32
 
-var msgTypeToJunkSize = map[uint32]int{
-	MessageInitiationType:  cfg.InitPacketJunkSize,
-	MessageResponseType:    cfg.ResponsePacketJunkSize,
-	MessageCookieReplyType: cfg.UnderLoadPacketJunkSize,
-	MessageTransportType:   cfg.TransportPacketJunkSize,
-}
+var msgTypeToJunkSize map[uint32]int
 
 /* Type is an 8-bit field, followed by 3 nul bytes,
  * by marshalling the messages in little-endian byteorder

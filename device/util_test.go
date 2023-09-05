@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"testing"
-
-	"golang.zx2c4.com/wireguard/cfg"
 )
 
 func Test_randomJunktWithSize(t *testing.T) {
@@ -19,7 +17,7 @@ func Test_appendJunk(t *testing.T) {
 		buffer := bytes.NewBuffer([]byte(s))
 		err := appendJunk(buffer, 30)
 		if err != nil &&
-			buffer.Len() != len(s)+int(cfg.InitPacketJunkSize) {
+			buffer.Len() != len(s)+30 {
 			t.Errorf("appendWithJunk() size don't match")
 		}
 		read := make([]byte, 50)

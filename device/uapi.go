@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/netip"
 	"strconv"
@@ -97,6 +98,36 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 			sendf("fwmark=%d", device.net.fwmark)
 		}
 
+		if device.isAdvancedSecurityOn() {
+			if device.aSecCfg.junkPacketCount != 0 {
+				sendf("jc=%d", device.aSecCfg.junkPacketCount)
+			}
+			if device.aSecCfg.junkPacketMinSize != 0 {
+				sendf("jmin=%d", device.aSecCfg.junkPacketMinSize)
+			}
+			if device.aSecCfg.junkPacketMaxSize != 0 {
+				sendf("jmax=%d", device.aSecCfg.junkPacketMaxSize)
+			}
+			if device.aSecCfg.initPacketJunkSize != 0 {
+				sendf("s1=%d", device.aSecCfg.initPacketJunkSize)
+			}
+			if device.aSecCfg.responsePacketJunkSize != 0 {
+				sendf("s2=%d", device.aSecCfg.responsePacketJunkSize)
+			}
+			if device.aSecCfg.initPacketMagicHeader != 0 {
+				sendf("h1=%d", device.aSecCfg.initPacketMagicHeader)
+			}
+			if device.aSecCfg.responsePacketMagicHeader != 0 {
+				sendf("h2=%d", device.aSecCfg.responsePacketMagicHeader)
+			}
+			if device.aSecCfg.underloadPacketMagicHeader != 0 {
+				sendf("h3=%d", device.aSecCfg.underloadPacketMagicHeader)
+			}
+			if device.aSecCfg.transportPacketMagicHeader != 0 {
+				sendf("h4=%d", device.aSecCfg.transportPacketMagicHeader)
+			}
+		}
+
 		for _, peer := range device.peers.keyMap {
 			// Serialize peer state.
 			// Do the work in an anonymous function so that we can use defer.
@@ -119,12 +150,18 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
 				sendf("last_handshake_time_nsec=%d", nano)
 				sendf("tx_bytes=%d", peer.txBytes.Load())
 				sendf("rx_bytes=%d", peer.rxBytes.Load())
-				sendf("persistent_keepalive_interval=%d", peer.persistentKeepaliveInterval.Load())
+				sendf(
+					"persistent_keepalive_interval=%d",
+					peer.persistentKeepaliveInterval.Load(),
+				)
 
-				device.allowedips.EntriesForPeer(peer, func(prefix netip.Prefix) bool {
-					sendf("allowed_ip=%s", prefix.String())
-					return true
-				})
+				device.allowedips.EntriesForPeer(
+					peer,
+					func(prefix netip.Prefix) bool {
+						sendf("allowed_ip=%s", prefix.String())
+						return true
+					},
+				)
 			}()
 		}
 	}()
@@ -162,7 +199,11 @@ func (device *Device) IpcSetOperation(r io.Reader) (err error) {
 		}
 		key, value, ok := strings.Cut(line, "=")
 		if !ok {
-			return ipcErrorf(ipc.IpcErrorProtocol, "failed to parse line %q", line)
+			return ipcErrorf(
+				ipc.IpcErrorProtocol,
+				"failed to parse line %q",
+				line,
+			)
 		}
 
 		if key == "public_key" {
@@ -188,6 +229,7 @@ func (device *Device) IpcSetOperation(r io.Reader) (err error) {
 			return err
 		}
 	}
+	device.handlePostConfig()
 	peer.handlePostConfig()
 
 	if err := scanner.Err(); err != nil {
@@ -202,7 +244,11 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		var sk NoisePrivateKey
 		err := sk.FromMaybeZeroHex(value)
 		if err != nil {
-			return ipcErrorf(ipc.IpcErrorInvalid, "failed to set private_key: %w", err)
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"failed to set private_key: %w",
+				err,
+			)
 		}
 		device.log.Verbosef("UAPI: Updating private key")
 		device.SetPrivateKey(sk)
@@ -210,7 +256,11 @@ func (device *Device) handleDeviceLine(key, value string) error {
 	case "listen_port":
 		port, err := strconv.ParseUint(value, 10, 16)
 		if err != nil {
-			return ipcErrorf(ipc.IpcErrorInvalid, "failed to parse listen_port: %w", err)
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"failed to parse listen_port: %w",
+				err,
+			)
 		}
 
 		// update port and rebind
@@ -221,7 +271,11 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		device.net.Unlock()
 
 		if err := device.BindUpdate(); err != nil {
-			return ipcErrorf(ipc.IpcErrorPortInUse, "failed to set listen_port: %w", err)
+			return ipcErrorf(
+				ipc.IpcErrorPortInUse,
+				"failed to set listen_port: %w",
+				err,
+			)
 		}
 
 	case "fwmark":
@@ -232,18 +286,171 @@ func (device *Device) handleDeviceLine(key, value string) error {
 
 		device.log.Verbosef("UAPI: Updating fwmark")
 		if err := device.BindSetMark(uint32(mark)); err != nil {
-			return ipcErrorf(ipc.IpcErrorPortInUse, "failed to update fwmark: %w", err)
+			return ipcErrorf(
+				ipc.IpcErrorPortInUse,
+				"failed to update fwmark: %w",
+				err,
+			)
 		}
 
 	case "replace_peers":
 		if value != "true" {
-			return ipcErrorf(ipc.IpcErrorInvalid, "failed to set replace_peers, invalid value: %v", value)
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"failed to set replace_peers, invalid value: %v",
+				value,
+			)
 		}
 		device.log.Verbosef("UAPI: Removing all peers")
 		device.RemoveAllPeers()
+	case "jc":
+		junkPacketCount, err := strconv.Atoi(value)
+		if err != nil {
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"faield to parse junk_packet_count %w",
+				err,
+			)
+		}
 
+		if junkPacketCount < 0 {
+			log.Fatalf("JunkPacketCount should be non negative")
+		}
+		device.log.Verbosef("UAPI: Updating junk_packet_count")
+		device.aSecCfg.isOn = true
+		device.aSecCfg.junkPacketCount = junkPacketCount
+	case "jmin":
+		junkPacketMinSize, err := strconv.Atoi(value)
+		if err != nil {
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"faield to parse junk_packet_min_size %w",
+				err,
+			)
+		}
+		device.log.Verbosef("UAPI: Updating junk_packet_min_size")
+		device.aSecCfg.isOn = true
+		device.aSecCfg.junkPacketMinSize = junkPacketMinSize
+	case "jmax":
+		junkPacketMaxSize, err := strconv.Atoi(value)
+		if err != nil {
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"faield to parse junk_packet_max_size %w",
+				err,
+			)
+		}
+		if junkPacketMaxSize >= MaxSegmentSize {
+			log.Fatalf(
+				"JunkPacketMaxSize: %d; should be smaller than maxSegmentSize: %d",
+				junkPacketMaxSize,
+				MaxSegmentSize,
+			)
+		}
+		device.log.Verbosef("UAPI: Updating junk_packet_max_size")
+		device.aSecCfg.isOn = true
+		device.aSecCfg.junkPacketMaxSize = junkPacketMaxSize
+	case "s1":
+		initPacketJunkSize, err := strconv.Atoi(value)
+		if err != nil {
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"faield to parse init_packet_junk_size %w",
+				err,
+			)
+		}
+		if 148+initPacketJunkSize >= MaxSegmentSize {
+			log.Fatalf(
+				`init header size(148) + junkSize:%d; 
+				should be smaller than maxSegmentSize: %d`,
+				initPacketJunkSize,
+				MaxSegmentSize,
+			)
+		}
+		device.log.Verbosef("UAPI: Updating init_packet_junk_size")
+		device.aSecCfg.isOn = true
+		device.aSecCfg.initPacketJunkSize = initPacketJunkSize
+	case "s2":
+		responsePacketJunkSize, err := strconv.Atoi(value)
+		if err != nil {
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"faield to parse response_packet_junk_size %w",
+				err,
+			)
+		}
+		if 92+responsePacketJunkSize >= MaxSegmentSize {
+			log.Fatalf(
+				`response header size(92) + junkSize:%d; 
+				should be smaller than maxSegmentSize: %d`,
+				responsePacketJunkSize,
+				MaxSegmentSize,
+			)
+		}
+		device.log.Verbosef("UAPI: Updating response_packet_junk_size")
+		device.aSecCfg.isOn = true
+		device.aSecCfg.responsePacketJunkSize = responsePacketJunkSize
+
+	case "h1":
+		initPacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
+		if err != nil {
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"faield to parse init_packet_magic_header %w",
+				err,
+			)
+		}
+		device.log.Verbosef("UAPI: Updating init_packet_magic_header")
+		device.aSecCfg.isOn = true
+		device.aSecCfg.initPacketMagicHeader = uint32(initPacketMagicHeader)
+	case "h2":
+		responsePacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
+		if err != nil {
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"faield to parse response_packet_magic_header %w",
+				err,
+			)
+		}
+		device.log.Verbosef("UAPI: Updating response_packet_magic_header")
+		device.aSecCfg.isOn = true
+		device.aSecCfg.responsePacketMagicHeader = uint32(
+			responsePacketMagicHeader,
+		)
+	case "h3":
+		underloadPacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
+		if err != nil {
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"faield to parse underload_packet_magic_header %w",
+				err,
+			)
+		}
+		device.log.Verbosef("UAPI: Updating underload_packet_magic_header")
+		device.aSecCfg.isOn = true
+		device.aSecCfg.underloadPacketMagicHeader = uint32(
+			underloadPacketMagicHeader,
+		)
+	case "h4":
+		transportPacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
+		if err != nil {
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"faield to parse transport_packet_magic_header %w",
+				err,
+			)
+		}
+		device.log.Verbosef("UAPI: Updating transport_packet_magic_header")
+		device.aSecCfg.isOn = true
+		device.aSecCfg.transportPacketMagicHeader = uint32(
+			transportPacketMagicHeader,
+		)
 	default:
-		return ipcErrorf(ipc.IpcErrorInvalid, "invalid UAPI device key: %v", key)
+		return ipcErrorf(
+			ipc.IpcErrorInvalid,
+			"invalid UAPI device key: %v",
+			key,
+		)
 	}
 
 	return nil
@@ -262,7 +469,8 @@ func (peer *ipcSetPeer) handlePostConfig() {
 		return
 	}
 	if peer.created {
-		peer.disableRoaming = peer.device.net.brokenRoaming && peer.endpoint != nil
+		peer.disableRoaming = peer.device.net.brokenRoaming &&
+			peer.endpoint != nil
 	}
 	if peer.device.isUp() {
 		peer.Start()
@@ -273,12 +481,19 @@ func (peer *ipcSetPeer) handlePostConfig() {
 	}
 }
 
-func (device *Device) handlePublicKeyLine(peer *ipcSetPeer, value string) error {
+func (device *Device) handlePublicKeyLine(
+	peer *ipcSetPeer,
+	value string,
+) error {
 	// Load/create the peer we are configuring.
 	var publicKey NoisePublicKey
 	err := publicKey.FromHex(value)
 	if err != nil {
-		return ipcErrorf(ipc.IpcErrorInvalid, "failed to get peer by public key: %w", err)
+		return ipcErrorf(
+			ipc.IpcErrorInvalid,
+			"failed to get peer by public key: %w",
+			err,
+		)
 	}
 
 	// Ignore peer with the same public key as this device.
@@ -296,19 +511,30 @@ func (device *Device) handlePublicKeyLine(peer *ipcSetPeer, value string) error 
 	if peer.created {
 		peer.Peer, err = device.NewPeer(publicKey)
 		if err != nil {
-			return ipcErrorf(ipc.IpcErrorInvalid, "failed to create new peer: %w", err)
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"failed to create new peer: %w",
+				err,
+			)
 		}
 		device.log.Verbosef("%v - UAPI: Created", peer.Peer)
 	}
 	return nil
 }
 
-func (device *Device) handlePeerLine(peer *ipcSetPeer, key, value string) error {
+func (device *Device) handlePeerLine(
+	peer *ipcSetPeer,
+	key, value string,
+) error {
 	switch key {
 	case "update_only":
 		// allow disabling of creation
 		if value != "true" {
-			return ipcErrorf(ipc.IpcErrorInvalid, "failed to set update only, invalid value: %v", value)
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"failed to set update only, invalid value: %v",
+				value,
+			)
 		}
 		if peer.created && !peer.dummy {
 			device.RemovePeer(peer.handshake.remoteStatic)
@@ -319,7 +545,11 @@ func (device *Device) handlePeerLine(peer *ipcSetPeer, key, value string) error 
 	case "remove":
 		// remove currently selected peer from device
 		if value != "true" {
-			return ipcErrorf(ipc.IpcErrorInvalid, "failed to set remove, invalid value: %v", value)
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"failed to set remove, invalid value: %v",
+				value,
+			)
 		}
 		if !peer.dummy {
 			device.log.Verbosef("%v - UAPI: Removing", peer.Peer)
@@ -336,25 +566,41 @@ func (device *Device) handlePeerLine(peer *ipcSetPeer, key, value string) error 
 		peer.handshake.mutex.Unlock()
 
 		if err != nil {
-			return ipcErrorf(ipc.IpcErrorInvalid, "failed to set preshared key: %w", err)
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"failed to set preshared key: %w",
+				err,
+			)
 		}
 
 	case "endpoint":
 		device.log.Verbosef("%v - UAPI: Updating endpoint", peer.Peer)
 		endpoint, err := device.net.bind.ParseEndpoint(value)
 		if err != nil {
-			return ipcErrorf(ipc.IpcErrorInvalid, "failed to set endpoint %v: %w", value, err)
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"failed to set endpoint %v: %w",
+				value,
+				err,
+			)
 		}
 		peer.Lock()
 		defer peer.Unlock()
 		peer.endpoint = endpoint
 
 	case "persistent_keepalive_interval":
-		device.log.Verbosef("%v - UAPI: Updating persistent keepalive interval", peer.Peer)
+		device.log.Verbosef(
+			"%v - UAPI: Updating persistent keepalive interval",
+			peer.Peer,
+		)
 
 		secs, err := strconv.ParseUint(value, 10, 16)
 		if err != nil {
-			return ipcErrorf(ipc.IpcErrorInvalid, "failed to set persistent keepalive interval: %w", err)
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"failed to set persistent keepalive interval: %w",
+				err,
+			)
 		}
 
 		old := peer.persistentKeepaliveInterval.Swap(uint32(secs))
@@ -365,7 +611,11 @@ func (device *Device) handlePeerLine(peer *ipcSetPeer, key, value string) error 
 	case "replace_allowed_ips":
 		device.log.Verbosef("%v - UAPI: Removing all allowedips", peer.Peer)
 		if value != "true" {
-			return ipcErrorf(ipc.IpcErrorInvalid, "failed to replace allowedips, invalid value: %v", value)
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"failed to replace allowedips, invalid value: %v",
+				value,
+			)
 		}
 		if peer.dummy {
 			return nil
@@ -376,7 +626,11 @@ func (device *Device) handlePeerLine(peer *ipcSetPeer, key, value string) error 
 		device.log.Verbosef("%v - UAPI: Adding allowedip", peer.Peer)
 		prefix, err := netip.ParsePrefix(value)
 		if err != nil {
-			return ipcErrorf(ipc.IpcErrorInvalid, "failed to set allowed ip: %w", err)
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"failed to set allowed ip: %w",
+				err,
+			)
 		}
 		if peer.dummy {
 			return nil
@@ -385,7 +639,11 @@ func (device *Device) handlePeerLine(peer *ipcSetPeer, key, value string) error 
 
 	case "protocol_version":
 		if value != "1" {
-			return ipcErrorf(ipc.IpcErrorInvalid, "invalid protocol version: %v", value)
+			return ipcErrorf(
+				ipc.IpcErrorInvalid,
+				"invalid protocol version: %v",
+				value,
+			)
 		}
 
 	default:
@@ -433,7 +691,11 @@ func (device *Device) IpcHandle(socket net.Conn) {
 				return
 			}
 			if nextByte != '\n' {
-				err = ipcErrorf(ipc.IpcErrorInvalid, "trailing character in UAPI get: %q", nextByte)
+				err = ipcErrorf(
+					ipc.IpcErrorInvalid,
+					"trailing character in UAPI get: %q",
+					nextByte,
+				)
 				break
 			}
 			err = device.IpcGetOperation(buffered.Writer)

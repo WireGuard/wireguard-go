@@ -16,7 +16,6 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
-	"golang.zx2c4.com/wireguard/cfg"
 	"golang.zx2c4.com/wireguard/conn"
 )
 
@@ -142,12 +141,10 @@ func (device *Device) RoutineReceiveIncoming(
 			// check size of packet
 
 			packet := bufsArrs[i][:size]
-			if cfg.IsAdvancedSecurityOn() {
+			if device.isAdvancedSecurityOn() {
 				var junkSize int
-				if mapMsgType, ok := packetSizeToMsgType[size]; ok {
-					junkSize = msgTypeToJunkSize[mapMsgType]
-				} else {
-					junkSize = cfg.TransportPacketJunkSize
+				if msgType, ok := packetSizeToMsgType[size]; ok {
+					junkSize = msgTypeToJunkSize[msgType]
 				}
 				// shift junk
 				packet = packet[junkSize:]

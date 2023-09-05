@@ -19,7 +19,6 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
-	"golang.zx2c4.com/wireguard/cfg"
 	"golang.zx2c4.com/wireguard/tun"
 )
 
@@ -128,15 +127,15 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	}
 	// so only packet processed for cookie generation
 	var junkedHeader []byte
-	if cfg.IsAdvancedSecurityOn() {
+	if peer.device.isAdvancedSecurityOn() {
 		err = peer.sendJunkPackets()
 		if err != nil {
 			peer.device.log.Errorf("%v - %v", peer, err)
 			return err
 		}
-		var buf [cfg.InitPacketJunkSize]byte
+		buf := make([]byte, 0, peer.device.aSecCfg.initPacketJunkSize)
 		writer := bytes.NewBuffer(buf[:0])
-		err = appendJunk(writer, cfg.InitPacketJunkSize)
+		err = appendJunk(writer, peer.device.aSecCfg.initPacketJunkSize)
 		if err != nil {
 			peer.device.log.Errorf("%v - %v", peer, err)
 			return err
@@ -183,10 +182,10 @@ func (peer *Peer) SendHandshakeResponse() error {
 		return err
 	}
 	var junkedHeader []byte
-	if cfg.IsAdvancedSecurityOn() {
-		var buf [cfg.ResponsePacketJunkSize]byte
+	if peer.device.isAdvancedSecurityOn() {
+		buf := make([]byte, 0, peer.device.aSecCfg.responsePacketJunkSize)
 		writer := bytes.NewBuffer(buf[:0])
-		err = appendJunk(writer, cfg.ResponsePacketJunkSize)
+		err = appendJunk(writer, peer.device.aSecCfg.responsePacketJunkSize)
 		if err != nil {
 			peer.device.log.Errorf("%v - %v", peer, err)
 			return err
@@ -472,11 +471,11 @@ top:
 }
 
 func (peer *Peer) sendJunkPackets() error {
-	junks := make([][]byte, 0, cfg.JunkPacketCount)
-	for i := 0; i < cfg.JunkPacketCount; i++ {
+	junks := make([][]byte, 0, peer.device.aSecCfg.junkPacketCount)
+	for i := 0; i < peer.device.aSecCfg.junkPacketCount; i++ {
 		packetSize := rand.Intn(
-			cfg.JunkPacketMaxSize-cfg.JunkPacketMinSize,
-		) + cfg.JunkPacketMinSize
+			peer.device.aSecCfg.junkPacketMaxSize-peer.device.aSecCfg.junkPacketMinSize,
+		) + peer.device.aSecCfg.junkPacketMinSize
 
 		junk, err := randomJunkWithSize(packetSize)
 		if err != nil {

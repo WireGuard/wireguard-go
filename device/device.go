@@ -6,6 +6,7 @@
 package device
 
 import (
+	"log"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -89,6 +90,18 @@ type Device struct {
 	ipcMutex sync.RWMutex
 	closed   chan struct{}
 	log      *Logger
+	aSecCfg  struct {
+		isOn                       bool
+		junkPacketCount            int
+		junkPacketMinSize          int
+		junkPacketMaxSize          int
+		initPacketJunkSize         int
+		responsePacketJunkSize     int
+		initPacketMagicHeader      uint32
+		responsePacketMagicHeader  uint32
+		underloadPacketMagicHeader uint32
+		transportPacketMagicHeader uint32
+	}
 }
 
 // deviceState represents the state of a Device.
@@ -142,7 +155,10 @@ func (device *Device) changeState(want deviceState) (err error) {
 	old := device.deviceState()
 	if old == deviceStateClosed {
 		// once closed, always closed
-		device.log.Verbosef("Interface closed, ignored requested state %s", want)
+		device.log.Verbosef(
+			"Interface closed, ignored requested state %s",
+			want,
+		)
 		return nil
 	}
 	switch want {
@@ -162,7 +178,12 @@ func (device *Device) changeState(want deviceState) (err error) {
 			err = errDown
 		}
 	}
-	device.log.Verbosef("Interface state was %s, requested %s, now %s", old, want, device.deviceState())
+	device.log.Verbosef(
+		"Interface state was %s, requested %s, now %s",
+		old,
+		want,
+		device.deviceState(),
+	)
 	return
 }
 
@@ -267,7 +288,9 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 	expiredPeers := make([]*Peer, 0, len(device.peers.keyMap))
 	for _, peer := range device.peers.keyMap {
 		handshake := &peer.handshake
-		handshake.precomputedStaticStatic, _ = device.staticIdentity.privateKey.sharedSecret(handshake.remoteStatic)
+		handshake.precomputedStaticStatic, _ = device.staticIdentity.privateKey.sharedSecret(
+			handshake.remoteStatic,
+		)
 		expiredPeers = append(expiredPeers, peer)
 	}
 
@@ -411,7 +434,9 @@ func (device *Device) SendKeepalivesToPeersWithCurrentKeypair() {
 	device.peers.RLock()
 	for _, peer := range device.peers.keyMap {
 		peer.keypairs.RLock()
-		sendKeepalive := peer.keypairs.current != nil && !peer.keypairs.current.created.Add(RejectAfterTime).Before(time.Now())
+		sendKeepalive := peer.keypairs.current != nil &&
+			!peer.keypairs.current.created.Add(RejectAfterTime).
+				Before(time.Now())
 		peer.keypairs.RUnlock()
 		if sendKeepalive {
 			peer.SendKeepalive()
@@ -525,8 +550,12 @@ func (device *Device) BindUpdate() error {
 
 	// start receiving routines
 	device.net.stopping.Add(len(recvFns))
-	device.queue.decryption.wg.Add(len(recvFns)) // each RoutineReceiveIncoming goroutine writes to device.queue.decryption
-	device.queue.handshake.wg.Add(len(recvFns))  // each RoutineReceiveIncoming goroutine writes to device.queue.handshake
+	device.queue.decryption.wg.Add(
+		len(recvFns),
+	) // each RoutineReceiveIncoming goroutine writes to device.queue.decryption
+	device.queue.handshake.wg.Add(
+		len(recvFns),
+	) // each RoutineReceiveIncoming goroutine writes to device.queue.handshake
 	batchSize := netc.bind.BatchSize()
 	for _, fn := range recvFns {
 		go device.RoutineReceiveIncoming(batchSize, fn)
@@ -541,4 +570,58 @@ func (device *Device) BindClose() error {
 	err := closeBindLocked(device)
 	device.net.Unlock()
 	return err
+}
+func (device *Device) isAdvancedSecurityOn() bool {
+	return device.aSecCfg.isOn
+}
+
+func (device *Device) handlePostConfig() {
+	if device.isAdvancedSecurityOn() {
+		if device.aSecCfg.junkPacketMaxSize >= 0 {
+			if device.aSecCfg.junkPacketMaxSize == device.aSecCfg.junkPacketMinSize {
+				device.aSecCfg.junkPacketMaxSize++ // to make rand gen work
+			} else if device.aSecCfg.junkPacketMaxSize < device.aSecCfg.junkPacketMinSize {
+				log.Fatalf(
+					"MaxSize: %d; should be greater than MinSize: %d",
+					device.aSecCfg.junkPacketMaxSize,
+					device.aSecCfg.junkPacketMinSize,
+				)
+			}
+		}
+
+		if device.aSecCfg.initPacketMagicHeader != 0 &&
+			device.aSecCfg.initPacketMagicHeader != 1 {
+
+			MessageInitiationType = device.aSecCfg.initPacketMagicHeader
+		}
+		if device.aSecCfg.responsePacketMagicHeader != 0 &&
+			device.aSecCfg.responsePacketMagicHeader != 1 {
+
+			MessageResponseType = device.aSecCfg.responsePacketMagicHeader
+		}
+		if device.aSecCfg.underloadPacketMagicHeader != 0 &&
+			device.aSecCfg.underloadPacketMagicHeader != 1 {
+
+			MessageCookieReplyType = device.aSecCfg.underloadPacketMagicHeader
+		}
+		if device.aSecCfg.transportPacketMagicHeader != 0 &&
+			device.aSecCfg.transportPacketMagicHeader != 1 {
+
+			MessageTransportType = device.aSecCfg.transportPacketMagicHeader
+		}
+
+		packetSizeToMsgType = map[int]uint32{
+			MessageInitiationSize + device.aSecCfg.initPacketJunkSize:   MessageInitiationType,
+			MessageResponseSize + device.aSecCfg.responsePacketJunkSize: MessageResponseType,
+			MessageCookieReplySize: MessageCookieReplyType,
+			MessageTransportSize:   MessageTransportType,
+		}
+
+		msgTypeToJunkSize = map[uint32]int{
+			MessageInitiationType:  device.aSecCfg.initPacketJunkSize,
+			MessageResponseType:    device.aSecCfg.responsePacketJunkSize,
+			MessageCookieReplyType: 0,
+			MessageTransportType:   0,
+		}
+	}
 }
