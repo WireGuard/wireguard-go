@@ -51,18 +51,6 @@ This requires an installation of the latest version of [Go](https://go.dev/).
 ```
 $ git clone https://git.zx2c4.com/wireguard-go
 $ cd wireguard-go
-```
-
-### Config gen
-The configs are generate from a yml file. If you want to change the config run `make cfg_gen config_name` where `config_name` is the name of the yaml file you'd like to generate from. The script will search in the `cfg/settings/` folder
-
-### Example:
-`make cfg_gen default` will generate a config from `cfg/settings/default.yml` the file will be called `cfg/cfg_values.go`
-
-Every time you make changes to the yml you need to rerun.
-
-After the generation is done you can build with:
-```
 $ make
 ```
 
