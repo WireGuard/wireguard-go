@@ -697,7 +697,7 @@ func (device *Device) handlePostConfig(tempASecCfg *aSecCfgType) (err error) {
 		}
 	}
 
-	if device.aSecCfg.initPacketMagicHeader > 4 {
+	if tempASecCfg.initPacketMagicHeader > 4 {
 		isASecOn = true
 		device.log.Verbosef("UAPI: Updating init_packet_magic_header")
 		device.aSecCfg.initPacketMagicHeader = tempASecCfg.initPacketMagicHeader
@@ -705,7 +705,7 @@ func (device *Device) handlePostConfig(tempASecCfg *aSecCfgType) (err error) {
 	} else {
 		MessageInitiationType = 1
 	}
-	if device.aSecCfg.responsePacketMagicHeader > 4 {
+	if tempASecCfg.initPacketMagicHeader > 4 {
 		isASecOn = true
 		device.log.Verbosef("UAPI: Updating response_packet_magic_header")
 		device.aSecCfg.responsePacketMagicHeader = tempASecCfg.responsePacketMagicHeader
@@ -713,7 +713,7 @@ func (device *Device) handlePostConfig(tempASecCfg *aSecCfgType) (err error) {
 	} else {
 		MessageResponseType = 2
 	}
-	if device.aSecCfg.underloadPacketMagicHeader > 4 {
+	if tempASecCfg.initPacketMagicHeader > 4 {
 		isASecOn = true
 		device.log.Verbosef("UAPI: Updating underload_packet_magic_header")
 		device.aSecCfg.underloadPacketMagicHeader = tempASecCfg.underloadPacketMagicHeader
@@ -721,7 +721,7 @@ func (device *Device) handlePostConfig(tempASecCfg *aSecCfgType) (err error) {
 	} else {
 		MessageCookieReplyType = 3
 	}
-	if device.aSecCfg.transportPacketMagicHeader > 4 {
+	if tempASecCfg.initPacketMagicHeader > 4 {
 		isASecOn = true
 		device.log.Verbosef("UAPI: Updating transport_packet_magic_header")
 		device.aSecCfg.transportPacketMagicHeader = tempASecCfg.transportPacketMagicHeader

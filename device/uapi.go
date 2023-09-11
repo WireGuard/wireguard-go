@@ -194,6 +194,7 @@ func (device *Device) IpcSetOperation(r io.Reader) (err error) {
 		line := scanner.Text()
 		if line == "" {
 			// Blank line means terminate operation.
+			device.handlePostConfig(&tempASecCfg)
 			peer.handlePostConfig()
 			return nil
 		}
