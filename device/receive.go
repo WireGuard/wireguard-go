@@ -132,6 +132,7 @@ func (device *Device) RoutineReceiveIncoming(
 		}
 		deathSpiral = 0
 
+		device.aSecMux.RLock()
 		// handle each packet in the batch
 		for i, size := range sizes[:count] {
 			if size < MinMessageSize {
@@ -234,6 +235,7 @@ func (device *Device) RoutineReceiveIncoming(
 			default:
 			}
 		}
+		device.aSecMux.RUnlock()
 		for peer, elems := range elemsByPeer {
 			if peer.isRunning.Load() {
 				peer.queue.inbound.c <- elems
@@ -291,6 +293,8 @@ func (device *Device) RoutineHandshake(id int) {
 	device.log.Verbosef("Routine: handshake worker %d - started", id)
 
 	for elem := range device.queue.handshake.c {
+
+		device.aSecMux.RLock()
 
 		// handle cookie fields and ratelimiting
 
@@ -455,6 +459,7 @@ func (device *Device) RoutineHandshake(id int) {
 			peer.SendKeepalive()
 		}
 	skip:
+		device.aSecMux.RUnlock()
 		device.PutMessageBuffer(elem.buffer)
 	}
 }
