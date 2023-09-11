@@ -303,6 +303,7 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		}
 		device.log.Verbosef("UAPI: Removing all peers")
 		device.RemoveAllPeers()
+		
 	case "jc":
 		junkPacketCount, err := strconv.Atoi(value)
 		if err != nil {
@@ -319,6 +320,7 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		device.log.Verbosef("UAPI: Updating junk_packet_count")
 		device.aSecCfg.isOn = true
 		device.aSecCfg.junkPacketCount = junkPacketCount
+		
 	case "jmin":
 		junkPacketMinSize, err := strconv.Atoi(value)
 		if err != nil {
@@ -331,6 +333,7 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		device.log.Verbosef("UAPI: Updating junk_packet_min_size")
 		device.aSecCfg.isOn = true
 		device.aSecCfg.junkPacketMinSize = junkPacketMinSize
+		
 	case "jmax":
 		junkPacketMaxSize, err := strconv.Atoi(value)
 		if err != nil {
@@ -350,6 +353,7 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		device.log.Verbosef("UAPI: Updating junk_packet_max_size")
 		device.aSecCfg.isOn = true
 		device.aSecCfg.junkPacketMaxSize = junkPacketMaxSize
+		
 	case "s1":
 		initPacketJunkSize, err := strconv.Atoi(value)
 		if err != nil {
@@ -370,6 +374,7 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		device.log.Verbosef("UAPI: Updating init_packet_junk_size")
 		device.aSecCfg.isOn = true
 		device.aSecCfg.initPacketJunkSize = initPacketJunkSize
+		
 	case "s2":
 		responsePacketJunkSize, err := strconv.Atoi(value)
 		if err != nil {
@@ -391,6 +396,7 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		device.aSecCfg.isOn = true
 		device.aSecCfg.responsePacketJunkSize = responsePacketJunkSize
 
+		
 	case "h1":
 		initPacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
 		if err != nil {
@@ -403,6 +409,7 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		device.log.Verbosef("UAPI: Updating init_packet_magic_header")
 		device.aSecCfg.isOn = true
 		device.aSecCfg.initPacketMagicHeader = uint32(initPacketMagicHeader)
+		
 	case "h2":
 		responsePacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
 		if err != nil {
@@ -417,6 +424,7 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		device.aSecCfg.responsePacketMagicHeader = uint32(
 			responsePacketMagicHeader,
 		)
+		
 	case "h3":
 		underloadPacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
 		if err != nil {
@@ -431,6 +439,7 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		device.aSecCfg.underloadPacketMagicHeader = uint32(
 			underloadPacketMagicHeader,
 		)
+		
 	case "h4":
 		transportPacketMagicHeader, err := strconv.ParseUint(value, 10, 32)
 		if err != nil {

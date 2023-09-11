@@ -133,14 +133,16 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 			peer.device.log.Errorf("%v - %v", peer, err)
 			return err
 		}
-		buf := make([]byte, 0, peer.device.aSecCfg.initPacketJunkSize)
-		writer := bytes.NewBuffer(buf[:0])
-		err = appendJunk(writer, peer.device.aSecCfg.initPacketJunkSize)
-		if err != nil {
-			peer.device.log.Errorf("%v - %v", peer, err)
-			return err
+		if peer.device.aSecCfg.initPacketJunkSize != 0 {
+			buf := make([]byte, 0, peer.device.aSecCfg.initPacketJunkSize)
+			writer := bytes.NewBuffer(buf[:0])
+			err = appendJunk(writer, peer.device.aSecCfg.initPacketJunkSize)
+			if err != nil {
+				peer.device.log.Errorf("%v - %v", peer, err)
+				return err
+			}
+			junkedHeader = writer.Bytes()
 		}
-		junkedHeader = writer.Bytes()
 	}
 	var buf [MessageInitiationSize]byte
 	writer := bytes.NewBuffer(buf[:0])
@@ -182,7 +184,9 @@ func (peer *Peer) SendHandshakeResponse() error {
 		return err
 	}
 	var junkedHeader []byte
-	if peer.device.isAdvancedSecurityOn() {
+	if peer.device.isAdvancedSecurityOn() &&
+		peer.device.aSecCfg.responsePacketJunkSize != 0 {
+
 		buf := make([]byte, 0, peer.device.aSecCfg.responsePacketJunkSize)
 		writer := bytes.NewBuffer(buf[:0])
 		err = appendJunk(writer, peer.device.aSecCfg.responsePacketJunkSize)
@@ -471,6 +475,10 @@ top:
 }
 
 func (peer *Peer) sendJunkPackets() error {
+	if peer.device.aSecCfg.junkPacketCount == 0 {
+		return nil
+	}
+
 	junks := make([][]byte, 0, peer.device.aSecCfg.junkPacketCount)
 	for i := 0; i < peer.device.aSecCfg.junkPacketCount; i++ {
 		packetSize := rand.Intn(
