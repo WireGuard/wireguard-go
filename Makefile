@@ -29,27 +29,3 @@ clean:
 	rm -f wireguard-go
 
 .PHONY: all clean test install generate-version-and-build
-
-
-has_args = 
-# If the first argument is "cfg_gen"...
-ifeq (cfg_gen,$(firstword $(MAKECMDGOALS)))
-  	has_args = yes
-endif
-
-ifdef has_args
-    # use the rest as arguments for "cfg_gen"
-    RUN_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
-    # ...and turn them into do-nothing targets
-    $(eval $(RUN_ARGS):;@:)
-endif
-
-ifeq ($(OS),Windows_NT)
-	gen_run=generator.exe
-else 
-	gen_run=./generator
-endif
-
-.PHONY: cfg_gen
-cfg_gen: 
-	go build util/cfgGenerator/generator.go && $(gen_run) $(RUN_ARGS)
