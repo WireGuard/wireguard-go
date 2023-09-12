@@ -128,8 +128,10 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	// so only packet processed for cookie generation
 	var junkedHeader []byte
 	if peer.device.isAdvancedSecurityOn() {
+		peer.device.aSecMux.RLock()
 		err = peer.sendJunkPackets()
 		if err != nil {
+			peer.device.aSecMux.RUnlock()
 			peer.device.log.Errorf("%v - %v", peer, err)
 			return err
 		}
@@ -138,11 +140,13 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 			writer := bytes.NewBuffer(buf[:0])
 			err = appendJunk(writer, peer.device.aSecCfg.initPacketJunkSize)
 			if err != nil {
+				peer.device.aSecMux.RUnlock()
 				peer.device.log.Errorf("%v - %v", peer, err)
 				return err
 			}
 			junkedHeader = writer.Bytes()
 		}
+		peer.device.aSecMux.RUnlock()
 	}
 	var buf [MessageInitiationSize]byte
 	writer := bytes.NewBuffer(buf[:0])
@@ -184,17 +188,20 @@ func (peer *Peer) SendHandshakeResponse() error {
 		return err
 	}
 	var junkedHeader []byte
-	if peer.device.isAdvancedSecurityOn() &&
-		peer.device.aSecCfg.responsePacketJunkSize != 0 {
-
-		buf := make([]byte, 0, peer.device.aSecCfg.responsePacketJunkSize)
-		writer := bytes.NewBuffer(buf[:0])
-		err = appendJunk(writer, peer.device.aSecCfg.responsePacketJunkSize)
-		if err != nil {
-			peer.device.log.Errorf("%v - %v", peer, err)
-			return err
-		}
-		junkedHeader = writer.Bytes()
+	if peer.device.isAdvancedSecurityOn() {
+		peer.device.aSecMux.RLock()
+		if peer.device.aSecCfg.responsePacketJunkSize != 0 {
+			buf := make([]byte, 0, peer.device.aSecCfg.responsePacketJunkSize)
+			writer := bytes.NewBuffer(buf[:0])
+			err = appendJunk(writer, peer.device.aSecCfg.responsePacketJunkSize)
+			if err != nil {
+				peer.device.aSecMux.RUnlock()
+				peer.device.log.Errorf("%v - %v", peer, err)
+				return err
+			}
+			junkedHeader = writer.Bytes()
+		} 
+		peer.device.aSecMux.RUnlock()
 	}
 	var buf [MessageResponseSize]byte
 	writer := bytes.NewBuffer(buf[:0])

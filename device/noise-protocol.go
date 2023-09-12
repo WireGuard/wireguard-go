@@ -199,10 +199,12 @@ func (device *Device) CreateMessageInitiation(
 
 	handshake.mixHash(handshake.remoteStatic[:])
 
+	device.aSecMux.RLock()
 	msg := MessageInitiation{
 		Type:      MessageInitiationType,
 		Ephemeral: handshake.localEphemeral.publicKey(),
 	}
+	device.aSecMux.RUnlock()
 
 	handshake.mixKey(msg.Ephemeral[:])
 	handshake.mixHash(msg.Ephemeral[:])
@@ -261,9 +263,12 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 		chainKey [blake2s.Size]byte
 	)
 
+	device.aSecMux.RLock()
 	if msg.Type != MessageInitiationType {
+		device.aSecMux.RUnlock()
 		return nil
 	}
+	device.aSecMux.RUnlock()
 
 	device.staticIdentity.RLock()
 	defer device.staticIdentity.RUnlock()
@@ -392,7 +397,9 @@ func (device *Device) CreateMessageResponse(
 	}
 
 	var msg MessageResponse
+	device.aSecMux.RLock()
 	msg.Type = MessageResponseType
+	device.aSecMux.RUnlock()
 	msg.Sender = handshake.localIndex
 	msg.Receiver = handshake.remoteIndex
 
@@ -442,9 +449,12 @@ func (device *Device) CreateMessageResponse(
 }
 
 func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
+	device.aSecMux.RLock()
 	if msg.Type != MessageResponseType {
+		device.aSecMux.RUnlock()
 		return nil
 	}
+	device.aSecMux.RUnlock()
 
 	// lookup handshake by receiver
 
