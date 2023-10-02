@@ -19,13 +19,13 @@ import (
 // call wg.Done to remove the initial reference.
 // When the refcount hits 0, the queue's channel is closed.
 type outboundQueue struct {
-	c  chan *QueueOutboundElement
+	c  chan *[]*QueueOutboundElement
 	wg sync.WaitGroup
 }
 
 func newOutboundQueue() *outboundQueue {
 	q := &outboundQueue{
-		c: make(chan *QueueOutboundElement, QueueOutboundSize),
+		c: make(chan *[]*QueueOutboundElement, QueueOutboundSize),
 	}
 	q.wg.Add(1)
 	go func() {
@@ -37,13 +37,13 @@ func newOutboundQueue() *outboundQueue {
 
 // A inboundQueue is similar to an outboundQueue; see those docs.
 type inboundQueue struct {
-	c  chan *QueueInboundElement
+	c  chan *[]*QueueInboundElement
 	wg sync.WaitGroup
 }
 
 func newInboundQueue() *inboundQueue {
 	q := &inboundQueue{
-		c: make(chan *QueueInboundElement, QueueInboundSize),
+		c: make(chan *[]*QueueInboundElement, QueueInboundSize),
 	}
 	q.wg.Add(1)
 	go func() {
