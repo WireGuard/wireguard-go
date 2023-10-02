@@ -385,9 +385,7 @@ top:
 			// add to parallel and sequential queue
 			if peer.isRunning.Load() {
 				peer.queue.outbound.c <- elems
-				for _, elem := range *elems {
-					peer.device.queue.encryption.c <- elem
-				}
+				peer.device.queue.encryption.c <- elems
 			} else {
 				for _, elem := range *elems {
 					peer.device.PutMessageBuffer(elem.buffer)
@@ -447,32 +445,34 @@ func (device *Device) RoutineEncryption(id int) {
 	defer device.log.Verbosef("Routine: encryption worker %d - stopped", id)
 	device.log.Verbosef("Routine: encryption worker %d - started", id)
 
-	for elem := range device.queue.encryption.c {
-		// populate header fields
-		header := elem.buffer[:MessageTransportHeaderSize]
+	for elems := range device.queue.encryption.c {
+		for _, elem := range *elems {
+			// populate header fields
+			header := elem.buffer[:MessageTransportHeaderSize]
 
-		fieldType := header[0:4]
-		fieldReceiver := header[4:8]
-		fieldNonce := header[8:16]
+			fieldType := header[0:4]
+			fieldReceiver := header[4:8]
+			fieldNonce := header[8:16]
 
-		binary.LittleEndian.PutUint32(fieldType, MessageTransportType)
-		binary.LittleEndian.PutUint32(fieldReceiver, elem.keypair.remoteIndex)
-		binary.LittleEndian.PutUint64(fieldNonce, elem.nonce)
+			binary.LittleEndian.PutUint32(fieldType, MessageTransportType)
+			binary.LittleEndian.PutUint32(fieldReceiver, elem.keypair.remoteIndex)
+			binary.LittleEndian.PutUint64(fieldNonce, elem.nonce)
 
-		// pad content to multiple of 16
-		paddingSize := calculatePaddingSize(len(elem.packet), int(device.tun.mtu.Load()))
-		elem.packet = append(elem.packet, paddingZeros[:paddingSize]...)
+			// pad content to multiple of 16
+			paddingSize := calculatePaddingSize(len(elem.packet), int(device.tun.mtu.Load()))
+			elem.packet = append(elem.packet, paddingZeros[:paddingSize]...)
 
-		// encrypt content and release to consumer
+			// encrypt content and release to consumer
 
-		binary.LittleEndian.PutUint64(nonce[4:], elem.nonce)
-		elem.packet = elem.keypair.send.Seal(
-			header,
-			nonce[:],
-			elem.packet,
-			nil,
-		)
-		elem.Unlock()
+			binary.LittleEndian.PutUint64(nonce[4:], elem.nonce)
+			elem.packet = elem.keypair.send.Seal(
+				header,
+				nonce[:],
+				elem.packet,
+				nil,
+			)
+			elem.Unlock()
+		}
 	}
 }
 
