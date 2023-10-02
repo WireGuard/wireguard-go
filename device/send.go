@@ -17,6 +17,7 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
+	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/tun"
 )
 
@@ -525,6 +526,13 @@ func (peer *Peer) RoutineSequentialSender(maxBatchSize int) {
 			device.PutOutboundElement(elem)
 		}
 		device.PutOutboundElementsSlice(elems)
+		if err != nil {
+			var errGSO conn.ErrUDPGSODisabled
+			if errors.As(err, &errGSO) {
+				device.log.Verbosef(err.Error())
+				err = errGSO.RetryErr
+			}
+		}
 		if err != nil {
 			device.log.Errorf("%v - Failed to send data packets: %v", peer, err)
 			continue
