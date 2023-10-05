@@ -8,8 +8,8 @@ package ipc
 import (
 	"net"
 
+	"github.com/amnezia-vpn/amnezia-wg/ipc/namedpipe"
 	"golang.org/x/sys/windows"
-	"golang.zx2c4.com/wireguard/ipc/namedpipe"
 )
 
 // TODO: replace these with actual standard windows error numbers from the win package

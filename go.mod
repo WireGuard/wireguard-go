@@ -1,8 +1,9 @@
-module golang.zx2c4.com/wireguard
+module github.com/amnezia-vpn/amnezia-wg
 
 go 1.20
 
 require (
+	github.com/tevino/abool/v2 v2.1.0
 	golang.org/x/crypto v0.6.0
 	golang.org/x/net v0.7.0
 	golang.org/x/sys v0.5.1-0.20230222185716-a3b23cc77e89

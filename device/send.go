@@ -9,15 +9,16 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"math/rand"
 	"net"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/amnezia-vpn/amnezia-wg/tun"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
-	"golang.zx2c4.com/wireguard/tun"
 )
 
 /* Outbound flow
@@ -119,17 +120,44 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 		peer.device.log.Errorf("%v - Failed to create initiation message: %v", peer, err)
 		return err
 	}
-
+	var sendBuffer [][]byte
+	// so only packet processed for cookie generation
+	var junkedHeader []byte
+	if peer.device.isAdvancedSecurityOn() {
+		peer.device.aSecMux.RLock()
+		junks, err := peer.createJunkPackets()
+		if err != nil {
+			peer.device.aSecMux.RUnlock()
+			peer.device.log.Errorf("%v - %v", peer, err)
+			return err
+		}
+		sendBuffer = append(sendBuffer, junks...)
+		if peer.device.aSecCfg.initPacketJunkSize != 0 {
+			buf := make([]byte, 0, peer.device.aSecCfg.initPacketJunkSize)
+			writer := bytes.NewBuffer(buf[:0])
+			err = appendJunk(writer, peer.device.aSecCfg.initPacketJunkSize)
+			if err != nil {
+				peer.device.aSecMux.RUnlock()
+				peer.device.log.Errorf("%v - %v", peer, err)
+				return err
+			}
+			junkedHeader = writer.Bytes()
+		}
+		peer.device.aSecMux.RUnlock()
+	}
 	var buf [MessageInitiationSize]byte
 	writer := bytes.NewBuffer(buf[:0])
 	binary.Write(writer, binary.LittleEndian, msg)
 	packet := writer.Bytes()
 	peer.cookieGenerator.AddMacs(packet)
+	junkedHeader = append(junkedHeader, packet...)
 
 	peer.timersAnyAuthenticatedPacketTraversal()
 	peer.timersAnyAuthenticatedPacketSent()
-
-	err = peer.SendBuffers([][]byte{packet})
+	
+	sendBuffer = append(sendBuffer, junkedHeader)
+	
+	err = peer.SendBuffers(sendBuffer)
 	if err != nil {
 		peer.device.log.Errorf("%v - Failed to send handshake initiation: %v", peer, err)
 	}
@@ -150,12 +178,29 @@ func (peer *Peer) SendHandshakeResponse() error {
 		peer.device.log.Errorf("%v - Failed to create response message: %v", peer, err)
 		return err
 	}
-
+	var junkedHeader []byte
+	if peer.device.isAdvancedSecurityOn() {
+		peer.device.aSecMux.RLock()
+		if peer.device.aSecCfg.responsePacketJunkSize != 0 {
+			buf := make([]byte, 0, peer.device.aSecCfg.responsePacketJunkSize)
+			writer := bytes.NewBuffer(buf[:0])
+			err = appendJunk(writer, peer.device.aSecCfg.responsePacketJunkSize)
+			if err != nil {
+				peer.device.aSecMux.RUnlock()
+				peer.device.log.Errorf("%v - %v", peer, err)
+				return err
+			}
+			junkedHeader = writer.Bytes()
+		} 
+		peer.device.aSecMux.RUnlock()
+	}
 	var buf [MessageResponseSize]byte
 	writer := bytes.NewBuffer(buf[:0])
+
 	binary.Write(writer, binary.LittleEndian, response)
 	packet := writer.Bytes()
 	peer.cookieGenerator.AddMacs(packet)
+	junkedHeader = append(junkedHeader, packet...)
 
 	err = peer.BeginSymmetricSession()
 	if err != nil {
@@ -168,18 +213,24 @@ func (peer *Peer) SendHandshakeResponse() error {
 	peer.timersAnyAuthenticatedPacketSent()
 
 	// TODO: allocation could be avoided
-	err = peer.SendBuffers([][]byte{packet})
+	err = peer.SendBuffers([][]byte{junkedHeader})
 	if err != nil {
 		peer.device.log.Errorf("%v - Failed to send handshake response: %v", peer, err)
 	}
 	return err
 }
 
-func (device *Device) SendHandshakeCookie(initiatingElem *QueueHandshakeElement) error {
+func (device *Device) SendHandshakeCookie(
+	initiatingElem *QueueHandshakeElement,
+) error {
 	device.log.Verbosef("Sending cookie response for denied handshake message for %v", initiatingElem.endpoint.DstToString())
 
 	sender := binary.LittleEndian.Uint32(initiatingElem.packet[4:8])
-	reply, err := device.cookieChecker.CreateReply(initiatingElem.packet, sender, initiatingElem.endpoint.DstToBytes())
+	reply, err := device.cookieChecker.CreateReply(
+		initiatingElem.packet,
+		sender,
+		initiatingElem.endpoint.DstToBytes(),
+	)
 	if err != nil {
 		device.log.Errorf("Failed to create cookie reply: %v", err)
 		return err
@@ -404,6 +455,31 @@ top:
 	}
 }
 
+func (peer *Peer) createJunkPackets() ([][]byte, error) {
+	if peer.device.aSecCfg.junkPacketCount == 0 {
+		return nil, nil
+	}
+
+	junks := make([][]byte, 0, peer.device.aSecCfg.junkPacketCount)
+	for i := 0; i < peer.device.aSecCfg.junkPacketCount; i++ {
+		packetSize := rand.Intn(
+			peer.device.aSecCfg.junkPacketMaxSize-peer.device.aSecCfg.junkPacketMinSize,
+		) + peer.device.aSecCfg.junkPacketMinSize
+
+		junk, err := randomJunkWithSize(packetSize)
+		if err != nil {
+			peer.device.log.Errorf(
+				"%v - Failed to create junk packet: %v",
+				peer,
+				err,
+			)
+			return nil, err
+		}
+		junks = append(junks, junk)
+	}
+	return junks, nil
+}
+
 func (peer *Peer) FlushStagedPackets() {
 	for {
 		select {
@@ -459,18 +535,16 @@ func (device *Device) RoutineEncryption(id int) {
 		binary.LittleEndian.PutUint64(fieldNonce, elem.nonce)
 
 		// pad content to multiple of 16
-		paddingSize := calculatePaddingSize(len(elem.packet), int(device.tun.mtu.Load()))
+		paddingSize := calculatePaddingSize(
+			len(elem.packet),
+			int(device.tun.mtu.Load()),
+		)
 		elem.packet = append(elem.packet, paddingZeros[:paddingSize]...)
 
 		// encrypt content and release to consumer
 
 		binary.LittleEndian.PutUint64(nonce[4:], elem.nonce)
-		elem.packet = elem.keypair.send.Seal(
-			header,
-			nonce[:],
-			elem.packet,
-			nil,
-		)
+		elem.packet = elem.keypair.send.Seal(header, nonce[:], elem.packet, nil)
 		elem.Unlock()
 	}
 }

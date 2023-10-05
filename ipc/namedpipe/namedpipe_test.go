@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/amnezia-vpn/amnezia-wg/ipc/namedpipe"
 	"golang.org/x/sys/windows"
-	"golang.zx2c4.com/wireguard/ipc/namedpipe"
 )
 
 func randomPipePath() string {

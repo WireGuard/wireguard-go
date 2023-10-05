@@ -15,7 +15,7 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/poly1305"
 
-	"golang.zx2c4.com/wireguard/tai64n"
+	"github.com/amnezia-vpn/amnezia-wg/tai64n"
 )
 
 type handshakeState int
@@ -52,11 +52,11 @@ const (
 	WGLabelCookie     = "cookie--"
 )
 
-const (
-	MessageInitiationType  = 1
-	MessageResponseType    = 2
-	MessageCookieReplyType = 3
-	MessageTransportType   = 4
+var (
+	MessageInitiationType  uint32 = 1
+	MessageResponseType    uint32 = 2
+	MessageCookieReplyType uint32 = 3
+	MessageTransportType   uint32 = 4
 )
 
 const (
@@ -74,6 +74,10 @@ const (
 	MessageTransportOffsetCounter  = 8
 	MessageTransportOffsetContent  = 16
 )
+
+var packetSizeToMsgType map[int]uint32
+
+var msgTypeToJunkSize map[uint32]int
 
 /* Type is an 8-bit field, followed by 3 nul bytes,
  * by marshalling the messages in little-endian byteorder
@@ -193,10 +197,12 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 
 	handshake.mixHash(handshake.remoteStatic[:])
 
+	device.aSecMux.RLock()
 	msg := MessageInitiation{
 		Type:      MessageInitiationType,
 		Ephemeral: handshake.localEphemeral.publicKey(),
 	}
+	device.aSecMux.RUnlock()
 
 	handshake.mixKey(msg.Ephemeral[:])
 	handshake.mixHash(msg.Ephemeral[:])
@@ -250,9 +256,12 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 		chainKey [blake2s.Size]byte
 	)
 
+	device.aSecMux.RLock()
 	if msg.Type != MessageInitiationType {
+		device.aSecMux.RUnlock()
 		return nil
 	}
+	device.aSecMux.RUnlock()
 
 	device.staticIdentity.RLock()
 	defer device.staticIdentity.RUnlock()
@@ -367,7 +376,9 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 	}
 
 	var msg MessageResponse
+	device.aSecMux.RLock()
 	msg.Type = MessageResponseType
+	device.aSecMux.RUnlock()
 	msg.Sender = handshake.localIndex
 	msg.Receiver = handshake.remoteIndex
 
@@ -417,9 +428,12 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 }
 
 func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
+	device.aSecMux.RLock()
 	if msg.Type != MessageResponseType {
+		device.aSecMux.RUnlock()
 		return nil
 	}
+	device.aSecMux.RUnlock()
 
 	// lookup handshake by receiver
 

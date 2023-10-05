@@ -8,7 +8,7 @@ package device
 import (
 	"errors"
 
-	"golang.zx2c4.com/wireguard/conn"
+	"github.com/amnezia-vpn/amnezia-wg/conn"
 )
 
 type DummyDatagram struct {
