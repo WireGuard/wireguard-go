@@ -274,3 +274,7 @@ func (peer *Peer) SetEndpointFromPacket(endpoint conn.Endpoint) {
 	peer.endpoint = endpoint
 	peer.Unlock()
 }
+
+func (peer *Peer) GetStatistics() (atomic.Uint64, atomic.Uint64, Handshake) {
+	return peer.txBytes, peer.rxBytes, peer.handshake
+}
