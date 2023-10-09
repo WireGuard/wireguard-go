@@ -126,25 +126,31 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	if peer.device.isAdvancedSecurityOn() {
 		peer.device.aSecMux.RLock()
 		junks, err := peer.createJunkPackets()
+		peer.device.aSecMux.RUnlock()
+
 		if err != nil {
-			peer.device.aSecMux.RUnlock()
 			peer.device.log.Errorf("%v - %v", peer, err)
 			return err
 		}
-		sendBuffer = append(sendBuffer, junks...)
+
+		err = peer.SendBuffers(junks)
+		if err != nil {
+			peer.device.log.Errorf("%v - Failed to send junk packets: %v", peer, err)
+			return err
+		}
+
 		if peer.device.aSecCfg.initPacketJunkSize != 0 {
 			buf := make([]byte, 0, peer.device.aSecCfg.initPacketJunkSize)
 			writer := bytes.NewBuffer(buf[:0])
 			err = appendJunk(writer, peer.device.aSecCfg.initPacketJunkSize)
 			if err != nil {
-				peer.device.aSecMux.RUnlock()
 				peer.device.log.Errorf("%v - %v", peer, err)
 				return err
 			}
 			junkedHeader = writer.Bytes()
 		}
-		peer.device.aSecMux.RUnlock()
 	}
+
 	var buf [MessageInitiationSize]byte
 	writer := bytes.NewBuffer(buf[:0])
 	binary.Write(writer, binary.LittleEndian, msg)
@@ -154,9 +160,9 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 
 	peer.timersAnyAuthenticatedPacketTraversal()
 	peer.timersAnyAuthenticatedPacketSent()
-	
+
 	sendBuffer = append(sendBuffer, junkedHeader)
-	
+
 	err = peer.SendBuffers(sendBuffer)
 	if err != nil {
 		peer.device.log.Errorf("%v - Failed to send handshake initiation: %v", peer, err)
@@ -191,7 +197,7 @@ func (peer *Peer) SendHandshakeResponse() error {
 				return err
 			}
 			junkedHeader = writer.Bytes()
-		} 
+		}
 		peer.device.aSecMux.RUnlock()
 	}
 	var buf [MessageResponseSize]byte
