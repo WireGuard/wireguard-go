@@ -139,16 +139,19 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 			return err
 		}
 
+		peer.device.aSecMux.RLock()
 		if peer.device.aSecCfg.initPacketJunkSize != 0 {
 			buf := make([]byte, 0, peer.device.aSecCfg.initPacketJunkSize)
 			writer := bytes.NewBuffer(buf[:0])
 			err = appendJunk(writer, peer.device.aSecCfg.initPacketJunkSize)
 			if err != nil {
 				peer.device.log.Errorf("%v - %v", peer, err)
+				peer.device.aSecMux.RUnlock()
 				return err
 			}
 			junkedHeader = writer.Bytes()
 		}
+		peer.device.aSecMux.RUnlock()
 	}
 
 	var buf [MessageInitiationSize]byte
