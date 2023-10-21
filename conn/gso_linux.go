@@ -56,7 +56,7 @@ func setGSOSize(control *[]byte, gsoSize uint16) {
 	hdr.Level = unix.SOL_UDP
 	hdr.Type = unix.UDP_SEGMENT
 	hdr.SetLen(unix.CmsgLen(sizeOfGSOData))
-	copy((gsoControl)[unix.SizeofCmsghdr:], unsafe.Slice((*byte)(unsafe.Pointer(&gsoSize)), sizeOfGSOData))
+	copy((gsoControl)[unix.CmsgLen(0):], unsafe.Slice((*byte)(unsafe.Pointer(&gsoSize)), sizeOfGSOData))
 	*control = (*control)[:existingLen+space]
 }
 
