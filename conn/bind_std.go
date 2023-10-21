@@ -65,7 +65,7 @@ func NewStdNetBind() Bind {
 				msgs := make([]ipv6.Message, IdealBatchSize)
 				for i := range msgs {
 					msgs[i].Buffers = make(net.Buffers, 1)
-					msgs[i].OOB = make([]byte, controlSize)
+					msgs[i].OOB = make([]byte, stickyControlSize+gsoControlSize)
 				}
 				return &msgs
 			},
