@@ -447,6 +447,7 @@ func (peer *Peer) RoutineSequentialReceiver(maxBatchSize int) {
 		elemsContainer.Lock()
 		validTailPacket := -1
 		dataPacketReceived := false
+		rxBytesLen := uint64(0)
 		for i, elem := range elemsContainer.elems {
 			if elem.packet == nil {
 				// decryption failed
@@ -463,7 +464,7 @@ func (peer *Peer) RoutineSequentialReceiver(maxBatchSize int) {
 				peer.timersHandshakeComplete()
 				peer.SendStagedPackets()
 			}
-			peer.rxBytes.Add(uint64(len(elem.packet) + MinMessageSize))
+			rxBytesLen += uint64(len(elem.packet) + MinMessageSize)
 
 			if len(elem.packet) == 0 {
 				device.log.Verbosef("%v - Receiving keepalive packet", peer)
@@ -512,6 +513,8 @@ func (peer *Peer) RoutineSequentialReceiver(maxBatchSize int) {
 
 			bufs = append(bufs, elem.buffer[:MessageTransportOffsetContent+len(elem.packet)])
 		}
+
+		peer.rxBytes.Add(rxBytesLen)
 		if validTailPacket >= 0 {
 			peer.SetEndpointFromPacket(elemsContainer.elems[validTailPacket].endpoint)
 			peer.keepKeyFreshReceiving()
