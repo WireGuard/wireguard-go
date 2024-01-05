@@ -46,6 +46,14 @@ type StdNetBind struct {
 
 	blackhole4 bool
 	blackhole6 bool
+
+	receiverCreator ReceiverCreator
+}
+
+func NewStdNetBindWithReceiverCreator(receiverCreator ReceiverCreator) *StdNetBind {
+	b, _ := NewStdNetBind().(*StdNetBind)
+	b.receiverCreator = receiverCreator
+	return b
 }
 
 func NewStdNetBind() Bind {
@@ -65,7 +73,7 @@ func NewStdNetBind() Bind {
 				msgs := make([]ipv6.Message, IdealBatchSize)
 				for i := range msgs {
 					msgs[i].Buffers = make(net.Buffers, 1)
-					msgs[i].OOB = make([]byte, 0, stickyControlSize+gsoControlSize)
+					msgs[i].OOB = make([]byte, 0, StickyControlSize+gsoControlSize)
 				}
 				return &msgs
 			},
@@ -179,7 +187,12 @@ again:
 			v4pc = ipv4.NewPacketConn(v4conn)
 			s.ipv4PC = v4pc
 		}
-		fns = append(fns, s.makeReceiveIPv4(v4pc, v4conn, s.ipv4RxOffload))
+		if s.receiverCreator != nil {
+			// Todo: check if this still works
+			fns = append(fns, s.receiverCreator.CreateIPv4ReceiverFn(&s.msgsPool, v4pc, v4conn))
+		} else {
+			fns = append(fns, s.makeReceiveIPv4(v4pc, v4conn, s.ipv4RxOffload))
+		}
 		s.ipv4 = v4conn
 	}
 	if v6conn != nil {
@@ -271,7 +284,7 @@ func (s *StdNetBind) receiveIP(
 		}
 		addrPort := msg.Addr.(*net.UDPAddr).AddrPort()
 		ep := &StdNetEndpoint{AddrPort: addrPort} // TODO: remove allocation
-		getSrcFromControl(msg.OOB[:msg.NN], ep)
+		GetSrcFromControl(msg.OOB[:msg.NN], ep)
 		eps[i] = ep
 	}
 	return numMsgs, nil
