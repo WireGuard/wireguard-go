@@ -61,7 +61,12 @@ func genICMPv4(payload []byte, dst, src netip.Addr) []byte {
 	// https://tools.ietf.org/html/rfc792
 	icmpv4[0] = icmpv4Echo // type
 	icmpv4[1] = 0          // code
-	chksum := ^checksum(icmpv4, checksum(payload, 0))
+
+	icmpPkt := pkt[ipv4Size:]
+	copy(pkt[headerSize:], payload)
+
+	// checksum of icmpv4 header and payload
+	chksum := checksum(icmpPkt, 0)
 	binary.BigEndian.PutUint16(icmpv4[icmpv4ChecksumOffset:], chksum)
 
 	// https://tools.ietf.org/html/rfc760 section 3.1
@@ -72,10 +77,11 @@ func genICMPv4(payload []byte, dst, src netip.Addr) []byte {
 	ip[9] = icmpv4ProtocolNumber
 	copy(ip[12:], src.AsSlice())
 	copy(ip[16:], dst.AsSlice())
-	chksum = ^checksum(ip[:], 0)
+
+	// checksum of ipv4 header
+	chksum = checksum(ip[:], 0)
 	binary.BigEndian.PutUint16(ip[ipv4ChecksumOffset:], chksum)
 
-	copy(pkt[headerSize:], payload)
 	return pkt
 }
 

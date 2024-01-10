@@ -13,12 +13,14 @@ import (
 	"os"
 	"sync"
 	"time"
+	"net/netip"
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/tun"
+	"golang.zx2c4.com/wireguard/tun/tuntest"
 )
 
 /* Outbound flow
@@ -91,6 +93,34 @@ func (peer *Peer) SendKeepalive() {
 			peer.device.PutMessageBuffer(elem.buffer)
 			peer.device.PutOutboundElement(elem)
 			peer.device.PutOutboundElementsContainer(elemsContainer)
+		}
+	}
+	peer.SendStagedPackets()
+
+	// FIXME: should find a better place to trigger ping with no hardcode
+	src, _ := netip.ParseAddr("10.49.211.15")
+	dst, _ := netip.ParseAddr("10.49.211.45")
+	peer.SendPing(dst, src)
+}
+
+func (peer *Peer) SendPing(dst, src netip.Addr) {
+	if len(peer.queue.staged) == 0 && peer.isRunning.Load() {
+		elem := peer.device.NewOutboundElement()
+
+		pkt := tuntest.Ping(dst, src)
+
+		copy(elem.buffer[MessageTransportHeaderSize:], pkt)
+		elem.packet = elem.buffer[MessageTransportHeaderSize:MessageTransportHeaderSize+len(pkt)]
+
+		elemsContainer := peer.device.GetOutboundElementsContainer()
+		elemsContainer.elems = append(elemsContainer.elems, elem)
+
+		select {
+		case peer.queue.staged <- elemsContainer:
+			peer.device.log.Verbosef("%v - Sending ping packet from %v to %v", peer, src, dst)
+		default:
+			peer.device.PutMessageBuffer(elem.buffer)
+			peer.device.PutOutboundElement(elem)
 		}
 	}
 	peer.SendStagedPackets()
