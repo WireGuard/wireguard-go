@@ -62,13 +62,14 @@ func genICMPv4(payload []byte, dst, src netip.Addr) []byte {
 	icmpv4[0] = icmpv4Echo // type
 	icmpv4[1] = 0          // code
 
-	icmpPkt := pkt[ipv4Size:]
 	copy(pkt[headerSize:], payload)
 
 	// checksum of icmpv4 header and payload
+	icmpPkt := pkt[ipv4Size:]
 	chksum := checksum(icmpPkt, 0)
 	binary.BigEndian.PutUint16(icmpv4[icmpv4ChecksumOffset:], chksum)
 
+	// prepare ipv4 header
 	// https://tools.ietf.org/html/rfc760 section 3.1
 	length := uint16(len(pkt))
 	ip[0] = (4 << 4) | (ipv4Size / 4)
