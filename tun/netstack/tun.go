@@ -167,6 +167,7 @@ func (tun *netTun) WriteNotify() {
 
 func (tun *netTun) Close() error {
 	tun.stack.RemoveNIC(1)
+	tun.stack.Close()
 
 	if tun.events != nil {
 		close(tun.events)
