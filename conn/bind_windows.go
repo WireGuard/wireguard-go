@@ -18,7 +18,7 @@ import (
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/windows"
 
-	"golang.zx2c4.com/wireguard/conn/winrio"
+	"github.com/NordSecurity/wireguard-go/conn/winrio"
 )
 
 const (
