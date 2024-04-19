@@ -49,6 +49,10 @@ var byteBufferPool = &sync.Pool{
 // IpcGetOperation implements the WireGuard configuration protocol "get" operation.
 // See https://www.wireguard.com/xplatform/#configuration-protocol for details.
 func (device *Device) IpcGetOperation(w io.Writer) error {
+	if device.isClosed() {
+		return ipcErrorf(ipc.IpcErrorInvalid, "ipc get operation failed: %w", errors.New("device closed"))
+	}
+
 	device.ipcMutex.RLock()
 	defer device.ipcMutex.RUnlock()
 
