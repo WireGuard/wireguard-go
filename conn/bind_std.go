@@ -119,8 +119,8 @@ func (e *StdNetEndpoint) DstToString() string {
 	return e.AddrPort.String()
 }
 
-func listenNet(network string, port int) (*net.UDPConn, int, error) {
-	conn, err := listenConfig().ListenPacket(context.Background(), network, ":"+strconv.Itoa(port))
+func listenNet(network string, ip net.IP, port int) (*net.UDPConn, int, error) {
+	conn, err := listenConfig().ListenPacket(context.Background(), network, net.JoinHostPort(ip.String(), strconv.Itoa(port)))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -138,64 +138,7 @@ func listenNet(network string, port int) (*net.UDPConn, int, error) {
 }
 
 func (s *StdNetBind) Open(uport uint16) ([]ReceiveFunc, uint16, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	var err error
-	var tries int
-
-	if s.ipv4 != nil || s.ipv6 != nil {
-		return nil, 0, ErrBindAlreadyOpen
-	}
-
-	// Attempt to open ipv4 and ipv6 listeners on the same port.
-	// If uport is 0, we can retry on failure.
-again:
-	port := int(uport)
-	var v4conn, v6conn *net.UDPConn
-	var v4pc *ipv4.PacketConn
-	var v6pc *ipv6.PacketConn
-
-	v4conn, port, err = listenNet("udp4", port)
-	if err != nil && !errors.Is(err, syscall.EAFNOSUPPORT) {
-		return nil, 0, err
-	}
-
-	// Listen on the same port as we're using for ipv4.
-	v6conn, port, err = listenNet("udp6", port)
-	if uport == 0 && errors.Is(err, syscall.EADDRINUSE) && tries < 100 {
-		v4conn.Close()
-		tries++
-		goto again
-	}
-	if err != nil && !errors.Is(err, syscall.EAFNOSUPPORT) {
-		v4conn.Close()
-		return nil, 0, err
-	}
-	var fns []ReceiveFunc
-	if v4conn != nil {
-		s.ipv4TxOffload, s.ipv4RxOffload = supportsUDPOffload(v4conn)
-		if runtime.GOOS == "linux" || runtime.GOOS == "android" {
-			v4pc = ipv4.NewPacketConn(v4conn)
-			s.ipv4PC = v4pc
-		}
-		fns = append(fns, s.makeReceiveIPv4(v4pc, v4conn, s.ipv4RxOffload))
-		s.ipv4 = v4conn
-	}
-	if v6conn != nil {
-		s.ipv6TxOffload, s.ipv6RxOffload = supportsUDPOffload(v6conn)
-		if runtime.GOOS == "linux" || runtime.GOOS == "android" {
-			v6pc = ipv6.NewPacketConn(v6conn)
-			s.ipv6PC = v6pc
-		}
-		fns = append(fns, s.makeReceiveIPv6(v6pc, v6conn, s.ipv6RxOffload))
-		s.ipv6 = v6conn
-	}
-	if len(fns) == 0 {
-		return nil, 0, syscall.EAFNOSUPPORT
-	}
-
-	return fns, uint16(port), nil
+	return s.OpenOnAddr(net.IPv4zero, net.IPv6zero, uport)
 }
 
 func (s *StdNetBind) putMessages(msgs *[]ipv6.Message) {
@@ -225,7 +168,7 @@ type batchWriter interface {
 
 func (s *StdNetBind) receiveIP(
 	br batchReader,
-	conn *net.UDPConn,
+	con *net.UDPConn,
 	rxOffload bool,
 	bufs [][]byte,
 	sizes []int,
@@ -257,7 +200,7 @@ func (s *StdNetBind) receiveIP(
 		}
 	} else {
 		msg := &(*msgs)[0]
-		msg.N, msg.NN, _, msg.Addr, err = conn.ReadMsgUDP(msg.Buffers[0], msg.OOB)
+		msg.N, msg.NN, _, msg.Addr, err = con.ReadMsgUDP(msg.Buffers[0], msg.OOB)
 		if err != nil {
 			return 0, err
 		}
@@ -277,15 +220,15 @@ func (s *StdNetBind) receiveIP(
 	return numMsgs, nil
 }
 
-func (s *StdNetBind) makeReceiveIPv4(pc *ipv4.PacketConn, conn *net.UDPConn, rxOffload bool) ReceiveFunc {
+func (s *StdNetBind) makeReceiveIPv4(pc *ipv4.PacketConn, con *net.UDPConn, rxOffload bool) ReceiveFunc {
 	return func(bufs [][]byte, sizes []int, eps []Endpoint) (n int, err error) {
-		return s.receiveIP(pc, conn, rxOffload, bufs, sizes, eps)
+		return s.receiveIP(pc, con, rxOffload, bufs, sizes, eps)
 	}
 }
 
-func (s *StdNetBind) makeReceiveIPv6(pc *ipv6.PacketConn, conn *net.UDPConn, rxOffload bool) ReceiveFunc {
+func (s *StdNetBind) makeReceiveIPv6(pc *ipv6.PacketConn, con *net.UDPConn, rxOffload bool) ReceiveFunc {
 	return func(bufs [][]byte, sizes []int, eps []Endpoint) (n int, err error) {
-		return s.receiveIP(pc, conn, rxOffload, bufs, sizes, eps)
+		return s.receiveIP(pc, con, rxOffload, bufs, sizes, eps)
 	}
 }
 

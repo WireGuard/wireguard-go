@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/windows"
 
 	"golang.zx2c4.com/wireguard/conn/winrio"
@@ -77,11 +78,42 @@ type WinRingBind struct {
 	isOpen atomic.Uint32 // 0, 1, or 2
 }
 
-func NewDefaultBind() Bind { return NewWinRingBind() }
+type FullBind interface {
+	Bind
+	BindSocketToInterface
+	OpenOnLocalhost(port uint16) ([]ReceiveFunc, uint16, error)
+}
 
-func NewWinRingBind() Bind {
+func NewStdNetBindWindows() FullBind {
+	return &StdNetBind{
+		udpAddrPool: sync.Pool{
+			New: func() any {
+				return &net.UDPAddr{
+					IP: make([]byte, 16),
+				}
+			},
+		},
+
+		msgsPool: sync.Pool{
+			New: func() any {
+				// ipv6.Message and ipv4.Message are interchangeable as they are
+				// both aliases for x/net/internal/socket.Message.
+				msgs := make([]ipv6.Message, IdealBatchSize)
+				for i := range msgs {
+					msgs[i].Buffers = make(net.Buffers, 1)
+					msgs[i].OOB = make([]byte, 0, stickyControlSize+gsoControlSize)
+				}
+				return &msgs
+			},
+		},
+	}
+}
+
+func NewDefaultBind() FullBind { return NewWinRingBind() }
+
+func NewWinRingBind() FullBind {
 	if !winrio.Initialize() {
-		return NewStdNetBind()
+		return NewStdNetBindWindows()
 	}
 	return new(WinRingBind)
 }
