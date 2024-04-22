@@ -1,0 +1,37 @@
+name: test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    strategy:
+        matrix:
+          include:
+            - arch: x86_64
+              target_os: linux
+            - arch: i686
+              target_os: linux
+            - arch: aarch64
+              target_os: linux
+            - arch: armv7
+              target_os: linux
+            - arch: armv5
+              target_os: linux
+            - arch: x86_64
+              target_os: android
+            - arch: i686
+              target_os: android
+            - arch: aarch64
+              target_os: android
+            - arch: armv7
+              target_os: android
+            - arch: x86_64
+              target_os: windows
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v5
+    - run: export GOOS=${{ matrix.target_os }}
+    - run: export GOARCH=${{ matrix.arch }}
+    - run: go build
+    - run: go test ./...
