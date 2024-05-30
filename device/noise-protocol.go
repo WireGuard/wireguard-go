@@ -17,7 +17,7 @@ import (
 
 	"golang.zx2c4.com/wireguard/tai64n"
 
-	// Kyber1024
+	// Kyber1024 - CRYSTALS Kyber PQC KEM
 	kyberk2so "github.com/symbolicsoft/kyber-k2so"
 	//
 )
