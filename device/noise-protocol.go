@@ -16,6 +16,10 @@ import (
 	"golang.org/x/crypto/poly1305"
 
 	"golang.zx2c4.com/wireguard/tai64n"
+
+	// Kyber1024
+	kyberk2so "github.com/symbolicsoft/kyber-k2so"
+	//
 )
 
 type handshakeState int
@@ -60,8 +64,10 @@ const (
 )
 
 const (
-	MessageInitiationSize      = 148                                           // size of handshake initiation message
-	MessageResponseSize        = 92                                            // size of response message
+	// Kyber1024
+	MessageInitiationSize      = (148 + kyberk2so.Kyber1024PKBytes)            // size of handshake initiation message
+	// Kyber1024
+	MessageResponseSize        = (92 + kyberk2so.Kyber1024CTBytes)             // size of response message
 	MessageCookieReplySize     = 64                                            // size of cookie reply message
 	MessageTransportHeaderSize = 16                                            // size of data preceding content in transport message
 	MessageTransportSize       = MessageTransportHeaderSize + poly1305.TagSize // size of empty transport
@@ -87,6 +93,10 @@ type MessageInitiation struct {
 	Ephemeral NoisePublicKey
 	Static    [NoisePublicKeySize + poly1305.TagSize]byte
 	Timestamp [tai64n.TimestampSize + poly1305.TagSize]byte
+	//
+	// Kyber1024 : Caution) The first character must be uppercase.
+	PqcPublickey [kyberk2so.Kyber1024PKBytes]byte
+	//
 	MAC1      [blake2s.Size128]byte
 	MAC2      [blake2s.Size128]byte
 }
@@ -97,6 +107,10 @@ type MessageResponse struct {
 	Receiver  uint32
 	Ephemeral NoisePublicKey
 	Empty     [poly1305.TagSize]byte
+	//
+	// Kyber1024 : Caution) The first character must be uppercase.
+	PqcCiphertext [kyberk2so.Kyber1024CTBytes]byte
+	//
 	MAC1      [blake2s.Size128]byte
 	MAC2      [blake2s.Size128]byte
 }
@@ -115,6 +129,13 @@ type MessageCookieReply struct {
 	Cookie   [blake2s.Size128 + poly1305.TagSize]byte
 }
 
+// Kyber1024
+type noisePqcKem struct {
+	pqcPK [kyberk2so.Kyber1024PKBytes]byte
+	pqcSK [kyberk2so.Kyber1024SKBytes]byte
+}
+//
+
 type Handshake struct {
 	state                     handshakeState
 	mutex                     sync.RWMutex
@@ -130,6 +151,10 @@ type Handshake struct {
 	lastTimestamp             tai64n.Timestamp
 	lastInitiationConsumption time.Time
 	lastSentHandshake         time.Time
+	// Kyber1024
+	pqcKem                    noisePqcKem
+	pqcCiphertext             [kyberk2so.Kyber1024CTBytes]byte
+	//
 }
 
 var (
@@ -177,6 +202,9 @@ func init() {
 func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, error) {
 	device.staticIdentity.RLock()
 	defer device.staticIdentity.RUnlock()
+
+	//Kyber1024 debug codes
+	//fmt.Printf("CreateMessageInitiation() called.\n")
 
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
@@ -240,6 +268,18 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 	handshake.localIndex = msg.Sender
 
 	handshake.mixHash(msg.Timestamp[:])
+
+	// Kyber1024 - crypto_kem_keypair()
+	var pqcerr error
+	handshake.pqcKem.pqcSK, handshake.pqcKem.pqcPK, pqcerr = kyberk2so.KemKeypair1024()
+	if pqcerr == nil {
+		msg.PqcPublickey = handshake.pqcKem.pqcPK
+		fmt.Printf("kyberk2so.KemKeypair1024() : msg.pqcPublickey = handshake.pqcKem.pqcPK !!!\n")
+	} else {
+		fmt.Printf("kyberk2so.KemKeypair1024() failed.\n")
+	}
+	//
+
 	handshake.state = handshakeInitiationCreated
 	return &msg, nil
 }
@@ -249,6 +289,9 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 		hash     [blake2s.Size]byte
 		chainKey [blake2s.Size]byte
 	)
+
+	//Kyber1024 debug codes
+	//fmt.Printf("ConsumeMessageInitiation() called.\n")
 
 	if msg.Type != MessageInitiationType {
 		return nil
@@ -323,6 +366,17 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 		return nil
 	}
 
+	//
+	// Kyber1024 - crypto_kem_enc()
+	var pqcerr error
+	handshake.pqcCiphertext, handshake.presharedKey, pqcerr = kyberk2so.KemEncrypt1024(msg.PqcPublickey)
+	if pqcerr != nil {
+		fmt.Printf("kyberk2so.KemEncrypt1024() failed.\n")
+	} else {
+		fmt.Printf("kyberk2so.KemEncrypt1024() OK.\n")
+	}
+	//
+
 	// update handshake state
 
 	handshake.mutex.Lock()
@@ -352,6 +406,9 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 	handshake := &peer.handshake
 	handshake.mutex.Lock()
 	defer handshake.mutex.Unlock()
+
+	//Kyber1024 debug codes
+	//fmt.Printf("CreateMessageResponse() called.\n")
 
 	if handshake.state != handshakeInitiationConsumed {
 		return nil, errors.New("handshake initiation must be consumed first")
@@ -411,6 +468,12 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 	aead.Seal(msg.Empty[:0], ZeroNonce[:], nil, handshake.hash[:])
 	handshake.mixHash(msg.Empty[:])
 
+	//
+	// Kyber1024 - copy ciphertext
+	msg.PqcCiphertext = handshake.pqcCiphertext
+	fmt.Printf("msg.pqcCiphertext = handshake.pqcCiphertext !!!\n")
+	//
+
 	handshake.state = handshakeResponseCreated
 
 	return &msg, nil
@@ -421,6 +484,9 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 		return nil
 	}
 
+	//Kyber1024 debug codes
+	//fmt.Printf("ConsumeMessageResponse() called.\n")
+
 	// lookup handshake by receiver
 
 	lookup := device.indexTable.Lookup(msg.Receiver)
@@ -428,6 +494,17 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 	if handshake == nil {
 		return nil
 	}
+
+	//
+	// Kyber1024 - crypto_kem_dec()
+	var pqcerr error
+	handshake.presharedKey, pqcerr = kyberk2so.KemDecrypt1024(msg.PqcCiphertext, handshake.pqcKem.pqcSK)
+	if pqcerr != nil {
+		fmt.Printf("kyberk2so.KemDecrypt1024() failed.\n")
+	} else {
+		fmt.Printf("kyberk2so.KemDecrypt1024() OK.\n")
+	}
+	//
 
 	var (
 		hash     [blake2s.Size]byte
