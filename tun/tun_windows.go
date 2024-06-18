@@ -149,13 +149,13 @@ func (tun *NativeTun) Read(bufs [][]byte, sizes []int, offset int) (int, error) 
 	defer tun.running.Done()
 retry:
 	if tun.close.Load() {
-		return 0, os.ErrClosed
+		return 0, errors.New("Tunnel is being shutdown at the startup of reading of packets")
 	}
 	start := nanotime()
 	shouldSpin := tun.rate.current.Load() >= spinloopRateThreshold && uint64(start-tun.rate.nextStartTime.Load()) <= rateMeasurementGranularity*2
 	for {
 		if tun.close.Load() {
-			return 0, os.ErrClosed
+			return 0, errors.New("Tunnel is being shutdown while reading packets")
 		}
 		packet, err := tun.session.ReceivePacket()
 		switch err {
@@ -173,7 +173,7 @@ retry:
 			procyield(1)
 			continue
 		case windows.ERROR_HANDLE_EOF:
-			return 0, os.ErrClosed
+			return 0, errors.New("Driver indicated EOF while reading from tunnel")
 		case windows.ERROR_INVALID_DATA:
 			return 0, errors.New("Send ring corrupt")
 		}
