@@ -15,7 +15,6 @@ import (
 )
 
 func TestWaitPool(t *testing.T) {
-	t.Skip("Currently disabled")
 	var wg sync.WaitGroup
 	var trials atomic.Int32
 	startTrials := int32(100000)
@@ -32,7 +31,9 @@ func TestWaitPool(t *testing.T) {
 	wg.Add(workers)
 	var max atomic.Uint32
 	updateMax := func() {
-		count := p.count.Load()
+		p.lock.Lock()
+		count := p.count
+		p.lock.Unlock()
 		if count > p.max {
 			t.Errorf("count (%d) > max (%d)", count, p.max)
 		}
