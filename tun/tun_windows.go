@@ -127,6 +127,9 @@ func (tun *NativeTun) MTU() (int, error) {
 
 // TODO: This is a temporary hack. We really need to be monitoring the interface in real time and adapting to MTU changes.
 func (tun *NativeTun) ForceMTU(mtu int) {
+	if tun.close.Load() {
+		return
+	}
 	update := tun.forcedMTU != mtu
 	tun.forcedMTU = mtu
 	if update {
@@ -157,11 +160,10 @@ retry:
 		packet, err := tun.session.ReceivePacket()
 		switch err {
 		case nil:
-			packetSize := len(packet)
-			copy(bufs[0][offset:], packet)
-			sizes[0] = packetSize
+			n := copy(bufs[0][offset:], packet)
+			sizes[0] = n
 			tun.session.ReleaseReceivePacket(packet)
-			tun.rate.update(uint64(packetSize))
+			tun.rate.update(uint64(n))
 			return 1, nil
 		case windows.ERROR_NO_MORE_ITEMS:
 			if !shouldSpin || uint64(nanotime()-start) >= spinloopDuration {
