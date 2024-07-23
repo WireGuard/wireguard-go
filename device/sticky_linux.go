@@ -9,7 +9,7 @@
  *
  * Currently there is no way to achieve this within the net package:
  * See e.g. https://github.com/golang/go/issues/17930
- * So this code is remains platform dependent.
+ * So this code remains platform dependent.
  */
 
 package device
@@ -47,7 +47,7 @@ func (device *Device) startRouteListener(bind conn.Bind) (*rwcancel.RWCancel, er
 	return netlinkCancel, nil
 }
 
-func (device *Device) routineRouteListener(bind conn.Bind, netlinkSock int, netlinkCancel *rwcancel.RWCancel) {
+func (device *Device) routineRouteListener(_ conn.Bind, netlinkSock int, netlinkCancel *rwcancel.RWCancel) {
 	type peerEndpointPtr struct {
 		peer     *Peer
 		endpoint *conn.Endpoint

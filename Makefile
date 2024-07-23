@@ -25,6 +25,9 @@ install: wireguard-go
 test:
 	go test ./...
 
+benchmark:
+	go test -bench=. ./...
+
 clean:
 	rm -f wireguard-go
 

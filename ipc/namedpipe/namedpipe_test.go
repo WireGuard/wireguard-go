@@ -43,26 +43,35 @@ func TestPingPong(t *testing.T) {
 		t.Fatalf("unable to listen on pipe: %v", err)
 	}
 	defer listener.Close()
+	type FormatErr struct {
+		format string
+		args   any
+	}
+	errs := make(chan FormatErr)
 	go func() {
 		incoming, err := listener.Accept()
 		if err != nil {
-			t.Fatalf("unable to accept pipe connection: %v", err)
+			errs <- FormatErr{"unable to accept pipe connection: %v", err}
 		}
 		defer incoming.Close()
 		var data [1]byte
 		_, err = incoming.Read(data[:])
 		if err != nil {
-			t.Fatalf("unable to read ping from pipe: %v", err)
+			errs <- FormatErr{"unable to read ping from pipe: %v", err}
 		}
 		if data[0] != ping {
-			t.Fatalf("expected ping, got %d", data[0])
+			errs <- FormatErr{"expected ping, got %d", data[0]}
 		}
 		data[0] = pong
 		_, err = incoming.Write(data[:])
 		if err != nil {
-			t.Fatalf("unable to write pong to pipe: %v", err)
+			errs <- FormatErr{"unable to write pong to pipe: %v", err}
 		}
+		close(errs)
 	}()
+	for e := range errs {
+		t.Fatalf(e.format, e.args)
+	}
 	client, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
 	if err != nil {
 		t.Fatalf("unable to dial pipe: %v", err)
@@ -402,16 +411,22 @@ func TestTimeoutPendingRead(t *testing.T) {
 	defer l.Close()
 
 	serverDone := make(chan struct{})
+	errs := make(chan error)
 
 	go func() {
 		s, err := l.Accept()
 		if err != nil {
-			t.Fatal(err)
+			errs <- err
 		}
 		time.Sleep(1 * time.Second)
 		s.Close()
 		close(serverDone)
+		close(errs)
 	}()
+
+	for e := range errs {
+		t.Fatal(e)
+	}
 
 	client, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
 	if err != nil {
@@ -450,16 +465,22 @@ func TestTimeoutPendingWrite(t *testing.T) {
 	defer l.Close()
 
 	serverDone := make(chan struct{})
+	errs := make(chan error)
 
 	go func() {
 		s, err := l.Accept()
 		if err != nil {
-			t.Fatal(err)
+			errs <- err
 		}
 		time.Sleep(1 * time.Second)
 		s.Close()
 		close(serverDone)
+		close(errs)
 	}()
+
+	for e := range errs {
+		t.Fatal(e)
+	}
 
 	client, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
 	if err != nil {
@@ -506,40 +527,57 @@ func TestEchoWithMessaging(t *testing.T) {
 
 	listenerDone := make(chan bool)
 	clientDone := make(chan bool)
+	errs := make(chan error)
 	go func() {
 		// server echo
 		conn, err := l.Accept()
 		if err != nil {
-			t.Fatal(err)
+			errs <- err
 		}
 		defer conn.Close()
 
 		time.Sleep(500 * time.Millisecond) // make *sure* we don't begin to read before eof signal is sent
 		_, err = io.Copy(conn, conn)
 		if err != nil {
-			t.Fatal(err)
+			errs <- err
 		}
 		conn.(CloseWriter).CloseWrite()
 		close(listenerDone)
+		close(errs)
 	}()
+	for e := range errs {
+		t.Fatal(e)
+	}
 	client, err := namedpipe.DialTimeout(pipePath, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 
+	errs = make(chan error)
+	readErr := make(chan int)
+
 	go func() {
 		// client read back
 		bytes := make([]byte, 2)
 		n, e := client.Read(bytes)
 		if e != nil {
-			t.Fatal(e)
+			errs <- e
 		}
 		if n != 2 || bytes[0] != 0 || bytes[1] != 1 {
-			t.Fatalf("expected 2 bytes, got %v", n)
+			readErr <- n
 		}
 		close(clientDone)
+		close(errs)
+		close(readErr)
 	}()
+
+	for e := range errs {
+		t.Fatal(e)
+	}
+	for n := range readErr {
+		t.Fatalf("expected 2 bytes, got %v", n)
+	}
 
 	payload := make([]byte, 2)
 	payload[0] = 0
@@ -564,6 +602,7 @@ func TestConnectRace(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer l.Close()
+	errs := make(chan error)
 	go func() {
 		for {
 			s, err := l.Accept()
@@ -572,11 +611,16 @@ func TestConnectRace(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatal(err)
+				errs <- err
 			}
 			s.Close()
+			close(errs)
 		}
 	}()
+
+	for e := range errs {
+		t.Fatal(e)
+	}
 
 	for i := 0; i < 1000; i++ {
 		c, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
@@ -603,18 +647,24 @@ func TestMessageReadMode(t *testing.T) {
 	msg := ([]byte)("hello world")
 
 	wg.Add(1)
+	errs := make(chan error)
 	go func() {
 		defer wg.Done()
 		s, err := l.Accept()
 		if err != nil {
-			t.Fatal(err)
+			errs <- err
 		}
 		_, err = s.Write(msg)
 		if err != nil {
-			t.Fatal(err)
+			errs <- err
 		}
 		s.Close()
+		close(errs)
 	}()
+
+	for e := range errs {
+		t.Fatal(e)
+	}
 
 	c, err := namedpipe.DialTimeout(pipePath, time.Duration(0))
 	if err != nil {
