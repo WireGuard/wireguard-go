@@ -6,6 +6,8 @@
 package device
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"errors"
 	"fmt"
 	"sync"
@@ -213,7 +215,18 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 		handshake.chainKey[:],
 		ss[:],
 	)
-	aead, _ := chacha20poly1305.New(key[:])
+
+	var aead cipher.AEAD
+	if Encryption == AES256 {
+		block, err := aes.NewCipher(key[:])
+		if err != nil {
+			return nil, err
+		}
+		aead, _ = cipher.NewGCM(block)
+	} else {
+		aead, _ = chacha20poly1305.New(key[:])
+	}
+
 	aead.Seal(msg.Static[:0], ZeroNonce[:], device.staticIdentity.publicKey[:], handshake.hash[:])
 	handshake.mixHash(msg.Static[:])
 
@@ -228,7 +241,17 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 		handshake.precomputedStaticStatic[:],
 	)
 	timestamp := tai64n.Now()
-	aead, _ = chacha20poly1305.New(key[:])
+
+	if Encryption == AES256 {
+		block, err := aes.NewCipher(key[:])
+		if err != nil {
+			return nil, err
+		}
+		aead, _ = cipher.NewGCM(block)
+	} else {
+		aead, _ = chacha20poly1305.New(key[:])
+	}
+
 	aead.Seal(msg.Timestamp[:0], ZeroNonce[:], timestamp[:], handshake.hash[:])
 
 	// assign index
@@ -269,7 +292,18 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 		return nil
 	}
 	KDF2(&chainKey, &key, chainKey[:], ss[:])
-	aead, _ := chacha20poly1305.New(key[:])
+
+	var aead cipher.AEAD
+	if Encryption == AES256 {
+		block, err := aes.NewCipher(key[:])
+		if err != nil {
+			return nil
+		}
+		aead, _ = cipher.NewGCM(block)
+	} else {
+		aead, _ = chacha20poly1305.New(key[:])
+	}
+
 	_, err = aead.Open(peerPK[:0], ZeroNonce[:], msg.Static[:], hash[:])
 	if err != nil {
 		return nil
@@ -301,7 +335,17 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 		chainKey[:],
 		handshake.precomputedStaticStatic[:],
 	)
-	aead, _ = chacha20poly1305.New(key[:])
+
+	if Encryption == AES256 {
+		block, err := aes.NewCipher(key[:])
+		if err != nil {
+			return nil
+		}
+		aead, _ = cipher.NewGCM(block)
+	} else {
+		aead, _ = chacha20poly1305.New(key[:])
+	}
+
 	_, err = aead.Open(timestamp[:0], ZeroNonce[:], msg.Timestamp[:], hash[:])
 	if err != nil {
 		handshake.mutex.RUnlock()
@@ -407,7 +451,17 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 
 	handshake.mixHash(tau[:])
 
-	aead, _ := chacha20poly1305.New(key[:])
+	var aead cipher.AEAD
+	if Encryption == AES256 {
+		block, err := aes.NewCipher(key[:])
+		if err != nil {
+			return nil, err
+		}
+		aead, _ = cipher.NewGCM(block)
+	} else {
+		aead, _ = chacha20poly1305.New(key[:])
+	}
+
 	aead.Seal(msg.Empty[:0], ZeroNonce[:], nil, handshake.hash[:])
 	handshake.mixHash(msg.Empty[:])
 
@@ -483,7 +537,16 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 
 		// authenticate transcript
 
-		aead, _ := chacha20poly1305.New(key[:])
+		var aead cipher.AEAD
+		if Encryption == AES256 {
+			block, err := aes.NewCipher(key[:])
+			if err != nil {
+				return false
+			}
+			aead, _ = cipher.NewGCM(block)
+		} else {
+			aead, _ = chacha20poly1305.New(key[:])
+		}
 		_, err = aead.Open(nil, ZeroNonce[:], msg.Empty[:], hash[:])
 		if err != nil {
 			return false
@@ -558,8 +621,24 @@ func (peer *Peer) BeginSymmetricSession() error {
 	// create AEAD instances
 
 	keypair := new(Keypair)
-	keypair.send, _ = chacha20poly1305.New(sendKey[:])
-	keypair.receive, _ = chacha20poly1305.New(recvKey[:])
+
+	if Encryption == AES256 {
+		block, err := aes.NewCipher(sendKey[:])
+		if err != nil {
+			return nil
+		}
+		keypair.send, _ = cipher.NewGCM(block)
+
+		block, err = aes.NewCipher(recvKey[:])
+		if err != nil {
+			return nil
+		}
+		keypair.receive, _ = cipher.NewGCM(block)
+
+	} else {
+		keypair.send, _ = chacha20poly1305.New(sendKey[:])
+		keypair.receive, _ = chacha20poly1305.New(recvKey[:])
+	}
 
 	setZero(sendKey[:])
 	setZero(recvKey[:])

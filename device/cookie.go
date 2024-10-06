@@ -6,6 +6,8 @@
 package device
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/rand"
 	"sync"
@@ -14,6 +16,15 @@ import (
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20poly1305"
 )
+
+type Encryption_type int
+
+const (
+	ChaCha20Poly1305 Encryption_type = iota + 1
+	AES256
+)
+
+var Encryption = ChaCha20Poly1305
 
 type CookieChecker struct {
 	sync.RWMutex
@@ -39,6 +50,10 @@ type CookieGenerator struct {
 		lastMAC1      [blake2s.Size128]byte
 		encryptionKey [chacha20poly1305.KeySize]byte
 	}
+}
+
+func (e Encryption_type) String() string {
+	return [...]string{"ChaCha20Poly1305", "AES256"}[e-1]
 }
 
 func (st *CookieChecker) Init(pk NoisePublicKey) {
@@ -161,8 +176,17 @@ func (st *CookieChecker) CreateReply(
 		st.RUnlock()
 		return nil, err
 	}
+	var xchapoly cipher.AEAD
+	if Encryption == AES256 {
+		block, err := aes.NewCipher(st.mac2.encryptionKey[:])
+		if err != nil {
+			return nil, err
+		}
+		xchapoly, _ = cipher.NewGCM(block)
+	} else {
+		xchapoly, _ = chacha20poly1305.NewX(st.mac2.encryptionKey[:])
+	}
 
-	xchapoly, _ := chacha20poly1305.NewX(st.mac2.encryptionKey[:])
 	xchapoly.Seal(reply.Cookie[:0], reply.Nonce[:], cookie[:], msg[smac1:smac2])
 
 	st.RUnlock()
@@ -201,7 +225,17 @@ func (st *CookieGenerator) ConsumeReply(msg *MessageCookieReply) bool {
 
 	var cookie [blake2s.Size128]byte
 
-	xchapoly, _ := chacha20poly1305.NewX(st.mac2.encryptionKey[:])
+	var xchapoly cipher.AEAD
+	if Encryption == AES256 {
+		block, err := aes.NewCipher(st.mac2.encryptionKey[:])
+		if err != nil {
+			return false
+		}
+		xchapoly, _ = cipher.NewGCM(block)
+	} else {
+		xchapoly, _ = chacha20poly1305.NewX(st.mac2.encryptionKey[:])
+	}
+
 	_, err := xchapoly.Open(cookie[:0], msg.Nonce[:], msg.Cookie[:], st.mac2.lastMAC1[:])
 	if err != nil {
 		return false

@@ -109,6 +109,18 @@ func main() {
 		return device.LogLevelError
 	}()
 
+	// get encryption type (default: chacha20poly1305)
+	encryptionType, present := os.LookupEnv("ENCRYPTION")
+	if present {
+		switch encryptionType {
+		case "AES256":
+			device.Encryption = device.AES256
+		default:
+			device.Encryption = device.ChaCha20Poly1305
+		}
+	}
+	fmt.Printf("Using Encryption %s\n", device.Encryption)
+
 	// open TUN device (or use supplied fd)
 
 	tdev, err := func() (tun.Device, error) {

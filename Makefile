@@ -23,7 +23,10 @@ install: wireguard-go
 	@install -v -d "$(DESTDIR)$(BINDIR)" && install -v -m 0755 "$<" "$(DESTDIR)$(BINDIR)/wireguard-go"
 
 test:
+	go clean -testcache
 	go test ./...
+	go clean -testcache
+	ENCRYPTION=AES go test ./...
 
 clean:
 	rm -f wireguard-go
