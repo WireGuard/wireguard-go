@@ -25,9 +25,9 @@ func (e *StdNetEndpoint) SrcToString() string {
 // {get,set}srcControl feature set, but use alternatively named flags and need
 // ports and require testing.
 
-// GetSrcFromControl parses the control for PKTINFO and if found updates ep with
+// getSrcFromControl parses the control for PKTINFO and if found updates ep with
 // the source information found.
-func GetSrcFromControl(control []byte, ep *StdNetEndpoint) {
+func getSrcFromControl(control []byte, ep *StdNetEndpoint) {
 }
 
 // setSrcControl parses the control for PKTINFO and if found updates ep with
@@ -35,8 +35,8 @@ func GetSrcFromControl(control []byte, ep *StdNetEndpoint) {
 func setSrcControl(control *[]byte, ep *StdNetEndpoint) {
 }
 
-// StickyControlSize returns the recommended buffer size for pooling sticky
+// stickyControlSize returns the recommended buffer size for pooling sticky
 // offloading control data.
-const StickyControlSize = 0
+const stickyControlSize = 0
 
 const StdNetSupportsStickySockets = false

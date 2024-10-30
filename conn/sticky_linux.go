@@ -45,9 +45,9 @@ func (e *StdNetEndpoint) SrcToString() string {
 	return e.SrcIP().String()
 }
 
-// GetSrcFromControl parses the control for PKTINFO and if found updates ep with
+// getSrcFromControl parses the control for PKTINFO and if found updates ep with
 // the source information found.
-func GetSrcFromControl(control []byte, ep *StdNetEndpoint) {
+func getSrcFromControl(control []byte, ep *StdNetEndpoint) {
 	ep.ClearSrc()
 
 	var (
@@ -105,8 +105,8 @@ func setSrcControl(control *[]byte, ep *StdNetEndpoint) {
 	*control = append(*control, ep.src...)
 }
 
-// StickyControlSize returns the recommended buffer size for pooling sticky
+// stickyControlSize returns the recommended buffer size for pooling sticky
 // offloading control data.
-var StickyControlSize = unix.CmsgSpace(unix.SizeofInet6Pktinfo)
+var stickyControlSize = unix.CmsgSpace(unix.SizeofInet6Pktinfo)
 
 const StdNetSupportsStickySockets = true
