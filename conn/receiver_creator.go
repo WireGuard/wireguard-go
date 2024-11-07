@@ -8,5 +8,5 @@ import (
 )
 
 type ReceiverCreator interface {
-	CreateIPv4ReceiverFn(msgPool *sync.Pool, pc *ipv4.PacketConn, conn *net.UDPConn) ReceiveFunc
+	CreateIPv4ReceiverFn(pc *ipv4.PacketConn, conn *net.UDPConn, rxOffload bool, msgPool *sync.Pool) ReceiveFunc
 }

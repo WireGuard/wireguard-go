@@ -73,7 +73,7 @@ func NewStdNetBind() Bind {
 				msgs := make([]ipv6.Message, IdealBatchSize)
 				for i := range msgs {
 					msgs[i].Buffers = make(net.Buffers, 1)
-					msgs[i].OOB = make([]byte, 0, StickyControlSize+gsoControlSize)
+					msgs[i].OOB = make([]byte, 0, stickyControlSize+gsoControlSize)
 				}
 				return &msgs
 			},
@@ -189,7 +189,7 @@ again:
 		}
 		if s.receiverCreator != nil {
 			// Todo: check if this still works
-			fns = append(fns, s.receiverCreator.CreateIPv4ReceiverFn(&s.msgsPool, v4pc, v4conn))
+			fns = append(fns, s.receiverCreator.CreateIPv4ReceiverFn(v4pc, v4conn, s.ipv4RxOffload, &s.msgsPool))
 		} else {
 			fns = append(fns, s.makeReceiveIPv4(v4pc, v4conn, s.ipv4RxOffload))
 		}
@@ -284,7 +284,7 @@ func (s *StdNetBind) receiveIP(
 		}
 		addrPort := msg.Addr.(*net.UDPAddr).AddrPort()
 		ep := &StdNetEndpoint{AddrPort: addrPort} // TODO: remove allocation
-		GetSrcFromControl(msg.OOB[:msg.NN], ep)
+		getSrcFromControl(msg.OOB[:msg.NN], ep)
 		eps[i] = ep
 	}
 	return numMsgs, nil
