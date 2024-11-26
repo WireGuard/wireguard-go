@@ -60,7 +60,7 @@ const (
 )
 
 const (
-	MessageInitiationSize      = 148                                           // size of handshake initiation message
+	MessageInitiationSize      = 174                                           // size of handshake initiation message
 	MessageResponseSize        = 92                                            // size of response message
 	MessageCookieReplySize     = 64                                            // size of cookie reply message
 	MessageTransportHeaderSize = 16                                            // size of data preceding content in transport message
@@ -80,6 +80,10 @@ const (
  * we can treat these as a 32-bit unsigned int (for now)
  *
  */
+const (
+	JWTSize       = 10
+	JWTMagicValue = "secret1234"
+)
 
 type MessageInitiation struct {
 	Type      uint32
@@ -87,6 +91,7 @@ type MessageInitiation struct {
 	Ephemeral NoisePublicKey
 	Static    [NoisePublicKeySize + poly1305.TagSize]byte
 	Timestamp [tai64n.TimestampSize + poly1305.TagSize]byte
+	JWT       [JWTSize + poly1305.TagSize]byte
 	MAC1      [blake2s.Size128]byte
 	MAC2      [blake2s.Size128]byte
 }
@@ -231,6 +236,12 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 	aead, _ = chacha20poly1305.New(key[:])
 	aead.Seal(msg.Timestamp[:0], ZeroNonce[:], timestamp[:], handshake.hash[:])
 
+	// encrypt jwt
+	handshake.mixHash(msg.Timestamp[:])
+	magicSecret := []byte(JWTMagicValue)
+	aead, _ = chacha20poly1305.New(key[:])
+	aead.Seal(msg.JWT[:0], ZeroNonce[:], magicSecret[:], handshake.hash[:])
+
 	// assign index
 	device.indexTable.Delete(handshake.localIndex)
 	msg.Sender, err = device.indexTable.NewIndexForHandshake(peer, handshake)
@@ -239,7 +250,7 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 	}
 	handshake.localIndex = msg.Sender
 
-	handshake.mixHash(msg.Timestamp[:])
+	handshake.mixHash(msg.JWT[:])
 	handshake.state = handshakeInitiationCreated
 	return &msg, nil
 }
@@ -308,12 +319,24 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 		return nil
 	}
 	mixHash(&hash, &hash, msg.Timestamp[:])
+	var jwt [10]byte
+	_, err = aead.Open(jwt[:0], ZeroNonce[:], msg.JWT[:], hash[:])
+	if err != nil {
+		handshake.mutex.RUnlock()
+		return nil
+	}
+	mixHash(&hash, &hash, msg.JWT[:])
 
-	// protect against replay & flood
+	// protect against replay, flood and black magic
 
+	secret := string(jwt[:]) != JWTMagicValue
 	replay := !timestamp.After(handshake.lastTimestamp)
 	flood := time.Since(handshake.lastInitiationConsumption) <= HandshakeInitationRate
 	handshake.mutex.RUnlock()
+	if secret {
+		device.log.Verbosef("%v - ConsumeMessageInitiation: invalid jwt", peer)
+		return nil
+	}
 	if replay {
 		device.log.Verbosef("%v - ConsumeMessageInitiation: handshake replay @ %v", peer, timestamp)
 		return nil
