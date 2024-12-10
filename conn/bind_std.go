@@ -46,6 +46,8 @@ type StdNetBind struct {
 
 	blackhole4 bool
 	blackhole6 bool
+
+	webRTCBinder WebRtcBinder
 }
 
 func NewStdNetBind() Bind {
@@ -179,7 +181,11 @@ again:
 			v4pc = ipv4.NewPacketConn(v4conn)
 			s.ipv4PC = v4pc
 		}
-		fns = append(fns, s.makeReceiveIPv4(v4pc, v4conn, s.ipv4RxOffload))
+		if s.webRTCBinder != nil {
+			fns = append(fns, s.webRTCBinder.IPv4Bind(&s.msgsPool, v4pc, v4conn))
+		} else {
+			fns = append(fns, s.makeReceiveIPv4(v4pc, v4conn, s.ipv4RxOffload))
+		}
 		s.ipv4 = v4conn
 	}
 	if v6conn != nil {
