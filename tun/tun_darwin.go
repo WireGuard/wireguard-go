@@ -33,7 +33,7 @@ type NativeTun struct {
 func retryInterfaceByIndex(index int) (iface *net.Interface, err error) {
 	for i := 0; i < 20; i++ {
 		iface, err = net.InterfaceByIndex(index)
-		if err != nil && errors.Is(err, unix.ENOMEM) {
+		if err != nil && (errors.Is(err, unix.ENOMEM) || errors.Is(err, unix.ENOBUFS)) {
 			time.Sleep(time.Duration(i) * time.Second / 3)
 			continue
 		}
