@@ -52,7 +52,7 @@ This requires an installation of the latest version of [Go](https://go.dev/).
 $ git clone https://git.zx2c4.com/wireguard-go
 $ cd wireguard-go
 $ make
-=> for PQ-WireGuard
+=> for QR-WireGuard(Quantum Resistant WireGuard)
 $ git clone https://github.com/ChunghanYi/wireguard-go
 $ cd wireguard-go
 $ go get github.com/symbolicsoft/kyber-k2so
