@@ -184,8 +184,9 @@ func newUDPGROTable() *udpGROTable {
 		itemsByFlow: make(map[udpFlowKey][]udpGROItem, conn.IdealBatchSize),
 		itemsPool:   make([][]udpGROItem, conn.IdealBatchSize),
 	}
+	items := make([]udpGROItem, 0, conn.IdealBatchSize*len(u.itemsPool))
 	for i := range u.itemsPool {
-		u.itemsPool[i] = make([]udpGROItem, 0, conn.IdealBatchSize)
+		u.itemsPool[i] = items[i*conn.IdealBatchSize : 0 : (i+1)*conn.IdealBatchSize]
 	}
 	return u
 }
