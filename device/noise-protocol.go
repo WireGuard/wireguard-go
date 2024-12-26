@@ -6,6 +6,7 @@
 package device
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"sync"
@@ -113,6 +114,53 @@ type MessageCookieReply struct {
 	Receiver uint32
 	Nonce    [chacha20poly1305.NonceSizeX]byte
 	Cookie   [blake2s.Size128 + poly1305.TagSize]byte
+}
+
+var errMessageTooShort = errors.New("message too short")
+
+func (msg *MessageInitiation) unmarshal(b []byte) error {
+	if len(b) < MessageInitiationSize {
+		return errMessageTooShort
+	}
+
+	msg.Type = binary.LittleEndian.Uint32(b)
+	msg.Sender = binary.LittleEndian.Uint32(b[4:])
+	copy(msg.Ephemeral[:], b[8:])
+	copy(msg.Static[:], b[8+len(msg.Ephemeral):])
+	copy(msg.Timestamp[:], b[8+len(msg.Ephemeral)+len(msg.Static):])
+	copy(msg.MAC1[:], b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp):])
+	copy(msg.MAC2[:], b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp)+len(msg.MAC1):])
+
+	return nil
+}
+
+func (msg *MessageResponse) unmarshal(b []byte) error {
+	if len(b) < MessageResponseSize {
+		return errMessageTooShort
+	}
+
+	msg.Type = binary.LittleEndian.Uint32(b)
+	msg.Sender = binary.LittleEndian.Uint32(b[4:])
+	msg.Receiver = binary.LittleEndian.Uint32(b[8:])
+	copy(msg.Ephemeral[:], b[12:])
+	copy(msg.Empty[:], b[12+len(msg.Ephemeral):])
+	copy(msg.MAC1[:], b[12+len(msg.Ephemeral)+len(msg.Empty):])
+	copy(msg.MAC2[:], b[12+len(msg.Ephemeral)+len(msg.Empty)+len(msg.MAC1):])
+
+	return nil
+}
+
+func (msg *MessageCookieReply) unmarshal(b []byte) error {
+	if len(b) < MessageCookieReplySize {
+		return errMessageTooShort
+	}
+
+	msg.Type = binary.LittleEndian.Uint32(b)
+	msg.Receiver = binary.LittleEndian.Uint32(b[4:])
+	copy(msg.Nonce[:], b[8:])
+	copy(msg.Cookie[:], b[8+len(msg.Nonce):])
+
+	return nil
 }
 
 type Handshake struct {
