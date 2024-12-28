@@ -6,6 +6,9 @@
 package device
 
 import (
+	"errors"
+	"fmt"
+	"net"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -533,4 +536,28 @@ func (device *Device) BindClose() error {
 	err := closeBindLocked(device)
 	device.net.Unlock()
 	return err
+}
+
+// CreateOutboundPacket creates and routes a packet to the appropriate peer
+func (device *Device) CreateOutboundPacket(payload []byte, dstIP net.IP) error {
+	peer := device.allowedips.Lookup(dstIP)
+	if peer == nil {
+		return fmt.Errorf("no peer found for IP %v", dstIP)
+	}
+	if !peer.isRunning.Load() {
+		return errors.New("peer not running")
+	}
+
+	elem := device.GetOutboundElement()
+	elem.buffer = device.GetMessageBuffer()
+
+	copy(elem.buffer[MessageTransportOffsetContent:], payload)
+	elem.packet = elem.buffer[MessageTransportOffsetContent : MessageTransportOffsetContent+len(payload)]
+
+	container := device.GetOutboundElementsContainer()
+	container.elems = append(container.elems, elem)
+
+	peer.StagePackets(container)
+	peer.SendStagedPackets()
+	return nil
 }
