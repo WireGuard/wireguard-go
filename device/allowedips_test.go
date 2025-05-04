@@ -44,7 +44,7 @@ func benchmarkTrie(peerNumber, addressNumber, _ int, b *testing.B) {
 	var peers []*Peer
 	root := parentIndirection{&trie, 2}
 
-	rand.Seed(1)
+	rng := rand.New(rand.NewSource(1))
 
 	const AddressLength = 4
 
@@ -54,15 +54,15 @@ func benchmarkTrie(peerNumber, addressNumber, _ int, b *testing.B) {
 
 	for n := 0; n < addressNumber; n++ {
 		var addr [AddressLength]byte
-		rand.Read(addr[:])
-		cidr := uint8(rand.Uint32() % (AddressLength * 8))
-		index := rand.Int() % peerNumber
+		rng.Read(addr[:])
+		cidr := uint8(rng.Uint32() % (AddressLength * 8))
+		index := rng.Int() % peerNumber
 		root.insert(addr[:], cidr, peers[index])
 	}
 
 	for n := 0; n < b.N; n++ {
 		var addr [AddressLength]byte
-		rand.Read(addr[:])
+		rng.Read(addr[:])
 		trie.lookup(addr[:])
 	}
 }
