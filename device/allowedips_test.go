@@ -39,7 +39,7 @@ func TestCommonBits(t *testing.T) {
 	}
 }
 
-func benchmarkTrie(peerNumber, addressNumber, addressLength int, b *testing.B) {
+func benchmarkTrie(peerNumber, addressNumber, _ int, b *testing.B) {
 	var trie *trieEntry
 	var peers []*Peer
 	root := parentIndirection{&trie, 2}
