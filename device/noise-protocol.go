@@ -134,6 +134,22 @@ func (msg *MessageInitiation) unmarshal(b []byte) error {
 	return nil
 }
 
+func (msg *MessageInitiation) marshal(b []byte) error {
+	if len(b) != MessageInitiationSize {
+		return errMessageLengthMismatch
+	}
+
+	binary.LittleEndian.PutUint32(b, msg.Type)
+	binary.LittleEndian.PutUint32(b[4:], msg.Sender)
+	copy(b[8:], msg.Ephemeral[:])
+	copy(b[8+len(msg.Ephemeral):], msg.Static[:])
+	copy(b[8+len(msg.Ephemeral)+len(msg.Static):], msg.Timestamp[:])
+	copy(b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp):], msg.MAC1[:])
+	copy(b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp)+len(msg.MAC1):], msg.MAC2[:])
+
+	return nil
+}
+
 func (msg *MessageResponse) unmarshal(b []byte) error {
 	if len(b) != MessageResponseSize {
 		return errMessageLengthMismatch
@@ -150,6 +166,22 @@ func (msg *MessageResponse) unmarshal(b []byte) error {
 	return nil
 }
 
+func (msg *MessageResponse) marshal(b []byte) error {
+	if len(b) != MessageResponseSize {
+		return errMessageLengthMismatch
+	}
+
+	binary.LittleEndian.PutUint32(b, msg.Type)
+	binary.LittleEndian.PutUint32(b[4:], msg.Sender)
+	binary.LittleEndian.PutUint32(b[8:], msg.Receiver)
+	copy(b[12:], msg.Ephemeral[:])
+	copy(b[12+len(msg.Ephemeral):], msg.Empty[:])
+	copy(b[12+len(msg.Ephemeral)+len(msg.Empty):], msg.MAC1[:])
+	copy(b[12+len(msg.Ephemeral)+len(msg.Empty)+len(msg.MAC1):], msg.MAC2[:])
+
+	return nil
+}
+
 func (msg *MessageCookieReply) unmarshal(b []byte) error {
 	if len(b) != MessageCookieReplySize {
 		return errMessageLengthMismatch
@@ -159,6 +191,19 @@ func (msg *MessageCookieReply) unmarshal(b []byte) error {
 	msg.Receiver = binary.LittleEndian.Uint32(b[4:])
 	copy(msg.Nonce[:], b[8:])
 	copy(msg.Cookie[:], b[8+len(msg.Nonce):])
+
+	return nil
+}
+
+func (msg *MessageCookieReply) marshal(b []byte) error {
+	if len(b) != MessageCookieReplySize {
+		return errMessageLengthMismatch
+	}
+
+	binary.LittleEndian.PutUint32(b, msg.Type)
+	binary.LittleEndian.PutUint32(b[4:], msg.Receiver)
+	copy(b[8:], msg.Nonce[:])
+	copy(b[8+len(msg.Nonce):], msg.Cookie[:])
 
 	return nil
 }
