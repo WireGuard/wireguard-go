@@ -7,6 +7,7 @@ package device
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -473,4 +474,38 @@ func TestBatchSize(t *testing.T) {
 	if want, got := 128, d.BatchSize(); got != want {
 		t.Errorf("expected batch size %d, got %d", want, got)
 	}
+}
+
+var packetSink []byte
+
+func BenchmarkMessageInitiationMarshal(b *testing.B) {
+	var msg MessageInitiation
+
+	b.Run("binary.Write", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			var buf [MessageInitiationSize]byte
+			writer := bytes.NewBuffer(buf[:0])
+			_ = binary.Write(writer, binary.LittleEndian, msg)
+			packetSink = writer.Bytes()
+		}
+	})
+
+	b.Run("binary.Encode", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			packet := make([]byte, MessageInitiationSize)
+			_, _ = binary.Encode(packet, binary.LittleEndian, msg)
+			packetSink = packet
+		}
+	})
+
+	b.Run("marshal", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			packet := make([]byte, MessageInitiationSize)
+			_ = msg.marshal(packet)
+			packetSink = packet
+		}
+	})
 }
