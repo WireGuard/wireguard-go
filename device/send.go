@@ -186,10 +186,13 @@ func (device *Device) SendHandshakeCookie(initiatingElem *QueueHandshakeElement)
 
 	packet := make([]byte, MessageCookieReplySize)
 	_ = reply.marshal(packet)
-	// TODO: allocation could be avoided
-	device.net.bind.Send([][]byte{packet}, initiatingElem.endpoint)
 
-	return nil
+	// TODO: allocation could be avoided
+	err = device.net.bind.Send([][]byte{packet}, initiatingElem.endpoint)
+	if err != nil {
+		device.log.Errorf("Failed to send cookie reply: %v", err)
+	}
+	return err
 }
 
 func (peer *Peer) keepKeyFreshSending() {
