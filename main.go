@@ -30,6 +30,7 @@ const (
 	ENV_WG_TUN_FD             = "WG_TUN_FD"
 	ENV_WG_UAPI_FD            = "WG_UAPI_FD"
 	ENV_WG_PROCESS_FOREGROUND = "WG_PROCESS_FOREGROUND"
+	ENV_WG_KEYLOG             = "WG_KEYLOGFILE"
 )
 
 func printUsage() {
@@ -152,6 +153,22 @@ func main() {
 		os.Exit(ExitSetupFailed)
 	}
 
+	// open keylog file
+
+	keyLog, err := func() (*os.File, error) {
+		fn := os.Getenv(ENV_WG_KEYLOG)
+		if fn == "" {
+			return nil, nil
+		}
+
+		return os.OpenFile(fn, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	}()
+	if err != nil {
+		logger.Errorf("failed to open keylog error: %v", err)
+		os.Exit(ExitSetupFailed)
+		return
+	}
+
 	// open UAPI file (or use supplied fd)
 
 	fileUAPI, err := func() (*os.File, error) {
@@ -174,6 +191,7 @@ func main() {
 		os.Exit(ExitSetupFailed)
 		return
 	}
+
 	// daemonize the process
 
 	if !foreground {
@@ -247,6 +265,14 @@ func main() {
 	}()
 
 	logger.Verbosef("UAPI listener started")
+
+	// start writing handshakes to keylog file
+
+	if keyLog != nil {
+		device.WriteKeyLog(keyLog)
+
+		logger.Verbosef("Keylog writer started")
+	}
 
 	// wait for program to terminate
 
