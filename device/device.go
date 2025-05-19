@@ -6,6 +6,8 @@
 package device
 
 import (
+	"fmt"
+	"net"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -16,6 +18,114 @@ import (
 	"golang.zx2c4.com/wireguard/rwcancel"
 	"golang.zx2c4.com/wireguard/tun"
 )
+
+// TCPConn wraps a TCP connection to implement the conn.Bind interface
+type TCPConn struct {
+	conn        net.Conn
+	listener    net.Listener
+	connections []net.Conn
+	mutex       sync.Mutex
+}
+
+// ListenTCP creates a TCP listener and starts accepting connections
+func (device *Device) ListenTCP(port int) error {
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return err
+	}
+	device.net.Lock()
+	defer device.net.Unlock()
+	
+	// Store TCP listener in device
+	tcpConn := &TCPConn{
+		listener:    listener,
+		connections: make([]net.Conn, 0),
+	}
+	
+	device.log.Verbosef("TCP listener started on port %d", port)
+	
+	// Start accepting connections in a separate goroutine
+	go device.acceptTCPConnections(tcpConn)
+	
+	return nil
+}
+
+// acceptTCPConnections accepts incoming TCP connections
+func (device *Device) acceptTCPConnections(tcpConn *TCPConn) {
+	for {
+		conn, err := tcpConn.listener.Accept()
+		if err != nil {
+			device.log.Errorf("TCP accept error: %v", err)
+			if device.isClosed() {
+				return
+			}
+			continue
+		}
+		
+		device.log.Verbosef("Accepted TCP connection from %s", conn.RemoteAddr().String())
+		
+		// Add connection to the list
+		tcpConn.mutex.Lock()
+		tcpConn.connections = append(tcpConn.connections, conn)
+		tcpConn.mutex.Unlock()
+		
+		// Handle the connection in a separate goroutine
+		go device.handleTCPConnection(conn)
+	}
+}
+
+// handleTCPConnection handles data from a TCP connection
+func (device *Device) handleTCPConnection(conn net.Conn) {
+	defer conn.Close()
+	
+	buffer := make([]byte, device.tun.mtu.Load()+32)
+	
+	for {
+		// Read data from TCP connection
+		n, err := conn.Read(buffer)
+		if err != nil {
+			if !device.isClosed() {
+				device.log.Verbosef("TCP connection read error: %v", err)
+			}
+			return
+		}
+		
+		if n > 0 {
+			// Process the packet (implement packet handling logic here)
+			// This is a simplified version - actual implementation would need to 
+			// correctly process WireGuard packets from TCP stream
+			packet := buffer[:n]
+			
+			// Assuming this packet needs to be written to the TUN device
+			// The actual handling would involve decryption and routing
+			device.tun.device.Write([][]byte{packet}, 0)
+		}
+	}
+}
+
+// CloseTCP closes the TCP listener and all connections
+func (device *Device) CloseTCP(tcpConn *TCPConn) error {
+	if tcpConn == nil {
+		return nil
+	}
+	
+	// Close listener
+	if tcpConn.listener != nil {
+		tcpConn.listener.Close()
+	}
+	
+	// Close all connections
+	tcpConn.mutex.Lock()
+	defer tcpConn.mutex.Unlock()
+	
+	for _, conn := range tcpConn.connections {
+		conn.Close()
+	}
+	
+	tcpConn.connections = nil
+	
+	return nil
+}
 
 type Device struct {
 	state struct {
