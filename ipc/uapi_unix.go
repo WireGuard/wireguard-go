@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 
 	"golang.org/x/sys/unix"
 )
@@ -28,12 +29,24 @@ const (
 // flag in wireguard-android.
 var socketDirectory = "/var/run/wireguard"
 
+const NET_EXT_APP_ID = "com.wireguard.macos.network-extension"
+
+func sockDir() string {
+	baseDir := socketDirectory
+	homeDir, err := os.UserHomeDir()
+	if err == nil && strings.Contains(homeDir, NET_EXT_APP_ID) {
+		// this is a macOS sandboxed app, so we don't have access to /var/run
+		baseDir = homeDir
+	}
+	return baseDir
+}
+
 func sockPath(iface string) string {
-	return fmt.Sprintf("%s/%s.sock", socketDirectory, iface)
+	return fmt.Sprintf("%s/%s.sock", sockDir(), iface)
 }
 
 func UAPIOpen(name string) (*os.File, error) {
-	if err := os.MkdirAll(socketDirectory, 0o755); err != nil {
+	if err := os.MkdirAll(sockDir(), 0o755); err != nil {
 		return nil, err
 	}
 
