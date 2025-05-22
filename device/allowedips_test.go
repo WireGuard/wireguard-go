@@ -302,3 +302,49 @@ func TestTrieIPv6(t *testing.T) {
 	remove(a, 0x24446800, 0xf0e40800, 0xeeaebeef, 0, 98)
 	assertNEQ(a, 0x24446800, 0xf0e40800, 0xeeaebeef, 0x10101010)
 }
+
+// Repeatedly insert and remove IPv4 /32s from AllowedIPs.
+func BenchmarkAllowedIPsInsertRemove(b *testing.B) {
+	// First, make 64k peers, all with unique IPs, in a seeded pseudo-random order.
+	const num = 256 * 256
+	var peers [num]*Peer
+	var ips [num]net.IP
+	for i := range peers {
+		peers[i] = new(Peer)
+		ips[i] = net.IPv4(100, 64, byte(i>>8), byte(i)).To4()
+	}
+	rand.Seed(1)
+	rand.Shuffle(num, func(i, j int) { ips[i], ips[j] = ips[j], ips[i] })
+
+	// Then repeatedly add one and remove one that was insert 32k inserts back.
+	b.ResetTimer()
+	var a AllowedIPs
+	for i := 0; i < b.N; i++ {
+		a.Insert(ips[i%num], 32, peers[i%num])
+		a.RemoveByPeer(peers[(i+num/2)%num])
+	}
+
+	// Finally, some stats & validity checks.
+	nodes, numPeer := 0, 0
+	peersSeen := map[*Peer]bool{}
+	foreachEntry(a.IPv4, func(n *trieEntry) {
+		nodes++
+		if n.peer != nil {
+			numPeer++
+			peersSeen[n.peer] = true
+		}
+	})
+	b.Logf("for N=%v: nodes=%v, peers=%v, unique_peers=%v", b.N, nodes, numPeer, len(peersSeen))
+	if numPeer != len(peersSeen) {
+		b.Errorf("walked %d nodes with peers != %d unique peers seen", numPeer, len(peersSeen))
+	}
+}
+
+func foreachEntry(n *trieEntry, f func(*trieEntry)) {
+	if n == nil {
+		return
+	}
+	f(n)
+	foreachEntry(n.child[0], f)
+	foreachEntry(n.child[1], f)
+}
