@@ -153,20 +153,30 @@ func (peer *Peer) String() string {
 	//
 	// except that it is considerably more efficient.
 	src := peer.handshake.remoteStatic
-	b64 := func(input byte) byte {
-		return input + 'A' + byte(((25-int(input))>>8)&6) - byte(((51-int(input))>>8)&75) - byte(((61-int(input))>>8)&15) + byte(((62-int(input))>>8)&3)
-	}
 	b := []byte("peer(____…____)")
+
 	const first = len("peer(")
 	const second = len("peer(____…")
-	b[first+0] = b64((src[0] >> 2) & 63)
-	b[first+1] = b64(((src[0] << 4) | (src[1] >> 4)) & 63)
-	b[first+2] = b64(((src[1] << 2) | (src[2] >> 6)) & 63)
-	b[first+3] = b64(src[2] & 63)
-	b[second+0] = b64(src[29] & 63)
-	b[second+1] = b64((src[30] >> 2) & 63)
-	b[second+2] = b64(((src[30] << 4) | (src[31] >> 4)) & 63)
-	b[second+3] = b64((src[31] << 2) & 63)
+	const encodeStd = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+	// Convert 3x 8bit source bytes into 4 bytes
+	val := uint(src[0+0])<<16 | uint(src[0+1])<<8 | uint(src[0+2])
+
+	b[first+0] = encodeStd[val>>18&0x3F]
+	b[first+1] = encodeStd[val>>12&0x3F]
+	b[first+2] = encodeStd[val>>6&0x3F]
+	b[first+3] = encodeStd[val&0x3F]
+
+	val = /*uint(src[27+0])<<16 | uint(src[27+1])<<8 |*/ uint(src[27+2])
+
+	b[second+0] = encodeStd[val&0x3F]
+
+	val = uint(src[30+0])<<16 | uint(src[30+1])<<8 /*| uint(src[30+2])*/
+
+	b[second+1] = encodeStd[val>>18&0x3F]
+	b[second+2] = encodeStd[val>>12&0x3F]
+	b[second+3] = encodeStd[val>>6&0x3F]
+
 	return string(b)
 }
 
