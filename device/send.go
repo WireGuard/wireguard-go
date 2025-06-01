@@ -347,56 +347,89 @@ top:
 	}
 
 	for {
-		var elemsContainerOOO *QueueOutboundElementsContainer
+		var elemsContainerOOO *QueueOutboundElementsContainer // For packets that exceed nonce limit
 		select {
-		case elemsContainer := <-peer.queue.staged:
-			i := 0
-			for _, elem := range elemsContainer.elems {
-				elem.peer = peer
+		case rawElemsContainer := <-peer.queue.staged: // This container is typically locked by pool, but we treat it as needing processing.
+			// Let's assume rawElemsContainer is unlocked or its lock state doesn't matter as we'll use its contents.
+
+			// *** BEGIN FEC MODIFICATION ***
+			// handleOutgoingPacketsWithFEC expects an unlocked container and returns an unlocked one.
+			// It recycles rawElemsContainer internally.
+			processedElemsContainer, fecErr := peer.handleOutgoingPacketsWithFEC(rawElemsContainer, keypair)
+			// At this point, rawElemsContainer has been recycled by handleOutgoingPacketsWithFEC.
+			// processedElemsContainer is the one to work with, and it's UNLOCKED.
+
+			if fecErr != nil {
+				peer.device.log.Errorf("%v - Error during FEC processing: %v. May be sending originals or nothing.", peer, fecErr)
+			}
+
+			if processedElemsContainer == nil || len(processedElemsContainer.elems) == 0 {
+				if processedElemsContainer != nil { // It was non-nil but empty
+					peer.device.PutOutboundElementsContainer(processedElemsContainer)
+				}
+				// peer.device.log.Verbosef("%v - No packets to send after FEC processing.", peer)
+				goto top
+			}
+			// *** END FEC MODIFICATION ***
+
+			// Assign nonces and keypair to elements in the (potentially new) container
+			currentIndex := 0
+			for _, elem := range processedElemsContainer.elems {
+				// elem.peer should already be set by handleOutgoingPacketsWithFEC
 				elem.nonce = keypair.sendNonce.Add(1) - 1
 				if elem.nonce >= RejectAfterMessages {
-					keypair.sendNonce.Store(RejectAfterMessages)
+					keypair.sendNonce.Store(RejectAfterMessages) // Prevent further use of this keypair for sending
 					if elemsContainerOOO == nil {
-						elemsContainerOOO = peer.device.GetOutboundElementsContainer()
+						elemsContainerOOO = peer.device.GetOutboundElementsContainer() // This is unlocked
 					}
-					elemsContainerOOO.elems = append(elemsContainerOOO.elems, elem)
+					elemsContainerOOO.elems = append(elemsContainerOOO.elems, elem) // Add to OOO, will be staged later
 					continue
-				} else {
-					elemsContainer.elems[i] = elem
-					i++
 				}
-
 				elem.keypair = keypair
+				processedElemsContainer.elems[currentIndex] = elem
+				currentIndex++
 			}
-			elemsContainer.Lock()
-			elemsContainer.elems = elemsContainer.elems[:i]
+			processedElemsContainer.elems = processedElemsContainer.elems[:currentIndex]
 
-			if elemsContainerOOO != nil {
-				peer.StagePackets(elemsContainerOOO) // XXX: Out of order, but we can't front-load go chans
+			// If we have out-of-nonce-order packets, stage them.
+			// SendStagedPackets will be called again.
+			if elemsContainerOOO != nil && len(elemsContainerOOO.elems) > 0 {
+				peer.StagePackets(elemsContainerOOO)
 			}
 
-			if len(elemsContainer.elems) == 0 {
-				peer.device.PutOutboundElementsContainer(elemsContainer)
+			// If all packets were moved to OOO, put back the current (now empty) container.
+			if len(processedElemsContainer.elems) == 0 {
+				peer.device.PutOutboundElementsContainer(processedElemsContainer)
+				// If elemsContainerOOO was populated, a new handshake might be needed if RejectAfterMessages was hit.
+				// The next call to SendStagedPackets will handle handshake initiation if keypair is exhausted.
 				goto top
 			}
 
-			// add to parallel and sequential queue
+			// Lock the container before sending to concurrent queues
+			processedElemsContainer.Lock()
+
 			if peer.isRunning.Load() {
-				peer.queue.outbound.c <- elemsContainer
-				peer.device.queue.encryption.c <- elemsContainer
+				peer.queue.outbound.c <- processedElemsContainer
+				peer.device.queue.encryption.c <- processedElemsContainer
 			} else {
-				for _, elem := range elemsContainer.elems {
+				// Not running, unlock and recycle everything
+				processedElemsContainer.Unlock()
+				for _, elem := range processedElemsContainer.elems {
 					peer.device.PutMessageBuffer(elem.buffer)
 					peer.device.PutOutboundElement(elem)
 				}
-				peer.device.PutOutboundElementsContainer(elemsContainer)
+				peer.device.PutOutboundElementsContainer(processedElemsContainer)
 			}
 
-			if elemsContainerOOO != nil {
-				goto top
+			// If some packets were out of order and staged, and we also sent some packets now,
+			// it's fine, SendStagedPackets will be re-evaluated.
+			// If RejectAfterMessages was hit, the next iteration will trigger handshake.
+			if elemsContainerOOO != nil && len(elemsContainerOOO.elems) > 0 {
+				goto top // Re-evaluate immediately if OOO packets were staged
 			}
+
 		default:
-			return
+			return // No more staged packets
 		}
 	}
 }
