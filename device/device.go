@@ -6,6 +6,9 @@
 package device
 
 import (
+	"encoding/base64"
+	"fmt"
+	"io"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -16,6 +19,8 @@ import (
 	"golang.zx2c4.com/wireguard/rwcancel"
 	"golang.zx2c4.com/wireguard/tun"
 )
+
+type HandshakeHandler func(t time.Time, ls NoisePrivateKey, rs NoisePublicKey, le NoisePrivateKey, ps NoisePresharedKey)
 
 type Device struct {
 	state struct {
@@ -85,6 +90,8 @@ type Device struct {
 		device tun.Device
 		mtu    atomic.Int32
 	}
+
+	keyLogHandler HandshakeHandler
 
 	ipcMutex sync.RWMutex
 	closed   chan struct{}
@@ -533,4 +540,27 @@ func (device *Device) BindClose() error {
 	err := closeBindLocked(device)
 	device.net.Unlock()
 	return err
+}
+
+func (device *Device) OnHandshake(hdlr HandshakeHandler) {
+	device.keyLogHandler = hdlr
+}
+
+func (device *Device) WriteKeyLog(wr io.Writer) {
+	mu := sync.Mutex{}
+
+	device.OnHandshake(func(t time.Time, ls NoisePrivateKey, rs NoisePublicKey, le NoisePrivateKey, ps NoisePresharedKey) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		fmt.Fprintf(wr, "LOCAL_STATIC_PRIVATE_KEY=%s\n", base64.StdEncoding.EncodeToString(ls[:]))
+		fmt.Fprintf(wr, "REMOTE_STATIC_PUBLIC_KEY=%s\n", base64.StdEncoding.EncodeToString(rs[:]))
+		fmt.Fprintf(wr, "LOCAL_EPHEMERAL_PRIVATE_KEY=%s\n", base64.StdEncoding.EncodeToString(le[:]))
+
+		if !ps.IsZero() {
+			fmt.Fprintf(wr, "PRESHARED_KEY=%s\n", base64.StdEncoding.EncodeToString(ps[:]))
+		}
+
+		device.log.Verbosef("Writing new ephemeral key to keylog")
+	})
 }
