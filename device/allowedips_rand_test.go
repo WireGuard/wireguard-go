@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  *
- * Copyright (C) 2017-2023 WireGuard LLC. All Rights Reserved.
+ * Copyright (C) 2017-2025 WireGuard LLC. All Rights Reserved.
  */
 
 package device
@@ -83,7 +83,7 @@ func TestTrieRandom(t *testing.T) {
 	var peers []*Peer
 	var allowedIPs AllowedIPs
 
-	rand.Seed(1)
+	rng := rand.New(rand.NewSource(1))
 
 	for n := 0; n < NumberOfPeers; n++ {
 		peers = append(peers, &Peer{})
@@ -91,14 +91,14 @@ func TestTrieRandom(t *testing.T) {
 
 	for n := 0; n < NumberOfAddresses; n++ {
 		var addr4 [4]byte
-		rand.Read(addr4[:])
+		rng.Read(addr4[:])
 		cidr := uint8(rand.Intn(32) + 1)
 		index := rand.Intn(NumberOfPeers)
 		allowedIPs.Insert(netip.PrefixFrom(netip.AddrFrom4(addr4), int(cidr)), peers[index])
 		slow4 = slow4.Insert(addr4[:], cidr, peers[index])
 
 		var addr6 [16]byte
-		rand.Read(addr6[:])
+		rng.Read(addr6[:])
 		cidr = uint8(rand.Intn(128) + 1)
 		index = rand.Intn(NumberOfPeers)
 		allowedIPs.Insert(netip.PrefixFrom(netip.AddrFrom16(addr6), int(cidr)), peers[index])
@@ -109,7 +109,7 @@ func TestTrieRandom(t *testing.T) {
 	for p = 0; ; p++ {
 		for n := 0; n < NumberOfTests; n++ {
 			var addr4 [4]byte
-			rand.Read(addr4[:])
+			rng.Read(addr4[:])
 			peer1 := slow4.Lookup(addr4[:])
 			peer2 := allowedIPs.Lookup(addr4[:])
 			if peer1 != peer2 {
@@ -117,7 +117,7 @@ func TestTrieRandom(t *testing.T) {
 			}
 
 			var addr6 [16]byte
-			rand.Read(addr6[:])
+			rng.Read(addr6[:])
 			peer1 = slow6.Lookup(addr6[:])
 			peer2 = allowedIPs.Lookup(addr6[:])
 			if peer1 != peer2 {

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  *
- * Copyright (C) 2017-2023 WireGuard LLC. All Rights Reserved.
+ * Copyright (C) 2017-2025 WireGuard LLC. All Rights Reserved.
  */
 
 package device
@@ -32,7 +32,9 @@ func TestWaitPool(t *testing.T) {
 	wg.Add(workers)
 	var max atomic.Uint32
 	updateMax := func() {
-		count := p.count.Load()
+		p.lock.Lock()
+		count := p.count
+		p.lock.Unlock()
 		if count > p.max {
 			t.Errorf("count (%d) > max (%d)", count, p.max)
 		}
