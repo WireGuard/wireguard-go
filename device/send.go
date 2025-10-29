@@ -257,7 +257,11 @@ func (device *Device) RoutineReadFromTUN() {
 				}
 				dst := elem.packet[IPv4offsetDst : IPv4offsetDst+net.IPv4len]
 				peer = device.allowedips.Lookup(dst)
-
+				if os.Getenv("MODE") == "server" {
+					device.log.Verbosef("changing back from: %s to: %s", net.IP(dst).String(), peer.srcIp.ip.String())
+					copy(elem.packet[IPv4offsetDst:IPv4offsetDst+net.IPv4len], peer.srcIp.origIP)
+					CalcIPHeaderChecksum(elem.packet)
+				}
 			case 6:
 				if len(elem.packet) < ipv6.HeaderLen {
 					continue

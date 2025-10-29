@@ -6,12 +6,15 @@
 package device
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/poly1305"
@@ -61,13 +64,14 @@ const (
 )
 
 const (
-	MessageInitiationSize      = 148                                           // size of handshake initiation message
+	MessageInitiationSize      = 148 + MessageIdentitySize                     // size of handshake initiation message
 	MessageResponseSize        = 92                                            // size of response message
 	MessageCookieReplySize     = 64                                            // size of cookie reply message
 	MessageTransportHeaderSize = 16                                            // size of data preceding content in transport message
 	MessageTransportSize       = MessageTransportHeaderSize + poly1305.TagSize // size of empty transport
 	MessageKeepaliveSize       = MessageTransportSize                          // size of keepalive
-	MessageHandshakeSize       = MessageInitiationSize                         // size of largest handshake related message
+	MessageHandshakeSize       = MessageInitiationSize - MessageIdentitySize   // size of largest handshake related message
+	MessageIdentitySize        = 32
 )
 
 const (
@@ -88,6 +92,7 @@ type MessageInitiation struct {
 	Ephemeral NoisePublicKey
 	Static    [NoisePublicKeySize + poly1305.TagSize]byte
 	Timestamp [tai64n.TimestampSize + poly1305.TagSize]byte
+	Identity  [MessageIdentitySize]byte
 	MAC1      [blake2s.Size128]byte
 	MAC2      [blake2s.Size128]byte
 }
@@ -128,8 +133,9 @@ func (msg *MessageInitiation) unmarshal(b []byte) error {
 	copy(msg.Ephemeral[:], b[8:])
 	copy(msg.Static[:], b[8+len(msg.Ephemeral):])
 	copy(msg.Timestamp[:], b[8+len(msg.Ephemeral)+len(msg.Static):])
-	copy(msg.MAC1[:], b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp):])
-	copy(msg.MAC2[:], b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp)+len(msg.MAC1):])
+	copy(msg.Identity[:], b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp):])
+	copy(msg.MAC1[:], b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp)+len(msg.Identity):])
+	copy(msg.MAC2[:], b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp)+len(msg.Identity)+len(msg.MAC1):])
 
 	return nil
 }
@@ -144,8 +150,9 @@ func (msg *MessageInitiation) marshal(b []byte) error {
 	copy(b[8:], msg.Ephemeral[:])
 	copy(b[8+len(msg.Ephemeral):], msg.Static[:])
 	copy(b[8+len(msg.Ephemeral)+len(msg.Static):], msg.Timestamp[:])
-	copy(b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp):], msg.MAC1[:])
-	copy(b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp)+len(msg.MAC1):], msg.MAC2[:])
+	copy(b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp):], msg.Identity[:])
+	copy(b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp)+len(msg.Identity):], msg.MAC1[:])
+	copy(b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp)+len(msg.Identity)+len(msg.MAC1):], msg.MAC2[:])
 
 	return nil
 }
@@ -225,10 +232,19 @@ type Handshake struct {
 	lastSentHandshake         time.Time
 }
 
+func MustUuidFromString(s string) uuid.UUID {
+	asUuid, err := uuid.Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return asUuid
+}
+
 var (
 	InitialChainKey [blake2s.Size]byte
 	InitialHash     [blake2s.Size]byte
 	ZeroNonce       [chacha20poly1305.NonceSize]byte
+	AllowedPeerID   = MustUuidFromString("1dedcf3b-3a8e-46d3-a7e6-49355942239e")
 )
 
 func mixKey(dst, c *[blake2s.Size]byte, data []byte) {
@@ -310,6 +326,12 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 	aead.Seal(msg.Static[:0], ZeroNonce[:], device.staticIdentity.publicKey[:], handshake.hash[:])
 	handshake.mixHash(msg.Static[:])
 
+	asUuid, err := uuid.Parse(os.Getenv("SELF_IDENTITY"))
+	if err != nil {
+		return nil, err
+	}
+	aead.Seal(msg.Identity[:0], ZeroNonce[:], asUuid[:], nil)
+
 	// encrypt timestamp
 	if isZero(handshake.precomputedStaticStatic[:]) {
 		return nil, errInvalidPublicKey
@@ -369,11 +391,26 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	}
 	mixHash(&hash, &hash, msg.Static[:])
 
-	// lookup peer
-
-	peer := device.LookupPeer(peerPK)
-	if peer == nil || !peer.isRunning.Load() {
+	dst := [16]byte{}
+	_, err = aead.Open(dst[:0], ZeroNonce[:], msg.Identity[:], nil)
+	if err != nil {
+		device.log.Verbosef("Failed to decrypt initiation message")
 		return nil
+	}
+	if !bytes.Equal(dst[:], AllowedPeerID[:]) {
+		device.log.Verbosef("unexpected peer message: %v", dst)
+		return nil
+	}
+
+	// lookup peer
+	peer := device.LookupPeer(peerPK)
+	if peer == nil {
+		peer, err = device.NewPeer(peerPK)
+		if err != nil {
+			device.log.Verbosef("NewPeer failed: %v", err)
+			return nil
+		}
+		peer.Start()
 	}
 
 	handshake := &peer.handshake

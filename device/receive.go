@@ -9,6 +9,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"net"
+	"net/netip"
+	"os"
 	"sync"
 	"time"
 
@@ -160,7 +162,6 @@ func (device *Device) RoutineReceiveIncoming(maxBatchSize int, recv conn.Receive
 				}
 
 				// check keypair expiry
-
 				if keypair.created.Add(RejectAfterTime).Before(time.Now()) {
 					continue
 				}
@@ -264,6 +265,57 @@ func (device *Device) RoutineDecryption(id int) {
 		}
 		elemsContainer.Unlock()
 	}
+}
+
+type IPRange struct {
+	ipMu  sync.Mutex
+	done  bool
+	base  net.IP
+	idx   uint32
+	ipnet *net.IPNet
+}
+
+func NewIPRange(cidr string) (*IPRange, error) {
+	base, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return nil, err
+	}
+	return &IPRange{
+		base:  base.To4(),
+		ipnet: ipnet,
+		idx:   2,
+	}, nil
+}
+
+func (r *IPRange) Next() net.IP {
+	r.ipMu.Lock()
+	defer r.ipMu.Unlock()
+
+	if r.done {
+		return nil
+	}
+
+	for !r.done {
+		curr := make(net.IP, len(r.base))
+		copy(curr, r.base)
+
+		// Add offset (idx) to the last octet
+		curr[3] += byte(r.idx)
+
+		if !r.ipnet.Contains(curr) {
+			r.done = true
+			return nil
+		}
+
+		r.idx++
+
+		if curr.String() == "10.0.0.1" {
+			continue
+		}
+
+		return curr
+	}
+	return nil
 }
 
 /* Handles incoming packets related to handshake
@@ -426,6 +478,27 @@ func (device *Device) RoutineHandshake(id int) {
 	}
 }
 
+func IPv4HeaderChecksum(header []byte) uint16 {
+	var sum uint32
+	for i := 0; i+1 < len(header); i += 2 {
+		sum += uint32(binary.BigEndian.Uint16(header[i : i+2]))
+	}
+	if len(header)%2 == 1 {
+		sum += uint32(header[len(header)-1]) << 8
+	}
+	sum = (sum >> 16) + (sum & 0xFFFF)
+	sum += (sum >> 16)
+	return ^uint16(sum)
+}
+
+func CalcIPHeaderChecksum(packet []byte) {
+	headerLen := int(packet[0]&0x0F) * 4
+	packet[10] = 0
+	packet[11] = 0
+	checksum := IPv4HeaderChecksum(packet[:headerLen])
+	binary.BigEndian.PutUint16(packet[10:12], checksum)
+}
+
 func (peer *Peer) RoutineSequentialReceiver(maxBatchSize int) {
 	device := peer.device
 	defer func() {
@@ -452,6 +525,33 @@ func (peer *Peer) RoutineSequentialReceiver(maxBatchSize int) {
 
 			if !elem.keypair.replayFilter.ValidateCounter(elem.counter, RejectAfterMessages) {
 				continue
+			}
+
+			if os.Getenv("MODE") == "server" {
+				if !peer.srcIp.isSet {
+					peer.srcIp.ipMu.Lock()
+					if !peer.srcIp.isSet {
+						assignedIP := peer.device.ipRange.Next()
+						if assignedIP == nil {
+							peer.device.log.Verbosef("could not assign IP for peer")
+							continue
+						}
+						asIp := netip.PrefixFrom(netip.AddrFrom4([4]byte(assignedIP)), 32)
+						peer.device.log.Verbosef("assigned new ip for peer", asIp.String())
+						peer.device.allowedips.Insert(asIp, peer)
+						peer.srcIp.isSet = true
+						peer.srcIp.ip = assignedIP
+
+						var origIp [4]byte
+						copy(origIp[:], elem.packet[IPv4offsetSrc:IPv4offsetSrc+net.IPv4len])
+						peer.srcIp.origIP = origIp[:]
+					}
+					peer.srcIp.ipMu.Unlock()
+				}
+				if len(elem.packet) != 0 {
+					copy(elem.packet[IPv4offsetSrc:IPv4offsetSrc+net.IPv4len], peer.srcIp.ip)
+					CalcIPHeaderChecksum(elem.packet)
+				}
 			}
 
 			validTailPacket = i

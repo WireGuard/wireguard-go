@@ -89,6 +89,7 @@ type Device struct {
 	ipcMutex sync.RWMutex
 	closed   chan struct{}
 	log      *Logger
+	ipRange  *IPRange
 }
 
 // deviceState represents the state of a Device.
@@ -305,6 +306,14 @@ func NewDevice(tunDevice tun.Device, bind conn.Bind, logger *Logger) *Device {
 	device.queue.handshake = newHandshakeQueue()
 	device.queue.encryption = newOutboundQueue()
 	device.queue.decryption = newInboundQueue()
+
+	// ipRange
+	ipRange, err := NewIPRange("10.0.0.0/24")
+	if err != nil {
+		device.log.Errorf("Unable to create ip range: %v", err)
+		return nil
+	}
+	device.ipRange = ipRange
 
 	// start workers
 

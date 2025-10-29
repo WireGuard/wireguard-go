@@ -8,6 +8,7 @@ package device
 import (
 	"container/list"
 	"errors"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,6 +57,13 @@ type Peer struct {
 	cookieGenerator             CookieGenerator
 	trieEntries                 list.List
 	persistentKeepaliveInterval atomic.Uint32
+
+	srcIp struct {
+		ipMu   sync.RWMutex
+		isSet  bool
+		ip     net.IP
+		origIP net.IP
+	}
 }
 
 func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
