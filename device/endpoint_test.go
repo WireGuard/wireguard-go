@@ -6,7 +6,7 @@
 package device
 
 import (
-	"math/rand"
+	"crypto/rand"
 	"net/netip"
 )
 
