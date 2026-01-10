@@ -18,10 +18,10 @@ const (
 )
 
 type (
-	NoisePublicKey    [NoisePublicKeySize]byte
-	NoisePrivateKey   [NoisePrivateKeySize]byte
-	NoisePresharedKey [NoisePresharedKeySize]byte
-	NoiseNonce        uint64 // padded to 12-bytes
+	NoisePublicKey    [NoisePublicKeySize]byte    // 公開鍵(32バイトということに注目)
+	NoisePrivateKey   [NoisePrivateKeySize]byte   // 秘密鍵
+	NoisePresharedKey [NoisePresharedKeySize]byte // 共有鍵
+	NoiseNonce        uint64                      // padded to 12-bytes
 )
 
 func loadExactHex(dst []byte, src string) error {

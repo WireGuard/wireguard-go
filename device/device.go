@@ -53,6 +53,10 @@ type Device struct {
 		publicKey  NoisePublicKey
 	}
 
+	// この書き方は無名構造体という書き方と思う(カプセル化)
+	// peer: 接続先(Cryptokey Routing（公開鍵ルーティング） の実装そのもの)
+	// 通常のVPNは「IPアドレス」でルーティングするが、
+	// WireGuardは「NoisePublicKey(公開鍵)」をキーにして Peer オブジェクトを引く
 	peers struct {
 		sync.RWMutex // protects keyMap
 		keyMap       map[NoisePublicKey]*Peer
@@ -226,6 +230,7 @@ func (device *Device) IsUnderLoad() bool {
 	return device.rate.underLoadUntil.Load() > now.UnixNano()
 }
 
+// keyMapやpeerに注目して、「通信の開始から終了までの流れが見えてくる」
 func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 	// lock required resources
 
