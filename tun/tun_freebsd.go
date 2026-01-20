@@ -68,12 +68,39 @@ type nd6Req struct {
 }
 
 type NativeTun struct {
-	name        string
-	tunFile     *os.File
-	events      chan Event
-	errors      chan error
-	routeSocket int
-	closeOnce   sync.Once
+	name               string
+	tunFile            *os.File
+	events             chan Event
+	errors             chan error
+	routeSocket        int
+	closeOnce          sync.Once
+	writeForceChecksum bool
+}
+
+// Option functional option interface
+type Option func(tun *NativeTun) error
+
+// WithOffload API compatability stub, does nothing on this platform
+func WithOffload(offload bool) Option {
+	return func(tun *NativeTun) error {
+		return nil
+	}
+}
+
+// WithCarrier API compatability stub, does nothing on this platform
+func WithCarrier(carrier bool) Option {
+	return func(tun *NativeTun) error {
+		return nil
+	}
+}
+
+// WithWriteForceChecksum force checksum computation for sent packets, default false
+func WithWriteForceChecksum(forceChecksum bool) Option {
+	return func(tun *NativeTun) error {
+		tun.writeForceChecksum = forceChecksum
+
+		return nil
+	}
 }
 
 func (tun *NativeTun) routineRouteListener(tunIfindex int) {
@@ -159,7 +186,7 @@ func tunDestroy(name string) error {
 	return nil
 }
 
-func CreateTUN(name string, mtu int) (Device, error) {
+func CreateTUN(name string, mtu int, options ...Option) (Device, error) {
 	if len(name) > unix.IFNAMSIZ-1 {
 		return nil, errors.New("interface name too long")
 	}
@@ -258,14 +285,21 @@ func CreateTUN(name string, mtu int) (Device, error) {
 		}
 	}
 
-	return CreateTUNFromFile(tunFile, mtu)
+	return CreateTUNFromFile(tunFile, mtu, options...)
 }
 
-func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
+func CreateTUNFromFile(file *os.File, mtu int, options ...Option) (Device, error) {
 	tun := &NativeTun{
 		tunFile: file,
 		events:  make(chan Event, 10),
 		errors:  make(chan error, 1),
+	}
+
+	for _, opt := range options {
+		err := opt(tun)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var errno syscall.Errno
@@ -353,6 +387,10 @@ func (tun *NativeTun) Write(bufs [][]byte, offset int) (int, error) {
 		return 0, io.ErrShortBuffer
 	}
 	for i, buf := range bufs {
+		if tun.writeForceChecksum {
+			ComputeIPChecksumBuffer(bufs[i][offset:], false)
+		}
+
 		buf = buf[offset-4:]
 		if len(buf) < 5 {
 			return i, io.ErrShortBuffer
@@ -430,6 +468,14 @@ func (tun *NativeTun) MTU() (int, error) {
 	return int(*(*int32)(unsafe.Pointer(&ifr.MTU))), nil
 }
 
+func (tun *NativeTun) SetCarrier(carrier bool) (err error) {
+	return nil
+}
+
 func (tun *NativeTun) BatchSize() int {
 	return 1
+}
+
+func (tun *NativeTun) MinOffset() int {
+	return 4
 }

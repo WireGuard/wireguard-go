@@ -28,12 +28,39 @@ type ifreq_mtu struct {
 const _TUNSIFMODE = 0x8004745d
 
 type NativeTun struct {
-	name        string
-	tunFile     *os.File
-	events      chan Event
-	errors      chan error
-	routeSocket int
-	closeOnce   sync.Once
+	name               string
+	tunFile            *os.File
+	events             chan Event
+	errors             chan error
+	routeSocket        int
+	closeOnce          sync.Once
+	writeForceChecksum bool
+}
+
+// Option functional option interface
+type Option func(tun *NativeTun) error
+
+// WithOffload API compatability stub, does nothing on this platform
+func WithOffload(offload bool) Option {
+	return func(tun *NativeTun) error {
+		return nil
+	}
+}
+
+// WithCarrier API compatability stub, does nothing on this platform
+func WithCarrier(carrier bool) Option {
+	return func(tun *NativeTun) error {
+		return nil
+	}
+}
+
+// WithWriteForceChecksum force checksum computation for sent packets, default false
+func WithWriteForceChecksum(forceChecksum bool) Option {
+	return func(tun *NativeTun) error {
+		tun.writeForceChecksum = forceChecksum
+
+		return nil
+	}
 }
 
 func (tun *NativeTun) routineRouteListener(tunIfindex int) {
@@ -101,7 +128,7 @@ func (tun *NativeTun) routineRouteListener(tunIfindex int) {
 	}
 }
 
-func CreateTUN(name string, mtu int) (Device, error) {
+func CreateTUN(name string, mtu int, options ...Option) (Device, error) {
 	ifIndex := -1
 	if name != "tun" {
 		_, err := fmt.Sscanf(name, "tun%d", &ifIndex)
@@ -128,7 +155,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 		return nil, err
 	}
 
-	tun, err := CreateTUNFromFile(tunfile, mtu)
+	tun, err := CreateTUNFromFile(tunfile, mtu, options...)
 
 	if err == nil && name == "tun" {
 		fname := os.Getenv("WG_TUN_NAME_FILE")
@@ -140,11 +167,19 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	return tun, err
 }
 
-func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
+func CreateTUNFromFile(file *os.File, mtu int, options ...Option) (Device, error) {
 	tun := &NativeTun{
 		tunFile: file,
 		events:  make(chan Event, 10),
 		errors:  make(chan error, 1),
+	}
+
+	for _, opt := range options {
+		err := opt(tun)
+		if err != nil {
+			tun.tunFile.Close()
+			return nil, err
+		}
 	}
 
 	name, err := tun.Name()
@@ -224,6 +259,9 @@ func (tun *NativeTun) Write(bufs [][]byte, offset int) (int, error) {
 		return 0, io.ErrShortBuffer
 	}
 	for i, buf := range bufs {
+		if tun.writeForceChecksum {
+			ComputeIPChecksumBuffer(bufs[i][offset:], false)
+		}
 		buf = buf[offset-4:]
 		buf[0] = 0x00
 		buf[1] = 0x00
@@ -328,6 +366,14 @@ func (tun *NativeTun) MTU() (int, error) {
 	return int(*(*int32)(unsafe.Pointer(&ifr.MTU))), nil
 }
 
+func (tun *NativeTun) SetCarrier(carrier bool) (err error) {
+	return nil
+}
+
 func (tun *NativeTun) BatchSize() int {
 	return 1
+}
+
+func (tun *NativeTun) MinOffset() int {
+	return 4
 }

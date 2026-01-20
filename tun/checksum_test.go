@@ -40,7 +40,7 @@ func TestChecksum(t *testing.T) {
 		buf := make([]byte, length)
 		rng := rand.New(rand.NewSource(1))
 		rng.Read(buf)
-		csum := checksum(buf, 0x1234)
+		csum := Checksum(buf, 0x1234)
 		csumRef := checksumRef(buf, 0x1234)
 		if csum != csumRef {
 			t.Error("Expected checksum", csumRef, "got", csum)
@@ -49,18 +49,20 @@ func TestChecksum(t *testing.T) {
 }
 
 func TestPseudoHeaderChecksum(t *testing.T) {
+	lenbuf := make([]byte, 2)
+
 	for _, addrLen := range []int{4, 16} {
 		for length := 0; length <= 9001; length++ {
-			srcAddr := make([]byte, addrLen)
-			dstAddr := make([]byte, addrLen)
-			buf := make([]byte, length)
+			srcDstAddr := make([]byte, addrLen*2)
 			rng := rand.New(rand.NewSource(1))
-			rng.Read(srcAddr)
-			rng.Read(dstAddr)
+			rng.Read(srcDstAddr)
+			rng.Read(srcDstAddr[addrLen:])
+			buf := make([]byte, length)
 			rng.Read(buf)
-			phSum := pseudoHeaderChecksumNoFold(unix.IPPROTO_TCP, srcAddr, dstAddr, uint16(length))
-			csum := checksum(buf, phSum)
-			phSumRef := pseudoHeaderChecksumRefNoFold(unix.IPPROTO_TCP, srcAddr, dstAddr, uint16(length))
+			binary.BigEndian.PutUint16(lenbuf, uint16(length))
+			phSum := PseudoHeaderChecksumNoFold(PseudoHeaderProtocolTCP, srcDstAddr, lenbuf)
+			csum := Checksum(buf, phSum)
+			phSumRef := pseudoHeaderChecksumRefNoFold(unix.IPPROTO_TCP, srcDstAddr[:addrLen], srcDstAddr[addrLen:], uint16(length))
 			csumRef := checksumRef(buf, phSumRef)
 			if csum != csumRef {
 				t.Error("Expected checksumRef", csumRef, "got", csum)
@@ -91,7 +93,7 @@ func BenchmarkChecksum(b *testing.B) {
 			rng.Read(buf)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				checksum(buf, 0)
+				Checksum(buf, 0)
 			}
 		})
 	}

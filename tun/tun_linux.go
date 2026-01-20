@@ -49,10 +49,46 @@ type NativeTun struct {
 	readOpMu sync.Mutex                    // readOpMu guards readBuff
 	readBuff [virtioNetHdrLen + 65535]byte // if vnetHdr every read() is prefixed by virtioNetHdr
 
-	writeOpMu   sync.Mutex // writeOpMu guards toWrite, tcpGROTable
-	toWrite     []int
-	tcpGROTable *tcpGROTable
-	udpGROTable *udpGROTable
+	writeOpMu          sync.Mutex // writeOpMu guards toWrite, tcpGROTable
+	toWrite            []int
+	tcpGROTable        *tcpGROTable
+	udpGROTable        *udpGROTable
+	carrier            *bool
+	offload            bool
+	writeForceChecksum bool
+}
+
+// Option functional option interface
+type Option func(tun *NativeTun) error
+
+// WithOffload set whether offloads should be used if available, default true
+func WithOffload(offload bool) Option {
+	return func(tun *NativeTun) error {
+		tun.offload = offload
+
+		return nil
+	}
+}
+
+// WithCarrier set initial carrier state.
+// If provided and false, interface is created without carrier.
+// If provided and true, interface is marked as having carrier right after creation.
+// If not provided (default), interface is created with unknown carrier state.
+func WithCarrier(carrier bool) Option {
+	return func(tun *NativeTun) error {
+		tun.carrier = &carrier
+
+		return nil
+	}
+}
+
+// WithWriteForceChecksum force checksum computation for sent packets, default false
+func WithWriteForceChecksum(forceChecksum bool) Option {
+	return func(tun *NativeTun) error {
+		tun.writeForceChecksum = forceChecksum
+
+		return nil
+	}
 }
 
 func (tun *NativeTun) File() *os.File {
@@ -339,19 +375,26 @@ func (tun *NativeTun) Write(bufs [][]byte, offset int) (int, error) {
 		tun.udpGROTable.reset()
 		tun.writeOpMu.Unlock()
 	}()
+
 	var (
 		errs  error
 		total int
 	)
+
 	tun.toWrite = tun.toWrite[:0]
+
 	if tun.vnetHdr {
-		err := handleGRO(bufs, offset, tun.tcpGROTable, tun.udpGROTable, tun.udpGSO, &tun.toWrite)
+		err := handleGRO(bufs, offset, tun.tcpGROTable, tun.udpGROTable, tun.udpGSO, tun.writeForceChecksum, &tun.toWrite)
 		if err != nil {
 			return 0, err
 		}
 		offset -= virtioNetHdrLen
 	} else {
 		for i := range bufs {
+			if tun.writeForceChecksum {
+				ComputeIPChecksumBuffer(bufs[i][offset:], false)
+			}
+
 			tun.toWrite = append(tun.toWrite, i)
 		}
 	}
@@ -498,8 +541,38 @@ func (tun *NativeTun) Close() error {
 	return err2
 }
 
+func (tun *NativeTun) SetCarrier(carrier bool) (err error) {
+	sys, err := tun.File().SyscallConn()
+	if err != nil {
+		return err
+	}
+
+	var value int
+
+	if carrier {
+		value = 1
+	}
+
+	cerr := sys.Control(func(fd uintptr) {
+		err = unix.IoctlSetPointerInt(int(fd), unix.TUNSETCARRIER, value)
+	})
+	if err != nil {
+		return
+	}
+
+	return cerr
+}
+
 func (tun *NativeTun) BatchSize() int {
 	return tun.batchSize
+}
+
+func (tun *NativeTun) MinOffset() int {
+	if tun.vnetHdr {
+		return virtioNetHdrLen
+	}
+
+	return 0
 }
 
 const (
@@ -526,7 +599,7 @@ func (tun *NativeTun) initFromFlags(name string) error {
 			return
 		}
 		got := ifr.Uint16()
-		if got&unix.IFF_VNET_HDR != 0 {
+		if tun.offload && got&unix.IFF_VNET_HDR != 0 {
 			// tunTCPOffloads were added in Linux v2.6. We require their support
 			// if IFF_VNET_HDR is set.
 			err = unix.IoctlSetInt(int(fd), unix.TUNSETOFFLOAD, tunTCPOffloads)
@@ -541,6 +614,13 @@ func (tun *NativeTun) initFromFlags(name string) error {
 		} else {
 			tun.batchSize = 1
 		}
+
+		if tun.carrier != nil && *tun.carrier {
+			err = unix.IoctlSetPointerInt(int(fd), unix.TUNSETCARRIER, 1)
+			if err != nil {
+				return
+			}
+		}
 	}); e != nil {
 		return e
 	}
@@ -548,7 +628,7 @@ func (tun *NativeTun) initFromFlags(name string) error {
 }
 
 // CreateTUN creates a Device with the provided name and MTU.
-func CreateTUN(name string, mtu int) (Device, error) {
+func CreateTUN(name string, mtu int, options ...Option) (Device, error) {
 	nfd, err := unix.Open(cloneDevicePath, unix.O_RDWR|unix.O_CLOEXEC, 0)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -561,9 +641,21 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	tun, err := createTUN(options...)
+	if err != nil {
+		return nil, err
+	}
+
+	flags := uint16(unix.IFF_TUN | unix.IFF_NO_PI | unix.IFF_VNET_HDR)
+
+	if tun.carrier != nil && !*tun.carrier {
+		flags |= unix.IFF_NO_CARRIER
+	}
+
 	// IFF_VNET_HDR enables the "tun status hack" via routineHackListener()
 	// where a null write will return EINVAL indicating the TUN is up.
-	ifr.SetUint16(unix.IFF_TUN | unix.IFF_NO_PI | unix.IFF_VNET_HDR)
+	ifr.SetUint16(flags)
 	err = unix.IoctlIfreq(nfd, unix.TUNSETIFF, ifr)
 	if err != nil {
 		return nil, err
@@ -578,20 +670,42 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	// Note that the above -- open,ioctl,nonblock -- must happen prior to handing it to netpoll as below this line.
 
 	fd := os.NewFile(uintptr(nfd), cloneDevicePath)
-	return CreateTUNFromFile(fd, mtu)
+	return CreateTUNFromFile(fd, mtu, options...)
 }
 
 // CreateTUNFromFile creates a Device from an os.File with the provided MTU.
-func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
+func CreateTUNFromFile(file *os.File, mtu int, options ...Option) (Device, error) {
+	tun, err := createTUN(options...)
+	if err != nil {
+		return nil, err
+	}
+
+	return populateTUN(file, tun, mtu)
+}
+
+func createTUN(options ...Option) (*NativeTun, error) {
 	tun := &NativeTun{
-		tunFile:                 file,
 		events:                  make(chan Event, 5),
 		errors:                  make(chan error, 5),
 		statusListenersShutdown: make(chan struct{}),
 		tcpGROTable:             newTCPGROTable(),
 		udpGROTable:             newUDPGROTable(),
 		toWrite:                 make([]int, 0, conn.IdealBatchSize),
+		offload:                 true,
 	}
+
+	for _, opt := range options {
+		err := opt(tun)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return tun, nil
+}
+
+func populateTUN(file *os.File, tun *NativeTun, mtu int) (Device, error) {
+	tun.tunFile = file
 
 	name, err := tun.Name()
 	if err != nil {
@@ -634,7 +748,7 @@ func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 
 // CreateUnmonitoredTUNFromFD creates a Device from the provided file
 // descriptor.
-func CreateUnmonitoredTUNFromFD(fd int) (Device, string, error) {
+func CreateUnmonitoredTUNFromFD(fd int, options ...Option) (Device, string, error) {
 	err := unix.SetNonblock(fd, true)
 	if err != nil {
 		return nil, "", err
@@ -647,7 +761,16 @@ func CreateUnmonitoredTUNFromFD(fd int) (Device, string, error) {
 		tcpGROTable: newTCPGROTable(),
 		udpGROTable: newUDPGROTable(),
 		toWrite:     make([]int, 0, conn.IdealBatchSize),
+		offload:     true,
 	}
+
+	for _, opt := range options {
+		err = opt(tun)
+		if err != nil {
+			return nil, "", err
+		}
+	}
+
 	name, err := tun.Name()
 	if err != nil {
 		return nil, "", err

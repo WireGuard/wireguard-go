@@ -446,6 +446,8 @@ func (t *fakeTUNDeviceSized) Name() (string, error)                        { ret
 func (t *fakeTUNDeviceSized) Events() <-chan tun.Event                     { return nil }
 func (t *fakeTUNDeviceSized) Close() error                                 { return nil }
 func (t *fakeTUNDeviceSized) BatchSize() int                               { return t.size }
+func (t *fakeTUNDeviceSized) MinOffset() int                               { return 0 }
+func (t *fakeTUNDeviceSized) SetCarrier(bool) error                        { return nil }
 
 func TestBatchSize(t *testing.T) {
 	d := Device{}

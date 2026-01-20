@@ -191,6 +191,14 @@ func (tun *netTun) BatchSize() int {
 	return 1
 }
 
+func (tun *netTun) MinOffset() int {
+	return 0
+}
+
+func (tun *netTun) SetCarrier(bool) error {
+	return nil
+}
+
 func convertToFullAddr(endpoint netip.AddrPort) (tcpip.FullAddress, tcpip.NetworkProtocolNumber) {
 	var protoNumber tcpip.NetworkProtocolNumber
 	if endpoint.Addr().Is4() {

@@ -26,12 +26,14 @@ type Device interface {
 	// packet lengths within the sizes slice. len(sizes) must be >= len(bufs).
 	// A nonzero offset can be used to instruct the Device on where to begin
 	// reading into each element of the bufs slice.
+	// A value of offset must be equal or greater than indicated by MinOffset()
 	Read(bufs [][]byte, sizes []int, offset int) (n int, err error)
 
 	// Write one or more packets to the device (without any additional headers).
 	// On a successful write it returns the number of packets written. A nonzero
 	// offset can be used to instruct the Device on where to begin writing from
 	// each packet contained within the bufs slice.
+	// A value of offset must be equal or greater than indicated by MinOffset()
 	Write(bufs [][]byte, offset int) (int, error)
 
 	// MTU returns the MTU of the Device.
@@ -43,6 +45,9 @@ type Device interface {
 	// Events returns a channel of type Event, which is fed Device events.
 	Events() <-chan Event
 
+	// SetCarrier sets carrier indication
+	SetCarrier(present bool) error
+
 	// Close stops the Device and closes the Event channel.
 	Close() error
 
@@ -50,4 +55,7 @@ type Device interface {
 	// written in a single read/write call. BatchSize must not change over the
 	// lifetime of a Device.
 	BatchSize() int
+
+	// MinOffset indicates minimum offset value buffers must use
+	MinOffset() int
 }

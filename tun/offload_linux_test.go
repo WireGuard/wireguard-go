@@ -6,6 +6,7 @@
 package tun
 
 import (
+	"fmt"
 	"net/netip"
 	"testing"
 
@@ -236,6 +237,7 @@ func Test_handleVirtioRead(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			out := make([][]byte, conn.IdealBatchSize)
 			sizes := make([]int, conn.IdealBatchSize)
+
 			for i := range out {
 				out[i] = make([]byte, 65535)
 			}
@@ -288,244 +290,248 @@ func Fuzz_handleGRO(f *testing.F) {
 	pkt11 := udp6Packet(ip6PortA, ip6PortC, 100)
 	f.Add(pkt0, pkt1, pkt2, pkt3, pkt4, pkt5, pkt6, pkt7, pkt8, pkt9, pkt10, pkt11, true, offset)
 	f.Fuzz(func(t *testing.T, pkt0, pkt1, pkt2, pkt3, pkt4, pkt5, pkt6, pkt7, pkt8, pkt9, pkt10, pkt11 []byte, canUDPGRO bool, offset int) {
-		pkts := [][]byte{pkt0, pkt1, pkt2, pkt3, pkt4, pkt5, pkt6, pkt7, pkt8, pkt9, pkt10, pkt11}
-		toWrite := make([]int, 0, len(pkts))
-		handleGRO(pkts, offset, newTCPGROTable(), newUDPGROTable(), canUDPGRO, &toWrite)
-		if len(toWrite) > len(pkts) {
-			t.Errorf("len(toWrite): %d > len(pkts): %d", len(toWrite), len(pkts))
-		}
-		seenWriteI := make(map[int]bool)
-		for _, writeI := range toWrite {
-			if writeI < 0 || writeI > len(pkts)-1 {
-				t.Errorf("toWrite value (%d) outside bounds of len(pkts): %d", writeI, len(pkts))
+		for _, forceCSum := range []bool{false, true} {
+			pkts := [][]byte{pkt0, pkt1, pkt2, pkt3, pkt4, pkt5, pkt6, pkt7, pkt8, pkt9, pkt10, pkt11}
+			toWrite := make([]int, 0, len(pkts))
+			handleGRO(pkts, offset, newTCPGROTable(), newUDPGROTable(), canUDPGRO, forceCSum, &toWrite)
+			if len(toWrite) > len(pkts) {
+				t.Errorf("len(toWrite): %d > len(pkts): %d", len(toWrite), len(pkts))
 			}
-			if seenWriteI[writeI] {
-				t.Errorf("duplicate toWrite value: %d", writeI)
+			seenWriteI := make(map[int]bool)
+			for _, writeI := range toWrite {
+				if writeI < 0 || writeI > len(pkts)-1 {
+					t.Errorf("toWrite value (%d) outside bounds of len(pkts): %d", writeI, len(pkts))
+				}
+				if seenWriteI[writeI] {
+					t.Errorf("duplicate toWrite value: %d", writeI)
+				}
+				seenWriteI[writeI] = true
 			}
-			seenWriteI[writeI] = true
 		}
 	})
 }
 
 func Test_handleGRO(t *testing.T) {
-	tests := []struct {
-		name        string
-		pktsIn      [][]byte
-		canUDPGRO   bool
-		wantToWrite []int
-		wantLens    []int
-		wantErr     bool
-	}{
-		{
-			"multiple protocols and flows",
-			[][]byte{
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),   // tcp4 flow 1
-				udp4Packet(ip4PortA, ip4PortB, 100),                         // udp4 flow 1
-				udp4Packet(ip4PortA, ip4PortC, 100),                         // udp4 flow 2
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101), // tcp4 flow 1
-				tcp4Packet(ip4PortA, ip4PortC, header.TCPFlagAck, 100, 201), // tcp4 flow 2
-				tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 1),   // tcp6 flow 1
-				tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 101), // tcp6 flow 1
-				tcp6Packet(ip6PortA, ip6PortC, header.TCPFlagAck, 100, 201), // tcp6 flow 2
-				udp4Packet(ip4PortA, ip4PortB, 100),                         // udp4 flow 1
-				udp6Packet(ip6PortA, ip6PortB, 100),                         // udp6 flow 1
-				udp6Packet(ip6PortA, ip6PortB, 100),                         // udp6 flow 1
+	for _, forceCSum := range []bool{true, false} {
+		tests := []struct {
+			name        string
+			pktsIn      [][]byte
+			canUDPGRO   bool
+			wantToWrite []int
+			wantLens    []int
+			wantErr     bool
+		}{
+			{
+				"multiple protocols and flows",
+				[][]byte{
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),   // tcp4 flow 1
+					udp4Packet(ip4PortA, ip4PortB, 100),                         // udp4 flow 1
+					udp4Packet(ip4PortA, ip4PortC, 100),                         // udp4 flow 2
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101), // tcp4 flow 1
+					tcp4Packet(ip4PortA, ip4PortC, header.TCPFlagAck, 100, 201), // tcp4 flow 2
+					tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 1),   // tcp6 flow 1
+					tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 101), // tcp6 flow 1
+					tcp6Packet(ip6PortA, ip6PortC, header.TCPFlagAck, 100, 201), // tcp6 flow 2
+					udp4Packet(ip4PortA, ip4PortB, 100),                         // udp4 flow 1
+					udp6Packet(ip6PortA, ip6PortB, 100),                         // udp6 flow 1
+					udp6Packet(ip6PortA, ip6PortB, 100),                         // udp6 flow 1
+				},
+				true,
+				[]int{0, 1, 2, 4, 5, 7, 9},
+				[]int{240, 228, 128, 140, 260, 160, 248},
+				false,
 			},
-			true,
-			[]int{0, 1, 2, 4, 5, 7, 9},
-			[]int{240, 228, 128, 140, 260, 160, 248},
-			false,
-		},
-		{
-			"multiple protocols and flows no UDP GRO",
-			[][]byte{
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),   // tcp4 flow 1
-				udp4Packet(ip4PortA, ip4PortB, 100),                         // udp4 flow 1
-				udp4Packet(ip4PortA, ip4PortC, 100),                         // udp4 flow 2
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101), // tcp4 flow 1
-				tcp4Packet(ip4PortA, ip4PortC, header.TCPFlagAck, 100, 201), // tcp4 flow 2
-				tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 1),   // tcp6 flow 1
-				tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 101), // tcp6 flow 1
-				tcp6Packet(ip6PortA, ip6PortC, header.TCPFlagAck, 100, 201), // tcp6 flow 2
-				udp4Packet(ip4PortA, ip4PortB, 100),                         // udp4 flow 1
-				udp6Packet(ip6PortA, ip6PortB, 100),                         // udp6 flow 1
-				udp6Packet(ip6PortA, ip6PortB, 100),                         // udp6 flow 1
+			{
+				"multiple protocols and flows no UDP GRO",
+				[][]byte{
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),   // tcp4 flow 1
+					udp4Packet(ip4PortA, ip4PortB, 100),                         // udp4 flow 1
+					udp4Packet(ip4PortA, ip4PortC, 100),                         // udp4 flow 2
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101), // tcp4 flow 1
+					tcp4Packet(ip4PortA, ip4PortC, header.TCPFlagAck, 100, 201), // tcp4 flow 2
+					tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 1),   // tcp6 flow 1
+					tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 101), // tcp6 flow 1
+					tcp6Packet(ip6PortA, ip6PortC, header.TCPFlagAck, 100, 201), // tcp6 flow 2
+					udp4Packet(ip4PortA, ip4PortB, 100),                         // udp4 flow 1
+					udp6Packet(ip6PortA, ip6PortB, 100),                         // udp6 flow 1
+					udp6Packet(ip6PortA, ip6PortB, 100),                         // udp6 flow 1
+				},
+				false,
+				[]int{0, 1, 2, 4, 5, 7, 8, 9, 10},
+				[]int{240, 128, 128, 140, 260, 160, 128, 148, 148},
+				false,
 			},
-			false,
-			[]int{0, 1, 2, 4, 5, 7, 8, 9, 10},
-			[]int{240, 128, 128, 140, 260, 160, 128, 148, 148},
-			false,
-		},
-		{
-			"PSH interleaved",
-			[][]byte{
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),                     // v4 flow 1
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck|header.TCPFlagPsh, 100, 101), // v4 flow 1
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 201),                   // v4 flow 1
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 301),                   // v4 flow 1
-				tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 1),                     // v6 flow 1
-				tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck|header.TCPFlagPsh, 100, 101), // v6 flow 1
-				tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 201),                   // v6 flow 1
-				tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 301),                   // v6 flow 1
+			{
+				"PSH interleaved",
+				[][]byte{
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),                     // v4 flow 1
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck|header.TCPFlagPsh, 100, 101), // v4 flow 1
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 201),                   // v4 flow 1
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 301),                   // v4 flow 1
+					tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 1),                     // v6 flow 1
+					tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck|header.TCPFlagPsh, 100, 101), // v6 flow 1
+					tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 201),                   // v6 flow 1
+					tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 301),                   // v6 flow 1
+				},
+				true,
+				[]int{0, 2, 4, 6},
+				[]int{240, 240, 260, 260},
+				false,
 			},
-			true,
-			[]int{0, 2, 4, 6},
-			[]int{240, 240, 260, 260},
-			false,
-		},
-		{
-			"coalesceItemInvalidCSum",
-			[][]byte{
-				flipTCP4Checksum(tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1)), // v4 flow 1 seq 1 len 100
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101),                 // v4 flow 1 seq 101 len 100
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 201),                 // v4 flow 1 seq 201 len 100
-				flipUDP4Checksum(udp4Packet(ip4PortA, ip4PortB, 100)),
-				udp4Packet(ip4PortA, ip4PortB, 100),
-				udp4Packet(ip4PortA, ip4PortB, 100),
+			{
+				"coalesceItemInvalidCSum",
+				[][]byte{
+					flipTCP4Checksum(tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1)), // v4 flow 1 seq 1 len 100
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101),                 // v4 flow 1 seq 101 len 100
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 201),                 // v4 flow 1 seq 201 len 100
+					flipUDP4Checksum(udp4Packet(ip4PortA, ip4PortB, 100)),
+					udp4Packet(ip4PortA, ip4PortB, 100),
+					udp4Packet(ip4PortA, ip4PortB, 100),
+				},
+				true,
+				[]int{0, 1, 3, 4},
+				[]int{140, 240, 128, 228},
+				false,
 			},
-			true,
-			[]int{0, 1, 3, 4},
-			[]int{140, 240, 128, 228},
-			false,
-		},
-		{
-			"out of order",
-			[][]byte{
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101), // v4 flow 1 seq 101 len 100
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),   // v4 flow 1 seq 1 len 100
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 201), // v4 flow 1 seq 201 len 100
+			{
+				"out of order",
+				[][]byte{
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101), // v4 flow 1 seq 101 len 100
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),   // v4 flow 1 seq 1 len 100
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 201), // v4 flow 1 seq 201 len 100
+				},
+				true,
+				[]int{0},
+				[]int{340},
+				false,
 			},
-			true,
-			[]int{0},
-			[]int{340},
-			false,
-		},
-		{
-			"unequal TTL",
-			[][]byte{
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),
-				tcp4PacketMutateIPFields(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv4Fields) {
-					fields.TTL++
-				}),
-				udp4Packet(ip4PortA, ip4PortB, 100),
-				udp4PacketMutateIPFields(ip4PortA, ip4PortB, 100, func(fields *header.IPv4Fields) {
-					fields.TTL++
-				}),
+			{
+				"unequal TTL",
+				[][]byte{
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),
+					tcp4PacketMutateIPFields(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv4Fields) {
+						fields.TTL++
+					}),
+					udp4Packet(ip4PortA, ip4PortB, 100),
+					udp4PacketMutateIPFields(ip4PortA, ip4PortB, 100, func(fields *header.IPv4Fields) {
+						fields.TTL++
+					}),
+				},
+				true,
+				[]int{0, 1, 2, 3},
+				[]int{140, 140, 128, 128},
+				false,
 			},
-			true,
-			[]int{0, 1, 2, 3},
-			[]int{140, 140, 128, 128},
-			false,
-		},
-		{
-			"unequal ToS",
-			[][]byte{
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),
-				tcp4PacketMutateIPFields(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv4Fields) {
-					fields.TOS++
-				}),
-				udp4Packet(ip4PortA, ip4PortB, 100),
-				udp4PacketMutateIPFields(ip4PortA, ip4PortB, 100, func(fields *header.IPv4Fields) {
-					fields.TOS++
-				}),
+			{
+				"unequal ToS",
+				[][]byte{
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),
+					tcp4PacketMutateIPFields(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv4Fields) {
+						fields.TOS++
+					}),
+					udp4Packet(ip4PortA, ip4PortB, 100),
+					udp4PacketMutateIPFields(ip4PortA, ip4PortB, 100, func(fields *header.IPv4Fields) {
+						fields.TOS++
+					}),
+				},
+				true,
+				[]int{0, 1, 2, 3},
+				[]int{140, 140, 128, 128},
+				false,
 			},
-			true,
-			[]int{0, 1, 2, 3},
-			[]int{140, 140, 128, 128},
-			false,
-		},
-		{
-			"unequal flags more fragments set",
-			[][]byte{
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),
-				tcp4PacketMutateIPFields(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv4Fields) {
-					fields.Flags = 1
-				}),
-				udp4Packet(ip4PortA, ip4PortB, 100),
-				udp4PacketMutateIPFields(ip4PortA, ip4PortB, 100, func(fields *header.IPv4Fields) {
-					fields.Flags = 1
-				}),
+			{
+				"unequal flags more fragments set",
+				[][]byte{
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),
+					tcp4PacketMutateIPFields(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv4Fields) {
+						fields.Flags = 1
+					}),
+					udp4Packet(ip4PortA, ip4PortB, 100),
+					udp4PacketMutateIPFields(ip4PortA, ip4PortB, 100, func(fields *header.IPv4Fields) {
+						fields.Flags = 1
+					}),
+				},
+				true,
+				[]int{0, 1, 2, 3},
+				[]int{140, 140, 128, 128},
+				false,
 			},
-			true,
-			[]int{0, 1, 2, 3},
-			[]int{140, 140, 128, 128},
-			false,
-		},
-		{
-			"unequal flags DF set",
-			[][]byte{
-				tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),
-				tcp4PacketMutateIPFields(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv4Fields) {
-					fields.Flags = 2
-				}),
-				udp4Packet(ip4PortA, ip4PortB, 100),
-				udp4PacketMutateIPFields(ip4PortA, ip4PortB, 100, func(fields *header.IPv4Fields) {
-					fields.Flags = 2
-				}),
+			{
+				"unequal flags DF set",
+				[][]byte{
+					tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 1),
+					tcp4PacketMutateIPFields(ip4PortA, ip4PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv4Fields) {
+						fields.Flags = 2
+					}),
+					udp4Packet(ip4PortA, ip4PortB, 100),
+					udp4PacketMutateIPFields(ip4PortA, ip4PortB, 100, func(fields *header.IPv4Fields) {
+						fields.Flags = 2
+					}),
+				},
+				true,
+				[]int{0, 1, 2, 3},
+				[]int{140, 140, 128, 128},
+				false,
 			},
-			true,
-			[]int{0, 1, 2, 3},
-			[]int{140, 140, 128, 128},
-			false,
-		},
-		{
-			"ipv6 unequal hop limit",
-			[][]byte{
-				tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 1),
-				tcp6PacketMutateIPFields(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv6Fields) {
-					fields.HopLimit++
-				}),
-				udp6Packet(ip6PortA, ip6PortB, 100),
-				udp6PacketMutateIPFields(ip6PortA, ip6PortB, 100, func(fields *header.IPv6Fields) {
-					fields.HopLimit++
-				}),
+			{
+				"ipv6 unequal hop limit",
+				[][]byte{
+					tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 1),
+					tcp6PacketMutateIPFields(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv6Fields) {
+						fields.HopLimit++
+					}),
+					udp6Packet(ip6PortA, ip6PortB, 100),
+					udp6PacketMutateIPFields(ip6PortA, ip6PortB, 100, func(fields *header.IPv6Fields) {
+						fields.HopLimit++
+					}),
+				},
+				true,
+				[]int{0, 1, 2, 3},
+				[]int{160, 160, 148, 148},
+				false,
 			},
-			true,
-			[]int{0, 1, 2, 3},
-			[]int{160, 160, 148, 148},
-			false,
-		},
-		{
-			"ipv6 unequal traffic class",
-			[][]byte{
-				tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 1),
-				tcp6PacketMutateIPFields(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv6Fields) {
-					fields.TrafficClass++
-				}),
-				udp6Packet(ip6PortA, ip6PortB, 100),
-				udp6PacketMutateIPFields(ip6PortA, ip6PortB, 100, func(fields *header.IPv6Fields) {
-					fields.TrafficClass++
-				}),
+			{
+				"ipv6 unequal traffic class",
+				[][]byte{
+					tcp6Packet(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 1),
+					tcp6PacketMutateIPFields(ip6PortA, ip6PortB, header.TCPFlagAck, 100, 101, func(fields *header.IPv6Fields) {
+						fields.TrafficClass++
+					}),
+					udp6Packet(ip6PortA, ip6PortB, 100),
+					udp6PacketMutateIPFields(ip6PortA, ip6PortB, 100, func(fields *header.IPv6Fields) {
+						fields.TrafficClass++
+					}),
+				},
+				true,
+				[]int{0, 1, 2, 3},
+				[]int{160, 160, 148, 148},
+				false,
 			},
-			true,
-			[]int{0, 1, 2, 3},
-			[]int{160, 160, 148, 148},
-			false,
-		},
-	}
+		}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			toWrite := make([]int, 0, len(tt.pktsIn))
-			err := handleGRO(tt.pktsIn, offset, newTCPGROTable(), newUDPGROTable(), tt.canUDPGRO, &toWrite)
-			if err != nil {
-				if tt.wantErr {
-					return
+		for _, tt := range tests {
+			t.Run(fmt.Sprint(tt.name, " force ", forceCSum), func(t *testing.T) {
+				toWrite := make([]int, 0, len(tt.pktsIn))
+				err := handleGRO(tt.pktsIn, offset, newTCPGROTable(), newUDPGROTable(), tt.canUDPGRO, forceCSum, &toWrite)
+				if err != nil {
+					if tt.wantErr {
+						return
+					}
+					t.Fatalf("got err: %v", err)
 				}
-				t.Fatalf("got err: %v", err)
-			}
-			if len(toWrite) != len(tt.wantToWrite) {
-				t.Fatalf("got %d packets, wanted %d", len(toWrite), len(tt.wantToWrite))
-			}
-			for i, pktI := range tt.wantToWrite {
-				if tt.wantToWrite[i] != toWrite[i] {
-					t.Fatalf("wantToWrite[%d]: %d != toWrite: %d", i, tt.wantToWrite[i], toWrite[i])
+				if len(toWrite) != len(tt.wantToWrite) {
+					t.Fatalf("got %d packets, wanted %d", len(toWrite), len(tt.wantToWrite))
 				}
-				if tt.wantLens[i] != len(tt.pktsIn[pktI][offset:]) {
-					t.Errorf("wanted len %d packet at %d, got: %d", tt.wantLens[i], i, len(tt.pktsIn[pktI][offset:]))
+				for i, pktI := range tt.wantToWrite {
+					if tt.wantToWrite[i] != toWrite[i] {
+						t.Fatalf("wantToWrite[%d]: %d != toWrite: %d", i, tt.wantToWrite[i], toWrite[i])
+					}
+					if tt.wantLens[i] != len(tt.pktsIn[pktI][offset:]) {
+						t.Errorf("wanted len %d packet at %d, got: %d", tt.wantLens[i], i, len(tt.pktsIn[pktI][offset:]))
+					}
 				}
-			}
-		})
+			})
+		}
 	}
 }
 

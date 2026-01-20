@@ -153,3 +153,5 @@ func (t *chTun) Close() error {
 	t.Write(nil, -1)
 	return nil
 }
+func (t *chTun) MinOffset() int        { return 0 }
+func (t *chTun) SetCarrier(bool) error { return nil }

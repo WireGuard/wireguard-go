@@ -32,18 +32,45 @@ type rateJuggler struct {
 }
 
 type NativeTun struct {
-	wt        *wintun.Adapter
-	name      string
-	handle    windows.Handle
-	rate      rateJuggler
-	session   wintun.Session
-	readWait  windows.Handle
-	events    chan Event
-	running   sync.WaitGroup
-	closeOnce sync.Once
-	close     atomic.Bool
-	forcedMTU int
-	outSizes  []int
+	wt                 *wintun.Adapter
+	name               string
+	handle             windows.Handle
+	rate               rateJuggler
+	session            wintun.Session
+	readWait           windows.Handle
+	events             chan Event
+	running            sync.WaitGroup
+	closeOnce          sync.Once
+	close              atomic.Bool
+	forcedMTU          int
+	outSizes           []int
+	writeForceChecksum bool
+}
+
+// Option functional option interface
+type Option func(tun *NativeTun) error
+
+// WithOffload API compatability stub, does nothing on this platform
+func WithOffload(offload bool) Option {
+	return func(tun *NativeTun) error {
+		return nil
+	}
+}
+
+// WithCarrier API compatability stub, does nothing on this platform
+func WithCarrier(carrier bool) Option {
+	return func(tun *NativeTun) error {
+		return nil
+	}
+}
+
+// WithWriteForceChecksum force checksum computation for sent packets, default false
+func WithWriteForceChecksum(forceChecksum bool) Option {
+	return func(tun *NativeTun) error {
+		tun.writeForceChecksum = forceChecksum
+
+		return nil
+	}
 }
 
 var (
@@ -59,13 +86,13 @@ func nanotime() int64
 
 // CreateTUN creates a Wintun interface with the given name. Should a Wintun
 // interface with the same name exist, it is reused.
-func CreateTUN(ifname string, mtu int) (Device, error) {
-	return CreateTUNWithRequestedGUID(ifname, WintunStaticRequestedGUID, mtu)
+func CreateTUN(ifname string, mtu int, options ...Option) (Device, error) {
+	return CreateTUNWithRequestedGUID(ifname, WintunStaticRequestedGUID, mtu, options...)
 }
 
 // CreateTUNWithRequestedGUID creates a Wintun interface with the given name and
 // a requested GUID. Should a Wintun interface with the same name exist, it is reused.
-func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu int) (Device, error) {
+func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu int, options ...Option) (Device, error) {
 	wt, err := wintun.CreateAdapter(ifname, WintunTunnelType, requestedGUID)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating interface: %w", err)
@@ -82,6 +109,15 @@ func CreateTUNWithRequestedGUID(ifname string, requestedGUID *windows.GUID, mtu 
 		handle:    windows.InvalidHandle,
 		events:    make(chan Event, 10),
 		forcedMTU: forcedMTU,
+	}
+
+	for _, opt := range options {
+		err = opt(tun)
+		if err != nil {
+			tun.wt.Close()
+			close(tun.events)
+			return nil, fmt.Errorf("Error configuring interface: %w", err)
+		}
 	}
 
 	tun.session, err = wt.StartSession(0x800000) // Ring capacity, 8 MiB
@@ -137,9 +173,17 @@ func (tun *NativeTun) ForceMTU(mtu int) {
 	}
 }
 
+func (tun *NativeTun) SetCarrier(carrier bool) (err error) {
+	return nil
+}
+
 func (tun *NativeTun) BatchSize() int {
 	// TODO: implement batching with wintun
 	return 1
+}
+
+func (tun *NativeTun) MinOffset() int {
+	return 0
 }
 
 // Note: Read() and Write() assume the caller comes only from a single thread; there's no locking.
@@ -189,6 +233,10 @@ func (tun *NativeTun) Write(bufs [][]byte, offset int) (int, error) {
 	}
 
 	for i, buf := range bufs {
+		if tun.writeForceChecksum {
+			ComputeIPChecksumBuffer(bufs[i][offset:], false)
+		}
+
 		packetSize := len(buf) - offset
 		tun.rate.update(uint64(packetSize))
 
