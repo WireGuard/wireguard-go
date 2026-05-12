@@ -141,6 +141,7 @@ func (device *Device) RoutineReceiveIncoming(maxBatchSize int, recv conn.Receive
 			// check if transport
 
 			case MessageTransportType:
+				device.log.Verbosef("MessageTransportType")
 
 				// check size
 
@@ -188,16 +189,19 @@ func (device *Device) RoutineReceiveIncoming(maxBatchSize int, recv conn.Receive
 			// otherwise it is a fixed size & handshake related packet
 
 			case MessageInitiationType:
+				device.log.Verbosef("MessageInitiationType")
 				if len(packet) != MessageInitiationSize {
 					continue
 				}
 
 			case MessageResponseType:
+				device.log.Verbosef("MessageResponseType")
 				if len(packet) != MessageResponseSize {
 					continue
 				}
 
 			case MessageCookieReplyType:
+				device.log.Verbosef("MessageCookieReplyType")
 				if len(packet) != MessageCookieReplySize {
 					continue
 				}
@@ -364,6 +368,11 @@ func (device *Device) RoutineHandshake(id int) {
 				device.log.Verbosef("Received invalid initiation message from %s", elem.endpoint.DstToString())
 				goto skip
 			}
+			sockAddr := &IpSocketAddr{}
+			sockAddr.Encode(elem.endpoint.DstToString())
+			peer.handshake.mutex.Lock()
+			peer.handshake.socketAddr = sockAddr
+			peer.handshake.mutex.Unlock()
 
 			// update timers
 

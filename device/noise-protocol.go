@@ -62,7 +62,7 @@ const (
 
 const (
 	MessageInitiationSize      = 148                                           // size of handshake initiation message
-	MessageResponseSize        = 92                                            // size of response message
+	MessageResponseSize        = 112                                           // size of response message
 	MessageCookieReplySize     = 64                                            // size of cookie reply message
 	MessageTransportHeaderSize = 16                                            // size of data preceding content in transport message
 	MessageTransportSize       = MessageTransportHeaderSize + poly1305.TagSize // size of empty transport
@@ -93,13 +93,13 @@ type MessageInitiation struct {
 }
 
 type MessageResponse struct {
-	Type      uint32
-	Sender    uint32
-	Receiver  uint32
-	Ephemeral NoisePublicKey
-	Empty     [poly1305.TagSize]byte
-	MAC1      [blake2s.Size128]byte
-	MAC2      [blake2s.Size128]byte
+	Type       uint32
+	Sender     uint32
+	Receiver   uint32
+	Ephemeral  NoisePublicKey
+	SocketAddr [poly1305.TagSize + 20]byte
+	MAC1       [blake2s.Size128]byte
+	MAC2       [blake2s.Size128]byte
 }
 
 type MessageTransport struct {
@@ -159,9 +159,9 @@ func (msg *MessageResponse) unmarshal(b []byte) error {
 	msg.Sender = binary.LittleEndian.Uint32(b[4:])
 	msg.Receiver = binary.LittleEndian.Uint32(b[8:])
 	copy(msg.Ephemeral[:], b[12:])
-	copy(msg.Empty[:], b[12+len(msg.Ephemeral):])
-	copy(msg.MAC1[:], b[12+len(msg.Ephemeral)+len(msg.Empty):])
-	copy(msg.MAC2[:], b[12+len(msg.Ephemeral)+len(msg.Empty)+len(msg.MAC1):])
+	copy(msg.SocketAddr[:], b[12+len(msg.Ephemeral):])
+	copy(msg.MAC1[:], b[12+len(msg.Ephemeral)+len(msg.SocketAddr):])
+	copy(msg.MAC2[:], b[12+len(msg.Ephemeral)+len(msg.SocketAddr)+len(msg.MAC1):])
 
 	return nil
 }
@@ -175,9 +175,9 @@ func (msg *MessageResponse) marshal(b []byte) error {
 	binary.LittleEndian.PutUint32(b[4:], msg.Sender)
 	binary.LittleEndian.PutUint32(b[8:], msg.Receiver)
 	copy(b[12:], msg.Ephemeral[:])
-	copy(b[12+len(msg.Ephemeral):], msg.Empty[:])
-	copy(b[12+len(msg.Ephemeral)+len(msg.Empty):], msg.MAC1[:])
-	copy(b[12+len(msg.Ephemeral)+len(msg.Empty)+len(msg.MAC1):], msg.MAC2[:])
+	copy(b[12+len(msg.Ephemeral):], msg.SocketAddr[:])
+	copy(b[12+len(msg.Ephemeral)+len(msg.SocketAddr):], msg.MAC1[:])
+	copy(b[12+len(msg.Ephemeral)+len(msg.SocketAddr)+len(msg.MAC1):], msg.MAC2[:])
 
 	return nil
 }
@@ -223,6 +223,7 @@ type Handshake struct {
 	lastTimestamp             tai64n.Timestamp
 	lastInitiationConsumption time.Time
 	lastSentHandshake         time.Time
+	socketAddr                *IpSocketAddr
 }
 
 var (
@@ -501,8 +502,8 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 	handshake.mixHash(tau[:])
 
 	aead, _ := chacha20poly1305.New(key[:])
-	aead.Seal(msg.Empty[:0], ZeroNonce[:], nil, handshake.hash[:])
-	handshake.mixHash(msg.Empty[:])
+	aead.Seal(msg.SocketAddr[:0], ZeroNonce[:], handshake.socketAddr[:], handshake.hash[:])
+	handshake.mixHash(msg.SocketAddr[:])
 
 	handshake.state = handshakeResponseCreated
 
@@ -526,7 +527,7 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 		hash     [blake2s.Size]byte
 		chainKey [blake2s.Size]byte
 	)
-
+	socketAddr := &IpSocketAddr{}
 	ok := func() bool {
 		// lock handshake state
 
@@ -577,11 +578,12 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 		// authenticate transcript
 
 		aead, _ := chacha20poly1305.New(key[:])
-		_, err = aead.Open(nil, ZeroNonce[:], msg.Empty[:], hash[:])
+
+		_, err = aead.Open(socketAddr[:], ZeroNonce[:], msg.SocketAddr[:], hash[:])
 		if err != nil {
 			return false
 		}
-		mixHash(&hash, &hash, msg.Empty[:])
+		mixHash(&hash, &hash, msg.SocketAddr[:])
 		return true
 	}()
 
@@ -597,6 +599,7 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 	handshake.chainKey = chainKey
 	handshake.remoteIndex = msg.Sender
 	handshake.state = handshakeResponseConsumed
+	handshake.socketAddr = socketAddr
 
 	handshake.mutex.Unlock()
 
