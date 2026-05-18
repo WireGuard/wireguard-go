@@ -14,11 +14,11 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/rohrerj/scion-over-wireguard/conn"
+	"github.com/rohrerj/scion-over-wireguard/device"
+	"github.com/rohrerj/scion-over-wireguard/ipc"
+	"github.com/rohrerj/scion-over-wireguard/tun"
 	"golang.org/x/sys/unix"
-	"golang.zx2c4.com/wireguard/conn"
-	"golang.zx2c4.com/wireguard/device"
-	"golang.zx2c4.com/wireguard/ipc"
-	"golang.zx2c4.com/wireguard/tun"
 )
 
 const (

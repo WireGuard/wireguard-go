@@ -22,7 +22,7 @@ import (
 	"syscall"
 	"time"
 
-	"golang.zx2c4.com/wireguard/tun"
+	"github.com/rohrerj/scion-over-wireguard/tun"
 
 	"golang.org/x/net/dns/dnsmessage"
 	"gvisor.dev/gvisor/pkg/buffer"

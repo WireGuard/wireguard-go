@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rohrerj/scion-over-wireguard/conn"
+	"github.com/rohrerj/scion-over-wireguard/tun"
 	"golang.org/x/crypto/chacha20poly1305"
-	"golang.zx2c4.com/wireguard/conn"
-	"golang.zx2c4.com/wireguard/tun"
 )
 
 /* Outbound flow

@@ -1,4 +1,4 @@
-module golang.zx2c4.com/wireguard
+module github.com/rohrerj/scion-over-wireguard
 
 go 1.23.1
 

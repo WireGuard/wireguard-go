@@ -9,8 +9,8 @@ import (
 	"net/netip"
 	"testing"
 
+	"github.com/rohrerj/scion-over-wireguard/conn"
 	"golang.org/x/sys/unix"
-	"golang.zx2c4.com/wireguard/conn"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 )

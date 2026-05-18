@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rohrerj/scion-over-wireguard/conn"
 	"golang.org/x/crypto/chacha20poly1305"
-	"golang.zx2c4.com/wireguard/conn"
 )
 
 type QueueHandshakeElement struct {

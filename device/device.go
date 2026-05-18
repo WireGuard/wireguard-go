@@ -11,10 +11,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.zx2c4.com/wireguard/conn"
-	"golang.zx2c4.com/wireguard/ratelimiter"
-	"golang.zx2c4.com/wireguard/rwcancel"
-	"golang.zx2c4.com/wireguard/tun"
+	"github.com/rohrerj/scion-over-wireguard/conn"
+	"github.com/rohrerj/scion-over-wireguard/ratelimiter"
+	"github.com/rohrerj/scion-over-wireguard/rwcancel"
+	"github.com/rohrerj/scion-over-wireguard/tun"
 )
 
 type HandshakeInfo struct {
