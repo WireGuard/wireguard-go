@@ -579,7 +579,7 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 
 		aead, _ := chacha20poly1305.New(key[:])
 
-		_, err = aead.Open(socketAddr[:], ZeroNonce[:], msg.SocketAddr[:], hash[:])
+		_, err = aead.Open(socketAddr[:0], ZeroNonce[:], msg.SocketAddr[:], hash[:])
 		if err != nil {
 			return false
 		}

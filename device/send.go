@@ -8,14 +8,11 @@ package device
 import (
 	"encoding/binary"
 	"errors"
-	"net"
 	"os"
 	"sync"
 	"time"
 
 	"golang.org/x/crypto/chacha20poly1305"
-	"golang.org/x/net/ipv4"
-	"golang.org/x/net/ipv6"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/tun"
 )
@@ -250,7 +247,13 @@ func (device *Device) RoutineReadFromTUN() {
 
 			// lookup peer
 			var peer *Peer
-			switch elem.packet[0] >> 4 {
+			if elem.packet[0] != 0 {
+				device.log.Verbosef("Received packet with unknown SCION version")
+				continue
+			}
+			dst := []byte{127, 0, 0, 1}
+			peer = device.allowedips.Lookup(dst)
+			/*switch elem.packet[0] >> 4 {
 			case 4:
 				if len(elem.packet) < ipv4.HeaderLen {
 					continue
@@ -267,9 +270,10 @@ func (device *Device) RoutineReadFromTUN() {
 
 			default:
 				device.log.Verbosef("Received packet with unknown IP version")
-			}
+			}*/
 
 			if peer == nil {
+				device.log.Verbosef("RoutineReadFromTUN peer is nil")
 				continue
 			}
 			elemsForPeer, ok := elemsByPeer[peer]

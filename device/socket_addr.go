@@ -34,7 +34,7 @@ func (b *IpSocketAddr) Encode(addr string) error {
 	return nil
 }
 
-func (b *IpSocketAddr) Decode() (net.Addr, error) {
+func (b *IpSocketAddr) Decode() (*net.UDPAddr, error) {
 	if b[1] != 0 {
 		return nil, fmt.Errorf("reserved byte must be 0")
 	}

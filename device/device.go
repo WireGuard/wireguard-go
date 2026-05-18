@@ -17,8 +17,13 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 )
 
+type HandshakeInfo struct {
+	IpSocketAddr IpSocketAddr
+}
+
 type Device struct {
-	state struct {
+	OnHandshakeComplete chan HandshakeInfo
+	state               struct {
 		// state holds the device's state. It is accessed atomically.
 		// Use the device.deviceState method to read it.
 		// device.deviceState does not acquire the mutex, so it captures only a snapshot.
@@ -297,6 +302,7 @@ func NewDevice(tunDevice tun.Device, bind conn.Bind, logger *Logger) *Device {
 	device.peers.keyMap = make(map[NoisePublicKey]*Peer)
 	device.rate.limiter.Init()
 	device.indexTable.Init()
+	device.OnHandshakeComplete = make(chan HandshakeInfo, 1)
 
 	device.PopulatePools()
 
