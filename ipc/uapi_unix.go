@@ -52,7 +52,8 @@ func UAPIOpen(name string) (*os.File, error) {
 	}
 
 	// Test socket, if not in use cleanup and try again.
-	if _, err := net.Dial("unix", socketPath); err == nil {
+	if conn, err := net.Dial("unix", socketPath); err == nil {
+		conn.Close()
 		return nil, errors.New("unix socket in use")
 	}
 	if err := os.Remove(socketPath); err != nil {
