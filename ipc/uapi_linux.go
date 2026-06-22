@@ -74,6 +74,7 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 
 	uapi.inotifyFd, err = unix.InotifyInit()
 	if err != nil {
+		listener.Close()
 		return nil, err
 	}
 
@@ -86,11 +87,14 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 	)
 
 	if err != nil {
+		listener.Close()
+		unix.Close(uapi.inotifyFd)
 		return nil, err
 	}
 
 	uapi.inotifyRWCancel, err = rwcancel.NewRWCancel(uapi.inotifyFd)
 	if err != nil {
+		listener.Close()
 		unix.Close(uapi.inotifyFd)
 		return nil, err
 	}
