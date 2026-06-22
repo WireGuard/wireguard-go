@@ -132,6 +132,7 @@ func listenNet(network string, port int) (*net.UDPConn, int, error) {
 		laddr.String(),
 	)
 	if err != nil {
+		conn.Close()
 		return nil, 0, err
 	}
 	return conn.(*net.UDPConn), uaddr.Port, nil
