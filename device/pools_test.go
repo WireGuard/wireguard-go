@@ -64,7 +64,7 @@ func TestWaitPool(t *testing.T) {
 	}
 	wg.Wait()
 	if max.Load() != p.max {
-		t.Errorf("Actual maximum count (%d) != ideal maximum count (%d)", max, p.max)
+		t.Errorf("Actual maximum count (%d) != ideal maximum count (%d)", max.Load(), p.max)
 	}
 }
 
