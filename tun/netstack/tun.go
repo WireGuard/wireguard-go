@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -49,6 +50,7 @@ type netTun struct {
 	mtu            int
 	dnsServers     []netip.Addr
 	hasV4, hasV6   bool
+	closeOnce      sync.Once
 }
 
 type Net netTun
@@ -176,19 +178,26 @@ func (tun *netTun) WriteNotify() {
 	tun.incomingPacket <- view
 }
 
+// Close tears the device down. It is safe to call more than once and from
+// several goroutines: callers above this layer hold their own references to the
+// device and cannot coordinate with each other, and Device.Close is also
+// reached from RoutineReadFromTUN, so a bare close of the channels here takes
+// the whole process down with a close of closed channel panic.
 func (tun *netTun) Close() error {
-	tun.stack.RemoveNIC(1)
-	tun.stack.Close()
-	tun.ep.RemoveNotify(tun.notifyHandle)
-	tun.ep.Close()
+	tun.closeOnce.Do(func() {
+		tun.stack.RemoveNIC(1)
+		tun.stack.Close()
+		tun.ep.RemoveNotify(tun.notifyHandle)
+		tun.ep.Close()
 
-	if tun.events != nil {
-		close(tun.events)
-	}
+		if tun.events != nil {
+			close(tun.events)
+		}
 
-	if tun.incomingPacket != nil {
-		close(tun.incomingPacket)
-	}
+		if tun.incomingPacket != nil {
+			close(tun.incomingPacket)
+		}
+	})
 
 	return nil
 }
