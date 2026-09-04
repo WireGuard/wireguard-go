@@ -99,19 +99,42 @@ func (elem *QueueOutboundElement) clearPointers() {
  */
 func (peer *Peer) SendKeepalive() {
 	if len(peer.queue.staged) == 0 && peer.isRunning.Load() {
-		elem := peer.device.NewOutboundElement()
-		elemsContainer := peer.device.GetOutboundElementsContainer()
-		elemsContainer.elems = append(elemsContainer.elems, elem)
-		select {
-		case peer.queue.staged <- elemsContainer:
-			peer.device.log.Verbosef("%v - Sending keepalive packet", peer)
-		default:
-			peer.device.PutMessageBuffer(elem.buffer)
-			peer.device.PutOutboundElement(elem)
-			peer.device.PutOutboundElementsContainer(elemsContainer)
-		}
+		peer.stageKeepalive()
 	}
 	peer.SendStagedPackets()
+}
+
+// stageKeepalive queues one keepalive packet, or gives up if the buffer pool is
+// at capacity.
+//
+// Giving up matters: the keepalive timers call this from a timer callback, which
+// holds that timer's runningLock for the whole of the call. Timer.DelSync waits
+// on the same lock, so a callback parked in the pool blocks Peer.Stop, and with
+// it RemovePeer and Device.Close - the very operations that would return staged
+// buffers to the pool and let it drain. A keepalive is best effort, so dropping
+// one costs nothing and the next tick retries.
+func (peer *Peer) stageKeepalive() {
+	elem, ok := peer.device.TryNewOutboundElement()
+	if !ok {
+		peer.device.log.Verbosef("%v - Skipping keepalive, buffer pool exhausted", peer)
+		return
+	}
+	elemsContainer, ok := peer.device.TryGetOutboundElementsContainer()
+	if !ok {
+		peer.device.PutMessageBuffer(elem.buffer)
+		peer.device.PutOutboundElement(elem)
+		peer.device.log.Verbosef("%v - Skipping keepalive, buffer pool exhausted", peer)
+		return
+	}
+	elemsContainer.elems = append(elemsContainer.elems, elem)
+	select {
+	case peer.queue.staged <- elemsContainer:
+		peer.device.log.Verbosef("%v - Sending keepalive packet", peer)
+	default:
+		peer.device.PutMessageBuffer(elem.buffer)
+		peer.device.PutOutboundElement(elem)
+		peer.device.PutOutboundElementsContainer(elemsContainer)
+	}
 }
 
 func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
