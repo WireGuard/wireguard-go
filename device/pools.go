@@ -36,6 +36,24 @@ func (p *WaitPool) Get() any {
 	return p.pool.Get()
 }
 
+// TryGet is Get without the wait: on a tracked pool that is at capacity it
+// reports false instead of blocking. Callers that run inside a WireGuard timer
+// callback must use this - a callback holds the timer's runningLock, and
+// Timer.DelSync waits on that lock, so a callback parked in Get makes peer
+// removal and device close impossible.
+func (p *WaitPool) TryGet() (any, bool) {
+	if p.tracked {
+		p.lock.Lock()
+		if p.max != 0 && p.count >= p.max {
+			p.lock.Unlock()
+			return nil, false
+		}
+		p.count++
+		p.lock.Unlock()
+	}
+	return p.pool.Get(), true
+}
+
 func (p *WaitPool) Put(x any) {
 	p.pool.Put(x)
 	if !p.tracked {
@@ -100,6 +118,17 @@ func (device *Device) GetOutboundElementsContainer() *QueueOutboundElementsConta
 	return c
 }
 
+// TryGetOutboundElementsContainer is GetOutboundElementsContainer without the wait.
+func (device *Device) TryGetOutboundElementsContainer() (*QueueOutboundElementsContainer, bool) {
+	v, ok := device.pool.outboundElementsContainer.TryGet()
+	if !ok {
+		return nil, false
+	}
+	c := v.(*QueueOutboundElementsContainer)
+	c.Mutex = sync.Mutex{}
+	return c, true
+}
+
 func (device *Device) PutOutboundElementsContainer(c *QueueOutboundElementsContainer) {
 	for i := range c.elems {
 		c.elems[i] = nil
@@ -110,6 +139,15 @@ func (device *Device) PutOutboundElementsContainer(c *QueueOutboundElementsConta
 
 func (device *Device) GetMessageBuffer() *[MaxMessageSize]byte {
 	return device.pool.messageBuffers.Get().(*[MaxMessageSize]byte)
+}
+
+// TryGetMessageBuffer is GetMessageBuffer without the wait.
+func (device *Device) TryGetMessageBuffer() (*[MaxMessageSize]byte, bool) {
+	v, ok := device.pool.messageBuffers.TryGet()
+	if !ok {
+		return nil, false
+	}
+	return v.(*[MaxMessageSize]byte), true
 }
 
 func (device *Device) PutMessageBuffer(msg *[MaxMessageSize]byte) {
@@ -127,6 +165,15 @@ func (device *Device) PutInboundElement(elem *QueueInboundElement) {
 
 func (device *Device) GetOutboundElement() *QueueOutboundElement {
 	return device.pool.outboundElements.Get().(*QueueOutboundElement)
+}
+
+// TryGetOutboundElement is GetOutboundElement without the wait.
+func (device *Device) TryGetOutboundElement() (*QueueOutboundElement, bool) {
+	v, ok := device.pool.outboundElements.TryGet()
+	if !ok {
+		return nil, false
+	}
+	return v.(*QueueOutboundElement), true
 }
 
 func (device *Device) PutOutboundElement(elem *QueueOutboundElement) {

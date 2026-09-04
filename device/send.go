@@ -66,6 +66,24 @@ func (device *Device) NewOutboundElement() *QueueOutboundElement {
 	return elem
 }
 
+// TryNewOutboundElement is NewOutboundElement without the wait. It returns
+// false if either pool is at capacity, giving back whatever it already took.
+func (device *Device) TryNewOutboundElement() (*QueueOutboundElement, bool) {
+	elem, ok := device.TryGetOutboundElement()
+	if !ok {
+		return nil, false
+	}
+	buffer, ok := device.TryGetMessageBuffer()
+	if !ok {
+		device.PutOutboundElement(elem)
+		return nil, false
+	}
+	elem.buffer = buffer
+	elem.nonce = 0
+	// keypair and peer were cleared (if necessary) by clearPointers.
+	return elem, true
+}
+
 // clearPointers clears elem fields that contain pointers.
 // This makes the garbage collector's life easier and
 // avoids accidentally keeping other objects around unnecessarily.
