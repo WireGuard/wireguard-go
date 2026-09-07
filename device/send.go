@@ -139,7 +139,10 @@ func (peer *Peer) stageKeepalive() {
 
 // SendHandshakeInitiation sends a handshake initiation, rate-limited to one per
 // RekeyTimeout. resetAttempts clears the failed-attempt counter that
-// expiredRetransmitHandshake reads to decide when to give up.
+// expiredRetransmitHandshake reads to decide when to give up: pass true only
+// when there is evidence the peer is reachable - a live keypair, a completed
+// handshake, a peer whose timers just started - so the negotiation has earned
+// a fresh budget of attempts. Outbound traffic alone is not such evidence.
 func (peer *Peer) SendHandshakeInitiation(resetAttempts bool) error {
 	if resetAttempts {
 		peer.timers.handshakeAttempts.Store(0)
@@ -415,7 +418,12 @@ top:
 
 	keypair := peer.keypairs.Current()
 	if keypair == nil || keypair.sendNonce.Load() >= RejectAfterMessages || time.Since(keypair.created) >= RejectAfterTime {
-		peer.SendHandshakeInitiation(true)
+		// Do not reset the counter. Traffic for a peer with no usable keypair
+		// keeps arriving while the peer is down, and resetting on every packet
+		// keeps expiredRetransmitHandshake from ever reaching
+		// MaxTimerHandshakes - the point at which it gives up, flushes the
+		// staged queue and releases its buffers.
+		peer.SendHandshakeInitiation(false)
 		return
 	}
 
