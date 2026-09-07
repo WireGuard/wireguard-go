@@ -137,8 +137,11 @@ func (peer *Peer) stageKeepalive() {
 	}
 }
 
-func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
-	if !isRetry {
+// SendHandshakeInitiation sends a handshake initiation, rate-limited to one per
+// RekeyTimeout. resetAttempts clears the failed-attempt counter that
+// expiredRetransmitHandshake reads to decide when to give up.
+func (peer *Peer) SendHandshakeInitiation(resetAttempts bool) error {
+	if resetAttempts {
 		peer.timers.handshakeAttempts.Store(0)
 	}
 
@@ -269,7 +272,7 @@ func (peer *Peer) keepKeyFreshSending() {
 	}
 	nonce := keypair.sendNonce.Load()
 	if nonce > RekeyAfterMessages || (keypair.isInitiator && time.Since(keypair.created) > RekeyAfterTime) {
-		peer.SendHandshakeInitiation(false)
+		peer.SendHandshakeInitiation(true)
 	}
 }
 
@@ -412,7 +415,7 @@ top:
 
 	keypair := peer.keypairs.Current()
 	if keypair == nil || keypair.sendNonce.Load() >= RejectAfterMessages || time.Since(keypair.created) >= RejectAfterTime {
-		peer.SendHandshakeInitiation(false)
+		peer.SendHandshakeInitiation(true)
 		return
 	}
 
