@@ -241,7 +241,7 @@ func (s *StdNetBind) receiveIP(
 	if runtime.GOOS == "linux" || runtime.GOOS == "android" {
 		if rxOffload {
 			readAt := len(*msgs) - (IdealBatchSize / udpSegmentMaxDatagrams)
-			numMsgs, err = br.ReadBatch((*msgs)[readAt:], 0)
+			_, err = br.ReadBatch((*msgs)[readAt:], 0)
 			if err != nil {
 				return 0, err
 			}
