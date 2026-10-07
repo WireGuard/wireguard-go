@@ -48,11 +48,17 @@ func UAPIOpen(name string) (*os.File, error) {
 
 	listener, err := net.ListenUnix("unix", addr)
 	if err == nil {
-		return listener.File()
+		file, err := listener.File()
+		if err != nil {
+			listener.Close()
+			return nil, err
+		}
+		return file, nil
 	}
 
 	// Test socket, if not in use cleanup and try again.
-	if _, err := net.Dial("unix", socketPath); err == nil {
+	if conn, err := net.Dial("unix", socketPath); err == nil {
+		conn.Close()
 		return nil, errors.New("unix socket in use")
 	}
 	if err := os.Remove(socketPath); err != nil {
@@ -62,5 +68,10 @@ func UAPIOpen(name string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	return listener.File()
+	file, err := listener.File()
+	if err != nil {
+		listener.Close()
+		return nil, err
+	}
+	return file, nil
 }
