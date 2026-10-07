@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudflare/circl/kem/kyber/kyber1024"
+	"github.com/cloudflare/circl/sign/dilithium/mode5"
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/poly1305"
@@ -61,13 +63,13 @@ const (
 )
 
 const (
-	MessageInitiationSize      = 148                                           // size of handshake initiation message
-	MessageResponseSize        = 92                                            // size of response message
-	MessageCookieReplySize     = 64                                            // size of cookie reply message
-	MessageTransportHeaderSize = 16                                            // size of data preceding content in transport message
-	MessageTransportSize       = MessageTransportHeaderSize + poly1305.TagSize // size of empty transport
-	MessageKeepaliveSize       = MessageTransportSize                          // size of keepalive
-	MessageHandshakeSize       = MessageInitiationSize                         // size of largest handshake related message
+	MessageInitiationSize      = 148 + (MLKEMCiphertextSize + poly1305.TagSize) + MLDSASignatureSize // size of handshake initiation message
+	MessageResponseSize        = 92                                                                  // size of response message
+	MessageCookieReplySize     = 64                                                                  // size of cookie reply message
+	MessageTransportHeaderSize = 16                                                                  // size of data preceding content in transport message
+	MessageTransportSize       = MessageTransportHeaderSize + poly1305.TagSize                       // size of empty transport
+	MessageKeepaliveSize       = MessageTransportSize                                                // size of keepalive
+	MessageHandshakeSize       = MessageInitiationSize                                               // size of largest handshake related message
 )
 
 const (
@@ -87,7 +89,9 @@ type MessageInitiation struct {
 	Sender    uint32
 	Ephemeral NoisePublicKey
 	Static    [NoisePublicKeySize + poly1305.TagSize]byte
+	MLKEM     [MLKEMCiphertextSize + poly1305.TagSize]byte
 	Timestamp [tai64n.TimestampSize + poly1305.TagSize]byte
+	Signature MLDSASignature
 	MAC1      [blake2s.Size128]byte
 	MAC2      [blake2s.Size128]byte
 }
@@ -127,9 +131,12 @@ func (msg *MessageInitiation) unmarshal(b []byte) error {
 	msg.Sender = binary.LittleEndian.Uint32(b[4:])
 	copy(msg.Ephemeral[:], b[8:])
 	copy(msg.Static[:], b[8+len(msg.Ephemeral):])
-	copy(msg.Timestamp[:], b[8+len(msg.Ephemeral)+len(msg.Static):])
-	copy(msg.MAC1[:], b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp):])
-	copy(msg.MAC2[:], b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp)+len(msg.MAC1):])
+  
+	copy(msg.MLKEM[:], b[8+len(msg.Ephemeral)+len(msg.Static):])
+	copy(msg.Timestamp[:], b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.MLKEM):])
+	copy(msg.Signature[:], b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.MLKEM)+len(msg.Timestamp):])
+	copy(msg.MAC1[:], b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.MLKEM)+len(msg.Timestamp)+len(msg.Signature):])
+	copy(msg.MAC2[:], b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.MLKEM)+len(msg.Timestamp)+len(msg.Signature)+len(msg.MAC1):])
 
 	return nil
 }
@@ -143,9 +150,12 @@ func (msg *MessageInitiation) marshal(b []byte) error {
 	binary.LittleEndian.PutUint32(b[4:], msg.Sender)
 	copy(b[8:], msg.Ephemeral[:])
 	copy(b[8+len(msg.Ephemeral):], msg.Static[:])
-	copy(b[8+len(msg.Ephemeral)+len(msg.Static):], msg.Timestamp[:])
-	copy(b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp):], msg.MAC1[:])
-	copy(b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.Timestamp)+len(msg.MAC1):], msg.MAC2[:])
+
+	copy(b[8+len(msg.Ephemeral)+len(msg.Static):], msg.MLKEM[:])
+	copy(b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.MLKEM):], msg.Timestamp[:])
+	copy(b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.MLKEM)+len(msg.Timestamp):], msg.Signature[:])
+	copy(b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.MLKEM)+len(msg.Timestamp)+len(msg.Signature):], msg.MAC1[:])
+	copy(b[8+len(msg.Ephemeral)+len(msg.Static)+len(msg.MLKEM)+len(msg.Timestamp)+len(msg.Signature)+len(msg.MAC1):], msg.MAC2[:])
 
 	return nil
 }
@@ -218,6 +228,8 @@ type Handshake struct {
 	localIndex                uint32                   // used to clear hash-table
 	remoteIndex               uint32                   // index for sending
 	remoteStatic              NoisePublicKey           // long term key
+	remoteMLKEMStatic         MLKEMPublicKey           // long term remote ML-KEM static public key
+	remoteMLDSAStatic         MLDSAPublicKey           // long term remote ML-DSA static public key
 	remoteEphemeral           NoisePublicKey           // ephemeral public key
 	precomputedStaticStatic   [NoisePublicKeySize]byte // precomputed shared secret
 	lastTimestamp             tai64n.Timestamp
@@ -275,7 +287,6 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 	handshake.mutex.Lock()
 	defer handshake.mutex.Unlock()
 
-	// create ephemeral key
 	var err error
 	handshake.hash = InitialHash
 	handshake.chainKey = InitialChainKey
@@ -294,37 +305,47 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 	handshake.mixKey(msg.Ephemeral[:])
 	handshake.mixHash(msg.Ephemeral[:])
 
-	// encrypt static key
 	ss, err := handshake.localEphemeral.sharedSecret(handshake.remoteStatic)
 	if err != nil {
 		return nil, err
 	}
+
 	var key [chacha20poly1305.KeySize]byte
-	KDF2(
-		&handshake.chainKey,
-		&key,
-		handshake.chainKey[:],
-		ss[:],
-	)
+	var tempChainKey [blake2s.Size]byte
+	KDF2(&tempChainKey, &key, handshake.chainKey[:], ss[:])
+
 	aead, _ := chacha20poly1305.New(key[:])
 	aead.Seal(msg.Static[:0], ZeroNonce[:], device.staticIdentity.publicKey[:], handshake.hash[:])
 	handshake.mixHash(msg.Static[:])
 
-	// encrypt timestamp
+	scheme := kyber1024.Scheme()
+	pk, err := scheme.UnmarshalBinaryPublicKey(handshake.remoteMLKEMStatic[:])
+	if err != nil {
+		return nil, err
+	}
+	ciphertext, mlkemSecret, err := scheme.Encapsulate(pk)
+	if err != nil {
+		return nil, err
+	}
+
+	KDF1(&key, handshake.chainKey[:], []byte("pqc-ciphertext-key"))
+	aead, _ = chacha20poly1305.New(key[:])
+	aead.Seal(msg.MLKEM[:0], ZeroNonce[:], ciphertext, handshake.hash[:])
+	handshake.mixHash(msg.MLKEM[:])
+
+	var combinedSecret [blake2s.Size]byte
+	var dummy [blake2s.Size]byte
+	KDF2(&combinedSecret, &dummy, ss[:], mlkemSecret)
+	KDF2(&handshake.chainKey, &key, handshake.chainKey[:], combinedSecret[:])
+
 	if isZero(handshake.precomputedStaticStatic[:]) {
 		return nil, errInvalidPublicKey
 	}
-	KDF2(
-		&handshake.chainKey,
-		&key,
-		handshake.chainKey[:],
-		handshake.precomputedStaticStatic[:],
-	)
+	KDF2(&handshake.chainKey, &key, handshake.chainKey[:], handshake.precomputedStaticStatic[:])
 	timestamp := tai64n.Now()
 	aead, _ = chacha20poly1305.New(key[:])
 	aead.Seal(msg.Timestamp[:0], ZeroNonce[:], timestamp[:], handshake.hash[:])
 
-	// assign index
 	device.indexTable.Delete(handshake.localIndex)
 	msg.Sender, err = device.indexTable.NewIndexForHandshake(peer, handshake)
 	if err != nil {
@@ -334,6 +355,21 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
 
 	handshake.mixHash(msg.Timestamp[:])
 	handshake.state = handshakeInitiationCreated
+
+	signScheme := mode5.Scheme()
+	skSign, err := signScheme.UnmarshalBinaryPrivateKey(device.staticIdentity.mldsaPrivateKey[:])
+	if err != nil {
+		return nil, err
+	}
+
+	messageToSign := make([]byte, MessageInitiationSize)
+	if err := msg.marshal(messageToSign); err != nil {
+		return nil, err
+	}
+
+	signature := signScheme.Sign(skSign, messageToSign[:MessageInitiationSize-blake2s.Size128*2-MLDSASignatureSize], nil)
+	copy(msg.Signature[:], signature)
+
 	return &msg, nil
 }
 
@@ -361,7 +397,9 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	if err != nil {
 		return nil
 	}
-	KDF2(&chainKey, &key, chainKey[:], ss[:])
+
+	var tempChainKey [blake2s.Size]byte
+	KDF2(&tempChainKey, &key, chainKey[:], ss[:])
 	aead, _ := chacha20poly1305.New(key[:])
 	_, err = aead.Open(peerPK[:0], ZeroNonce[:], msg.Static[:], hash[:])
 	if err != nil {
@@ -370,20 +408,62 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	mixHash(&hash, &hash, msg.Static[:])
 
 	// lookup peer
-
 	peer := device.LookupPeer(peerPK)
 	if peer == nil || !peer.isRunning.Load() {
 		return nil
 	}
 
+	signScheme := mode5.Scheme()
+	pkSign, err := signScheme.UnmarshalBinaryPublicKey(peer.handshake.remoteMLDSAStatic[:])
+	if err != nil {
+		return nil
+	}
+
+	messageToCheck := make([]byte, MessageInitiationSize)
+	if err := msg.marshal(messageToCheck); err != nil {
+		return nil
+	}
+
+	if !signScheme.Verify(pkSign, messageToCheck[:MessageInitiationSize-blake2s.Size128*2-MLDSASignatureSize], msg.Signature[:], nil) {
+		return nil
+	}
+
 	handshake := &peer.handshake
 
+	// decrypt KEM ciphertext
+	KDF1(&key, chainKey[:], []byte("pqc-ciphertext-key"))
+	aead, _ = chacha20poly1305.New(key[:])
+	var ciphertext [MLKEMCiphertextSize]byte
+	_, err = aead.Open(ciphertext[:0], ZeroNonce[:], msg.MLKEM[:], hash[:])
+	if err != nil {
+		return nil
+	}
+
+	mixHash(&hash, &hash, msg.MLKEM[:])
+
+	// post-quantum decapsulation
+	scheme := kyber1024.Scheme()
+	sk, err := scheme.UnmarshalBinaryPrivateKey(device.staticIdentity.mlkemPrivateKey[:])
+	if err != nil {
+		return nil
+	}
+
+	mlkemSecret, err := scheme.Decapsulate(sk, ciphertext[:])
+	if err != nil {
+		return nil
+	}
+
+	// mix classic (ss) and post-quantum secret (mlkemSecret) into a single secret
+	var combinedSecret [blake2s.Size]byte
+	var dummy [blake2s.Size]byte
+	KDF2(&combinedSecret, &dummy, ss[:], mlkemSecret)
+
+	// main chainKey is now updated with the combined secret
+	KDF2(&chainKey, &key, chainKey[:], combinedSecret[:])
+
 	// verify identity
-
 	var timestamp tai64n.Timestamp
-
 	handshake.mutex.RLock()
-
 	if isZero(handshake.precomputedStaticStatic[:]) {
 		handshake.mutex.RUnlock()
 		return nil
@@ -394,16 +474,17 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 		chainKey[:],
 		handshake.precomputedStaticStatic[:],
 	)
+	handshake.mutex.RUnlock()
+
 	aead, _ = chacha20poly1305.New(key[:])
 	_, err = aead.Open(timestamp[:0], ZeroNonce[:], msg.Timestamp[:], hash[:])
 	if err != nil {
-		handshake.mutex.RUnlock()
 		return nil
 	}
 	mixHash(&hash, &hash, msg.Timestamp[:])
 
 	// protect against replay & flood
-
+	handshake.mutex.RLock()
 	replay := !timestamp.After(handshake.lastTimestamp)
 	flood := time.Since(handshake.lastInitiationConsumption) <= HandshakeInitationRate
 	handshake.mutex.RUnlock()
@@ -417,9 +498,7 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	}
 
 	// update handshake state
-
 	handshake.mutex.Lock()
-
 	handshake.hash = hash
 	handshake.chainKey = chainKey
 	handshake.remoteIndex = msg.Sender
@@ -432,7 +511,6 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 		handshake.lastInitiationConsumption = now
 	}
 	handshake.state = handshakeInitiationConsumed
-
 	handshake.mutex.Unlock()
 
 	setZero(hash[:])

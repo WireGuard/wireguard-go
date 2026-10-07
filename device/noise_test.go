@@ -1,8 +1,3 @@
-/* SPDX-License-Identifier: MIT
- *
- * Copyright (C) 2017-2025 WireGuard LLC. All Rights Reserved.
- */
-
 package device
 
 import (
@@ -71,6 +66,15 @@ func TestNoiseHandshake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	pair := testPair{}
+	pair[0].dev = dev1 
+	pair[1].dev = dev2
+
+	installMLKEMKeys(t, &pair)
+	
+	installMLDSAKeys(t, &pair)
+
 	peer1.Start()
 	peer2.Start()
 
@@ -79,10 +83,6 @@ func TestNoiseHandshake(t *testing.T) {
 		peer1.handshake.precomputedStaticStatic[:],
 		peer2.handshake.precomputedStaticStatic[:],
 	)
-
-	/* simulate handshake */
-
-	// initiation message
 
 	t.Log("exchange initiation message")
 
@@ -110,7 +110,6 @@ func TestNoiseHandshake(t *testing.T) {
 		peer2.handshake.hash[:],
 	)
 
-	// response message
 
 	t.Log("exchange response message")
 
@@ -134,8 +133,6 @@ func TestNoiseHandshake(t *testing.T) {
 		peer2.handshake.hash[:],
 	)
 
-	// key pairs
-
 	t.Log("deriving keys")
 
 	err = peer1.BeginSymmetricSession()
@@ -150,8 +147,6 @@ func TestNoiseHandshake(t *testing.T) {
 
 	key1 := peer1.keypairs.next.Load()
 	key2 := peer2.keypairs.current
-
-	// encrypting / decryption test
 
 	t.Log("test key pairs")
 

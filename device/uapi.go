@@ -171,7 +171,7 @@ func (device *Device) IpcSetOperation(r io.Reader) (err error) {
 			// Load/create the peer we are now configuring.
 			err := device.handlePublicKeyLine(peer, value)
 			if err != nil {
-				return err
+				return ipcErrorf(ipc.IpcErrorInvalid, "failed to load MLKEM public key: %w", err)
 			}
 			continue
 		}
@@ -239,6 +239,16 @@ func (device *Device) handleDeviceLine(key, value string) error {
 		}
 		device.log.Verbosef("UAPI: Removing all peers")
 		device.RemoveAllPeers()
+
+	case "mlkem_private_key":
+		var mlkemPrivateKey MLKEMPrivateKey
+		err := loadExactHex(mlkemPrivateKey[:], value)
+		if err != nil {
+			return err
+		}
+		device.staticIdentity.Lock()
+		device.staticIdentity.mlkemPrivateKey = mlkemPrivateKey
+		device.staticIdentity.Unlock()
 
 	default:
 		return ipcErrorf(ipc.IpcErrorInvalid, "invalid UAPI device key: %v", key)
@@ -396,6 +406,16 @@ func (device *Device) handlePeerLine(peer *ipcSetPeer, key, value string) error 
 		if value != "1" {
 			return ipcErrorf(ipc.IpcErrorInvalid, "invalid protocol version: %v", value)
 		}
+
+	case "mlkem_public_key":
+		device.log.Verbosef("%v - UAPI: Updating mlkem_public_key", peer.Peer)
+		peer.handshake.mutex.Lock()
+		err := loadExactHex(peer.handshake.remoteMLKEMStatic[:], value)
+		if err != nil {
+			peer.handshake.mutex.Unlock()
+			return err
+		}
+		peer.handshake.mutex.Unlock()
 
 	default:
 		return ipcErrorf(ipc.IpcErrorInvalid, "invalid UAPI peer key: %v", key)
