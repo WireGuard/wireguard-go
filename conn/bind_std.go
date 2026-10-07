@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"runtime"
 	"strconv"
 	"sync"
 	"syscall"
@@ -33,8 +32,8 @@ type StdNetBind struct {
 	mu            sync.Mutex // protects all fields except as specified
 	ipv4          *net.UDPConn
 	ipv6          *net.UDPConn
-	ipv4PC        *ipv4.PacketConn // will be nil on non-Linux
-	ipv6PC        *ipv6.PacketConn // will be nil on non-Linux
+	batch4        batchIO // nil when platform has no batch UDP I/O
+	batch6        batchIO
 	ipv4TxOffload bool
 	ipv4RxOffload bool
 	ipv6TxOffload bool
@@ -153,8 +152,6 @@ func (s *StdNetBind) Open(uport uint16) ([]ReceiveFunc, uint16, error) {
 again:
 	port := int(uport)
 	var v4conn, v6conn *net.UDPConn
-	var v4pc *ipv4.PacketConn
-	var v6pc *ipv6.PacketConn
 
 	v4conn, port, err = listenNet("udp4", port)
 	if err != nil && !errors.Is(err, syscall.EAFNOSUPPORT) {
@@ -175,21 +172,18 @@ again:
 	var fns []ReceiveFunc
 	if v4conn != nil {
 		s.ipv4TxOffload, s.ipv4RxOffload = supportsUDPOffload(v4conn)
-		if runtime.GOOS == "linux" || runtime.GOOS == "android" {
-			v4pc = ipv4.NewPacketConn(v4conn)
-			s.ipv4PC = v4pc
-		}
-		fns = append(fns, s.makeReceiveIPv4(v4pc, v4conn, s.ipv4RxOffload))
 		s.ipv4 = v4conn
 	}
 	if v6conn != nil {
 		s.ipv6TxOffload, s.ipv6RxOffload = supportsUDPOffload(v6conn)
-		if runtime.GOOS == "linux" || runtime.GOOS == "android" {
-			v6pc = ipv6.NewPacketConn(v6conn)
-			s.ipv6PC = v6pc
-		}
-		fns = append(fns, s.makeReceiveIPv6(v6pc, v6conn, s.ipv6RxOffload))
 		s.ipv6 = v6conn
+	}
+	s.setupBatch(v4conn, v6conn)
+	if v4conn != nil {
+		fns = append(fns, s.makeReceiveIPv4(s.batch4, v4conn, s.ipv4RxOffload))
+	}
+	if v6conn != nil {
+		fns = append(fns, s.makeReceiveIPv6(s.batch6, v6conn, s.ipv6RxOffload))
 	}
 	if len(fns) == 0 {
 		return nil, 0, syscall.EAFNOSUPPORT
@@ -223,6 +217,11 @@ type batchWriter interface {
 	WriteBatch([]ipv6.Message, int) (int, error)
 }
 
+type batchIO interface {
+	batchReader
+	batchWriter
+}
+
 func (s *StdNetBind) receiveIP(
 	br batchReader,
 	conn *net.UDPConn,
@@ -238,7 +237,7 @@ func (s *StdNetBind) receiveIP(
 	}
 	defer s.putMessages(msgs)
 	var numMsgs int
-	if runtime.GOOS == "linux" || runtime.GOOS == "android" {
+	if br != nil {
 		if rxOffload {
 			readAt := len(*msgs) - (IdealBatchSize / udpSegmentMaxDatagrams)
 			numMsgs, err = br.ReadBatch((*msgs)[readAt:], 0)
@@ -277,22 +276,22 @@ func (s *StdNetBind) receiveIP(
 	return numMsgs, nil
 }
 
-func (s *StdNetBind) makeReceiveIPv4(pc *ipv4.PacketConn, conn *net.UDPConn, rxOffload bool) ReceiveFunc {
+func (s *StdNetBind) makeReceiveIPv4(br batchReader, conn *net.UDPConn, rxOffload bool) ReceiveFunc {
 	return func(bufs [][]byte, sizes []int, eps []Endpoint) (n int, err error) {
-		return s.receiveIP(pc, conn, rxOffload, bufs, sizes, eps)
+		return s.receiveIP(br, conn, rxOffload, bufs, sizes, eps)
 	}
 }
 
-func (s *StdNetBind) makeReceiveIPv6(pc *ipv6.PacketConn, conn *net.UDPConn, rxOffload bool) ReceiveFunc {
+func (s *StdNetBind) makeReceiveIPv6(br batchReader, conn *net.UDPConn, rxOffload bool) ReceiveFunc {
 	return func(bufs [][]byte, sizes []int, eps []Endpoint) (n int, err error) {
-		return s.receiveIP(pc, conn, rxOffload, bufs, sizes, eps)
+		return s.receiveIP(br, conn, rxOffload, bufs, sizes, eps)
 	}
 }
 
 // TODO: When all Binds handle IdealBatchSize, remove this dynamic function and
 // rename the IdealBatchSize constant to BatchSize.
 func (s *StdNetBind) BatchSize() int {
-	if runtime.GOOS == "linux" || runtime.GOOS == "android" {
+	if stdNetBindBatches {
 		return IdealBatchSize
 	}
 	return 1
@@ -306,12 +305,12 @@ func (s *StdNetBind) Close() error {
 	if s.ipv4 != nil {
 		err1 = s.ipv4.Close()
 		s.ipv4 = nil
-		s.ipv4PC = nil
+		s.batch4 = nil
 	}
 	if s.ipv6 != nil {
 		err2 = s.ipv6.Close()
 		s.ipv6 = nil
-		s.ipv6PC = nil
+		s.batch6 = nil
 	}
 	s.blackhole4 = false
 	s.blackhole6 = false
@@ -343,12 +342,12 @@ func (s *StdNetBind) Send(bufs [][]byte, endpoint Endpoint) error {
 	blackhole := s.blackhole4
 	conn := s.ipv4
 	offload := s.ipv4TxOffload
-	br := batchWriter(s.ipv4PC)
+	br := batchWriter(s.batch4)
 	is6 := false
 	if endpoint.DstIP().Is6() {
 		blackhole = s.blackhole6
 		conn = s.ipv6
-		br = s.ipv6PC
+		br = s.batch6
 		is6 = true
 		offload = s.ipv6TxOffload
 	}
@@ -415,7 +414,7 @@ func (s *StdNetBind) send(conn *net.UDPConn, pc batchWriter, msgs []ipv6.Message
 		err   error
 		start int
 	)
-	if runtime.GOOS == "linux" || runtime.GOOS == "android" {
+	if pc != nil {
 		for {
 			n, err = pc.WriteBatch(msgs[start:], 0)
 			if err != nil || n == len(msgs[start:]) {

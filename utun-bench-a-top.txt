@@ -1,0 +1,38 @@
+File: wireguard-go
+Type: cpu
+Time: 2026-07-30 17:11:41 EDT
+Duration: 21.84s, Total samples = 26.59s (121.72%)
+Showing nodes accounting for 25.85s, 97.22% of 26.59s total
+Dropped 106 nodes (cum <= 0.13s)
+Showing top 30 nodes out of 44
+      flat  flat%   sum%        cum   cum%
+    19.86s 74.69% 74.69%     19.86s 74.69%  syscall.Syscall6
+     2.13s  8.01% 82.70%      2.13s  8.01%  runtime.pthread_cond_wait
+     1.97s  7.41% 90.11%      1.97s  7.41%  golang.org/x/crypto/chacha20.xorKeyStreamVX
+     0.86s  3.23% 93.34%      0.98s  3.69%  golang.org/x/crypto/internal/poly1305.updateGeneric
+     0.29s  1.09% 94.43%      0.29s  1.09%  runtime.kevent
+     0.21s  0.79% 95.22%      4.09s 15.38%  golang.zx2c4.com/wireguard/device.(*Device).RoutineReadFromTUN
+     0.20s  0.75% 95.98%      0.20s  0.75%  runtime.pthread_cond_signal
+     0.19s  0.71% 96.69%      2.20s  8.27%  golang.org/x/crypto/chacha20.(*Cipher).XORKeyStream
+     0.04s  0.15% 96.84%      1.02s  3.84%  golang.org/x/crypto/internal/poly1305.(*macGeneric).Write
+     0.03s  0.11% 96.95%     16.15s 60.74%  golang.zx2c4.com/wireguard/device.(*Peer).RoutineSequentialSender
+     0.02s 0.075% 97.03%      1.99s  7.48%  golang.org/x/crypto/chacha20.(*Cipher).xorKeyStreamBlocks (inline)
+     0.02s 0.075% 97.10%      3.30s 12.41%  golang.org/x/crypto/chacha20poly1305.(*chacha20poly1305).Seal
+     0.01s 0.038% 97.14%      3.28s 12.34%  golang.org/x/crypto/chacha20poly1305.(*chacha20poly1305).sealGeneric
+     0.01s 0.038% 97.18%      1.03s  3.87%  golang.org/x/crypto/internal/poly1305.(*MAC).Write (inline)
+     0.01s 0.038% 97.22%      3.44s 12.94%  golang.zx2c4.com/wireguard/device.(*Device).RoutineEncryption
+         0     0% 97.22%      3.28s 12.34%  golang.org/x/crypto/chacha20poly1305.(*chacha20poly1305).seal (inline)
+         0     0% 97.22%      0.98s  3.69%  golang.org/x/crypto/chacha20poly1305.writeWithPadding
+         0     0% 97.22%     16.06s 60.40%  golang.zx2c4.com/wireguard/conn.(*StdNetBind).Send
+         0     0% 97.22%     16.06s 60.40%  golang.zx2c4.com/wireguard/conn.(*StdNetBind).send
+         0     0% 97.22%     16.06s 60.40%  golang.zx2c4.com/wireguard/conn.(*darwinBatchConn).WriteBatch
+         0     0% 97.22%      3.80s 14.29%  golang.zx2c4.com/wireguard/darwinmsgx.RecvmsgX
+         0     0% 97.22%      3.80s 14.29%  golang.zx2c4.com/wireguard/darwinmsgx.RecvmsgX.func1
+         0     0% 97.22%     16.06s 60.40%  golang.zx2c4.com/wireguard/darwinmsgx.SendmsgX
+         0     0% 97.22%     16.06s 60.40%  golang.zx2c4.com/wireguard/darwinmsgx.SendmsgX.func1
+         0     0% 97.22%     16.06s 60.40%  golang.zx2c4.com/wireguard/device.(*Peer).SendBuffers
+         0     0% 97.22%      3.76s 14.14%  golang.zx2c4.com/wireguard/tun.(*NativeTun).Read
+         0     0% 97.22%      3.80s 14.29%  internal/poll.(*FD).RawRead
+         0     0% 97.22%     16.06s 60.40%  internal/poll.(*FD).RawWrite
+         0     0% 97.22%     16.06s 60.40%  net.(*rawConn).Write
+         0     0% 97.22%      3.76s 14.14%  os.(*rawConn).Read

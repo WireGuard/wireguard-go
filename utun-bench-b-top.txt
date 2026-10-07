@@ -1,0 +1,38 @@
+File: wireguard-go
+Type: cpu
+Time: 2026-07-30 17:11:41 EDT
+Duration: 21.83s, Total samples = 26.48s (121.32%)
+Showing nodes accounting for 25.26s, 95.39% of 26.48s total
+Dropped 129 nodes (cum <= 0.13s)
+Showing top 30 nodes out of 64
+      flat  flat%   sum%        cum   cum%
+    13.86s 52.34% 52.34%     13.88s 52.42%  syscall.Syscall6
+     4.53s 17.11% 69.45%      4.53s 17.11%  runtime.kevent
+     2.31s  8.72% 78.17%      2.31s  8.72%  runtime.pthread_cond_wait
+     1.81s  6.84% 85.01%      1.81s  6.84%  runtime.pthread_cond_signal
+     0.86s  3.25% 88.26%      0.86s  3.25%  golang.org/x/crypto/chacha20.xorKeyStreamVX
+     0.86s  3.25% 91.50%      0.86s  3.25%  runtime.usleep
+     0.28s  1.06% 92.56%      0.35s  1.32%  golang.org/x/crypto/internal/poly1305.updateGeneric
+     0.16s   0.6% 93.16%      0.16s   0.6%  runtime.memclrNoHeapPointers
+     0.11s  0.42% 93.58%      0.85s  3.21%  runtime.stealWork
+     0.09s  0.34% 93.92%      9.33s 35.23%  golang.zx2c4.com/wireguard/conn.(*darwinBatchConn).ReadBatch
+     0.07s  0.26% 94.18%      9.99s 37.73%  golang.zx2c4.com/wireguard/device.(*Device).RoutineReceiveIncoming
+     0.06s  0.23% 94.41%      9.59s 36.22%  golang.zx2c4.com/wireguard/conn.(*StdNetBind).receiveIP
+     0.05s  0.19% 94.60%      0.92s  3.47%  golang.org/x/crypto/chacha20.(*Cipher).XORKeyStream
+     0.03s  0.11% 94.71%      0.26s  0.98%  runtime.mallocgcSmallScanNoHeader
+     0.02s 0.076% 94.79%      4.50s 16.99%  runtime.netpoll
+     0.02s 0.076% 94.86%      0.71s  2.68%  runtime.runqgrab
+     0.02s 0.076% 94.94%      1.95s  7.36%  runtime.wakep
+     0.01s 0.038% 94.98%      0.87s  3.29%  golang.org/x/crypto/chacha20.(*Cipher).xorKeyStreamBlocks (inline)
+     0.01s 0.038% 95.02%      0.37s  1.40%  golang.org/x/crypto/chacha20poly1305.writeWithPadding
+     0.01s 0.038% 95.05%      0.36s  1.36%  golang.org/x/crypto/internal/poly1305.(*macGeneric).Write
+     0.01s 0.038% 95.09%      9.17s 34.63%  golang.zx2c4.com/wireguard/darwinmsgx.RecvmsgX
+     0.01s 0.038% 95.13%      5.03s 19.00%  golang.zx2c4.com/wireguard/device.(*Peer).RoutineSequentialReceiver
+     0.01s 0.038% 95.17%      4.88s 18.43%  golang.zx2c4.com/wireguard/tun.(*NativeTun).Write
+     0.01s 0.038% 95.20%      0.17s  0.64%  runtime.(*mcache).refill
+     0.01s 0.038% 95.24%      0.16s   0.6%  runtime.(*mspan).initHeapBits
+     0.01s 0.038% 95.28%      0.19s  0.72%  runtime.lock2
+     0.01s 0.038% 95.32%      2.33s  8.80%  runtime.semasleep
+     0.01s 0.038% 95.35%      1.86s  7.02%  runtime.startm
+     0.01s 0.038% 95.39%      1.61s  6.08%  runtime.systemstack
+         0     0% 95.39%      1.35s  5.10%  golang.org/x/crypto/chacha20poly1305.(*chacha20poly1305).Open
