@@ -117,14 +117,15 @@ type MessageCookieReply struct {
 }
 
 var errMessageLengthMismatch = errors.New("message length mismatch")
+const xorKey uint32 = 0xBEEFDEAD
 
 func (msg *MessageInitiation) unmarshal(b []byte) error {
 	if len(b) != MessageInitiationSize {
 		return errMessageLengthMismatch
 	}
 
-	msg.Type = binary.LittleEndian.Uint32(b)
-	msg.Sender = binary.LittleEndian.Uint32(b[4:])
+	msg.Type = binary.LittleEndian.Uint32(b) ^ xorKey
+	msg.Sender = binary.LittleEndian.Uint32(b[4:]) ^ xorKey
 	copy(msg.Ephemeral[:], b[8:])
 	copy(msg.Static[:], b[8+len(msg.Ephemeral):])
 	copy(msg.Timestamp[:], b[8+len(msg.Ephemeral)+len(msg.Static):])
@@ -139,8 +140,8 @@ func (msg *MessageInitiation) marshal(b []byte) error {
 		return errMessageLengthMismatch
 	}
 
-	binary.LittleEndian.PutUint32(b, msg.Type)
-	binary.LittleEndian.PutUint32(b[4:], msg.Sender)
+	binary.LittleEndian.PutUint32(b, msg.Type ^ xorKey)
+	binary.LittleEndian.PutUint32(b[4:], msg.Sender ^ xorKey)
 	copy(b[8:], msg.Ephemeral[:])
 	copy(b[8+len(msg.Ephemeral):], msg.Static[:])
 	copy(b[8+len(msg.Ephemeral)+len(msg.Static):], msg.Timestamp[:])
