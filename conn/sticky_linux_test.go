@@ -213,7 +213,7 @@ func Test_getSrcFromControl(t *testing.T) {
 
 func Test_listenConfig(t *testing.T) {
 	t.Run("IPv4", func(t *testing.T) {
-		conn, err := listenConfig().ListenPacket(context.Background(), "udp4", ":0")
+		conn, err := listenConfig(nil).ListenPacket(context.Background(), "udp4", ":0")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -239,7 +239,7 @@ func Test_listenConfig(t *testing.T) {
 		}
 	})
 	t.Run("IPv6", func(t *testing.T) {
-		conn, err := listenConfig().ListenPacket(context.Background(), "udp6", ":0")
+		conn, err := listenConfig(nil).ListenPacket(context.Background(), "udp6", ":0")
 		if err != nil {
 			t.Fatal(err)
 		}

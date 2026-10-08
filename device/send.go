@@ -50,6 +50,8 @@ type QueueOutboundElement struct {
 	nonce   uint64                // nonce for encryption
 	keypair *Keypair              // keypair for encryption
 	peer    *Peer                 // related peer
+	service conn.Service          // inner packet service
+	drop    bool                  // service identifier result, should drop this packet
 }
 
 type QueueOutboundElementsContainer struct {
@@ -130,7 +132,7 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	peer.timersAnyAuthenticatedPacketTraversal()
 	peer.timersAnyAuthenticatedPacketSent()
 
-	err = peer.SendBuffers([][]byte{packet})
+	err = peer.SendBuffers([][]byte{packet}, []conn.Service{nil})
 	if err != nil {
 		peer.device.log.Errorf("%v - Failed to send handshake initiation: %v", peer, err)
 	}
@@ -167,7 +169,7 @@ func (peer *Peer) SendHandshakeResponse() error {
 	peer.timersAnyAuthenticatedPacketSent()
 
 	// TODO: allocation could be avoided
-	err = peer.SendBuffers([][]byte{packet})
+	err = peer.SendBuffers([][]byte{packet}, []conn.Service{nil})
 	if err != nil {
 		peer.device.log.Errorf("%v - Failed to send handshake response: %v", peer, err)
 	}
@@ -187,7 +189,7 @@ func (device *Device) SendHandshakeCookie(initiatingElem *QueueHandshakeElement)
 	packet := make([]byte, MessageCookieReplySize)
 	_ = reply.marshal(packet)
 	// TODO: allocation could be avoided
-	device.net.bind.Send([][]byte{packet}, initiatingElem.endpoint)
+	device.net.bind.Send([][]byte{packet}, []conn.Service{nil}, initiatingElem.endpoint)
 
 	return nil
 }
@@ -445,6 +447,14 @@ func (device *Device) RoutineEncryption(id int) {
 
 	for elemsContainer := range device.queue.encryption.c {
 		for _, elem := range elemsContainer.elems {
+			// identify inner packet
+			service, shouldDrop := conn.ExecuteServiceFns(elem.packet)
+			if shouldDrop {
+				elem.drop = true
+				continue
+			}
+			elem.service = service
+
 			// populate header fields
 			header := elem.buffer[:MessageTransportHeaderSize]
 
@@ -483,9 +493,11 @@ func (peer *Peer) RoutineSequentialSender(maxBatchSize int) {
 	device.log.Verbosef("%v - Routine: sequential sender - started", peer)
 
 	bufs := make([][]byte, 0, maxBatchSize)
+	services := make([]conn.Service, 0, maxBatchSize)
 
 	for elemsContainer := range peer.queue.outbound.c {
 		bufs = bufs[:0]
+		services = services[:0]
 		if elemsContainer == nil {
 			return
 		}
@@ -507,16 +519,20 @@ func (peer *Peer) RoutineSequentialSender(maxBatchSize int) {
 		dataSent := false
 		elemsContainer.Lock()
 		for _, elem := range elemsContainer.elems {
+			if elem.drop {
+				continue
+			}
 			if len(elem.packet) != MessageKeepaliveSize {
 				dataSent = true
 			}
 			bufs = append(bufs, elem.packet)
+			services = append(services, elem.service)
 		}
 
 		peer.timersAnyAuthenticatedPacketTraversal()
 		peer.timersAnyAuthenticatedPacketSent()
 
-		err := peer.SendBuffers(bufs)
+		err := peer.SendBuffers(bufs, services)
 		if dataSent {
 			peer.timersDataSent()
 		}

@@ -47,7 +47,7 @@ type Bind interface {
 
 	// Send writes one or more packets in bufs to address ep. The length of
 	// bufs must not exceed BatchSize().
-	Send(bufs [][]byte, ep Endpoint) error
+	Send(bufs [][]byte, services []Service, ep Endpoint) error
 
 	// ParseEndpoint creates a new endpoint from a string.
 	ParseEndpoint(s string) (Endpoint, error)

@@ -113,7 +113,7 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	return peer, nil
 }
 
-func (peer *Peer) SendBuffers(buffers [][]byte) error {
+func (peer *Peer) SendBuffers(buffers [][]byte, services []conn.Service) error {
 	peer.device.net.RLock()
 	defer peer.device.net.RUnlock()
 
@@ -133,7 +133,7 @@ func (peer *Peer) SendBuffers(buffers [][]byte) error {
 	}
 	peer.endpoint.Unlock()
 
-	err := peer.device.net.bind.Send(buffers, endpoint)
+	err := peer.device.net.bind.Send(buffers, services, endpoint)
 	if err == nil {
 		var totalLen uint64
 		for _, b := range buffers {
