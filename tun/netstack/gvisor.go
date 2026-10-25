@@ -16,8 +16,6 @@ import (
 	"net"
 	"net/netip"
 	"os"
-	"regexp"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -50,9 +48,7 @@ type netTun struct {
 	hasV4, hasV6   bool
 }
 
-type Net netTun
-
-func CreateNetTUN(localAddresses, dnsServers []netip.Addr, mtu int) (tun.Device, *Net, error) {
+func CreateNetTUNGvisor(localAddresses, dnsServers []netip.Addr, mtu int) (tun.Device, *Net, error) {
 	opts := stack.Options{
 		NetworkProtocols:   []stack.NetworkProtocolFactory{ipv4.NewProtocol, ipv6.NewProtocol},
 		TransportProtocols: []stack.TransportProtocolFactory{tcp.NewProtocol, udp.NewProtocol, icmp.NewProtocol6, icmp.NewProtocol4},
@@ -105,8 +101,10 @@ func CreateNetTUN(localAddresses, dnsServers []netip.Addr, mtu int) (tun.Device,
 	}
 
 	dev.events <- tun.EventUp
-	return dev, (*Net)(dev), nil
+	return dev, &Net{stack: dev}, nil
 }
+
+var _ Stack = (*netTun)(nil)
 
 func (tun *netTun) Name() (string, error) {
 	return "go", nil
@@ -131,6 +129,7 @@ func (tun *netTun) Read(buf [][]byte, sizes []int, offset int) (int, error) {
 		return 0, err
 	}
 	sizes[0] = n
+	debugIPPacket(true, buf[0][offset:offset+n])
 	return 1, nil
 }
 
@@ -140,6 +139,7 @@ func (tun *netTun) Write(buf [][]byte, offset int) (int, error) {
 		if len(packet) == 0 {
 			continue
 		}
+		debugIPPacket(false, packet)
 
 		pkb := stack.NewPacketBuffer(stack.PacketBufferOptions{Payload: buffer.MakeWithData(packet)})
 		switch packet[0] >> 4 {
@@ -205,46 +205,34 @@ func convertToFullAddr(endpoint netip.AddrPort) (tcpip.FullAddress, tcpip.Networ
 	}, protoNumber
 }
 
-func (net *Net) DialContextTCPAddrPort(ctx context.Context, addr netip.AddrPort) (*gonet.TCPConn, error) {
+func (tun *netTun) DialContextTCPAddrPort(ctx context.Context, addr netip.AddrPort) (TCPConn, error) {
 	fa, pn := convertToFullAddr(addr)
-	return gonet.DialContextTCP(ctx, net.stack, fa, pn)
-}
-
-func (net *Net) DialContextTCP(ctx context.Context, addr *net.TCPAddr) (*gonet.TCPConn, error) {
-	if addr == nil {
-		return net.DialContextTCPAddrPort(ctx, netip.AddrPort{})
+	c, err := gonet.DialContextTCP(ctx, tun.stack, fa, pn)
+	if err != nil {
+		return nil, err
 	}
-	ip, _ := netip.AddrFromSlice(addr.IP)
-	return net.DialContextTCPAddrPort(ctx, netip.AddrPortFrom(ip, uint16(addr.Port)))
+	return c, nil
 }
 
-func (net *Net) DialTCPAddrPort(addr netip.AddrPort) (*gonet.TCPConn, error) {
+func (tun *netTun) DialTCPAddrPort(addr netip.AddrPort) (TCPConn, error) {
 	fa, pn := convertToFullAddr(addr)
-	return gonet.DialTCP(net.stack, fa, pn)
-}
-
-func (net *Net) DialTCP(addr *net.TCPAddr) (*gonet.TCPConn, error) {
-	if addr == nil {
-		return net.DialTCPAddrPort(netip.AddrPort{})
+	c, err := gonet.DialTCP(tun.stack, fa, pn)
+	if err != nil {
+		return nil, err
 	}
-	ip, _ := netip.AddrFromSlice(addr.IP)
-	return net.DialTCPAddrPort(netip.AddrPortFrom(ip, uint16(addr.Port)))
+	return c, nil
 }
 
-func (net *Net) ListenTCPAddrPort(addr netip.AddrPort) (*gonet.TCPListener, error) {
+func (tun *netTun) ListenTCPAddrPort(addr netip.AddrPort) (TCPListener, error) {
 	fa, pn := convertToFullAddr(addr)
-	return gonet.ListenTCP(net.stack, fa, pn)
-}
-
-func (net *Net) ListenTCP(addr *net.TCPAddr) (*gonet.TCPListener, error) {
-	if addr == nil {
-		return net.ListenTCPAddrPort(netip.AddrPort{})
+	l, err := gonet.ListenTCP(tun.stack, fa, pn)
+	if err != nil {
+		return nil, err
 	}
-	ip, _ := netip.AddrFromSlice(addr.IP)
-	return net.ListenTCPAddrPort(netip.AddrPortFrom(ip, uint16(addr.Port)))
+	return l, nil
 }
 
-func (net *Net) DialUDPAddrPort(laddr, raddr netip.AddrPort) (*gonet.UDPConn, error) {
+func (tun *netTun) DialUDPAddrPort(laddr, raddr netip.AddrPort) (UDPConn, error) {
 	var lfa, rfa *tcpip.FullAddress
 	var pn tcpip.NetworkProtocolNumber
 	if laddr.IsValid() || laddr.Port() > 0 {
@@ -257,31 +245,19 @@ func (net *Net) DialUDPAddrPort(laddr, raddr netip.AddrPort) (*gonet.UDPConn, er
 		addr, pn = convertToFullAddr(raddr)
 		rfa = &addr
 	}
-	return gonet.DialUDP(net.stack, lfa, rfa, pn)
-}
-
-func (net *Net) ListenUDPAddrPort(laddr netip.AddrPort) (*gonet.UDPConn, error) {
-	return net.DialUDPAddrPort(laddr, netip.AddrPort{})
-}
-
-func (net *Net) DialUDP(laddr, raddr *net.UDPAddr) (*gonet.UDPConn, error) {
-	var la, ra netip.AddrPort
-	if laddr != nil {
-		ip, _ := netip.AddrFromSlice(laddr.IP)
-		la = netip.AddrPortFrom(ip, uint16(laddr.Port))
+	c, err := gonet.DialUDP(tun.stack, lfa, rfa, pn)
+	if err != nil {
+		return nil, err
 	}
-	if raddr != nil {
-		ip, _ := netip.AddrFromSlice(raddr.IP)
-		ra = netip.AddrPortFrom(ip, uint16(raddr.Port))
-	}
-	return net.DialUDPAddrPort(la, ra)
+	return c, nil
 }
 
-func (net *Net) ListenUDP(laddr *net.UDPAddr) (*gonet.UDPConn, error) {
-	return net.DialUDP(laddr, nil)
+func (tun *netTun) ListenUDPAddrPort(laddr netip.AddrPort) (UDPConn, error) {
+	return tun.DialUDPAddrPort(laddr, netip.AddrPort{})
 }
 
-type PingConn struct {
+// pingConn is the gvisor-backed [PingConn] implementation.
+type pingConn struct {
 	laddr    PingAddr
 	raddr    PingAddr
 	wq       waiter.Queue
@@ -289,30 +265,7 @@ type PingConn struct {
 	deadline *time.Timer
 }
 
-type PingAddr struct{ addr netip.Addr }
-
-func (ia PingAddr) String() string {
-	return ia.addr.String()
-}
-
-func (ia PingAddr) Network() string {
-	if ia.addr.Is4() {
-		return "ping4"
-	} else if ia.addr.Is6() {
-		return "ping6"
-	}
-	return "ping"
-}
-
-func (ia PingAddr) Addr() netip.Addr {
-	return ia.addr
-}
-
-func PingAddrFromAddr(addr netip.Addr) *PingAddr {
-	return &PingAddr{addr}
-}
-
-func (net *Net) DialPingAddr(laddr, raddr netip.Addr) (*PingConn, error) {
+func (tun *netTun) DialPingAddr(laddr, raddr netip.Addr) (PingConn, error) {
 	if !laddr.IsValid() && !raddr.IsValid() {
 		return nil, errors.New("ping dial: invalid address")
 	}
@@ -333,13 +286,13 @@ func (net *Net) DialPingAddr(laddr, raddr netip.Addr) (*PingConn, error) {
 		pn = ipv6.ProtocolNumber
 	}
 
-	pc := &PingConn{
+	pc := &pingConn{
 		laddr:    PingAddr{laddr},
 		deadline: time.NewTimer(time.Hour << 10),
 	}
 	pc.deadline.Stop()
 
-	ep, tcpipErr := net.stack.NewEndpoint(tn, pn, &pc.wq)
+	ep, tcpipErr := tun.stack.NewEndpoint(tn, pn, &pc.wq)
 	if tcpipErr != nil {
 		return nil, fmt.Errorf("ping socket: endpoint: %s", tcpipErr)
 	}
@@ -363,48 +316,29 @@ func (net *Net) DialPingAddr(laddr, raddr netip.Addr) (*PingConn, error) {
 	return pc, nil
 }
 
-func (net *Net) ListenPingAddr(laddr netip.Addr) (*PingConn, error) {
-	return net.DialPingAddr(laddr, netip.Addr{})
+func (tun *netTun) ListenPingAddr(laddr netip.Addr) (PingConn, error) {
+	return tun.DialPingAddr(laddr, netip.Addr{})
 }
 
-func (net *Net) DialPing(laddr, raddr *PingAddr) (*PingConn, error) {
-	var la, ra netip.Addr
-	if laddr != nil {
-		la = laddr.addr
-	}
-	if raddr != nil {
-		ra = raddr.addr
-	}
-	return net.DialPingAddr(la, ra)
-}
-
-func (net *Net) ListenPing(laddr *PingAddr) (*PingConn, error) {
-	var la netip.Addr
-	if laddr != nil {
-		la = laddr.addr
-	}
-	return net.ListenPingAddr(la)
-}
-
-func (pc *PingConn) LocalAddr() net.Addr {
+func (pc *pingConn) LocalAddr() net.Addr {
 	return pc.laddr
 }
 
-func (pc *PingConn) RemoteAddr() net.Addr {
+func (pc *pingConn) RemoteAddr() net.Addr {
 	return pc.raddr
 }
 
-func (pc *PingConn) Close() error {
+func (pc *pingConn) Close() error {
 	pc.deadline.Reset(0)
 	pc.ep.Close()
 	return nil
 }
 
-func (pc *PingConn) SetWriteDeadline(t time.Time) error {
+func (pc *pingConn) SetWriteDeadline(t time.Time) error {
 	return errors.New("not implemented")
 }
 
-func (pc *PingConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
+func (pc *pingConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	var na netip.Addr
 	switch v := addr.(type) {
 	case *PingAddr:
@@ -431,11 +365,11 @@ func (pc *PingConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	return int(n64), nil
 }
 
-func (pc *PingConn) Write(p []byte) (n int, err error) {
+func (pc *pingConn) Write(p []byte) (n int, err error) {
 	return pc.WriteTo(p, &pc.raddr)
 }
 
-func (pc *PingConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
+func (pc *pingConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	e, notifyCh := waiter.NewChannelEntry(waiter.EventIn)
 	pc.wq.EventRegister(&e)
 	defer pc.wq.EventUnregister(&e)
@@ -459,81 +393,20 @@ func (pc *PingConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	return res.Count, &PingAddr{remoteAddr}, nil
 }
 
-func (pc *PingConn) Read(p []byte) (n int, err error) {
+func (pc *pingConn) Read(p []byte) (n int, err error) {
 	n, _, err = pc.ReadFrom(p)
 	return
 }
 
-func (pc *PingConn) SetDeadline(t time.Time) error {
+func (pc *pingConn) SetDeadline(t time.Time) error {
 	// pc.SetWriteDeadline is unimplemented
 
 	return pc.SetReadDeadline(t)
 }
 
-func (pc *PingConn) SetReadDeadline(t time.Time) error {
+func (pc *pingConn) SetReadDeadline(t time.Time) error {
 	pc.deadline.Reset(time.Until(t))
 	return nil
-}
-
-var (
-	errNoSuchHost                   = errors.New("no such host")
-	errLameReferral                 = errors.New("lame referral")
-	errCannotUnmarshalDNSMessage    = errors.New("cannot unmarshal DNS message")
-	errCannotMarshalDNSMessage      = errors.New("cannot marshal DNS message")
-	errServerMisbehaving            = errors.New("server misbehaving")
-	errInvalidDNSResponse           = errors.New("invalid DNS response")
-	errNoAnswerFromDNSServer        = errors.New("no answer from DNS server")
-	errServerTemporarilyMisbehaving = errors.New("server misbehaving")
-	errCanceled                     = errors.New("operation was canceled")
-	errTimeout                      = errors.New("i/o timeout")
-	errNumericPort                  = errors.New("port must be numeric")
-	errNoSuitableAddress            = errors.New("no suitable address found")
-	errMissingAddress               = errors.New("missing address")
-)
-
-func (net *Net) LookupHost(host string) (addrs []string, err error) {
-	return net.LookupContextHost(context.Background(), host)
-}
-
-func isDomainName(s string) bool {
-	l := len(s)
-	if l == 0 || l > 254 || l == 254 && s[l-1] != '.' {
-		return false
-	}
-	last := byte('.')
-	nonNumeric := false
-	partlen := 0
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch {
-		default:
-			return false
-		case 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || c == '_':
-			nonNumeric = true
-			partlen++
-		case '0' <= c && c <= '9':
-			partlen++
-		case c == '-':
-			if last == '.' {
-				return false
-			}
-			partlen++
-			nonNumeric = true
-		case c == '.':
-			if last == '.' || last == '-' {
-				return false
-			}
-			if partlen > 63 || partlen == 0 {
-				return false
-			}
-			partlen = 0
-		}
-		last = c
-	}
-	if last == '-' || partlen > 63 {
-		return false
-	}
-	return nonNumeric
 }
 
 func randU16() uint16 {
@@ -650,7 +523,7 @@ func dnsStreamRoundTrip(c net.Conn, id uint16, query dnsmessage.Question, b []by
 	return p, h, nil
 }
 
-func (tnet *Net) exchange(ctx context.Context, server netip.Addr, q dnsmessage.Question, timeout time.Duration) (dnsmessage.Parser, dnsmessage.Header, error) {
+func (tnet *netTun) exchange(ctx context.Context, server netip.Addr, q dnsmessage.Question, timeout time.Duration) (dnsmessage.Parser, dnsmessage.Header, error) {
 	q.Class = dnsmessage.ClassINET
 	id, udpReq, tcpReq, err := newRequest(q)
 	if err != nil {
@@ -743,7 +616,7 @@ func skipToAnswer(p *dnsmessage.Parser, qtype dnsmessage.Type) error {
 	}
 }
 
-func (tnet *Net) tryOneName(ctx context.Context, name string, qtype dnsmessage.Type) (dnsmessage.Parser, string, error) {
+func (tnet *netTun) tryOneName(ctx context.Context, name string, qtype dnsmessage.Type) (dnsmessage.Parser, string, error) {
 	var lastErr error
 
 	n, err := dnsmessage.NewName(name)
@@ -810,7 +683,7 @@ func (tnet *Net) tryOneName(ctx context.Context, name string, qtype dnsmessage.T
 	return dnsmessage.Parser{}, "", lastErr
 }
 
-func (tnet *Net) LookupContextHost(ctx context.Context, host string) ([]string, error) {
+func (tnet *netTun) LookupContextHost(ctx context.Context, host string) ([]string, error) {
 	if host == "" || (!tnet.hasV6 && !tnet.hasV4) {
 		return nil, &net.DNSError{Err: errNoSuchHost.Error(), Name: host, IsNotFound: true}
 	}
@@ -930,128 +803,4 @@ func (tnet *Net) LookupContextHost(ctx context.Context, host string) ([]string, 
 		saddrs = append(saddrs, ip.String())
 	}
 	return saddrs, nil
-}
-
-func partialDeadline(now, deadline time.Time, addrsRemaining int) (time.Time, error) {
-	if deadline.IsZero() {
-		return deadline, nil
-	}
-	timeRemaining := deadline.Sub(now)
-	if timeRemaining <= 0 {
-		return time.Time{}, errTimeout
-	}
-	timeout := timeRemaining / time.Duration(addrsRemaining)
-	const saneMinimum = 2 * time.Second
-	if timeout < saneMinimum {
-		if timeRemaining < saneMinimum {
-			timeout = timeRemaining
-		} else {
-			timeout = saneMinimum
-		}
-	}
-	return now.Add(timeout), nil
-}
-
-var protoSplitter = regexp.MustCompile(`^(tcp|udp|ping)(4|6)?$`)
-
-func (tnet *Net) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	if ctx == nil {
-		panic("nil context")
-	}
-	var acceptV4, acceptV6 bool
-	matches := protoSplitter.FindStringSubmatch(network)
-	if matches == nil {
-		return nil, &net.OpError{Op: "dial", Err: net.UnknownNetworkError(network)}
-	} else if len(matches[2]) == 0 {
-		acceptV4 = true
-		acceptV6 = true
-	} else {
-		acceptV4 = matches[2][0] == '4'
-		acceptV6 = !acceptV4
-	}
-	var host string
-	var port int
-	if matches[1] == "ping" {
-		host = address
-	} else {
-		var sport string
-		var err error
-		host, sport, err = net.SplitHostPort(address)
-		if err != nil {
-			return nil, &net.OpError{Op: "dial", Err: err}
-		}
-		port, err = strconv.Atoi(sport)
-		if err != nil || port < 0 || port > 65535 {
-			return nil, &net.OpError{Op: "dial", Err: errNumericPort}
-		}
-	}
-	allAddr, err := tnet.LookupContextHost(ctx, host)
-	if err != nil {
-		return nil, &net.OpError{Op: "dial", Err: err}
-	}
-	var addrs []netip.AddrPort
-	for _, addr := range allAddr {
-		ip, err := netip.ParseAddr(addr)
-		if err == nil && ((ip.Is4() && acceptV4) || (ip.Is6() && acceptV6)) {
-			addrs = append(addrs, netip.AddrPortFrom(ip, uint16(port)))
-		}
-	}
-	if len(addrs) == 0 && len(allAddr) != 0 {
-		return nil, &net.OpError{Op: "dial", Err: errNoSuitableAddress}
-	}
-
-	var firstErr error
-	for i, addr := range addrs {
-		select {
-		case <-ctx.Done():
-			err := ctx.Err()
-			if err == context.Canceled {
-				err = errCanceled
-			} else if err == context.DeadlineExceeded {
-				err = errTimeout
-			}
-			return nil, &net.OpError{Op: "dial", Err: err}
-		default:
-		}
-
-		dialCtx := ctx
-		if deadline, hasDeadline := ctx.Deadline(); hasDeadline {
-			partialDeadline, err := partialDeadline(time.Now(), deadline, len(addrs)-i)
-			if err != nil {
-				if firstErr == nil {
-					firstErr = &net.OpError{Op: "dial", Err: err}
-				}
-				break
-			}
-			if partialDeadline.Before(deadline) {
-				var cancel context.CancelFunc
-				dialCtx, cancel = context.WithDeadline(ctx, partialDeadline)
-				defer cancel()
-			}
-		}
-
-		var c net.Conn
-		switch matches[1] {
-		case "tcp":
-			c, err = tnet.DialContextTCPAddrPort(dialCtx, addr)
-		case "udp":
-			c, err = tnet.DialUDPAddrPort(netip.AddrPort{}, addr)
-		case "ping":
-			c, err = tnet.DialPingAddr(netip.Addr{}, addr.Addr())
-		}
-		if err == nil {
-			return c, nil
-		}
-		if firstErr == nil {
-			firstErr = err
-		}
-	}
-	if firstErr == nil {
-		firstErr = &net.OpError{Op: "dial", Err: errMissingAddress}
-	}
-	return nil, firstErr
-}
-
-func (tnet *Net) Dial(network, address string) (net.Conn, error) {
-	return tnet.DialContext(context.Background(), network, address)
 }
