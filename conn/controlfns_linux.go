@@ -29,7 +29,7 @@ func kernelVersion() (major, minor int) {
 			value = (value * 10) + int(c-'0')
 		} else {
 			// Note that we're assuming N.N.N here.
-			// If we see anything else, we are likely to mis-parse it.
+			// If we see anything else, we are likely to miss-parse it.
 			values[vi] = value
 			vi++
 			if vi >= len(values) {
