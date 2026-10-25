@@ -367,12 +367,12 @@ func (s *StdNetBind) Send(bufs [][]byte, endpoint Endpoint) error {
 	defer s.udpAddrPool.Put(ua)
 	if is6 {
 		as16 := endpoint.DstIP().As16()
-		copy(ua.IP, as16[:])
 		ua.IP = ua.IP[:16]
+		copy(ua.IP, as16[:])
 	} else {
 		as4 := endpoint.DstIP().As4()
-		copy(ua.IP, as4[:])
 		ua.IP = ua.IP[:4]
+		copy(ua.IP, as4[:])
 	}
 	ua.Port = int(endpoint.(*StdNetEndpoint).Port())
 	var (
