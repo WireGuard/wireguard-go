@@ -76,3 +76,26 @@ func (key NoisePublicKey) Equals(tar NoisePublicKey) bool {
 func (key *NoisePresharedKey) FromHex(src string) error {
 	return loadExactHex(key[:], src)
 }
+
+const (
+	MLKEMPublicKeySize  = 1568
+	MLKEMPrivateKeySize = 3168
+	MLKEMCiphertextSize = 1568
+)
+
+type (
+	MLKEMPublicKey  [MLKEMPublicKeySize]byte
+	MLKEMPrivateKey [MLKEMPrivateKeySize]byte
+)
+
+const (
+	MLDSAPublicKeySize  = 2592
+	MLDSAPrivateKeySize = 4864
+	MLDSASignatureSize  = 4595
+)
+
+type (
+	MLDSAPublicKey  [MLDSAPublicKeySize]byte
+	MLDSAPrivateKey [MLDSAPrivateKeySize]byte
+	MLDSASignature  [MLDSASignatureSize]byte
+)
