@@ -246,7 +246,7 @@ func (net *Net) ListenTCP(addr *net.TCPAddr) (*gonet.TCPListener, error) {
 
 func (net *Net) DialUDPAddrPort(laddr, raddr netip.AddrPort) (*gonet.UDPConn, error) {
 	var lfa, rfa *tcpip.FullAddress
-	var pn tcpip.NetworkProtocolNumber
+	var pn = ipv6.ProtocolNumber
 	if laddr.IsValid() || laddr.Port() > 0 {
 		var addr tcpip.FullAddress
 		addr, pn = convertToFullAddr(laddr)
