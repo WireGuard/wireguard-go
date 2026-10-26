@@ -3,6 +3,8 @@
  * Copyright (C) 2017-2025 WireGuard LLC. All Rights Reserved.
  */
 
+//go:build freebsd || dragonfly
+
 package tun
 
 import (
@@ -21,7 +23,6 @@ import (
 const (
 	_TUNSIFHEAD = 0x80047460
 	_TUNSIFMODE = 0x8004745e
-	_TUNGIFNAME = 0x4020745d
 	_TUNSIFPID  = 0x2000745f
 
 	_SIOCGIFINFO_IN6        = 0xc048696c
