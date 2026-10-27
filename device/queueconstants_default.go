@@ -15,5 +15,8 @@ const (
 	QueueInboundSize           = 1024
 	QueueHandshakeSize         = 1024
 	MaxSegmentSize             = (1 << 16) - 1 // largest possible UDP datagram
-	PreallocatedBuffersPerPool = 0             // Disable and allow for infinite memory growth
 )
+
+// Infinite memory growth quickly oom-kills processes on small devices
+// Allow fine tuning on such systems.
+var PreallocatedBuffersPerPool uint32 = 0          // Disable and allow for infinite memory growth
