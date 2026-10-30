@@ -115,6 +115,10 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	peer.handshake.lastSentHandshake = time.Now()
 	peer.handshake.mutex.Unlock()
 
+	return peer.sendHandshakeInitiation()
+}
+
+func (peer *Peer) sendHandshakeInitiation() error {
 	peer.device.log.Verbosef("%v - Sending handshake initiation", peer)
 
 	msg, err := peer.device.CreateMessageInitiation(peer)
@@ -137,6 +141,25 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 	peer.timersHandshakeInitiated()
 
 	return err
+}
+
+// needsHandshake reports whether the peer lacks a usable session, i.e. a new
+// handshake is required before traffic can flow.
+func (peer *Peer) needsHandshake() bool {
+	keypair := peer.keypairs.Current()
+	return keypair == nil ||
+		keypair.sendNonce.Load() >= RejectAfterMessages ||
+		time.Since(keypair.created) >= RejectAfterTime
+}
+
+func (peer *Peer) SendHandshakeInitiationOnEndpointChange() error {
+	peer.timers.handshakeAttempts.Store(0)
+
+	peer.handshake.mutex.Lock()
+	peer.handshake.lastSentHandshake = time.Now()
+	peer.handshake.mutex.Unlock()
+
+	return peer.sendHandshakeInitiation()
 }
 
 func (peer *Peer) SendHandshakeResponse() error {
