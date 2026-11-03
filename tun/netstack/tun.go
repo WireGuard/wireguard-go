@@ -71,6 +71,11 @@ func CreateNetTUN(localAddresses, dnsServers []netip.Addr, mtu int) (tun.Device,
 	if tcpipErr != nil {
 		return nil, nil, fmt.Errorf("could not enable TCP SACK: %v", tcpipErr)
 	}
+	recoveryOpt := tcpip.TCPRecovery(0) // TCP RACK is enabled by default, but stalls after a burst of losses
+	tcpipErr = dev.stack.SetTransportProtocolOption(tcp.ProtocolNumber, &recoveryOpt)
+	if tcpipErr != nil {
+		return nil, nil, fmt.Errorf("could not disable TCP RACK: %v", tcpipErr)
+	}
 	dev.notifyHandle = dev.ep.AddNotify(dev)
 	tcpipErr = dev.stack.CreateNIC(1, dev.ep)
 	if tcpipErr != nil {
