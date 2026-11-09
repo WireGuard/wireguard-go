@@ -8,7 +8,9 @@ package device
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,6 +66,47 @@ func (peer *Peer) keepKeyFreshReceiving() {
 	}
 }
 
+const (
+	udpBatchHistExactMax  = 12
+	udpBatchHistWideWidth = 10
+	udpBatchHistWideEnd   = 130
+)
+
+func udpBatchHistWideBuckets() int {
+	return (udpBatchHistWideEnd-udpBatchHistExactMax-1)/udpBatchHistWideWidth + 1
+}
+
+func recordUDPBatchSize(exact []int, wide []int, count int) {
+	if count < 0 {
+		return
+	}
+	if count <= udpBatchHistExactMax {
+		exact[count]++
+		return
+	}
+	idx := (count - udpBatchHistExactMax - 1) / udpBatchHistWideWidth
+	if idx >= len(wide) {
+		idx = len(wide) - 1
+	}
+	wide[idx]++
+}
+
+func appendUDPBatchHistBar(b *strings.Builder, label string, calls, total int) {
+	if calls == 0 || total == 0 {
+		return
+	}
+	share := 100 * float64(calls) / float64(total)
+	barLen := int(share/5 + 0.5) // 5% per '#'
+	if barLen < 1 {
+		barLen = 1
+	}
+	if barLen > 20 {
+		barLen = 20
+	}
+	fmt.Fprintf(b, "  %7s  %7d  %6.1f%%  %s\n",
+		label, calls, share, strings.Repeat("#", barLen))
+}
+
 /* Receives incoming datagrams for the device
  *
  * Every time the bind is updated a new routine is started for
@@ -91,6 +134,11 @@ func (device *Device) RoutineReceiveIncoming(maxBatchSize int, recv conn.Receive
 		endpoints   = make([]conn.Endpoint, maxBatchSize)
 		deathSpiral int
 		elemsByPeer = make(map[*Peer]*QueueInboundElementsContainer, maxBatchSize)
+
+		udpPackets, udpBatches, udpMaxSize int
+		udpHistExact                       [udpBatchHistExactMax + 1]int
+		udpHistWide                        = make([]int, udpBatchHistWideBuckets())
+		udpLastLog                         = time.Now()
 	)
 
 	for i := range bufsArrs {
@@ -124,6 +172,38 @@ func (device *Device) RoutineReceiveIncoming(maxBatchSize int, recv conn.Receive
 			return
 		}
 		deathSpiral = 0
+
+		udpPackets += count
+		udpBatches++
+		recordUDPBatchSize(udpHistExact[:], udpHistWide, count)
+		if count > udpMaxSize {
+			udpMaxSize = count
+		}
+		if now := time.Now(); now.Sub(udpLastLog) >= time.Second {
+			avg := 0.0
+			if udpBatches > 0 {
+				avg = float64(udpPackets) / float64(udpBatches)
+			}
+			var b strings.Builder
+			fmt.Fprintf(&b, "UDP recv %s (cumulative)\n", recvName)
+			fmt.Fprintf(&b, "  packets=%d  calls=%d  avg=%.2f  cap=%d\n",
+				udpPackets, udpBatches, avg, maxBatchSize)
+			fmt.Fprintf(&b, "  %7s  %7s  %7s  %s\n", "size", "calls", "share", "dist")
+			for n, c := range udpHistExact {
+				appendUDPBatchHistBar(&b, fmt.Sprintf("%d", n), c, udpBatches)
+			}
+			for i, c := range udpHistWide {
+				lo := udpBatchHistExactMax + 1 + i*udpBatchHistWideWidth
+				hi := lo + udpBatchHistWideWidth - 1
+				if hi > udpBatchHistWideEnd {
+					hi = udpBatchHistWideEnd
+				}
+				appendUDPBatchHistBar(&b, fmt.Sprintf("%d-%d", lo, hi), c, udpBatches)
+			}
+			fmt.Fprintf(&b, "  max_batch_size=%d", udpMaxSize)
+			device.log.Verbosef("%s", b.String())
+			udpLastLog = now
+		}
 
 		// handle each packet in the batch
 		for i, size := range sizes[:count] {

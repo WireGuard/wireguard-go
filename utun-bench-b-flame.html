@@ -1,0 +1,1910 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>wireguard-go cpu</title>
+  <style type="text/css">
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+html, body {
+  height: 100%;
+}
+body {
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+  font-size: 13px;
+  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+}
+a {
+  color: #2a66d9;
+}
+.header {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  min-height: 44px;
+  background-color: #eee;
+  color: #212121;
+  padding: 0 1rem;
+}
+.header > div {
+  margin: 0 0.125em;
+}
+.header .title h1 {
+  font-size: 1.75em;
+  margin-right: 1rem;
+  margin-bottom: 4px;
+}
+.header .title a {
+  color: #212121;
+  text-decoration: none;
+}
+.header .title a:hover {
+  text-decoration: underline;
+}
+.header .description {
+  width: 100%;
+  text-align: right;
+  white-space: nowrap;
+}
+@media screen and (max-width: 799px) {
+  .header input {
+    display: none;
+  }
+}
+#detailsbox {
+  display: none;
+  position: fixed;
+  top: 40px;
+  right: 20px;
+  background-color: #ffffff;
+  box-shadow: 0 1px 5px rgba(0,0,0,.3);
+  line-height: 24px;
+  padding: 1em;
+  text-align: left;
+}
+.header input {
+  background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' style='pointer-events:none;display:block;width:100%25;height:100%25;fill:%23757575'%3E%3Cpath d='M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61.0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z'/%3E%3C/svg%3E") no-repeat 4px center/20px 20px;
+  border: 1px solid #d1d2d3;
+  border-radius: 2px 0 0 2px;
+  padding: 0.25em;
+  padding-left: 28px;
+  margin-left: 1em;
+  font-family: 'Roboto', 'Noto', sans-serif;
+  font-size: 1em;
+  line-height: 24px;
+  color: #212121;
+}
+.downArrow {
+  border-top: .36em solid #ccc;
+  border-left: .36em solid transparent;
+  border-right: .36em solid transparent;
+  margin-bottom: .05em;
+  margin-left: .5em;
+  transition: border-top-color 200ms;
+}
+.menu-item {
+  height: 100%;
+  text-transform: uppercase;
+  font-family: 'Roboto Medium', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+  position: relative;
+}
+.menu-item .menu-name:hover {
+  opacity: 0.75;
+}
+.menu-item .menu-name:hover .downArrow {
+  border-top-color: #666;
+}
+.menu-name {
+  height: 100%;
+  padding: 0 0.5em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.menu-name a {
+  text-decoration: none;
+  color: #212121;
+}
+.submenu {
+  display: none;
+  margin-top: -4px;
+  min-width: 10em;
+  position: absolute;
+  left: 0px;
+  background-color: white;
+  box-shadow: 0 1px 5px rgba(0,0,0,.3);
+  font-size: 100%;
+  text-transform: none;
+  white-space: nowrap;
+}
+.menu-item, .submenu {
+  user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -webkit-user-select: none;
+}
+.submenu hr {
+  border: 0;
+  border-top: 2px solid #eee;
+}
+.submenu a {
+  display: block;
+  padding: .5em 1em;
+  text-decoration: none;
+}
+.submenu a:hover, .submenu a.active {
+  color: white;
+  background-color: #6b82d6;
+}
+.submenu a.disabled {
+  color: gray;
+  pointer-events: none;
+}
+.menu-check-mark {
+  position: absolute;
+  left: 2px;
+}
+.menu-delete-btn {
+  position: absolute;
+  right: 2px;
+}
+
+.help {
+  padding-left: 1em;
+}
+
+
+#dialog-overlay {
+  display: none;
+  position: fixed;
+  left: 0px;
+  top: 0px;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(1,1,1,0.1);
+}
+
+.dialog {
+  
+  display: none;
+  position: fixed;
+  margin: 0px;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 125%;
+  background-color: #ffffff;
+  box-shadow: 0 1px 5px rgba(0,0,0,.3);
+}
+.dialog-header {
+  font-size: 120%;
+  border-bottom: 1px solid #CCCCCC;
+  width: 100%;
+  text-align: center;
+  background: #EEEEEE;
+  user-select: none;
+}
+.dialog-footer {
+  border-top: 1px solid #CCCCCC;
+  width: 100%;
+  text-align: right;
+  padding: 10px;
+}
+.dialog-error {
+  margin: 10px;
+  color: red;
+}
+.dialog input {
+  margin: 10px;
+  font-size: inherit;
+}
+.dialog button {
+  margin-left: 10px;
+  font-size: inherit;
+}
+#save-dialog, #delete-dialog {
+  width: 50%;
+  max-width: 20em;
+}
+#delete-prompt {
+  padding: 10px;
+}
+
+#content {
+  overflow-y: scroll;
+  padding: 1em;
+}
+#top {
+  overflow-y: scroll;
+}
+#graph {
+  overflow: hidden;
+}
+#graph svg {
+  width: 100%;
+  height: auto;
+  padding: 10px;
+}
+#content.source .filename {
+  margin-top: 0;
+  margin-bottom: 1em;
+  font-size: 120%;
+}
+#content.source pre {
+  margin-bottom: 3em;
+}
+table {
+  border-spacing: 0px;
+  width: 100%;
+  padding-bottom: 1em;
+  white-space: nowrap;
+}
+table thead {
+  font-family: 'Roboto Medium', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+}
+table tr th {
+  position: sticky;
+  top: 0;
+  background-color: #ddd;
+  text-align: right;
+  padding: .3em .5em;
+}
+table tr td {
+  padding: .3em .5em;
+  text-align: right;
+}
+#top table tr th:nth-child(6),
+#top table tr th:nth-child(7),
+#top table tr td:nth-child(6),
+#top table tr td:nth-child(7) {
+  text-align: left;
+}
+#top table tr td:nth-child(6) {
+  width: 100%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+#flathdr1, #flathdr2, #cumhdr1, #cumhdr2, #namehdr {
+  cursor: ns-resize;
+}
+.hilite {
+  background-color: #ebf5fb;
+  font-weight: bold;
+}
+ 
+.boxtext         { z-index: 2; }   
+#current-details { z-index: 2; }   
+#detailsbox      { z-index: 3; }   
+.submenu         { z-index: 4; }
+.dialog          { z-index: 5; }
+</style>
+
+  <style type="text/css">
+body {
+  overflow: hidden;  
+}
+ 
+#stack-holder {
+  width: 100%;
+  flex-grow: 1;
+  overflow-y: auto;
+  background: #eee;  
+  position: relative;  
+}
+ 
+#stack-chart {
+  width: 100%;
+  position: relative;  
+}
+ 
+#current-details {
+  position: relative;
+  background: #eee;  
+  font-size: 12pt;
+  padding: 0 4px;
+  width: 100%;
+}
+ 
+#current-details-left {
+  float: left;
+  max-width: 60%;
+  white-space: nowrap;
+  overflow-x: hidden;
+}
+#current-details-right {
+  float: right;
+  max-width: 40%;
+  white-space: nowrap;
+  overflow-x: hidden;
+}
+ 
+.boxbg {
+  border-width: 0px;
+  position: absolute;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: #d8d8d8;
+}
+.positive { position: absolute; background: #caa; }
+.negative { position: absolute; background: #aca; }
+ 
+.not-inlined {
+  border-top: 1px solid black;
+}
+ 
+.boxtext {
+  position: absolute;
+  width: 100%;
+  padding-left: 2px;
+  line-height: 18px;
+  cursor: default;
+  font-family: "Google Sans", Arial, sans-serif;
+  font-size: 12pt;
+  z-index: 2;
+}
+ 
+.hilite { box-shadow: 0px 0px 0px 2px #000; z-index: 1; }
+.hilite2 { box-shadow: 0px 0px 0px 2px #000; z-index: 1; }
+ 
+.separator {
+  position: absolute;
+  text-align: center;
+  font-size: 12pt;
+  font-weight: bold;
+}
+ 
+#action-menu {
+  max-width: 15em;
+}
+ 
+#action-title {
+  display: block;
+  padding: 0.5em 1em;
+  background: #888;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+ 
+#textsizer {
+  position: absolute;
+  bottom: -100px;
+}
+</style>
+
+</head>
+<body>
+  <div class="header">
+  <div class="title">
+    <h1><a href="./">pprof</a></h1>
+  </div>
+
+  <div id="view" class="menu-item">
+    <div class="menu-name">
+      View
+      <i class="downArrow"></i>
+    </div>
+    <div class="submenu">
+      <a title="Outputs top entries in text form"  href="./top" id="topbtn">Top</a>
+      <a title="Display profile as a directed graph" href="./" id="graphbtn">Graph</a>
+      <a title="Display profile as a flame graph" href="./flamegraph" id="flamegraph">Flame Graph</a>
+      <a title="Output callers/callees of functions matching regexp" href="./peek" id="peek">Peek</a>
+      <a title="Output annotated source for functions matching regexp" href="./source" id="list">Source</a>
+      <a title="Output assembly listings annotated with samples" href="./disasm" id="disasm">Disassemble</a>
+    </div>
+  </div>
+
+  
+  
+  <div id="sample" class="menu-item">
+    <div class="menu-name">
+      Sample
+      <i class="downArrow"></i>
+    </div>
+    <div class="submenu">
+      
+      <a href="?si=samples" id="sampletype-samples">samples</a>
+      
+      <a href="?si=cpu" id="sampletype-cpu">cpu</a>
+      
+    </div>
+  </div>
+  
+
+  <div id="refine" class="menu-item">
+    <div class="menu-name">
+      Refine
+      <i class="downArrow"></i>
+    </div>
+    <div class="submenu">
+      <a title="Restricts to samples going through a node matching regexp
+Discard samples that do not include a node matching this regexp.
+Matching includes the function name, filename or object name.
+" href="?" id="focus">Focus</a>
+      <a title="Skips paths going through any nodes matching regexp
+If set, discard samples that include a node matching this regexp.
+Matching includes the function name, filename or object name.
+" href="?" id="ignore">Ignore</a>
+      <a title="Skips nodes matching regexp
+Discard nodes that match this location.
+Other nodes from samples that include this location will be shown.
+Matching includes the function name, filename or object name.
+" href="?" id="hide">Hide</a>
+      <a title="Only show nodes matching regexp
+If set, only show nodes that match this location.
+Matching includes the function name, filename or object name.
+" href="?" id="show">Show</a>
+      <a title="Drops functions above the highest matched frame.
+If set, all frames above the highest match are dropped from every sample.
+Matching includes the function name, filename or object name.
+" href="?" id="show-from">Show from</a>
+      <hr>
+      <a title="Show the entire profile" href="?">Reset</a>
+    </div>
+  </div>
+
+  <div id="config" class="menu-item">
+    <div class="menu-name">
+      Config
+      <i class="downArrow"></i>
+    </div>
+    <div class="submenu">
+      <a title="Save current settings" id="save-config">Save as ...</a>
+      <hr>
+      
+      <a href="?">
+        <span class="menu-check-mark">✓</span>
+        Default
+        
+      </a>
+      
+    </div>
+  </div>
+
+  <div id="download" class="menu-item">
+    <div class="menu-name">
+      <a href="./download">Download</a>
+    </div>
+  </div>
+
+  <div>
+    <input id="search" type="text" placeholder="Search regexp" autocomplete="off" autocapitalize="none" size=40>
+  </div>
+
+  <div class="description">
+    <a title="Show information about the profile and this view" href="#" id="details">wireguard-go cpu</a>
+    <div id="detailsbox">
+      <div>File: wireguard-go</div><div>Type: cpu</div><div>Time: 2026-07-30 17:11:41 EDT</div><div>Duration: 21.83s, Total samples = 26.48s (121.32%)</div><div>Showing nodes accounting for 26.48s, 100% of 26.48s total</div>
+    </div>
+  </div>
+
+  
+</div>
+
+<div id="dialog-overlay"></div>
+
+<div class="dialog" id="save-dialog">
+  <div class="dialog-header">Save options as</div>
+  <datalist id="config-list">
+    
+  </datalist>
+  <input id="save-name" type="text" list="config-list" placeholder="New config" />
+  <div class="dialog-footer">
+    <span class="dialog-error" id="save-error"></span>
+    <button id="save-cancel">Cancel</button>
+    <button id="save-confirm">Save</button>
+  </div>
+</div>
+
+<div class="dialog" id="delete-dialog">
+  <div class="dialog-header" id="delete-dialog-title">Delete config</div>
+  <div id="delete-prompt"></div>
+  <div class="dialog-footer">
+    <span class="dialog-error" id="delete-error"></span>
+    <button id="delete-cancel">Cancel</button>
+    <button id="delete-confirm">Delete</button>
+  </div>
+</div>
+
+<div id="errors"></div>
+
+  <div id="current-details">
+    <div id="current-details-left"></div>
+    <div id="current-details-right"> </div>
+  </div>
+  <div id="stack-holder">
+    <div id="stack-chart"></div>
+  </div>
+  <div id="action-menu" class="submenu">
+    <span id="action-title"></span>
+    <hr>
+    <a title="Output annotated source for functions matching regexp" id="action-source" href="./source">Show source code</a>
+    <a title="Output annotated source for functions matching regexp" id="action-source-tab" href="./source" target="_blank">Show source in new tab</a>
+    <hr>
+    <a title="Restricts to samples going through a node matching regexp
+Discard samples that do not include a node matching this regexp.
+Matching includes the function name, filename or object name.
+" id="action-focus" href="?">Focus</a>
+    <a title="Skips paths going through any nodes matching regexp
+If set, discard samples that include a node matching this regexp.
+Matching includes the function name, filename or object name.
+" id="action-ignore" href="?">Ignore</a>
+    <a title="Skips nodes matching regexp
+Discard nodes that match this location.
+Other nodes from samples that include this location will be shown.
+Matching includes the function name, filename or object name.
+" id="action-hide" href="?">Hide</a>
+    <a title="Drops functions above the highest matched frame.
+If set, all frames above the highest match are dropped from every sample.
+Matching includes the function name, filename or object name.
+" id="action-showfrom" href="?">Show from</a>
+  </div>
+  <script>
+
+
+function initPanAndZoom(svg, clickHandler) {
+  'use strict';
+
+  
+  const IDLE = 0;
+  const MOUSEPAN = 1;
+  const TOUCHPAN = 2;
+  const TOUCHZOOM = 3;
+  let mode = IDLE;
+
+  
+  let currentScale = 1.0;
+  const initWidth = svg.viewBox.baseVal.width;
+  const initHeight = svg.viewBox.baseVal.height;
+
+  
+  let panLastX = 0;      
+  let panLastY = 0;      
+  let moved = false;     
+  let touchid = null;    
+
+  
+  let touchid2 = null;     
+  let initGap = 1.0;       
+  let initScale = 1.0;     
+  let centerPoint = null;  
+
+  
+  function toSvg(x, y) {
+    const p = svg.createSVGPoint();
+    p.x = x;
+    p.y = y;
+    let m = svg.getCTM();
+    if (m == null) m = svg.getScreenCTM(); 
+    return p.matrixTransform(m.inverse());
+  }
+
+  
+  
+  function rescale(s, u) {
+    
+    if (s < 0.2) s = 0.2;
+    if (s > 10.0) s = 10.0;
+
+    currentScale = s;
+
+    
+    
+    
+    const vb = svg.viewBox;
+    const w1 = vb.baseVal.width;
+    const w2 = initWidth / s;
+    const h1 = vb.baseVal.height;
+    const h2 = initHeight / s;
+    vb.baseVal.width = w2;
+    vb.baseVal.height = h2;
+
+    
+    
+    
+    
+    
+    
+    
+    vb.baseVal.x = u.x - (u.x - vb.baseVal.x) * (w2 / w1);
+    vb.baseVal.y = u.y - (u.y - vb.baseVal.y) * (h2 / h1);
+  }
+
+  function handleWheel(e) {
+    if (e.deltaY == 0) return;
+    
+    rescale(currentScale * (e.deltaY < 0 ? 1.1 : (1/1.1)),
+            toSvg(e.offsetX, e.offsetY));
+  }
+
+  function setMode(m) {
+    mode = m;
+    touchid = null;
+    touchid2 = null;
+  }
+
+  function panStart(x, y) {
+    moved = false;
+    panLastX = x;
+    panLastY = y;
+  }
+
+  function panMove(x, y) {
+    let dx = x - panLastX;
+    let dy = y - panLastY;
+    if (Math.abs(dx) <= 2 && Math.abs(dy) <= 2) return; 
+
+    moved = true;
+    panLastX = x;
+    panLastY = y;
+
+    
+    const swidth = svg.clientWidth || svg.parentNode.clientWidth;
+    const sheight = svg.clientHeight || svg.parentNode.clientHeight;
+
+    
+    dx *= (svg.viewBox.baseVal.width / swidth);
+    dy *= (svg.viewBox.baseVal.height / sheight);
+
+    svg.viewBox.baseVal.x -= dx;
+    svg.viewBox.baseVal.y -= dy;
+  }
+
+  function handleScanStart(e) {
+    if (e.button != 0) return; 
+    setMode(MOUSEPAN);
+    panStart(e.clientX, e.clientY);
+    e.preventDefault();
+    svg.addEventListener('mousemove', handleScanMove);
+  }
+
+  function handleScanMove(e) {
+    if (e.buttons == 0) {
+      
+      setMode(IDLE);
+      svg.removeEventListener('mousemove', handleScanMove);
+      return;
+    }
+    if (mode == MOUSEPAN) panMove(e.clientX, e.clientY);
+  }
+
+  function handleScanEnd(e) {
+    if (mode == MOUSEPAN) panMove(e.clientX, e.clientY);
+    setMode(IDLE);
+    svg.removeEventListener('mousemove', handleScanMove);
+    if (!moved) clickHandler(e.target);
+  }
+
+  
+  function findTouch(tlist, id) {
+    for (const t of tlist) {
+      if (t.identifier == id) return t;
+    }
+    return null;
+  }
+
+  
+  function touchGap(t1, t2) {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  function handleTouchStart(e) {
+    if (mode == IDLE && e.changedTouches.length == 1) {
+      
+      const t = e.changedTouches[0];
+      setMode(TOUCHPAN);
+      touchid = t.identifier;
+      panStart(t.clientX, t.clientY);
+      e.preventDefault();
+    } else if (mode == TOUCHPAN && e.touches.length == 2) {
+      
+      setMode(TOUCHZOOM);
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      touchid = t1.identifier;
+      touchid2 = t2.identifier;
+      initScale = currentScale;
+      initGap = touchGap(t1, t2);
+      centerPoint = toSvg((t1.clientX + t2.clientX) / 2,
+                          (t1.clientY + t2.clientY) / 2);
+      e.preventDefault();
+    }
+  }
+
+  function handleTouchMove(e) {
+    if (mode == TOUCHPAN) {
+      const t = findTouch(e.changedTouches, touchid);
+      if (t == null) return;
+      if (e.touches.length != 1) {
+        setMode(IDLE);
+        return;
+      }
+      panMove(t.clientX, t.clientY);
+      e.preventDefault();
+    } else if (mode == TOUCHZOOM) {
+      
+      const t1 = findTouch(e.touches, touchid);
+      const t2 = findTouch(e.touches, touchid2);
+      if (t1 == null || t2 == null) return;
+      const gap = touchGap(t1, t2);
+      rescale(initScale * gap / initGap, centerPoint);
+      e.preventDefault();
+    }
+  }
+
+  function handleTouchEnd(e) {
+    if (mode == TOUCHPAN) {
+      const t = findTouch(e.changedTouches, touchid);
+      if (t == null) return;
+      panMove(t.clientX, t.clientY);
+      setMode(IDLE);
+      e.preventDefault();
+      if (!moved) clickHandler(t.target);
+    } else if (mode == TOUCHZOOM) {
+      setMode(IDLE);
+      e.preventDefault();
+    }
+  }
+
+  svg.addEventListener('mousedown', handleScanStart);
+  svg.addEventListener('mouseup', handleScanEnd);
+  svg.addEventListener('touchstart', handleTouchStart);
+  svg.addEventListener('touchmove', handleTouchMove);
+  svg.addEventListener('touchend', handleTouchEnd);
+  svg.addEventListener('wheel', handleWheel, true);
+}
+
+function initMenus() {
+  'use strict';
+
+  let activeMenu = null;
+  let activeMenuHdr = null;
+
+  function cancelActiveMenu() {
+    if (activeMenu == null) return;
+    activeMenu.style.display = 'none';
+    activeMenu = null;
+    activeMenuHdr = null;
+  }
+
+  
+  for (const menu of document.getElementsByClassName('submenu')) {
+    const hdr = menu.parentElement;
+    if (hdr == null) return;
+    if (hdr.classList.contains('disabled')) return;
+    function showMenu(e) {
+      
+      
+      if (e.target.parentElement != hdr) return;
+      activeMenu = menu;
+      activeMenuHdr = hdr;
+      menu.style.display = 'block';
+    }
+    hdr.addEventListener('mousedown', showMenu);
+    hdr.addEventListener('touchstart', showMenu);
+  }
+
+  
+  for (const t of ['mousedown', 'touchstart']) {
+    document.addEventListener(t, (e) => {
+      
+      
+      if (activeMenuHdr != e.target.closest('.menu-item')) {
+        cancelActiveMenu();
+      }
+    }, { passive: true, capture: true });
+  }
+
+  
+  document.addEventListener('mouseup', (e) => {
+    if (activeMenu == e.target.closest('.submenu')) {
+      cancelActiveMenu();
+    }
+  }, { passive: true, capture: true });
+}
+
+function sendURL(method, url, done) {
+  fetch(url.toString(), {method: method})
+      .then((response) => { done(response.ok); })
+      .catch((error) => { done(false); });
+}
+
+
+function initConfigManager() {
+  'use strict';
+
+  
+  function elem(id) {
+    const result = document.getElementById(id);
+    if (!result) console.warn('element ' + id + ' not found');
+    return result;
+  }
+  const overlay = elem('dialog-overlay');
+  const saveDialog = elem('save-dialog');
+  const saveInput = elem('save-name');
+  const saveError = elem('save-error');
+  const delDialog = elem('delete-dialog');
+  const delPrompt = elem('delete-prompt');
+  const delError = elem('delete-error');
+
+  let currentDialog = null;
+  let currentDeleteTarget = null;
+
+  function showDialog(dialog) {
+    if (currentDialog != null) {
+      overlay.style.display = 'none';
+      currentDialog.style.display = 'none';
+    }
+    currentDialog = dialog;
+    if (dialog != null) {
+      overlay.style.display = 'block';
+      dialog.style.display = 'block';
+    }
+  }
+
+  function cancelDialog(e) {
+    showDialog(null);
+  }
+
+  
+  function showSaveDialog(e) {
+    saveError.innerText = '';
+    showDialog(saveDialog);
+    saveInput.focus();
+  }
+
+  
+  function commitSave(e) {
+    const name = saveInput.value;
+    const url = new URL(document.URL);
+    
+    url.pathname = new URL('./saveconfig', document.URL).pathname;
+    url.searchParams.set('config', name);
+    saveError.innerText = '';
+    sendURL('POST', url, (ok) => {
+      if (!ok) {
+        saveError.innerText = 'Save failed';
+      } else {
+        showDialog(null);
+        location.reload();  
+      }
+    });
+  }
+
+  function handleSaveInputKey(e) {
+    if (e.key === 'Enter') commitSave(e);
+  }
+
+  function deleteConfig(e, elem) {
+    e.preventDefault();
+    const config = elem.dataset.config;
+    delPrompt.innerText = 'Delete ' + config + '?';
+    currentDeleteTarget = elem;
+    showDialog(delDialog);
+  }
+
+  function commitDelete(e, elem) {
+    if (!currentDeleteTarget) return;
+    const config = currentDeleteTarget.dataset.config;
+    const url = new URL('./deleteconfig', document.URL);
+    url.searchParams.set('config', config);
+    delError.innerText = '';
+    sendURL('DELETE', url, (ok) => {
+      if (!ok) {
+        delError.innerText = 'Delete failed';
+        return;
+      }
+      showDialog(null);
+      
+      if (currentDeleteTarget && currentDeleteTarget.parentElement) {
+        currentDeleteTarget.parentElement.remove();
+      }
+    });
+  }
+
+  
+  function bind(event, elem, fn) {
+    if (elem == null) return;
+    elem.addEventListener(event, fn);
+    if (event == 'click') {
+      
+      elem.addEventListener('touchstart', fn);
+    }
+  }
+
+  bind('click', elem('save-config'), showSaveDialog);
+  bind('click', elem('save-cancel'), cancelDialog);
+  bind('click', elem('save-confirm'), commitSave);
+  bind('keydown', saveInput, handleSaveInputKey);
+
+  bind('click', elem('delete-cancel'), cancelDialog);
+  bind('click', elem('delete-confirm'), commitDelete);
+
+  
+  for (const del of Array.from(document.getElementsByClassName('menu-delete-btn'))) {
+    bind('click', del, (e) => {
+      deleteConfig(e, del);
+    });
+  }
+}
+
+
+
+
+
+
+function viewer(baseUrl, nodes, options) {
+  'use strict';
+
+  
+  const search = document.getElementById('search');
+  const graph0 = document.getElementById('graph0');
+  const svg = (graph0 == null ? null : graph0.parentElement);
+  const toptable = document.getElementById('toptable');
+
+  let regexpActive = false;
+  let selected = new Map();
+  let origFill = new Map();
+  let searchAlarm = null;
+  let buttonsEnabled = true;
+
+  
+  function getSelection() {
+    if (selected.size > 0) {
+      return selected;
+    } else if (options && options.current) {
+      return options.current();
+    }
+    return new Map();
+  }
+
+  function handleDetails(e) {
+    e.preventDefault();
+    const detailsText = document.getElementById('detailsbox');
+    if (detailsText != null) {
+      if (detailsText.style.display === 'block') {
+        detailsText.style.display = 'none';
+      } else {
+        detailsText.style.display = 'block';
+      }
+    }
+  }
+
+  function handleKey(e) {
+    if (e.keyCode != 13) return;
+    setHrefParams(window.location, function (params) {
+      params.set('f', search.value);
+    });
+    e.preventDefault();
+  }
+
+  function handleSearch() {
+    
+    if (searchAlarm != null) {
+      clearTimeout(searchAlarm);
+    }
+    searchAlarm = setTimeout(selectMatching, 300);
+
+    regexpActive = true;
+    updateButtons();
+  }
+
+  function selectMatching() {
+    searchAlarm = null;
+    let re = null;
+    if (search.value != '') {
+      try {
+        re = new RegExp(search.value);
+      } catch (e) {
+        
+        return;
+      }
+    }
+
+    function match(text) {
+      return re != null && re.test(text);
+    }
+
+    
+    selected.forEach(function(v, n) {
+      if (!match(nodes[n])) {
+        unselect(n);
+      }
+    })
+
+    
+    if (nodes) {
+      for (let n = 0; n < nodes.length; n++) {
+        if (!selected.has(n) && match(nodes[n])) {
+          select(n);
+        }
+      }
+    }
+
+    updateButtons();
+  }
+
+  function toggleSvgSelect(elem) {
+    
+    while (elem != null && elem.parentElement != graph0) {
+      elem = elem.parentElement;
+    }
+    if (!elem) return;
+
+    
+    regexpActive = false;
+
+    const n = nodeId(elem);
+    if (n < 0) return;
+    if (selected.has(n)) {
+      unselect(n);
+    } else {
+      select(n);
+    }
+    updateButtons();
+  }
+
+  function unselect(n) {
+    if (setNodeHighlight(n, false)) selected.delete(n);
+  }
+
+  function select(n, elem) {
+    if (setNodeHighlight(n, true)) selected.set(n, true);
+  }
+
+  function nodeId(elem) {
+    const id = elem.id;
+    if (!id) return -1;
+    if (!id.startsWith('node')) return -1;
+    const n = parseInt(id.slice(4), 10);
+    if (isNaN(n)) return -1;
+    if (n < 0 || n >= nodes.length) return -1;
+    return n;
+  }
+
+  
+  function setNodeHighlight(n, set) {
+    if (options && options.hiliter) return options.hiliter(n, set);
+
+    const elem = document.getElementById('node' + n);
+    if (!elem) return false;
+
+    
+    if (elem.nodeName == 'TR') {
+      elem.classList.toggle('hilite', set);
+      return true;
+    }
+
+    
+    const p = findPolygon(elem);
+    if (p != null) {
+      if (set) {
+        origFill.set(p, p.style.fill);
+        p.style.fill = '#ccccff';
+      } else if (origFill.has(p)) {
+        p.style.fill = origFill.get(p);
+      }
+    }
+
+    return true;
+  }
+
+  function findPolygon(elem) {
+    if (elem.localName == 'polygon') return elem;
+    for (const c of elem.children) {
+      const p = findPolygon(c);
+      if (p != null) return p;
+    }
+    return null;
+  }
+
+  function setSampleIndexLink(si) {
+    const elem = document.getElementById('sampletype-' + si);
+    if (elem != null) {
+      setHrefParams(elem, function (params) {
+        params.set("si", si);
+      });
+    }
+  }
+
+  
+  
+  function makeSearchLinkDynamic(id) {
+    const elem = document.getElementById(id);
+    if (elem == null) return;
+
+    
+    
+    let param = 'f';
+    if (id == 'ignore') param = 'i';
+    if (id == 'hide') param = 'h';
+    if (id == 'show') param = 's';
+    if (id == 'show-from') param = 'sf';
+
+    
+    elem.addEventListener('mouseenter', updater);
+    elem.addEventListener('touchstart', updater);
+
+    function updater() {
+      
+      
+      let re = regexpActive
+          ? search.value
+          : Array.from(getSelection().keys()).map(key => pprofQuoteMeta(nodes[key])).join('|');
+
+      setHrefParams(elem, function (params) {
+        if (re != '') {
+          
+          if (param != 'f' && param != 's' && param != 'sf' && params.has(param)) {
+            const old = params.get(param);
+            if (old != '') {
+              re += '|' + old;
+            }
+          }
+          params.set(param, re);
+        } else {
+          params.delete(param);
+        }
+      });
+    }
+  }
+
+  function setHrefParams(elem, paramSetter) {
+    let url = new URL(elem.href);
+    url.hash = '';
+
+    
+    const params = url.searchParams;
+    for (const p of new URLSearchParams(window.location.search)) {
+      params.set(p[0], p[1]);
+    }
+
+    
+    paramSetter(params);
+
+    elem.href = url.toString();
+  }
+
+  function handleTopClick(e) {
+    
+    let elem = e.target;
+    while (elem != null && elem.nodeName != 'TR') {
+      elem = elem.parentElement;
+    }
+    if (elem == null || elem.children.length < 6) return;
+
+    e.preventDefault();
+    const tr = elem;
+    const td = elem.children[5];
+    if (td.nodeName != 'TD') return;
+    const name = td.innerText;
+    const index = nodes.indexOf(name);
+    if (index < 0) return;
+
+    
+    regexpActive = false;
+
+    if (selected.has(index)) {
+      unselect(index, elem);
+    } else {
+      select(index, elem);
+    }
+    updateButtons();
+  }
+
+  function updateButtons() {
+    const enable = (search.value != '' || getSelection().size != 0);
+    if (buttonsEnabled == enable) return;
+    buttonsEnabled = enable;
+    for (const id of ['focus', 'ignore', 'hide', 'show', 'show-from']) {
+      const link = document.getElementById(id);
+      if (link != null) {
+        link.classList.toggle('disabled', !enable);
+      }
+    }
+  }
+
+  
+  updateButtons();
+
+  
+  initMenus();
+  if (svg != null) {
+    initPanAndZoom(svg, toggleSvgSelect);
+  }
+  if (toptable != null) {
+    toptable.addEventListener('mousedown', handleTopClick);
+    toptable.addEventListener('touchstart', handleTopClick);
+  }
+
+  const ids = ['topbtn', 'graphbtn',
+               'flamegraph',
+               'peek', 'list',
+               'disasm', 'focus', 'ignore', 'hide', 'show', 'show-from'];
+  ids.forEach(makeSearchLinkDynamic);
+
+  const sampleIDs = ['samples', 'cpu', ];
+  sampleIDs.forEach(setSampleIndexLink);
+
+  
+  function addAction(id, action) {
+    const btn = document.getElementById(id);
+    if (btn != null) {
+      btn.addEventListener('click', action);
+      btn.addEventListener('touchstart', action);
+    }
+  }
+
+  addAction('details', handleDetails);
+  initConfigManager();
+
+  search.addEventListener('input', handleSearch);
+  search.addEventListener('keydown', handleKey);
+
+  
+  const main = document.getElementById('bodycontainer');
+  if (main) {
+    main.focus();
+  }
+}
+
+
+function pprofQuoteMeta(str) {
+  return '^' + str.replace(/([\\\.?+*\[\](){}|^$])/g, '\\$1') + '$';
+}
+</script>
+
+  <script>
+
+
+
+function stackViewer(stacks, nodes) {
+  'use strict';
+
+  
+  const ROW = 20;
+  const PADDING = 2;
+  const MIN_WIDTH = 4;
+  const MIN_TEXT_WIDTH = 16;
+  const TEXT_MARGIN = 2;
+  const FONT_SIZE = 12;
+  const MIN_FONT_SIZE = 8;
+
+  
+  let pivots = [];          
+  let matches = new Set();  
+  let elems = new Map();    
+  let displayList = [];     
+  let actionMenuOn = false; 
+  let actionTarget = null;  
+  let diff = false;         
+  let shown = 0;            
+
+  for (const stack of stacks.Stacks) {
+    if (stack.Value < 0) {
+      diff = true;
+      break;
+    }
+  }
+
+  
+  const textSizer = document.createElement('canvas');
+  textSizer.id = 'textsizer';
+  const textContext = textSizer.getContext('2d');
+
+  
+  const chart = find('stack-chart');
+  const search = find('search');
+  const actions = find('action-menu');
+  const actionTitle = find('action-title');
+  const leftDetailBox = find('current-details-left');
+  const rightDetailBox = find('current-details-right');
+
+  window.addEventListener('resize', render);
+  window.addEventListener('popstate', render);
+  search.addEventListener('keydown', handleSearchKey);
+
+  
+  document.addEventListener('mousedown', (e) => {
+    if (!actions.contains(e.target)) {
+      hideActionMenu();
+    }
+  });
+  actions.addEventListener('click', hideActionMenu);
+
+  
+  viewer(new URL(window.location.href), nodes, {
+    hiliter: (n, on) => { return hilite(n, on); },
+    current: () => {
+      let r = new Map();
+      if (pivots.length == 1 && pivots[0] == 0) {
+        
+      } else {
+        for (let p of pivots) {
+          r.set(p, true);
+        }
+      }
+      return r;
+    }});
+
+  render();
+  clearDetails();
+
+  
+
+  
+  function hilite(src, on) {
+    if (on) {
+      matches.add(src);
+    } else {
+      matches.delete(src);
+    }
+    toggleClass(src, 'hilite', on);
+    return true;
+  }
+
+  
+  function showActionMenu(e, box) {
+    if (box.src == 0) return; 
+    e.preventDefault(); 
+    const src = stacks.Sources[box.src];
+    actionTitle.innerText = src.Display[src.Display.length-1];
+    const menu = actions;
+    menu.style.display = 'block';
+    
+    const x = Math.min(e.clientX - 10, document.body.clientWidth - menu.clientWidth);
+    const y = Math.min(e.clientY - 10, document.body.clientHeight - menu.clientHeight);
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    
+    setHrefParam('action-source', 'f', box.src);
+    setHrefParam('action-source-tab', 'f', box.src);
+    setHrefParam('action-focus', 'f', box.src);
+    setHrefParam('action-ignore', 'i', box.src);
+    setHrefParam('action-hide', 'h', box.src);
+    setHrefParam('action-showfrom', 'sf', box.src);
+    toggleClass(box.src, 'hilite2', true);
+    actionTarget = box;
+    actionMenuOn = true;
+  }
+
+  function hideActionMenu() {
+    actions.style.display = 'none';
+    actionMenuOn = false;
+    if (actionTarget != null) {
+      toggleClass(actionTarget.src, 'hilite2', false);
+    }
+  }
+
+  
+  
+  function setHrefParam(id, param, src) {
+    const elem = document.getElementById(id);
+    if (!elem) return;
+
+    let url = new URL(elem.href);
+    url.hash = '';
+
+    
+    const params = url.searchParams;
+    for (const p of new URLSearchParams(window.location.search)) {
+      params.set(p[0], p[1]);
+    }
+
+    
+    
+    
+    let v = pprofQuoteMeta(stacks.Sources[src].FullName.replace(/:[0-9]+$/, ''));
+    if (param != 'f' && param != 'sf') { 
+      
+      const old = params.get(param);
+      if (old && old != '') {
+        v += '|' + old;
+      }
+    }
+    params.set(param, v);
+
+    elem.href = url.toString();
+  }
+
+  
+  function handleSearchKey(e) {
+    if (e.key != 'Enter') return;
+    e.stopImmediatePropagation();  
+    const val = search.value;
+    try {
+      new RegExp(search.value);
+    } catch (error) {
+      return;  
+    }
+    switchPivots(val);
+  }
+
+  function switchPivots(regexp) {
+    
+    const url = new URL(document.URL);
+    if (regexp === '' || regexp === '^$') {
+      url.searchParams.delete('p');  
+    } else {
+      url.searchParams.set('p', regexp);
+    }
+    history.pushState('', '', url.toString()); 
+    matches = new Set();
+    search.value = '';
+    render();
+  }
+
+  function handleEnter(box, div) {
+    if (actionMenuOn) return;
+    const src = stacks.Sources[box.src];
+    div.title = details(box) + ' │ ' + src.FullName + (src.Inlined ? "\n(inlined)" : "");
+    leftDetailBox.innerText = src.FullName + (src.Inlined ? " (inlined)" : "");
+    let timing = summary(box.sumpos, box.sumneg);
+    if (box.self != 0) {
+      timing = "self " + unitText(box.self) + " │ " + timing;
+    }
+    rightDetailBox.innerText = timing;
+    
+    toggleClass(box.src, 'hilite2', true);
+  }
+
+  function handleLeave(box) {
+    if (actionMenuOn) return;
+    clearDetails();
+    toggleClass(box.src, 'hilite2', false);
+  }
+
+  function clearDetails() {
+    leftDetailBox.innerText = '';
+    rightDetailBox.innerText = percentText(shown);
+  }
+
+  
+  function urlPivots() {
+    const pivots = [];
+    const params = (new URL(document.URL)).searchParams;
+    const val = params.get('p');
+    if (val !== null && val != '') {
+      try {
+        const re = new RegExp(val);
+        for (let i = 0; i < stacks.Sources.length; i++) {
+          const src = stacks.Sources[i];
+          if (re.test(src.UniqueName) || re.test(src.FileName)) {
+            pivots.push(i);
+          }
+        }
+      } catch (error) {}
+    }
+    if (pivots.length == 0) {
+      pivots.push(0);
+    }
+    return pivots;
+  }
+
+  
+  function render() {
+    pivots = urlPivots();
+
+    
+    let places = [];
+    for (let pivot of pivots) {
+      const src = stacks.Sources[pivot];
+      for (let p of src.Places) {
+        places.push(p);
+      }
+    }
+
+    const width = chart.clientWidth;
+    elems.clear();
+    actionTarget = null;
+    const [pos, neg] = totalValue(places);
+    const total = pos + neg;
+    const xscale = (width-2*PADDING) / total; 
+    const x = PADDING;
+    const y = 0;
+
+    
+    const showPivotSummary = !(pivots.length == 1 && pivots[0] == 0);
+
+    shown = pos + neg;
+    displayList.length = 0;
+    renderStacks(0, xscale, x, y, places, +1);  
+    renderStacks(0, xscale, x, y-ROW, places, -1);  
+    display(xscale, pos, neg, displayList, showPivotSummary);
+  }
+
+  
+  
+  
+  function renderStacks(depth, xscale, x, y, places, direction) {
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    const groups = partitionPlaces(places);
+    for (const g of groups) {
+      renderGroup(depth, xscale, x, y, g, direction);
+      x += groupWidth(xscale, g);
+    }
+  }
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+  function groupWidth(xscale, g) {
+    return xscale * (g.sumpos + g.sumneg);
+  }
+
+  function renderGroup(depth, xscale, x, y, g, direction) {
+    
+    const width = groupWidth(xscale, g);
+    if (width < MIN_WIDTH) return;
+
+    
+    
+    if (depth != 0 || direction > 0) {
+      const box = {
+        x:      x,
+        y:      y,
+        width:  width,
+        src:    g.src,
+        sumpos: g.sumpos,
+        sumneg: g.sumneg,
+        self:   g.self,
+      };
+      displayList.push(box);
+      if (direction > 0) {
+        
+        x += xscale*Math.abs(g.self);
+      }
+    }
+    y += direction * ROW;
+
+    
+    const next = [];
+    for (const place of g.places) {
+      const stack = stacks.Stacks[place.Stack];
+      const nextSlot = place.Pos + direction;
+      if (nextSlot >= 0 && nextSlot < stack.Sources.length) {
+        next.push({Stack: place.Stack, Pos: nextSlot});
+      }
+    }
+    renderStacks(depth+1, xscale, x, y, next, direction);
+  }
+
+  
+  
+  
+  function partitionPlaces(places) {
+    
+    const stackMap = new Map();  
+    for (const place of places) {
+      const prevSlot = stackMap.get(place.Stack);
+      if (prevSlot && prevSlot <= place.Pos) {
+        
+      } else {
+        stackMap.set(place.Stack, place.Pos);
+      }
+    }
+
+    
+    const groups = [];           
+    const groupMap = new Map();  
+    for (const place of places) {
+      if (stackMap.get(place.Stack) != place.Pos) {
+        continue;
+      }
+
+      const stack = stacks.Stacks[place.Stack];
+      const src = stack.Sources[place.Pos];
+      let group = groupMap.get(src);
+      if (!group) {
+        const name = stacks.Sources[src].FullName;
+        group = {name: name, src: src, sumpos: 0, sumneg: 0, self: 0, places: []};
+        groupMap.set(src, group);
+        groups.push(group);
+      }
+      if (stack.Value < 0) {
+        group.sumneg += -stack.Value;
+      } else {
+        group.sumpos += stack.Value;
+      }
+      group.self += (place.Pos == stack.Sources.length-1) ? stack.Value : 0;
+      group.places.push(place);
+    }
+
+    
+    
+    
+    groups.sort(function(a, b) {
+      return (b.sumpos + b.sumneg) - (a.sumpos + a.sumneg);
+    });
+
+    return groups;
+  }
+
+  function display(xscale, posTotal, negTotal, list, showPivotSummary) {
+    
+    list.sort(function(a, b) {
+      if (a.y != b.y) return a.y - b.y;
+      return a.x - b.x;
+    });
+
+    
+    let adjust = (list.length > 0) ? list[0].y : 0;
+
+    const divs = [];
+    for (const box of list) {
+      box.y -= adjust;
+      divs.push(drawBox(xscale, box));
+    }
+    if (showPivotSummary) {
+      divs.push(drawSep(-adjust, posTotal, negTotal));
+    }
+
+    const h = (list.length > 0 ?  list[list.length-1].y : 0) + 4*ROW;
+    chart.style.height = h+'px';
+    chart.replaceChildren(...divs);
+  }
+
+  function drawBox(xscale, box) {
+    const srcIndex = box.src;
+    const src = stacks.Sources[srcIndex];
+
+    function makeRect(cl, x, y, w, h) {
+      const r = document.createElement('div');
+      r.style.left = x+'px';
+      r.style.top = y+'px';
+      r.style.width = w+'px';
+      r.style.height = h+'px';
+      r.classList.add(cl);
+      return r;
+    }
+
+    
+    const w = box.width - 1; 
+    const r = makeRect('boxbg', box.x, box.y, w, ROW);
+    if (!diff) r.style.background = makeColor(src.Color);
+    addElem(srcIndex, r);
+    if (!src.Inlined) {
+      r.classList.add('not-inlined');
+    }
+
+    
+    if (diff) {
+      const delta = box.sumpos - box.sumneg;
+      const partWidth = xscale * Math.abs(delta);
+      if (partWidth >= MIN_WIDTH) {
+        r.appendChild(makeRect((delta < 0 ? 'negative' : 'positive'),
+                               0, 0, partWidth, ROW-1));
+      }
+    }
+
+    
+    if (box.width >= MIN_TEXT_WIDTH) {
+      const t = document.createElement('div');
+      t.classList.add('boxtext');
+      fitText(t, box.width-2*TEXT_MARGIN, src.Display);
+      r.appendChild(t);
+    }
+
+    onClick(r, () => { switchPivots(pprofQuoteMeta(src.UniqueName)); });
+    r.addEventListener('mouseenter', () => { handleEnter(box, r); });
+    r.addEventListener('mouseleave', () => { handleLeave(box); });
+    r.addEventListener('contextmenu', (e) => { showActionMenu(e, box); });
+    return r;
+  }
+
+  
+  function onClick(target, handler) {
+    
+    const threshold = 3;
+    let [x, y] = [-1, -1];
+    target.addEventListener('mousedown', (e) => {
+      [x, y] = [e.clientX, e.clientY];
+    });
+    target.addEventListener('click', (e) => {
+      if (Math.abs(e.clientX - x) <= threshold &&
+          Math.abs(e.clientY - y) <= threshold) {
+        handler();
+      }
+    });
+  }
+
+  function drawSep(y, posTotal, negTotal) {
+    const m = document.createElement('div');
+    m.innerText = summary(posTotal, negTotal);
+    m.style.top = (y-ROW) + 'px';
+    m.style.left = PADDING + 'px';
+    m.style.width = (chart.clientWidth - PADDING*2) + 'px';
+    m.classList.add('separator');
+    return m;
+  }
+
+  
+  function addElem(src, elem) {
+    let list = elems.get(src);
+    if (!list) {
+      list = [];
+      elems.set(src, list);
+    }
+    list.push(elem);
+    elem.classList.toggle('hilite', matches.has(src));
+  }
+
+  
+  function toggleClass(src, cl, value) {
+    const list = elems.get(src);
+    if (list) {
+      for (const elem of list) {
+        elem.classList.toggle(cl, value);
+      }
+    }
+  }
+
+  
+  function fitText(t, avail, textList) {
+    
+    let width = avail;
+    textContext.font = FONT_SIZE + 'pt Arial';
+    for (let i = 0; i < textList.length; i++) {
+      let text = textList[i];
+      width = textContext.measureText(text).width;
+      if (width <= avail) {
+        t.innerText = text;
+        return;
+      }
+    }
+
+    
+    let text = textList[textList.length-1];
+    const fs = Math.max(MIN_FONT_SIZE, FONT_SIZE * (avail / width));
+    t.style.fontSize = fs + 'pt';
+    t.innerText = text;
+  }
+
+  
+  
+  function totalValue(places) {
+    const seen = new Set();
+    let pos = 0;
+    let neg = 0;
+    for (const place of places) {
+      if (seen.has(place.Stack)) continue; 
+      seen.add(place.Stack);
+      const stack = stacks.Stacks[place.Stack];
+      if (stack.Value < 0) {
+        neg += -stack.Value;
+      } else {
+        pos += stack.Value;
+      }
+    }
+    return [pos, neg];
+  }
+
+  function summary(pos, neg) {
+    
+    
+    
+    return diff ? diffText(neg, pos) : percentText(pos);
+  }
+
+  function details(box) {
+    
+    
+    
+    
+    let result = percentText(box.sumpos - box.sumneg);
+    if (box.self != 0) {
+      result += " │ self " + unitText(box.self);
+    }
+    if (diff && box.sumpos > 0 && box.sumneg > 0) {
+      result += " │ " + diffText(box.sumneg, box.sumpos);
+    }
+    return result;
+  }
+
+  
+  
+  function diffText(from, to) {
+    return percentText(from) + " 🠆 " + percentText(to);
+  }
+
+  
+  
+  function percentText(v) {
+    function percent(v, total) {
+      return Number(((100.0 * v) / total).toFixed(1)) + '%';
+    }
+    return unitText(v) + " (" + percent(v, stacks.Total) + ")";
+  }
+
+  
+  function unitText(value) {
+    return pprofUnitText(value*stacks.Scale, stacks.Unit);
+  }
+
+  function find(name) {
+    const elem = document.getElementById(name);
+    if (!elem) {
+      throw 'element not found: ' + name
+    }
+    return elem;
+  }
+
+  function makeColor(index) {
+    
+    
+    
+    const PHI = 1.618033988;
+    const hue = (index+1) * PHI * 2 * Math.PI; 
+    const hsl = `hsl(${hue}rad 50% 80%)`;
+    return hsl;
+  }
+}
+
+
+function pprofUnitText(value, unit) {
+  const sign = (value < 0) ? "-" : "";
+  let v = Math.abs(value);
+  
+  let list = null;
+  for (const def of pprofUnitDefs) {
+    if (def.DefaultUnit.CanonicalName == unit) {
+      list = def.Units;
+      v *= def.DefaultUnit.Factor;
+      break;
+    }
+  }
+  if (list) {
+    
+    for (let i = 0; i < list.length; i++) {
+      if (i == list.length-1 || list[i+1].Factor > v) {
+        v /= list[i].Factor;
+        unit = list[i].CanonicalName;
+        break;
+      }
+    }
+  }
+  return sign + Number(v.toFixed(2)) + unit;
+}
+</script>
+
+  <script>
+    pprofUnitDefs = [{"DefaultUnit":{"CanonicalName":"B","Factor":1},"Units":[{"CanonicalName":"B","Factor":1},{"CanonicalName":"kB","Factor":1024},{"CanonicalName":"MB","Factor":1048576},{"CanonicalName":"GB","Factor":1073741824},{"CanonicalName":"TB","Factor":1099511627776},{"CanonicalName":"PB","Factor":1125899906842624}]},{"DefaultUnit":{"CanonicalName":"s","Factor":1000000000},"Units":[{"CanonicalName":"ns","Factor":1},{"CanonicalName":"us","Factor":1000},{"CanonicalName":"ms","Factor":1000000},{"CanonicalName":"s","Factor":1000000000},{"CanonicalName":"hrs","Factor":3600000000000}]},{"DefaultUnit":{"CanonicalName":"GCU","Factor":1},"Units":[{"CanonicalName":"n*GCU","Factor":1e-9},{"CanonicalName":"u*GCU","Factor":0.000001},{"CanonicalName":"m*GCU","Factor":0.001},{"CanonicalName":"GCU","Factor":1},{"CanonicalName":"k*GCU","Factor":1000},{"CanonicalName":"M*GCU","Factor":1000000},{"CanonicalName":"G*GCU","Factor":1000000000},{"CanonicalName":"T*GCU","Factor":1000000000000},{"CanonicalName":"P*GCU","Factor":1000000000000000}]}];
+    stackViewer({"Total":26480000000,"Scale":1e-9,"Type":"cpu","Unit":"s","Stacks":[{"Value":9060000000,"Sources":[0,1,2,3,4,5,6,7,8,9]},{"Value":4740000000,"Sources":[0,10,11,12,13,14,15,9]},{"Value":60000000,"Sources":[0,1]},{"Value":80000000,"Sources":[0,16,17,18,19,20,21]},{"Value":2280000000,"Sources":[0,22,23,24,25,26,27]},{"Value":2300000000,"Sources":[0,22,23,24,25,28,29,30,31,32]},{"Value":1000000000,"Sources":[0,16,33,34,35,36,37,38,39]},{"Value":430000000,"Sources":[0,22,23,24,40,35,36,37,38,39]},{"Value":690000000,"Sources":[0,22,23,24,25,41,42,43,44]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":2190000000,"Sources":[0,22,23,24,25,26,27]},{"Value":10000000,"Sources":[0,1,2,3]},{"Value":20000000,"Sources":[0,45,52,53,54,55,56,57,44]},{"Value":50000000,"Sources":[0,45,46,47,48,58,59,60,61]},{"Value":10000000,"Sources":[0,1,62,63]},{"Value":10000000,"Sources":[0,16,64,34,35,36,37,38,65]},{"Value":30000000,"Sources":[0,22,23,24,25,41]},{"Value":30000000,"Sources":[0,45,46,47,48,49]},{"Value":10000000,"Sources":[0,1,66,67,68,69,70]},{"Value":10000000,"Sources":[0,1,71,72,73,74,16,33,34,35,54,55,56]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":360000000,"Sources":[0,16,64,34,35,36,37,38,39]},{"Value":40000000,"Sources":[0,1,2,3,4]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,10,11,75,76,77,78,79,80,81]},{"Value":20000000,"Sources":[0,45,46,47,48,58,59,60,61]},{"Value":10000000,"Sources":[0,10,11]},{"Value":20000000,"Sources":[0,1,2,3,82]},{"Value":50000000,"Sources":[0,1,2,3,4,83,77,78,79,84,85,86,87,88,89]},{"Value":40000000,"Sources":[0,22,23,24,25,54,55,56,57,44]},{"Value":30000000,"Sources":[0,22,23,24,25,41]},{"Value":20000000,"Sources":[0,45,46,47,48,58,59,60,61,90]},{"Value":40000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,22,23,24,25,28,29,30,31]},{"Value":30000000,"Sources":[0,16,64,34,35,54,55,56,57,44]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,10]},{"Value":10000000,"Sources":[0,1,91,92,93]},{"Value":10000000,"Sources":[0,1,2,3,4,83,94,78,95]},{"Value":10000000,"Sources":[0,1,71,72,73,74,16,33,34,35]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":70000000,"Sources":[0,45,46,47,48,58,59,60,61]},{"Value":20000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,10,11,75,76,77,78,79,84,85,86,87,88]},{"Value":30000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,1,2,3,4]},{"Value":20000000,"Sources":[0,1,96,97]},{"Value":10000000,"Sources":[0,10,98,99,100,101,94,78,102,89]},{"Value":30000000,"Sources":[0,1,2,3,4,5,77,78,79,84,85,86,87,88,89]},{"Value":10000000,"Sources":[0,45,46,47,48,58,59,60]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":20000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,52,53]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":30000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,103]},{"Value":10000000,"Sources":[0,1,2,3,82]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,10,11,12,77,78,95]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":30000000,"Sources":[0,1,2,3]},{"Value":10000000,"Sources":[0,1,71,72,54,55,56,57,44]},{"Value":10000000,"Sources":[0,1,96,97,104]},{"Value":20000000,"Sources":[0,16,105,37,38,39]},{"Value":30000000,"Sources":[0,22,23,24,40,35,36,37,38,65]},{"Value":10000000,"Sources":[0,10,106]},{"Value":70000000,"Sources":[0,45,46,47,48,58,59,60,61]},{"Value":20000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,107,108]},{"Value":20000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,16]},{"Value":30000000,"Sources":[0,45,46,47,48,107,108]},{"Value":10000000,"Sources":[0,1,2,3,4]},{"Value":10000000,"Sources":[0,10,11,75,76,77,78,79]},{"Value":20000000,"Sources":[0,1,2,3,82]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":30000000,"Sources":[0,45,46,47,48,58,59,60,61]},{"Value":10000000,"Sources":[0,45,109,110,111,112,113]},{"Value":10000000,"Sources":[0,22,23,24,25,28,114,115]},{"Value":10000000,"Sources":[0,45,109,110,111,112,113,55,56,57,44]},{"Value":10000000,"Sources":[0,1,116,92,93,117]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,10,118,119,120]},{"Value":10000000,"Sources":[0,10,11,12,77,78,79,84,85,86,87,88,89]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,1,121,92,93,122,123,124]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,1,116,92,93,125,126,127]},{"Value":50000000,"Sources":[0,1,2,3,77,78,79,84,85,86,87,88,89]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,22,23,24,25,41,128,69,70]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,22,23,24,25,28,29,30,31,129]},{"Value":10000000,"Sources":[0,1]},{"Value":10000000,"Sources":[0,1,130,131,132,133,134]},{"Value":10000000,"Sources":[0,10,11,12,77,78,95,135]},{"Value":10000000,"Sources":[0,1,2,3,82]},{"Value":10000000,"Sources":[0,10,11,75,76,77,78,79,135]},{"Value":10000000,"Sources":[0,1,2,3,4,5]},{"Value":10000000,"Sources":[0,10,11,12,13,14,136,137]},{"Value":10000000,"Sources":[0,22,23,24,25,128,69,70]},{"Value":10000000,"Sources":[0,1,130,131,132,133]},{"Value":20000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,10,106,138,110]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,58]},{"Value":10000000,"Sources":[0,16,33,34,35,36,37,38,129]},{"Value":10000000,"Sources":[0,10,98,99,100,117]},{"Value":20000000,"Sources":[0,22,23,24,25,41,139]},{"Value":10000000,"Sources":[0,1,2,3,4]},{"Value":10000000,"Sources":[0,1,2,3,4]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":20000000,"Sources":[0,1,66,67,68,140]},{"Value":30000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":20000000,"Sources":[0,22,23,24,25,54,55,56,57,44]},{"Value":10000000,"Sources":[0,1,91,92]},{"Value":10000000,"Sources":[0,22,23,24,25,26]},{"Value":10000000,"Sources":[0,22,23,24,25,141]},{"Value":10000000,"Sources":[0,22,23,24,25,41,42,43]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":60000000,"Sources":[0,22,23,24,25,142,143,27]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":20000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":20000000,"Sources":[0,1,2,3,82]},{"Value":10000000,"Sources":[0,10,11,12,77,78,79,144,145]},{"Value":10000000,"Sources":[0,1,2,3,4]},{"Value":10000000,"Sources":[0,1,2,3]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":20000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,109,110,111,112,113,146]},{"Value":10000000,"Sources":[0,45,46,47,48,58,59,60,61]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,10,11,12,77,78,79,147]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,10,148,149,150]},{"Value":10000000,"Sources":[0,1,118,119]},{"Value":10000000,"Sources":[0,1,2,3,4,5,77,78,79,80,81]},{"Value":20000000,"Sources":[0,45,46,47,48,58,59,60,61]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,1,2,3,4,5,77,78,95]},{"Value":40000000,"Sources":[0,45,46,47,48,58,59,60,61,90]},{"Value":20000000,"Sources":[0,22,23,24,25,141,151]},{"Value":10000000,"Sources":[0,1,2,3,82]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,1,62,152,153]},{"Value":10000000,"Sources":[0,10,118,119,120,154,155]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,1,71,72,73,74,16,33,34,35,36]},{"Value":20000000,"Sources":[0,10,156]},{"Value":10000000,"Sources":[0,10,157,158,159,160]},{"Value":10000000,"Sources":[0,22,23,24,25,69,70]},{"Value":10000000,"Sources":[0,1,121,92,93,122,123]},{"Value":10000000,"Sources":[0,1,62]},{"Value":10000000,"Sources":[0,1,2,3,82]},{"Value":10000000,"Sources":[0,1,2,3,4,5,6,7,161,162,163,164]},{"Value":20000000,"Sources":[0,1,130,97]},{"Value":10000000,"Sources":[0,10,118,119,120,165,69,70,166]},{"Value":10000000,"Sources":[0,22,23,24,25,41]},{"Value":20000000,"Sources":[0,16,33,34,35,54,55,56,57,44]},{"Value":10000000,"Sources":[0,10,52,53]},{"Value":10000000,"Sources":[0,1,2,3,4,5,77,78,79,84,85,86,87,88,89]},{"Value":10000000,"Sources":[0,22,23,24,25,167,168]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,22,23,24,25,128]},{"Value":10000000,"Sources":[0,45,46,47,48,107,108]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,22,23,169,170,171,172]},{"Value":10000000,"Sources":[0,22,23,24,25,41]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,10,118,119,120,165,69,70]},{"Value":10000000,"Sources":[0,1,130,131,132]},{"Value":10000000,"Sources":[0,22,23,24,25,41]},{"Value":10000000,"Sources":[0,10,11,75,76,77,78,79,144]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,1,121,92,93,125,126,127,173]},{"Value":10000000,"Sources":[0,45,46,47,48,58,59,60,61,90]},{"Value":10000000,"Sources":[0,1,2,3,4,5,77,78,95,135]},{"Value":10000000,"Sources":[0,1,130,131,132,133]},{"Value":10000000,"Sources":[0,1,2,3]},{"Value":20000000,"Sources":[0,1,2,3,82,174]},{"Value":10000000,"Sources":[0,1,130,131,132,133,134]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,10,52,53,175,176]},{"Value":10000000,"Sources":[0,22,23,24,40,35,54,55,56,57,44]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":40000000,"Sources":[0,16,177,178,179,180,21]},{"Value":10000000,"Sources":[0,1,2,3,4,5,6,7,8,9,181,182,183]},{"Value":10000000,"Sources":[0,22,23,24,25,26]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,22,23,24,25,26,184]},{"Value":10000000,"Sources":[0,1,185,186]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,22,23,187]},{"Value":10000000,"Sources":[0,1,2,3,82]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,58,59,60,61]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,1,71,72,54,55,56,31,32]},{"Value":10000000,"Sources":[0,22,23,24,25,128,168]},{"Value":10000000,"Sources":[0,1,2,3,4,5,77,78,95]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,1,62,188]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,22,23,24,25,41]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,10,11,12,77,78,95]},{"Value":10000000,"Sources":[0,22,23,24,25,167]},{"Value":10000000,"Sources":[0,22,23,24,25,28,54,55,56,57,44]},{"Value":10000000,"Sources":[0,22,23,24,25,41,42,43]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50]},{"Value":10000000,"Sources":[0,1,2,3,4,83,77,78,79]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,22,23,24,40,35]},{"Value":10000000,"Sources":[0,22,23,24,25,41]},{"Value":10000000,"Sources":[0,1,2,3,77,78,79,84,85]},{"Value":10000000,"Sources":[0,10,11,12,13,14,15,9,181,182,183]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,22,23,24,40,35,36,37,38,129]},{"Value":10000000,"Sources":[0,1,2,3,77,78,79]},{"Value":10000000,"Sources":[0,45,46,47,48,49]},{"Value":10000000,"Sources":[0,1,66,67,68]},{"Value":10000000,"Sources":[0,45,46,47,48,49]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,45,46,47,48,49,50,51]},{"Value":10000000,"Sources":[0,1,91,92,93]},{"Value":60000000,"Sources":[0,189,190,191,192,193,12,194,14,15,9]}],"Sources":[{"FullName":"root","FileName":"","UniqueName":"","Inlined":false,"Display":["root"],"Places":[{"Stack":0,"Pos":0},{"Stack":1,"Pos":0},{"Stack":2,"Pos":0},{"Stack":3,"Pos":0},{"Stack":4,"Pos":0},{"Stack":5,"Pos":0},{"Stack":6,"Pos":0},{"Stack":7,"Pos":0},{"Stack":8,"Pos":0},{"Stack":9,"Pos":0},{"Stack":10,"Pos":0},{"Stack":11,"Pos":0},{"Stack":12,"Pos":0},{"Stack":13,"Pos":0},{"Stack":14,"Pos":0},{"Stack":15,"Pos":0},{"Stack":16,"Pos":0},{"Stack":17,"Pos":0},{"Stack":18,"Pos":0},{"Stack":19,"Pos":0},{"Stack":20,"Pos":0},{"Stack":21,"Pos":0},{"Stack":22,"Pos":0},{"Stack":23,"Pos":0},{"Stack":24,"Pos":0},{"Stack":25,"Pos":0},{"Stack":26,"Pos":0},{"Stack":27,"Pos":0},{"Stack":28,"Pos":0},{"Stack":29,"Pos":0},{"Stack":30,"Pos":0},{"Stack":31,"Pos":0},{"Stack":32,"Pos":0},{"Stack":33,"Pos":0},{"Stack":34,"Pos":0},{"Stack":35,"Pos":0},{"Stack":36,"Pos":0},{"Stack":37,"Pos":0},{"Stack":38,"Pos":0},{"Stack":39,"Pos":0},{"Stack":40,"Pos":0},{"Stack":41,"Pos":0},{"Stack":42,"Pos":0},{"Stack":43,"Pos":0},{"Stack":44,"Pos":0},{"Stack":45,"Pos":0},{"Stack":46,"Pos":0},{"Stack":47,"Pos":0},{"Stack":48,"Pos":0},{"Stack":49,"Pos":0},{"Stack":50,"Pos":0},{"Stack":51,"Pos":0},{"Stack":52,"Pos":0},{"Stack":53,"Pos":0},{"Stack":54,"Pos":0},{"Stack":55,"Pos":0},{"Stack":56,"Pos":0},{"Stack":57,"Pos":0},{"Stack":58,"Pos":0},{"Stack":59,"Pos":0},{"Stack":60,"Pos":0},{"Stack":61,"Pos":0},{"Stack":62,"Pos":0},{"Stack":63,"Pos":0},{"Stack":64,"Pos":0},{"Stack":65,"Pos":0},{"Stack":66,"Pos":0},{"Stack":67,"Pos":0},{"Stack":68,"Pos":0},{"Stack":69,"Pos":0},{"Stack":70,"Pos":0},{"Stack":71,"Pos":0},{"Stack":72,"Pos":0},{"Stack":73,"Pos":0},{"Stack":74,"Pos":0},{"Stack":75,"Pos":0},{"Stack":76,"Pos":0},{"Stack":77,"Pos":0},{"Stack":78,"Pos":0},{"Stack":79,"Pos":0},{"Stack":80,"Pos":0},{"Stack":81,"Pos":0},{"Stack":82,"Pos":0},{"Stack":83,"Pos":0},{"Stack":84,"Pos":0},{"Stack":85,"Pos":0},{"Stack":86,"Pos":0},{"Stack":87,"Pos":0},{"Stack":88,"Pos":0},{"Stack":89,"Pos":0},{"Stack":90,"Pos":0},{"Stack":91,"Pos":0},{"Stack":92,"Pos":0},{"Stack":93,"Pos":0},{"Stack":94,"Pos":0},{"Stack":95,"Pos":0},{"Stack":96,"Pos":0},{"Stack":97,"Pos":0},{"Stack":98,"Pos":0},{"Stack":99,"Pos":0},{"Stack":100,"Pos":0},{"Stack":101,"Pos":0},{"Stack":102,"Pos":0},{"Stack":103,"Pos":0},{"Stack":104,"Pos":0},{"Stack":105,"Pos":0},{"Stack":106,"Pos":0},{"Stack":107,"Pos":0},{"Stack":108,"Pos":0},{"Stack":109,"Pos":0},{"Stack":110,"Pos":0},{"Stack":111,"Pos":0},{"Stack":112,"Pos":0},{"Stack":113,"Pos":0},{"Stack":114,"Pos":0},{"Stack":115,"Pos":0},{"Stack":116,"Pos":0},{"Stack":117,"Pos":0},{"Stack":118,"Pos":0},{"Stack":119,"Pos":0},{"Stack":120,"Pos":0},{"Stack":121,"Pos":0},{"Stack":122,"Pos":0},{"Stack":123,"Pos":0},{"Stack":124,"Pos":0},{"Stack":125,"Pos":0},{"Stack":126,"Pos":0},{"Stack":127,"Pos":0},{"Stack":128,"Pos":0},{"Stack":129,"Pos":0},{"Stack":130,"Pos":0},{"Stack":131,"Pos":0},{"Stack":132,"Pos":0},{"Stack":133,"Pos":0},{"Stack":134,"Pos":0},{"Stack":135,"Pos":0},{"Stack":136,"Pos":0},{"Stack":137,"Pos":0},{"Stack":138,"Pos":0},{"Stack":139,"Pos":0},{"Stack":140,"Pos":0},{"Stack":141,"Pos":0},{"Stack":142,"Pos":0},{"Stack":143,"Pos":0},{"Stack":144,"Pos":0},{"Stack":145,"Pos":0},{"Stack":146,"Pos":0},{"Stack":147,"Pos":0},{"Stack":148,"Pos":0},{"Stack":149,"Pos":0},{"Stack":150,"Pos":0},{"Stack":151,"Pos":0},{"Stack":152,"Pos":0},{"Stack":153,"Pos":0},{"Stack":154,"Pos":0},{"Stack":155,"Pos":0},{"Stack":156,"Pos":0},{"Stack":157,"Pos":0},{"Stack":158,"Pos":0},{"Stack":159,"Pos":0},{"Stack":160,"Pos":0},{"Stack":161,"Pos":0},{"Stack":162,"Pos":0},{"Stack":163,"Pos":0},{"Stack":164,"Pos":0},{"Stack":165,"Pos":0},{"Stack":166,"Pos":0},{"Stack":167,"Pos":0},{"Stack":168,"Pos":0},{"Stack":169,"Pos":0},{"Stack":170,"Pos":0},{"Stack":171,"Pos":0},{"Stack":172,"Pos":0},{"Stack":173,"Pos":0},{"Stack":174,"Pos":0},{"Stack":175,"Pos":0},{"Stack":176,"Pos":0},{"Stack":177,"Pos":0},{"Stack":178,"Pos":0},{"Stack":179,"Pos":0},{"Stack":180,"Pos":0},{"Stack":181,"Pos":0},{"Stack":182,"Pos":0},{"Stack":183,"Pos":0},{"Stack":184,"Pos":0},{"Stack":185,"Pos":0},{"Stack":186,"Pos":0},{"Stack":187,"Pos":0},{"Stack":188,"Pos":0},{"Stack":189,"Pos":0},{"Stack":190,"Pos":0},{"Stack":191,"Pos":0},{"Stack":192,"Pos":0},{"Stack":193,"Pos":0},{"Stack":194,"Pos":0},{"Stack":195,"Pos":0},{"Stack":196,"Pos":0},{"Stack":197,"Pos":0},{"Stack":198,"Pos":0},{"Stack":199,"Pos":0},{"Stack":200,"Pos":0},{"Stack":201,"Pos":0},{"Stack":202,"Pos":0},{"Stack":203,"Pos":0},{"Stack":204,"Pos":0},{"Stack":205,"Pos":0},{"Stack":206,"Pos":0},{"Stack":207,"Pos":0},{"Stack":208,"Pos":0},{"Stack":209,"Pos":0},{"Stack":210,"Pos":0},{"Stack":211,"Pos":0},{"Stack":212,"Pos":0},{"Stack":213,"Pos":0},{"Stack":214,"Pos":0},{"Stack":215,"Pos":0},{"Stack":216,"Pos":0},{"Stack":217,"Pos":0},{"Stack":218,"Pos":0},{"Stack":219,"Pos":0},{"Stack":220,"Pos":0},{"Stack":221,"Pos":0},{"Stack":222,"Pos":0},{"Stack":223,"Pos":0},{"Stack":224,"Pos":0},{"Stack":225,"Pos":0},{"Stack":226,"Pos":0},{"Stack":227,"Pos":0},{"Stack":228,"Pos":0},{"Stack":229,"Pos":0},{"Stack":230,"Pos":0},{"Stack":231,"Pos":0},{"Stack":232,"Pos":0},{"Stack":233,"Pos":0},{"Stack":234,"Pos":0},{"Stack":235,"Pos":0},{"Stack":236,"Pos":0},{"Stack":237,"Pos":0},{"Stack":238,"Pos":0},{"Stack":239,"Pos":0},{"Stack":240,"Pos":0},{"Stack":241,"Pos":0},{"Stack":242,"Pos":0}],"Self":0,"Color":0},{"FullName":"golang.zx2c4.com/wireguard/device.(*Device).RoutineReceiveIncoming","FileName":"/Users/woojer/Desktop/wireguard-go/device/receive.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Device).RoutineReceiveIncoming","Inlined":false,"Display":["device.(*Device).RoutineReceiveIncoming","(*Device).RoutineReceiveIncoming","RoutineReceiveIncoming"],"Places":[{"Stack":0,"Pos":1},{"Stack":2,"Pos":1},{"Stack":11,"Pos":1},{"Stack":14,"Pos":1},{"Stack":18,"Pos":1},{"Stack":19,"Pos":1},{"Stack":22,"Pos":1},{"Stack":27,"Pos":1},{"Stack":28,"Pos":1},{"Stack":37,"Pos":1},{"Stack":38,"Pos":1},{"Stack":39,"Pos":1},{"Stack":45,"Pos":1},{"Stack":46,"Pos":1},{"Stack":48,"Pos":1},{"Stack":60,"Pos":1},{"Stack":64,"Pos":1},{"Stack":65,"Pos":1},{"Stack":66,"Pos":1},{"Stack":76,"Pos":1},{"Stack":78,"Pos":1},{"Stack":84,"Pos":1},{"Stack":89,"Pos":1},{"Stack":91,"Pos":1},{"Stack":92,"Pos":1},{"Stack":97,"Pos":1},{"Stack":98,"Pos":1},{"Stack":100,"Pos":1},{"Stack":102,"Pos":1},{"Stack":105,"Pos":1},{"Stack":113,"Pos":1},{"Stack":114,"Pos":1},{"Stack":116,"Pos":1},{"Stack":120,"Pos":1},{"Stack":129,"Pos":1},{"Stack":131,"Pos":1},{"Stack":132,"Pos":1},{"Stack":145,"Pos":1},{"Stack":146,"Pos":1},{"Stack":149,"Pos":1},{"Stack":152,"Pos":1},{"Stack":154,"Pos":1},{"Stack":157,"Pos":1},{"Stack":161,"Pos":1},{"Stack":162,"Pos":1},{"Stack":163,"Pos":1},{"Stack":164,"Pos":1},{"Stack":165,"Pos":1},{"Stack":170,"Pos":1},{"Stack":181,"Pos":1},{"Stack":185,"Pos":1},{"Stack":187,"Pos":1},{"Stack":188,"Pos":1},{"Stack":189,"Pos":1},{"Stack":190,"Pos":1},{"Stack":191,"Pos":1},{"Stack":198,"Pos":1},{"Stack":203,"Pos":1},{"Stack":206,"Pos":1},{"Stack":211,"Pos":1},{"Stack":213,"Pos":1},{"Stack":215,"Pos":1},{"Stack":227,"Pos":1},{"Stack":231,"Pos":1},{"Stack":235,"Pos":1},{"Stack":237,"Pos":1},{"Stack":241,"Pos":1}],"Self":70000000,"Color":447576},{"FullName":"golang.zx2c4.com/wireguard/conn.(*StdNetBind).Open.(*StdNetBind).makeReceiveIPv4.func1","FileName":"/Users/woojer/Desktop/wireguard-go/conn/bind_std.go","UniqueName":"golang.zx2c4.com/wireguard/conn.(*StdNetBind).Open.(*StdNetBind).makeReceiveIPv4.func1","Inlined":false,"Display":["conn.(*StdNetBind).Open.(*StdNetBind).makeReceiveIPv4.func1","(*StdNetBind).Open.(*StdNetBind).makeReceiveIPv4.func1","Open.(*StdNetBind).makeReceiveIPv4.func1","(*StdNetBind).makeReceiveIPv4.func1","makeReceiveIPv4.func1","func1"],"Places":[{"Stack":0,"Pos":2},{"Stack":11,"Pos":2},{"Stack":22,"Pos":2},{"Stack":27,"Pos":2},{"Stack":28,"Pos":2},{"Stack":38,"Pos":2},{"Stack":45,"Pos":2},{"Stack":48,"Pos":2},{"Stack":60,"Pos":2},{"Stack":64,"Pos":2},{"Stack":76,"Pos":2},{"Stack":78,"Pos":2},{"Stack":92,"Pos":2},{"Stack":100,"Pos":2},{"Stack":102,"Pos":2},{"Stack":113,"Pos":2},{"Stack":114,"Pos":2},{"Stack":129,"Pos":2},{"Stack":131,"Pos":2},{"Stack":132,"Pos":2},{"Stack":146,"Pos":2},{"Stack":149,"Pos":2},{"Stack":152,"Pos":2},{"Stack":163,"Pos":2},{"Stack":164,"Pos":2},{"Stack":170,"Pos":2},{"Stack":187,"Pos":2},{"Stack":189,"Pos":2},{"Stack":190,"Pos":2},{"Stack":198,"Pos":2},{"Stack":206,"Pos":2},{"Stack":213,"Pos":2},{"Stack":227,"Pos":2},{"Stack":231,"Pos":2},{"Stack":235,"Pos":2}],"Self":0,"Color":36975},{"FullName":"golang.zx2c4.com/wireguard/conn.(*StdNetBind).receiveIP","FileName":"/Users/woojer/Desktop/wireguard-go/conn/bind_std.go","UniqueName":"golang.zx2c4.com/wireguard/conn.(*StdNetBind).receiveIP","Inlined":false,"Display":["conn.(*StdNetBind).receiveIP","(*StdNetBind).receiveIP","receiveIP"],"Places":[{"Stack":0,"Pos":3},{"Stack":11,"Pos":3},{"Stack":22,"Pos":3},{"Stack":27,"Pos":3},{"Stack":28,"Pos":3},{"Stack":38,"Pos":3},{"Stack":45,"Pos":3},{"Stack":48,"Pos":3},{"Stack":60,"Pos":3},{"Stack":64,"Pos":3},{"Stack":76,"Pos":3},{"Stack":78,"Pos":3},{"Stack":92,"Pos":3},{"Stack":100,"Pos":3},{"Stack":102,"Pos":3},{"Stack":113,"Pos":3},{"Stack":114,"Pos":3},{"Stack":129,"Pos":3},{"Stack":131,"Pos":3},{"Stack":132,"Pos":3},{"Stack":146,"Pos":3},{"Stack":149,"Pos":3},{"Stack":152,"Pos":3},{"Stack":163,"Pos":3},{"Stack":164,"Pos":3},{"Stack":170,"Pos":3},{"Stack":187,"Pos":3},{"Stack":189,"Pos":3},{"Stack":190,"Pos":3},{"Stack":198,"Pos":3},{"Stack":206,"Pos":3},{"Stack":213,"Pos":3},{"Stack":227,"Pos":3},{"Stack":231,"Pos":3},{"Stack":235,"Pos":3}],"Self":60000000,"Color":36975},{"FullName":"golang.zx2c4.com/wireguard/conn.(*darwinBatchConn).ReadBatch","FileName":"/Users/woojer/Desktop/wireguard-go/conn/bind_std_batch_darwin.go","UniqueName":"golang.zx2c4.com/wireguard/conn.(*darwinBatchConn).ReadBatch","Inlined":false,"Display":["conn.(*darwinBatchConn).ReadBatch","(*darwinBatchConn).ReadBatch","ReadBatch"],"Places":[{"Stack":0,"Pos":4},{"Stack":22,"Pos":4},{"Stack":28,"Pos":4},{"Stack":38,"Pos":4},{"Stack":45,"Pos":4},{"Stack":48,"Pos":4},{"Stack":76,"Pos":4},{"Stack":102,"Pos":4},{"Stack":113,"Pos":4},{"Stack":114,"Pos":4},{"Stack":131,"Pos":4},{"Stack":146,"Pos":4},{"Stack":149,"Pos":4},{"Stack":164,"Pos":4},{"Stack":170,"Pos":4},{"Stack":187,"Pos":4},{"Stack":198,"Pos":4},{"Stack":213,"Pos":4},{"Stack":227,"Pos":4}],"Self":90000000,"Color":36975},{"FullName":"golang.zx2c4.com/wireguard/darwinmsgx.RecvmsgX","FileName":"/Users/woojer/Desktop/wireguard-go/darwinmsgx/msgx.go","UniqueName":"golang.zx2c4.com/wireguard/darwinmsgx.RecvmsgX","Inlined":false,"Display":["darwinmsgx.RecvmsgX","RecvmsgX"],"Places":[{"Stack":0,"Pos":5},{"Stack":48,"Pos":5},{"Stack":102,"Pos":5},{"Stack":146,"Pos":5},{"Stack":149,"Pos":5},{"Stack":164,"Pos":5},{"Stack":170,"Pos":5},{"Stack":187,"Pos":5},{"Stack":198,"Pos":5},{"Stack":213,"Pos":5}],"Self":10000000,"Color":416785},{"FullName":"net.(*rawConn).Read","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/net/rawconn.go","UniqueName":"net.(*rawConn).Read","Inlined":false,"Display":["net.(*rawConn).Read","(*rawConn).Read","Read"],"Places":[{"Stack":0,"Pos":6},{"Stack":164,"Pos":6},{"Stack":198,"Pos":6}],"Self":0,"Color":1018528},{"FullName":"internal/poll.(*FD).RawRead","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/poll/fd_unix.go","UniqueName":"internal/poll.(*FD).RawRead","Inlined":false,"Display":["poll.(*FD).RawRead","(*FD).RawRead","RawRead"],"Places":[{"Stack":0,"Pos":7},{"Stack":164,"Pos":7},{"Stack":198,"Pos":7}],"Self":0,"Color":815401},{"FullName":"golang.zx2c4.com/wireguard/darwinmsgx.RecvmsgX.func1","FileName":"/Users/woojer/Desktop/wireguard-go/darwinmsgx/msgx.go","UniqueName":"golang.zx2c4.com/wireguard/darwinmsgx.RecvmsgX.func1","Inlined":false,"Display":["darwinmsgx.RecvmsgX.func1","RecvmsgX.func1","func1"],"Places":[{"Stack":0,"Pos":8},{"Stack":198,"Pos":8}],"Self":0,"Color":416785},{"FullName":"syscall.Syscall6","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/syscall/asm_darwin_arm64.s","UniqueName":"syscall.Syscall6","Inlined":false,"Display":["syscall.Syscall6","Syscall6"],"Places":[{"Stack":0,"Pos":9},{"Stack":1,"Pos":7},{"Stack":198,"Pos":9},{"Stack":232,"Pos":7},{"Stack":242,"Pos":10}],"Self":13860000000,"Color":766276},{"FullName":"golang.zx2c4.com/wireguard/device.(*Peer).RoutineSequentialReceiver","FileName":"/Users/woojer/Desktop/wireguard-go/device/receive.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Peer).RoutineSequentialReceiver","Inlined":false,"Display":["device.(*Peer).RoutineSequentialReceiver","(*Peer).RoutineSequentialReceiver","RoutineSequentialReceiver"],"Places":[{"Stack":1,"Pos":1},{"Stack":24,"Pos":1},{"Stack":26,"Pos":1},{"Stack":36,"Pos":1},{"Stack":43,"Pos":1},{"Stack":47,"Pos":1},{"Stack":62,"Pos":1},{"Stack":69,"Pos":1},{"Stack":77,"Pos":1},{"Stack":86,"Pos":1},{"Stack":87,"Pos":1},{"Stack":99,"Pos":1},{"Stack":101,"Pos":1},{"Stack":103,"Pos":1},{"Stack":107,"Pos":1},{"Stack":111,"Pos":1},{"Stack":130,"Pos":1},{"Stack":140,"Pos":1},{"Stack":144,"Pos":1},{"Stack":155,"Pos":1},{"Stack":158,"Pos":1},{"Stack":159,"Pos":1},{"Stack":166,"Pos":1},{"Stack":169,"Pos":1},{"Stack":180,"Pos":1},{"Stack":183,"Pos":1},{"Stack":194,"Pos":1},{"Stack":221,"Pos":1},{"Stack":232,"Pos":1}],"Self":10000000,"Color":447576},{"FullName":"golang.zx2c4.com/wireguard/tun.(*NativeTun).Write","FileName":"/Users/woojer/Desktop/wireguard-go/tun/tun_darwin.go","UniqueName":"golang.zx2c4.com/wireguard/tun.(*NativeTun).Write","Inlined":false,"Display":["tun.(*NativeTun).Write","(*NativeTun).Write","Write"],"Places":[{"Stack":1,"Pos":2},{"Stack":24,"Pos":2},{"Stack":26,"Pos":2},{"Stack":43,"Pos":2},{"Stack":62,"Pos":2},{"Stack":77,"Pos":2},{"Stack":87,"Pos":2},{"Stack":99,"Pos":2},{"Stack":101,"Pos":2},{"Stack":103,"Pos":2},{"Stack":130,"Pos":2},{"Stack":140,"Pos":2},{"Stack":183,"Pos":2},{"Stack":221,"Pos":2},{"Stack":232,"Pos":2}],"Self":10000000,"Color":927718},{"FullName":"golang.zx2c4.com/wireguard/darwinmsgx.SendmsgX","FileName":"/Users/woojer/Desktop/wireguard-go/darwinmsgx/msgx.go","UniqueName":"golang.zx2c4.com/wireguard/darwinmsgx.SendmsgX","Inlined":false,"Display":["darwinmsgx.SendmsgX","SendmsgX"],"Places":[{"Stack":1,"Pos":3},{"Stack":62,"Pos":3},{"Stack":87,"Pos":3},{"Stack":99,"Pos":3},{"Stack":103,"Pos":3},{"Stack":130,"Pos":3},{"Stack":140,"Pos":3},{"Stack":221,"Pos":3},{"Stack":232,"Pos":3},{"Stack":242,"Pos":6}],"Self":0,"Color":416785},{"FullName":"os.(*rawConn).Write","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/os/rawconn.go","UniqueName":"os.(*rawConn).Write","Inlined":false,"Display":["os.(*rawConn).Write","(*rawConn).Write","Write"],"Places":[{"Stack":1,"Pos":4},{"Stack":103,"Pos":4},{"Stack":232,"Pos":4}],"Self":0,"Color":854660},{"FullName":"internal/poll.(*FD).RawWrite","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/poll/fd_unix.go","UniqueName":"internal/poll.(*FD).RawWrite","Inlined":false,"Display":["poll.(*FD).RawWrite","(*FD).RawWrite","RawWrite"],"Places":[{"Stack":1,"Pos":5},{"Stack":103,"Pos":5},{"Stack":232,"Pos":5},{"Stack":242,"Pos":8}],"Self":0,"Color":815401},{"FullName":"golang.zx2c4.com/wireguard/darwinmsgx.SendmsgX.func1","FileName":"/Users/woojer/Desktop/wireguard-go/darwinmsgx/msgx.go","UniqueName":"golang.zx2c4.com/wireguard/darwinmsgx.SendmsgX.func1","Inlined":false,"Display":["darwinmsgx.SendmsgX.func1","SendmsgX.func1","func1"],"Places":[{"Stack":1,"Pos":6},{"Stack":232,"Pos":6},{"Stack":242,"Pos":9}],"Self":0,"Color":416785},{"FullName":"runtime.systemstack","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/asm_arm64.s","UniqueName":"runtime.systemstack","Inlined":false,"Display":["runtime.systemstack","systemstack"],"Places":[{"Stack":3,"Pos":1},{"Stack":6,"Pos":1},{"Stack":15,"Pos":1},{"Stack":19,"Pos":6},{"Stack":21,"Pos":1},{"Stack":34,"Pos":1},{"Stack":39,"Pos":6},{"Stack":67,"Pos":1},{"Stack":74,"Pos":1},{"Stack":110,"Pos":1},{"Stack":157,"Pos":6},{"Stack":168,"Pos":1},{"Stack":197,"Pos":1}],"Self":10000000,"Color":666841},{"FullName":"runtime.(*mheap).alloc.func1","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mheap.go","UniqueName":"runtime.(*mheap).alloc.func1","Inlined":false,"Display":["runtime.(*mheap).alloc.func1","(*mheap).alloc.func1","alloc.func1","func1"],"Places":[{"Stack":3,"Pos":2}],"Self":0,"Color":666841},{"FullName":"runtime.(*mheap).allocSpan","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mheap.go","UniqueName":"runtime.(*mheap).allocSpan","Inlined":false,"Display":["runtime.(*mheap).allocSpan","(*mheap).allocSpan","allocSpan"],"Places":[{"Stack":3,"Pos":3}],"Self":0,"Color":666841},{"FullName":"runtime.sysUsed","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mem.go","UniqueName":"runtime.sysUsed","Inlined":true,"Display":["runtime.sysUsed","sysUsed"],"Places":[{"Stack":3,"Pos":4}],"Self":0,"Color":666841},{"FullName":"runtime.sysUsedOS","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mem_darwin.go","UniqueName":"runtime.sysUsedOS","Inlined":true,"Display":["runtime.sysUsedOS","sysUsedOS"],"Places":[{"Stack":3,"Pos":5}],"Self":0,"Color":666841},{"FullName":"runtime.madvise","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sys_darwin.go","UniqueName":"runtime.madvise","Inlined":false,"Display":["runtime.madvise","madvise"],"Places":[{"Stack":3,"Pos":6},{"Stack":197,"Pos":6}],"Self":120000000,"Color":666841},{"FullName":"runtime.mcall","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/asm_arm64.s","UniqueName":"runtime.mcall","Inlined":false,"Display":["runtime.mcall","mcall"],"Places":[{"Stack":4,"Pos":1},{"Stack":5,"Pos":1},{"Stack":7,"Pos":1},{"Stack":8,"Pos":1},{"Stack":10,"Pos":1},{"Stack":16,"Pos":1},{"Stack":29,"Pos":1},{"Stack":30,"Pos":1},{"Stack":33,"Pos":1},{"Stack":68,"Pos":1},{"Stack":82,"Pos":1},{"Stack":94,"Pos":1},{"Stack":96,"Pos":1},{"Stack":104,"Pos":1},{"Stack":112,"Pos":1},{"Stack":119,"Pos":1},{"Stack":121,"Pos":1},{"Stack":122,"Pos":1},{"Stack":123,"Pos":1},{"Stack":125,"Pos":1},{"Stack":151,"Pos":1},{"Stack":160,"Pos":1},{"Stack":167,"Pos":1},{"Stack":171,"Pos":1},{"Stack":174,"Pos":1},{"Stack":177,"Pos":1},{"Stack":178,"Pos":1},{"Stack":182,"Pos":1},{"Stack":195,"Pos":1},{"Stack":199,"Pos":1},{"Stack":202,"Pos":1},{"Stack":205,"Pos":1},{"Stack":212,"Pos":1},{"Stack":217,"Pos":1},{"Stack":222,"Pos":1},{"Stack":223,"Pos":1},{"Stack":224,"Pos":1},{"Stack":229,"Pos":1},{"Stack":230,"Pos":1},{"Stack":234,"Pos":1}],"Self":0,"Color":666841},{"FullName":"runtime.park_m","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.park_m","Inlined":false,"Display":["runtime.park_m","park_m"],"Places":[{"Stack":4,"Pos":2},{"Stack":5,"Pos":2},{"Stack":7,"Pos":2},{"Stack":8,"Pos":2},{"Stack":10,"Pos":2},{"Stack":16,"Pos":2},{"Stack":29,"Pos":2},{"Stack":30,"Pos":2},{"Stack":33,"Pos":2},{"Stack":68,"Pos":2},{"Stack":82,"Pos":2},{"Stack":94,"Pos":2},{"Stack":96,"Pos":2},{"Stack":104,"Pos":2},{"Stack":112,"Pos":2},{"Stack":119,"Pos":2},{"Stack":121,"Pos":2},{"Stack":122,"Pos":2},{"Stack":123,"Pos":2},{"Stack":125,"Pos":2},{"Stack":151,"Pos":2},{"Stack":160,"Pos":2},{"Stack":167,"Pos":2},{"Stack":171,"Pos":2},{"Stack":174,"Pos":2},{"Stack":177,"Pos":2},{"Stack":178,"Pos":2},{"Stack":182,"Pos":2},{"Stack":195,"Pos":2},{"Stack":199,"Pos":2},{"Stack":202,"Pos":2},{"Stack":205,"Pos":2},{"Stack":212,"Pos":2},{"Stack":217,"Pos":2},{"Stack":222,"Pos":2},{"Stack":223,"Pos":2},{"Stack":224,"Pos":2},{"Stack":229,"Pos":2},{"Stack":230,"Pos":2},{"Stack":234,"Pos":2}],"Self":0,"Color":666841},{"FullName":"runtime.schedule","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.schedule","Inlined":false,"Display":["runtime.schedule","schedule"],"Places":[{"Stack":4,"Pos":3},{"Stack":5,"Pos":3},{"Stack":7,"Pos":3},{"Stack":8,"Pos":3},{"Stack":10,"Pos":3},{"Stack":16,"Pos":3},{"Stack":29,"Pos":3},{"Stack":30,"Pos":3},{"Stack":33,"Pos":3},{"Stack":68,"Pos":3},{"Stack":82,"Pos":3},{"Stack":94,"Pos":3},{"Stack":96,"Pos":3},{"Stack":104,"Pos":3},{"Stack":112,"Pos":3},{"Stack":119,"Pos":3},{"Stack":121,"Pos":3},{"Stack":122,"Pos":3},{"Stack":123,"Pos":3},{"Stack":125,"Pos":3},{"Stack":151,"Pos":3},{"Stack":160,"Pos":3},{"Stack":167,"Pos":3},{"Stack":171,"Pos":3},{"Stack":174,"Pos":3},{"Stack":178,"Pos":3},{"Stack":182,"Pos":3},{"Stack":195,"Pos":3},{"Stack":199,"Pos":3},{"Stack":202,"Pos":3},{"Stack":212,"Pos":3},{"Stack":217,"Pos":3},{"Stack":222,"Pos":3},{"Stack":223,"Pos":3},{"Stack":224,"Pos":3},{"Stack":229,"Pos":3},{"Stack":230,"Pos":3},{"Stack":234,"Pos":3}],"Self":0,"Color":666841},{"FullName":"runtime.findRunnable","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.findRunnable","Inlined":false,"Display":["runtime.findRunnable","findRunnable"],"Places":[{"Stack":4,"Pos":4},{"Stack":5,"Pos":4},{"Stack":8,"Pos":4},{"Stack":10,"Pos":4},{"Stack":16,"Pos":4},{"Stack":29,"Pos":4},{"Stack":30,"Pos":4},{"Stack":33,"Pos":4},{"Stack":82,"Pos":4},{"Stack":94,"Pos":4},{"Stack":96,"Pos":4},{"Stack":104,"Pos":4},{"Stack":112,"Pos":4},{"Stack":119,"Pos":4},{"Stack":121,"Pos":4},{"Stack":122,"Pos":4},{"Stack":123,"Pos":4},{"Stack":125,"Pos":4},{"Stack":151,"Pos":4},{"Stack":160,"Pos":4},{"Stack":167,"Pos":4},{"Stack":171,"Pos":4},{"Stack":174,"Pos":4},{"Stack":178,"Pos":4},{"Stack":182,"Pos":4},{"Stack":199,"Pos":4},{"Stack":202,"Pos":4},{"Stack":212,"Pos":4},{"Stack":217,"Pos":4},{"Stack":222,"Pos":4},{"Stack":223,"Pos":4},{"Stack":224,"Pos":4},{"Stack":230,"Pos":4}],"Self":0,"Color":666841},{"FullName":"runtime.netpoll","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/netpoll_kqueue.go","UniqueName":"runtime.netpoll","Inlined":false,"Display":["runtime.netpoll","netpoll"],"Places":[{"Stack":4,"Pos":5},{"Stack":10,"Pos":5},{"Stack":121,"Pos":5},{"Stack":199,"Pos":5},{"Stack":202,"Pos":5}],"Self":20000000,"Color":666841},{"FullName":"runtime.kevent","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sys_darwin.go","UniqueName":"runtime.kevent","Inlined":false,"Display":["runtime.kevent","kevent"],"Places":[{"Stack":4,"Pos":6},{"Stack":10,"Pos":6},{"Stack":125,"Pos":7}],"Self":4530000000,"Color":666841},{"FullName":"runtime.stopm","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.stopm","Inlined":false,"Display":["runtime.stopm","stopm"],"Places":[{"Stack":5,"Pos":5},{"Stack":33,"Pos":5},{"Stack":82,"Pos":5},{"Stack":96,"Pos":5},{"Stack":223,"Pos":5}],"Self":0,"Color":666841},{"FullName":"runtime.mPark","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.mPark","Inlined":true,"Display":["runtime.mPark","mPark"],"Places":[{"Stack":5,"Pos":6},{"Stack":33,"Pos":6},{"Stack":96,"Pos":6}],"Self":0,"Color":666841},{"FullName":"runtime.notesleep","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/lock_sema.go","UniqueName":"runtime.notesleep","Inlined":false,"Display":["runtime.notesleep","notesleep"],"Places":[{"Stack":5,"Pos":7},{"Stack":33,"Pos":7},{"Stack":96,"Pos":7}],"Self":0,"Color":666841},{"FullName":"runtime.semasleep","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/os_darwin.go","UniqueName":"runtime.semasleep","Inlined":false,"Display":["runtime.semasleep","semasleep"],"Places":[{"Stack":5,"Pos":8},{"Stack":33,"Pos":8},{"Stack":96,"Pos":8},{"Stack":211,"Pos":7}],"Self":10000000,"Color":666841},{"FullName":"runtime.pthread_cond_wait","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sys_darwin.go","UniqueName":"runtime.pthread_cond_wait","Inlined":false,"Display":["runtime.pthread_cond_wait","pthread_cond_wait"],"Places":[{"Stack":5,"Pos":9},{"Stack":211,"Pos":8}],"Self":2310000000,"Color":666841},{"FullName":"runtime.send.goready.func1","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.send.goready.func1","Inlined":false,"Display":["runtime.send.goready.func1","send.goready.func1","goready.func1","func1"],"Places":[{"Stack":6,"Pos":2},{"Stack":19,"Pos":7},{"Stack":39,"Pos":7},{"Stack":110,"Pos":2},{"Stack":157,"Pos":7},{"Stack":168,"Pos":2}],"Self":0,"Color":666841},{"FullName":"runtime.ready","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.ready","Inlined":false,"Display":["runtime.ready","ready"],"Places":[{"Stack":6,"Pos":3},{"Stack":15,"Pos":3},{"Stack":19,"Pos":8},{"Stack":21,"Pos":3},{"Stack":34,"Pos":3},{"Stack":39,"Pos":8},{"Stack":110,"Pos":3},{"Stack":157,"Pos":8},{"Stack":168,"Pos":3}],"Self":0,"Color":666841},{"FullName":"runtime.wakep","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.wakep","Inlined":false,"Display":["runtime.wakep","wakep"],"Places":[{"Stack":6,"Pos":4},{"Stack":7,"Pos":5},{"Stack":15,"Pos":4},{"Stack":19,"Pos":9},{"Stack":21,"Pos":4},{"Stack":34,"Pos":4},{"Stack":39,"Pos":9},{"Stack":68,"Pos":5},{"Stack":110,"Pos":4},{"Stack":157,"Pos":9},{"Stack":168,"Pos":4},{"Stack":195,"Pos":5},{"Stack":229,"Pos":5},{"Stack":234,"Pos":5}],"Self":20000000,"Color":666841},{"FullName":"runtime.startm","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.startm","Inlined":false,"Display":["runtime.startm","startm"],"Places":[{"Stack":6,"Pos":5},{"Stack":7,"Pos":6},{"Stack":15,"Pos":5},{"Stack":21,"Pos":5},{"Stack":68,"Pos":6},{"Stack":110,"Pos":5},{"Stack":157,"Pos":10},{"Stack":234,"Pos":6}],"Self":10000000,"Color":666841},{"FullName":"runtime.notewakeup","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/lock_sema.go","UniqueName":"runtime.notewakeup","Inlined":false,"Display":["runtime.notewakeup","notewakeup"],"Places":[{"Stack":6,"Pos":6},{"Stack":7,"Pos":7},{"Stack":15,"Pos":6},{"Stack":21,"Pos":6},{"Stack":67,"Pos":3},{"Stack":68,"Pos":7},{"Stack":110,"Pos":6},{"Stack":234,"Pos":7}],"Self":0,"Color":666841},{"FullName":"runtime.semawakeup","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/os_darwin.go","UniqueName":"runtime.semawakeup","Inlined":false,"Display":["runtime.semawakeup","semawakeup"],"Places":[{"Stack":6,"Pos":7},{"Stack":7,"Pos":8},{"Stack":15,"Pos":7},{"Stack":21,"Pos":7},{"Stack":67,"Pos":4},{"Stack":68,"Pos":8},{"Stack":110,"Pos":7},{"Stack":234,"Pos":8}],"Self":0,"Color":666841},{"FullName":"runtime.pthread_cond_signal","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sys_darwin.go","UniqueName":"runtime.pthread_cond_signal","Inlined":false,"Display":["runtime.pthread_cond_signal","pthread_cond_signal"],"Places":[{"Stack":6,"Pos":8},{"Stack":7,"Pos":9},{"Stack":21,"Pos":8},{"Stack":67,"Pos":5}],"Self":1810000000,"Color":666841},{"FullName":"runtime.resetspinning","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.resetspinning","Inlined":false,"Display":["runtime.resetspinning","resetspinning"],"Places":[{"Stack":7,"Pos":4},{"Stack":68,"Pos":4},{"Stack":195,"Pos":4},{"Stack":229,"Pos":4},{"Stack":234,"Pos":4}],"Self":0,"Color":666841},{"FullName":"runtime.stealWork","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.stealWork","Inlined":false,"Display":["runtime.stealWork","stealWork"],"Places":[{"Stack":8,"Pos":5},{"Stack":16,"Pos":5},{"Stack":30,"Pos":5},{"Stack":94,"Pos":5},{"Stack":112,"Pos":5},{"Stack":123,"Pos":5},{"Stack":167,"Pos":5},{"Stack":178,"Pos":5},{"Stack":182,"Pos":5},{"Stack":217,"Pos":5},{"Stack":224,"Pos":5},{"Stack":230,"Pos":5}],"Self":110000000,"Color":666841},{"FullName":"runtime.runqsteal","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.runqsteal","Inlined":false,"Display":["runtime.runqsteal","runqsteal"],"Places":[{"Stack":8,"Pos":6},{"Stack":123,"Pos":6},{"Stack":224,"Pos":6}],"Self":0,"Color":666841},{"FullName":"runtime.runqgrab","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.runqgrab","Inlined":false,"Display":["runtime.runqgrab","runqgrab"],"Places":[{"Stack":8,"Pos":7},{"Stack":123,"Pos":7},{"Stack":224,"Pos":7}],"Self":20000000,"Color":666841},{"FullName":"runtime.usleep","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sys_darwin.go","UniqueName":"runtime.usleep","Inlined":false,"Display":["runtime.usleep","usleep"],"Places":[{"Stack":8,"Pos":8},{"Stack":12,"Pos":8},{"Stack":29,"Pos":9},{"Stack":34,"Pos":9},{"Stack":65,"Pos":8},{"Stack":83,"Pos":10},{"Stack":119,"Pos":9},{"Stack":168,"Pos":9},{"Stack":195,"Pos":10},{"Stack":223,"Pos":10}],"Self":860000000,"Color":666841},{"FullName":"golang.zx2c4.com/wireguard/device.(*Device).RoutineDecryption","FileName":"/Users/woojer/Desktop/wireguard-go/device/receive.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Device).RoutineDecryption","Inlined":false,"Display":["device.(*Device).RoutineDecryption","(*Device).RoutineDecryption","RoutineDecryption"],"Places":[{"Stack":9,"Pos":1},{"Stack":12,"Pos":1},{"Stack":13,"Pos":1},{"Stack":17,"Pos":1},{"Stack":20,"Pos":1},{"Stack":23,"Pos":1},{"Stack":25,"Pos":1},{"Stack":31,"Pos":1},{"Stack":32,"Pos":1},{"Stack":35,"Pos":1},{"Stack":40,"Pos":1},{"Stack":41,"Pos":1},{"Stack":42,"Pos":1},{"Stack":44,"Pos":1},{"Stack":49,"Pos":1},{"Stack":50,"Pos":1},{"Stack":51,"Pos":1},{"Stack":52,"Pos":1},{"Stack":53,"Pos":1},{"Stack":54,"Pos":1},{"Stack":55,"Pos":1},{"Stack":56,"Pos":1},{"Stack":57,"Pos":1},{"Stack":58,"Pos":1},{"Stack":59,"Pos":1},{"Stack":61,"Pos":1},{"Stack":63,"Pos":1},{"Stack":70,"Pos":1},{"Stack":71,"Pos":1},{"Stack":72,"Pos":1},{"Stack":73,"Pos":1},{"Stack":75,"Pos":1},{"Stack":79,"Pos":1},{"Stack":80,"Pos":1},{"Stack":81,"Pos":1},{"Stack":83,"Pos":1},{"Stack":85,"Pos":1},{"Stack":88,"Pos":1},{"Stack":90,"Pos":1},{"Stack":93,"Pos":1},{"Stack":95,"Pos":1},{"Stack":106,"Pos":1},{"Stack":108,"Pos":1},{"Stack":109,"Pos":1},{"Stack":115,"Pos":1},{"Stack":117,"Pos":1},{"Stack":118,"Pos":1},{"Stack":124,"Pos":1},{"Stack":126,"Pos":1},{"Stack":127,"Pos":1},{"Stack":128,"Pos":1},{"Stack":133,"Pos":1},{"Stack":134,"Pos":1},{"Stack":135,"Pos":1},{"Stack":136,"Pos":1},{"Stack":137,"Pos":1},{"Stack":138,"Pos":1},{"Stack":139,"Pos":1},{"Stack":141,"Pos":1},{"Stack":142,"Pos":1},{"Stack":143,"Pos":1},{"Stack":147,"Pos":1},{"Stack":148,"Pos":1},{"Stack":150,"Pos":1},{"Stack":153,"Pos":1},{"Stack":156,"Pos":1},{"Stack":172,"Pos":1},{"Stack":173,"Pos":1},{"Stack":175,"Pos":1},{"Stack":176,"Pos":1},{"Stack":179,"Pos":1},{"Stack":184,"Pos":1},{"Stack":186,"Pos":1},{"Stack":192,"Pos":1},{"Stack":193,"Pos":1},{"Stack":196,"Pos":1},{"Stack":200,"Pos":1},{"Stack":201,"Pos":1},{"Stack":204,"Pos":1},{"Stack":207,"Pos":1},{"Stack":208,"Pos":1},{"Stack":209,"Pos":1},{"Stack":210,"Pos":1},{"Stack":214,"Pos":1},{"Stack":216,"Pos":1},{"Stack":218,"Pos":1},{"Stack":219,"Pos":1},{"Stack":220,"Pos":1},{"Stack":225,"Pos":1},{"Stack":226,"Pos":1},{"Stack":228,"Pos":1},{"Stack":233,"Pos":1},{"Stack":236,"Pos":1},{"Stack":238,"Pos":1},{"Stack":239,"Pos":1},{"Stack":240,"Pos":1}],"Self":0,"Color":447576},{"FullName":"golang.org/x/crypto/chacha20poly1305.(*chacha20poly1305).Open","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/chacha20poly1305/chacha20poly1305.go","UniqueName":"golang.org/x/crypto/chacha20poly1305.(*chacha20poly1305).Open","Inlined":false,"Display":["chacha20poly1305.(*chacha20poly1305).Open","(*chacha20poly1305).Open","Open"],"Places":[{"Stack":9,"Pos":2},{"Stack":13,"Pos":2},{"Stack":17,"Pos":2},{"Stack":20,"Pos":2},{"Stack":23,"Pos":2},{"Stack":25,"Pos":2},{"Stack":31,"Pos":2},{"Stack":32,"Pos":2},{"Stack":35,"Pos":2},{"Stack":40,"Pos":2},{"Stack":41,"Pos":2},{"Stack":42,"Pos":2},{"Stack":44,"Pos":2},{"Stack":49,"Pos":2},{"Stack":50,"Pos":2},{"Stack":51,"Pos":2},{"Stack":52,"Pos":2},{"Stack":54,"Pos":2},{"Stack":55,"Pos":2},{"Stack":56,"Pos":2},{"Stack":57,"Pos":2},{"Stack":58,"Pos":2},{"Stack":59,"Pos":2},{"Stack":61,"Pos":2},{"Stack":63,"Pos":2},{"Stack":70,"Pos":2},{"Stack":71,"Pos":2},{"Stack":72,"Pos":2},{"Stack":73,"Pos":2},{"Stack":75,"Pos":2},{"Stack":79,"Pos":2},{"Stack":80,"Pos":2},{"Stack":85,"Pos":2},{"Stack":88,"Pos":2},{"Stack":90,"Pos":2},{"Stack":93,"Pos":2},{"Stack":95,"Pos":2},{"Stack":106,"Pos":2},{"Stack":108,"Pos":2},{"Stack":109,"Pos":2},{"Stack":115,"Pos":2},{"Stack":117,"Pos":2},{"Stack":118,"Pos":2},{"Stack":124,"Pos":2},{"Stack":126,"Pos":2},{"Stack":127,"Pos":2},{"Stack":128,"Pos":2},{"Stack":133,"Pos":2},{"Stack":134,"Pos":2},{"Stack":135,"Pos":2},{"Stack":136,"Pos":2},{"Stack":138,"Pos":2},{"Stack":139,"Pos":2},{"Stack":141,"Pos":2},{"Stack":142,"Pos":2},{"Stack":143,"Pos":2},{"Stack":147,"Pos":2},{"Stack":148,"Pos":2},{"Stack":150,"Pos":2},{"Stack":153,"Pos":2},{"Stack":156,"Pos":2},{"Stack":172,"Pos":2},{"Stack":173,"Pos":2},{"Stack":175,"Pos":2},{"Stack":176,"Pos":2},{"Stack":179,"Pos":2},{"Stack":184,"Pos":2},{"Stack":186,"Pos":2},{"Stack":192,"Pos":2},{"Stack":193,"Pos":2},{"Stack":196,"Pos":2},{"Stack":200,"Pos":2},{"Stack":201,"Pos":2},{"Stack":204,"Pos":2},{"Stack":207,"Pos":2},{"Stack":208,"Pos":2},{"Stack":209,"Pos":2},{"Stack":210,"Pos":2},{"Stack":214,"Pos":2},{"Stack":216,"Pos":2},{"Stack":218,"Pos":2},{"Stack":219,"Pos":2},{"Stack":220,"Pos":2},{"Stack":225,"Pos":2},{"Stack":226,"Pos":2},{"Stack":228,"Pos":2},{"Stack":233,"Pos":2},{"Stack":236,"Pos":2},{"Stack":238,"Pos":2},{"Stack":239,"Pos":2},{"Stack":240,"Pos":2}],"Self":0,"Color":643682},{"FullName":"golang.org/x/crypto/chacha20poly1305.(*chacha20poly1305).open","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/chacha20poly1305/chacha20poly1305_noasm.go","UniqueName":"golang.org/x/crypto/chacha20poly1305.(*chacha20poly1305).open","Inlined":true,"Display":["chacha20poly1305.(*chacha20poly1305).open","(*chacha20poly1305).open","open"],"Places":[{"Stack":9,"Pos":3},{"Stack":13,"Pos":3},{"Stack":17,"Pos":3},{"Stack":20,"Pos":3},{"Stack":23,"Pos":3},{"Stack":25,"Pos":3},{"Stack":31,"Pos":3},{"Stack":32,"Pos":3},{"Stack":35,"Pos":3},{"Stack":40,"Pos":3},{"Stack":41,"Pos":3},{"Stack":42,"Pos":3},{"Stack":44,"Pos":3},{"Stack":49,"Pos":3},{"Stack":50,"Pos":3},{"Stack":51,"Pos":3},{"Stack":52,"Pos":3},{"Stack":54,"Pos":3},{"Stack":55,"Pos":3},{"Stack":56,"Pos":3},{"Stack":57,"Pos":3},{"Stack":58,"Pos":3},{"Stack":59,"Pos":3},{"Stack":61,"Pos":3},{"Stack":63,"Pos":3},{"Stack":70,"Pos":3},{"Stack":71,"Pos":3},{"Stack":72,"Pos":3},{"Stack":73,"Pos":3},{"Stack":75,"Pos":3},{"Stack":79,"Pos":3},{"Stack":80,"Pos":3},{"Stack":85,"Pos":3},{"Stack":88,"Pos":3},{"Stack":90,"Pos":3},{"Stack":93,"Pos":3},{"Stack":95,"Pos":3},{"Stack":106,"Pos":3},{"Stack":108,"Pos":3},{"Stack":109,"Pos":3},{"Stack":115,"Pos":3},{"Stack":117,"Pos":3},{"Stack":118,"Pos":3},{"Stack":124,"Pos":3},{"Stack":126,"Pos":3},{"Stack":127,"Pos":3},{"Stack":128,"Pos":3},{"Stack":133,"Pos":3},{"Stack":134,"Pos":3},{"Stack":135,"Pos":3},{"Stack":136,"Pos":3},{"Stack":138,"Pos":3},{"Stack":139,"Pos":3},{"Stack":141,"Pos":3},{"Stack":142,"Pos":3},{"Stack":143,"Pos":3},{"Stack":147,"Pos":3},{"Stack":148,"Pos":3},{"Stack":150,"Pos":3},{"Stack":153,"Pos":3},{"Stack":156,"Pos":3},{"Stack":172,"Pos":3},{"Stack":173,"Pos":3},{"Stack":175,"Pos":3},{"Stack":176,"Pos":3},{"Stack":179,"Pos":3},{"Stack":184,"Pos":3},{"Stack":186,"Pos":3},{"Stack":192,"Pos":3},{"Stack":193,"Pos":3},{"Stack":196,"Pos":3},{"Stack":200,"Pos":3},{"Stack":201,"Pos":3},{"Stack":204,"Pos":3},{"Stack":207,"Pos":3},{"Stack":208,"Pos":3},{"Stack":209,"Pos":3},{"Stack":210,"Pos":3},{"Stack":214,"Pos":3},{"Stack":216,"Pos":3},{"Stack":218,"Pos":3},{"Stack":219,"Pos":3},{"Stack":220,"Pos":3},{"Stack":225,"Pos":3},{"Stack":226,"Pos":3},{"Stack":228,"Pos":3},{"Stack":233,"Pos":3},{"Stack":236,"Pos":3},{"Stack":238,"Pos":3},{"Stack":239,"Pos":3},{"Stack":240,"Pos":3}],"Self":0,"Color":643682},{"FullName":"golang.org/x/crypto/chacha20poly1305.(*chacha20poly1305).openGeneric","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/chacha20poly1305/chacha20poly1305_generic.go","UniqueName":"golang.org/x/crypto/chacha20poly1305.(*chacha20poly1305).openGeneric","Inlined":false,"Display":["chacha20poly1305.(*chacha20poly1305).openGeneric","(*chacha20poly1305).openGeneric","openGeneric"],"Places":[{"Stack":9,"Pos":4},{"Stack":13,"Pos":4},{"Stack":17,"Pos":4},{"Stack":20,"Pos":4},{"Stack":23,"Pos":4},{"Stack":25,"Pos":4},{"Stack":31,"Pos":4},{"Stack":32,"Pos":4},{"Stack":35,"Pos":4},{"Stack":40,"Pos":4},{"Stack":41,"Pos":4},{"Stack":42,"Pos":4},{"Stack":44,"Pos":4},{"Stack":49,"Pos":4},{"Stack":50,"Pos":4},{"Stack":51,"Pos":4},{"Stack":52,"Pos":4},{"Stack":54,"Pos":4},{"Stack":55,"Pos":4},{"Stack":56,"Pos":4},{"Stack":57,"Pos":4},{"Stack":58,"Pos":4},{"Stack":59,"Pos":4},{"Stack":61,"Pos":4},{"Stack":63,"Pos":4},{"Stack":70,"Pos":4},{"Stack":71,"Pos":4},{"Stack":72,"Pos":4},{"Stack":73,"Pos":4},{"Stack":75,"Pos":4},{"Stack":79,"Pos":4},{"Stack":80,"Pos":4},{"Stack":85,"Pos":4},{"Stack":88,"Pos":4},{"Stack":90,"Pos":4},{"Stack":93,"Pos":4},{"Stack":95,"Pos":4},{"Stack":106,"Pos":4},{"Stack":108,"Pos":4},{"Stack":109,"Pos":4},{"Stack":115,"Pos":4},{"Stack":117,"Pos":4},{"Stack":118,"Pos":4},{"Stack":124,"Pos":4},{"Stack":126,"Pos":4},{"Stack":127,"Pos":4},{"Stack":128,"Pos":4},{"Stack":133,"Pos":4},{"Stack":134,"Pos":4},{"Stack":135,"Pos":4},{"Stack":136,"Pos":4},{"Stack":138,"Pos":4},{"Stack":139,"Pos":4},{"Stack":141,"Pos":4},{"Stack":142,"Pos":4},{"Stack":143,"Pos":4},{"Stack":147,"Pos":4},{"Stack":148,"Pos":4},{"Stack":150,"Pos":4},{"Stack":153,"Pos":4},{"Stack":156,"Pos":4},{"Stack":172,"Pos":4},{"Stack":173,"Pos":4},{"Stack":175,"Pos":4},{"Stack":176,"Pos":4},{"Stack":179,"Pos":4},{"Stack":184,"Pos":4},{"Stack":186,"Pos":4},{"Stack":192,"Pos":4},{"Stack":193,"Pos":4},{"Stack":196,"Pos":4},{"Stack":200,"Pos":4},{"Stack":201,"Pos":4},{"Stack":204,"Pos":4},{"Stack":207,"Pos":4},{"Stack":208,"Pos":4},{"Stack":209,"Pos":4},{"Stack":210,"Pos":4},{"Stack":214,"Pos":4},{"Stack":216,"Pos":4},{"Stack":218,"Pos":4},{"Stack":219,"Pos":4},{"Stack":220,"Pos":4},{"Stack":225,"Pos":4},{"Stack":226,"Pos":4},{"Stack":228,"Pos":4},{"Stack":233,"Pos":4},{"Stack":236,"Pos":4},{"Stack":238,"Pos":4},{"Stack":239,"Pos":4},{"Stack":240,"Pos":4}],"Self":0,"Color":643682},{"FullName":"golang.org/x/crypto/chacha20.(*Cipher).XORKeyStream","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/chacha20/chacha_generic.go","UniqueName":"golang.org/x/crypto/chacha20.(*Cipher).XORKeyStream","Inlined":false,"Display":["chacha20.(*Cipher).XORKeyStream","(*Cipher).XORKeyStream","XORKeyStream"],"Places":[{"Stack":9,"Pos":5},{"Stack":17,"Pos":5},{"Stack":20,"Pos":5},{"Stack":23,"Pos":5},{"Stack":32,"Pos":5},{"Stack":35,"Pos":5},{"Stack":40,"Pos":5},{"Stack":42,"Pos":5},{"Stack":44,"Pos":5},{"Stack":50,"Pos":5},{"Stack":51,"Pos":5},{"Stack":52,"Pos":5},{"Stack":54,"Pos":5},{"Stack":55,"Pos":5},{"Stack":56,"Pos":5},{"Stack":57,"Pos":5},{"Stack":58,"Pos":5},{"Stack":61,"Pos":5},{"Stack":63,"Pos":5},{"Stack":71,"Pos":5},{"Stack":73,"Pos":5},{"Stack":79,"Pos":5},{"Stack":85,"Pos":5},{"Stack":88,"Pos":5},{"Stack":90,"Pos":5},{"Stack":93,"Pos":5},{"Stack":95,"Pos":5},{"Stack":106,"Pos":5},{"Stack":108,"Pos":5},{"Stack":115,"Pos":5},{"Stack":117,"Pos":5},{"Stack":118,"Pos":5},{"Stack":124,"Pos":5},{"Stack":126,"Pos":5},{"Stack":127,"Pos":5},{"Stack":128,"Pos":5},{"Stack":133,"Pos":5},{"Stack":134,"Pos":5},{"Stack":135,"Pos":5},{"Stack":136,"Pos":5},{"Stack":139,"Pos":5},{"Stack":141,"Pos":5},{"Stack":142,"Pos":5},{"Stack":143,"Pos":5},{"Stack":148,"Pos":5},{"Stack":153,"Pos":5},{"Stack":156,"Pos":5},{"Stack":172,"Pos":5},{"Stack":173,"Pos":5},{"Stack":176,"Pos":5},{"Stack":179,"Pos":5},{"Stack":184,"Pos":5},{"Stack":192,"Pos":5},{"Stack":193,"Pos":5},{"Stack":196,"Pos":5},{"Stack":200,"Pos":5},{"Stack":201,"Pos":5},{"Stack":204,"Pos":5},{"Stack":207,"Pos":5},{"Stack":209,"Pos":5},{"Stack":210,"Pos":5},{"Stack":214,"Pos":5},{"Stack":216,"Pos":5},{"Stack":218,"Pos":5},{"Stack":219,"Pos":5},{"Stack":220,"Pos":5},{"Stack":225,"Pos":5},{"Stack":226,"Pos":5},{"Stack":228,"Pos":5},{"Stack":233,"Pos":5},{"Stack":236,"Pos":5},{"Stack":238,"Pos":5},{"Stack":239,"Pos":5},{"Stack":240,"Pos":5}],"Self":50000000,"Color":774195},{"FullName":"golang.org/x/crypto/chacha20.(*Cipher).xorKeyStreamBlocks","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/chacha20/chacha_arm64.go","UniqueName":"golang.org/x/crypto/chacha20.(*Cipher).xorKeyStreamBlocks","Inlined":true,"Display":["chacha20.(*Cipher).xorKeyStreamBlocks","(*Cipher).xorKeyStreamBlocks","xorKeyStreamBlocks"],"Places":[{"Stack":9,"Pos":6},{"Stack":20,"Pos":6},{"Stack":23,"Pos":6},{"Stack":32,"Pos":6},{"Stack":35,"Pos":6},{"Stack":40,"Pos":6},{"Stack":42,"Pos":6},{"Stack":44,"Pos":6},{"Stack":50,"Pos":6},{"Stack":51,"Pos":6},{"Stack":52,"Pos":6},{"Stack":54,"Pos":6},{"Stack":55,"Pos":6},{"Stack":56,"Pos":6},{"Stack":57,"Pos":6},{"Stack":58,"Pos":6},{"Stack":61,"Pos":6},{"Stack":63,"Pos":6},{"Stack":71,"Pos":6},{"Stack":73,"Pos":6},{"Stack":79,"Pos":6},{"Stack":85,"Pos":6},{"Stack":88,"Pos":6},{"Stack":90,"Pos":6},{"Stack":93,"Pos":6},{"Stack":95,"Pos":6},{"Stack":106,"Pos":6},{"Stack":108,"Pos":6},{"Stack":115,"Pos":6},{"Stack":117,"Pos":6},{"Stack":118,"Pos":6},{"Stack":124,"Pos":6},{"Stack":126,"Pos":6},{"Stack":127,"Pos":6},{"Stack":128,"Pos":6},{"Stack":133,"Pos":6},{"Stack":134,"Pos":6},{"Stack":135,"Pos":6},{"Stack":136,"Pos":6},{"Stack":139,"Pos":6},{"Stack":141,"Pos":6},{"Stack":142,"Pos":6},{"Stack":143,"Pos":6},{"Stack":148,"Pos":6},{"Stack":153,"Pos":6},{"Stack":156,"Pos":6},{"Stack":172,"Pos":6},{"Stack":173,"Pos":6},{"Stack":176,"Pos":6},{"Stack":179,"Pos":6},{"Stack":184,"Pos":6},{"Stack":192,"Pos":6},{"Stack":193,"Pos":6},{"Stack":196,"Pos":6},{"Stack":200,"Pos":6},{"Stack":201,"Pos":6},{"Stack":204,"Pos":6},{"Stack":207,"Pos":6},{"Stack":209,"Pos":6},{"Stack":210,"Pos":6},{"Stack":214,"Pos":6},{"Stack":216,"Pos":6},{"Stack":218,"Pos":6},{"Stack":219,"Pos":6},{"Stack":220,"Pos":6},{"Stack":225,"Pos":6},{"Stack":226,"Pos":6},{"Stack":228,"Pos":6},{"Stack":233,"Pos":6},{"Stack":239,"Pos":6},{"Stack":240,"Pos":6}],"Self":10000000,"Color":774195},{"FullName":"golang.org/x/crypto/chacha20.xorKeyStreamVX","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/chacha20/chacha_arm64.s","UniqueName":"golang.org/x/crypto/chacha20.xorKeyStreamVX","Inlined":false,"Display":["chacha20.xorKeyStreamVX","xorKeyStreamVX"],"Places":[{"Stack":9,"Pos":7},{"Stack":20,"Pos":7},{"Stack":23,"Pos":7},{"Stack":32,"Pos":7},{"Stack":35,"Pos":7},{"Stack":40,"Pos":7},{"Stack":42,"Pos":7},{"Stack":44,"Pos":7},{"Stack":50,"Pos":7},{"Stack":51,"Pos":7},{"Stack":52,"Pos":7},{"Stack":54,"Pos":7},{"Stack":55,"Pos":7},{"Stack":56,"Pos":7},{"Stack":57,"Pos":7},{"Stack":58,"Pos":7},{"Stack":61,"Pos":7},{"Stack":63,"Pos":7},{"Stack":71,"Pos":7},{"Stack":73,"Pos":7},{"Stack":79,"Pos":7},{"Stack":85,"Pos":7},{"Stack":88,"Pos":7},{"Stack":90,"Pos":7},{"Stack":93,"Pos":7},{"Stack":95,"Pos":7},{"Stack":106,"Pos":7},{"Stack":108,"Pos":7},{"Stack":115,"Pos":7},{"Stack":117,"Pos":7},{"Stack":118,"Pos":7},{"Stack":124,"Pos":7},{"Stack":126,"Pos":7},{"Stack":127,"Pos":7},{"Stack":128,"Pos":7},{"Stack":133,"Pos":7},{"Stack":134,"Pos":7},{"Stack":135,"Pos":7},{"Stack":136,"Pos":7},{"Stack":139,"Pos":7},{"Stack":141,"Pos":7},{"Stack":142,"Pos":7},{"Stack":143,"Pos":7},{"Stack":148,"Pos":7},{"Stack":153,"Pos":7},{"Stack":156,"Pos":7},{"Stack":172,"Pos":7},{"Stack":173,"Pos":7},{"Stack":176,"Pos":7},{"Stack":179,"Pos":7},{"Stack":184,"Pos":7},{"Stack":192,"Pos":7},{"Stack":193,"Pos":7},{"Stack":196,"Pos":7},{"Stack":200,"Pos":7},{"Stack":201,"Pos":7},{"Stack":204,"Pos":7},{"Stack":207,"Pos":7},{"Stack":209,"Pos":7},{"Stack":210,"Pos":7},{"Stack":214,"Pos":7},{"Stack":216,"Pos":7},{"Stack":218,"Pos":7},{"Stack":219,"Pos":7},{"Stack":220,"Pos":7},{"Stack":225,"Pos":7},{"Stack":228,"Pos":7},{"Stack":233,"Pos":7},{"Stack":239,"Pos":7},{"Stack":240,"Pos":7}],"Self":860000000,"Color":774195},{"FullName":"runtime.chanrecv2","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/chan.go","UniqueName":"runtime.chanrecv2","Inlined":false,"Display":["runtime.chanrecv2","chanrecv2"],"Places":[{"Stack":12,"Pos":2},{"Stack":53,"Pos":2},{"Stack":169,"Pos":2},{"Stack":194,"Pos":2}],"Self":0,"Color":666841},{"FullName":"runtime.chanrecv","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/chan.go","UniqueName":"runtime.chanrecv","Inlined":false,"Display":["runtime.chanrecv","chanrecv"],"Places":[{"Stack":12,"Pos":3},{"Stack":53,"Pos":3},{"Stack":169,"Pos":3},{"Stack":194,"Pos":3}],"Self":20000000,"Color":666841},{"FullName":"runtime.lock","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/lock_spinbit.go","UniqueName":"runtime.lock","Inlined":true,"Display":["runtime.lock","lock"],"Places":[{"Stack":12,"Pos":4},{"Stack":19,"Pos":10},{"Stack":29,"Pos":5},{"Stack":34,"Pos":5},{"Stack":65,"Pos":4},{"Stack":119,"Pos":5},{"Stack":168,"Pos":5},{"Stack":195,"Pos":6},{"Stack":211,"Pos":4},{"Stack":223,"Pos":6}],"Self":0,"Color":666841},{"FullName":"runtime.lockWithRank","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/lockrank_off.go","UniqueName":"runtime.lockWithRank","Inlined":true,"Display":["runtime.lockWithRank","lockWithRank"],"Places":[{"Stack":12,"Pos":5},{"Stack":19,"Pos":11},{"Stack":29,"Pos":6},{"Stack":34,"Pos":6},{"Stack":65,"Pos":5},{"Stack":83,"Pos":7},{"Stack":119,"Pos":6},{"Stack":168,"Pos":6},{"Stack":195,"Pos":7},{"Stack":211,"Pos":5},{"Stack":223,"Pos":7}],"Self":0,"Color":666841},{"FullName":"runtime.lock2","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/lock_spinbit.go","UniqueName":"runtime.lock2","Inlined":false,"Display":["runtime.lock2","lock2"],"Places":[{"Stack":12,"Pos":6},{"Stack":19,"Pos":12},{"Stack":29,"Pos":7},{"Stack":34,"Pos":7},{"Stack":65,"Pos":6},{"Stack":83,"Pos":8},{"Stack":119,"Pos":7},{"Stack":168,"Pos":7},{"Stack":195,"Pos":8},{"Stack":211,"Pos":6},{"Stack":223,"Pos":8}],"Self":10000000,"Color":666841},{"FullName":"runtime.osyield","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/os_darwin.go","UniqueName":"runtime.osyield","Inlined":true,"Display":["runtime.osyield","osyield"],"Places":[{"Stack":12,"Pos":7},{"Stack":29,"Pos":8},{"Stack":34,"Pos":8},{"Stack":65,"Pos":7},{"Stack":83,"Pos":9},{"Stack":119,"Pos":8},{"Stack":168,"Pos":8},{"Stack":195,"Pos":9},{"Stack":223,"Pos":9}],"Self":0,"Color":666841},{"FullName":"golang.org/x/crypto/chacha20poly1305.writeWithPadding","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/chacha20poly1305/chacha20poly1305_generic.go","UniqueName":"golang.org/x/crypto/chacha20poly1305.writeWithPadding","Inlined":false,"Display":["chacha20poly1305.writeWithPadding","writeWithPadding"],"Places":[{"Stack":13,"Pos":5},{"Stack":25,"Pos":5},{"Stack":31,"Pos":5},{"Stack":41,"Pos":5},{"Stack":49,"Pos":5},{"Stack":70,"Pos":5},{"Stack":80,"Pos":5},{"Stack":109,"Pos":5},{"Stack":138,"Pos":5},{"Stack":147,"Pos":5},{"Stack":150,"Pos":5},{"Stack":186,"Pos":5},{"Stack":208,"Pos":5}],"Self":10000000,"Color":643682},{"FullName":"golang.org/x/crypto/internal/poly1305.(*MAC).Write","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/internal/poly1305/poly1305.go","UniqueName":"golang.org/x/crypto/internal/poly1305.(*MAC).Write","Inlined":true,"Display":["poly1305.(*MAC).Write","(*MAC).Write","Write"],"Places":[{"Stack":13,"Pos":6},{"Stack":25,"Pos":6},{"Stack":31,"Pos":6},{"Stack":41,"Pos":6},{"Stack":49,"Pos":6},{"Stack":70,"Pos":6},{"Stack":80,"Pos":6},{"Stack":138,"Pos":6},{"Stack":147,"Pos":6},{"Stack":150,"Pos":6},{"Stack":186,"Pos":6},{"Stack":208,"Pos":6}],"Self":0,"Color":507098},{"FullName":"golang.org/x/crypto/internal/poly1305.(*macGeneric).Write","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/internal/poly1305/sum_generic.go","UniqueName":"golang.org/x/crypto/internal/poly1305.(*macGeneric).Write","Inlined":false,"Display":["poly1305.(*macGeneric).Write","(*macGeneric).Write","Write"],"Places":[{"Stack":13,"Pos":7},{"Stack":25,"Pos":7},{"Stack":31,"Pos":7},{"Stack":41,"Pos":7},{"Stack":49,"Pos":7},{"Stack":70,"Pos":7},{"Stack":80,"Pos":7},{"Stack":138,"Pos":7},{"Stack":147,"Pos":7},{"Stack":150,"Pos":7},{"Stack":186,"Pos":7},{"Stack":208,"Pos":7}],"Self":10000000,"Color":507098},{"FullName":"golang.org/x/crypto/internal/poly1305.updateGeneric","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/internal/poly1305/sum_generic.go","UniqueName":"golang.org/x/crypto/internal/poly1305.updateGeneric","Inlined":false,"Display":["poly1305.updateGeneric","updateGeneric"],"Places":[{"Stack":13,"Pos":8},{"Stack":25,"Pos":8},{"Stack":31,"Pos":8},{"Stack":41,"Pos":8},{"Stack":70,"Pos":8},{"Stack":80,"Pos":8},{"Stack":138,"Pos":8},{"Stack":147,"Pos":8},{"Stack":150,"Pos":8},{"Stack":186,"Pos":8},{"Stack":208,"Pos":8}],"Self":280000000,"Color":507098},{"FullName":"golang.zx2c4.com/wireguard/device.(*IndexTable).Lookup","FileName":"/Users/woojer/Desktop/wireguard-go/device/indextable.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*IndexTable).Lookup","Inlined":false,"Display":["device.(*IndexTable).Lookup","(*IndexTable).Lookup","Lookup"],"Places":[{"Stack":14,"Pos":2},{"Stack":154,"Pos":2},{"Stack":162,"Pos":2},{"Stack":215,"Pos":2}],"Self":10000000,"Color":447576},{"FullName":"runtime.mapaccess1_fast32","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/runtime/maps/runtime_fast32_swiss.go","UniqueName":"runtime.mapaccess1_fast32","Inlined":false,"Display":["runtime.mapaccess1_fast32","mapaccess1_fast32"],"Places":[{"Stack":14,"Pos":3}],"Self":10000000,"Color":666841},{"FullName":"runtime.readyWithTime.goready.func1","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.readyWithTime.goready.func1","Inlined":false,"Display":["runtime.readyWithTime.goready.func1","readyWithTime.goready.func1","goready.func1","func1"],"Places":[{"Stack":15,"Pos":2},{"Stack":21,"Pos":2},{"Stack":34,"Pos":2}],"Self":0,"Color":666841},{"FullName":"runtime.pthread_mutex_unlock","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sys_darwin.go","UniqueName":"runtime.pthread_mutex_unlock","Inlined":false,"Display":["runtime.pthread_mutex_unlock","pthread_mutex_unlock"],"Places":[{"Stack":15,"Pos":8},{"Stack":68,"Pos":9}],"Self":40000000,"Color":666841},{"FullName":"time.Now","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/time/time.go","UniqueName":"time.Now","Inlined":false,"Display":["time.Now","Now"],"Places":[{"Stack":18,"Pos":2},{"Stack":116,"Pos":2},{"Stack":237,"Pos":2}],"Self":0,"Color":286771},{"FullName":"time.runtimeNow","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/time.go","UniqueName":"time.runtimeNow","Inlined":false,"Display":["time.runtimeNow","runtimeNow"],"Places":[{"Stack":18,"Pos":3},{"Stack":116,"Pos":3},{"Stack":237,"Pos":3}],"Self":0,"Color":286771},{"FullName":"time.now","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/timestub.go","UniqueName":"time.now","Inlined":false,"Display":["time.now","now"],"Places":[{"Stack":18,"Pos":4},{"Stack":116,"Pos":4},{"Stack":237,"Pos":4}],"Self":10000000,"Color":286771},{"FullName":"runtime.nanotime","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/time_nofake.go","UniqueName":"runtime.nanotime","Inlined":true,"Display":["runtime.nanotime","nanotime"],"Places":[{"Stack":18,"Pos":5},{"Stack":94,"Pos":7},{"Stack":104,"Pos":6},{"Stack":160,"Pos":5},{"Stack":166,"Pos":6},{"Stack":180,"Pos":6}],"Self":0,"Color":666841},{"FullName":"runtime.nanotime1","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sys_darwin.go","UniqueName":"runtime.nanotime1","Inlined":false,"Display":["runtime.nanotime1","nanotime1"],"Places":[{"Stack":18,"Pos":6},{"Stack":94,"Pos":8},{"Stack":104,"Pos":7},{"Stack":160,"Pos":6},{"Stack":166,"Pos":7},{"Stack":180,"Pos":7}],"Self":50000000,"Color":666841},{"FullName":"runtime.chansend1","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/chan.go","UniqueName":"runtime.chansend1","Inlined":false,"Display":["runtime.chansend1","chansend1"],"Places":[{"Stack":19,"Pos":2},{"Stack":39,"Pos":2},{"Stack":65,"Pos":2},{"Stack":157,"Pos":2},{"Stack":211,"Pos":2}],"Self":0,"Color":666841},{"FullName":"runtime.chansend","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/chan.go","UniqueName":"runtime.chansend","Inlined":false,"Display":["runtime.chansend","chansend"],"Places":[{"Stack":19,"Pos":3},{"Stack":39,"Pos":3},{"Stack":65,"Pos":3},{"Stack":157,"Pos":3},{"Stack":211,"Pos":3}],"Self":0,"Color":666841},{"FullName":"runtime.send","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/chan.go","UniqueName":"runtime.send","Inlined":false,"Display":["runtime.send","send"],"Places":[{"Stack":19,"Pos":4},{"Stack":39,"Pos":4},{"Stack":157,"Pos":4}],"Self":0,"Color":666841},{"FullName":"runtime.goready","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.goready","Inlined":true,"Display":["runtime.goready","goready"],"Places":[{"Stack":19,"Pos":5},{"Stack":39,"Pos":5},{"Stack":157,"Pos":5}],"Self":0,"Color":666841},{"FullName":"os.(*File).SyscallConn","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/os/file.go","UniqueName":"os.(*File).SyscallConn","Inlined":true,"Display":["os.(*File).SyscallConn","(*File).SyscallConn","SyscallConn"],"Places":[{"Stack":24,"Pos":3},{"Stack":43,"Pos":3},{"Stack":77,"Pos":3},{"Stack":101,"Pos":3},{"Stack":183,"Pos":3}],"Self":0,"Color":854660},{"FullName":"os.newRawConn","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/os/rawconn.go","UniqueName":"os.newRawConn","Inlined":true,"Display":["os.newRawConn","newRawConn"],"Places":[{"Stack":24,"Pos":4},{"Stack":43,"Pos":4},{"Stack":77,"Pos":4},{"Stack":101,"Pos":4},{"Stack":183,"Pos":4}],"Self":0,"Color":854660},{"FullName":"runtime.newobject","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/malloc.go","UniqueName":"runtime.newobject","Inlined":false,"Display":["runtime.newobject","newobject"],"Places":[{"Stack":24,"Pos":5},{"Stack":28,"Pos":6},{"Stack":43,"Pos":5},{"Stack":48,"Pos":6},{"Stack":62,"Pos":4},{"Stack":77,"Pos":5},{"Stack":87,"Pos":4},{"Stack":92,"Pos":4},{"Stack":99,"Pos":4},{"Stack":101,"Pos":5},{"Stack":130,"Pos":4},{"Stack":140,"Pos":4},{"Stack":146,"Pos":6},{"Stack":149,"Pos":6},{"Stack":170,"Pos":6},{"Stack":183,"Pos":5},{"Stack":187,"Pos":6},{"Stack":213,"Pos":6},{"Stack":221,"Pos":4},{"Stack":227,"Pos":6},{"Stack":231,"Pos":4},{"Stack":235,"Pos":4}],"Self":0,"Color":666841},{"FullName":"runtime.mallocgc","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/malloc.go","UniqueName":"runtime.mallocgc","Inlined":false,"Display":["runtime.mallocgc","mallocgc"],"Places":[{"Stack":24,"Pos":6},{"Stack":28,"Pos":7},{"Stack":38,"Pos":7},{"Stack":43,"Pos":6},{"Stack":47,"Pos":7},{"Stack":48,"Pos":7},{"Stack":62,"Pos":5},{"Stack":77,"Pos":6},{"Stack":87,"Pos":5},{"Stack":92,"Pos":5},{"Stack":99,"Pos":5},{"Stack":101,"Pos":6},{"Stack":130,"Pos":5},{"Stack":140,"Pos":5},{"Stack":146,"Pos":7},{"Stack":149,"Pos":7},{"Stack":170,"Pos":7},{"Stack":183,"Pos":6},{"Stack":187,"Pos":7},{"Stack":213,"Pos":7},{"Stack":221,"Pos":5},{"Stack":227,"Pos":7},{"Stack":231,"Pos":5},{"Stack":235,"Pos":5}],"Self":0,"Color":666841},{"FullName":"runtime.mallocgcSmallScanNoHeader","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/malloc.go","UniqueName":"runtime.mallocgcSmallScanNoHeader","Inlined":false,"Display":["runtime.mallocgcSmallScanNoHeader","mallocgcSmallScanNoHeader"],"Places":[{"Stack":24,"Pos":7},{"Stack":28,"Pos":8},{"Stack":43,"Pos":7},{"Stack":48,"Pos":8},{"Stack":77,"Pos":7},{"Stack":87,"Pos":6},{"Stack":92,"Pos":6},{"Stack":101,"Pos":7},{"Stack":130,"Pos":6},{"Stack":140,"Pos":6},{"Stack":146,"Pos":8},{"Stack":170,"Pos":8},{"Stack":183,"Pos":7},{"Stack":227,"Pos":8},{"Stack":231,"Pos":6},{"Stack":235,"Pos":6}],"Self":30000000,"Color":666841},{"FullName":"runtime.makeSpanClass","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mheap.go","UniqueName":"runtime.makeSpanClass","Inlined":true,"Display":["runtime.makeSpanClass","makeSpanClass"],"Places":[{"Stack":24,"Pos":8},{"Stack":146,"Pos":9}],"Self":0,"Color":666841},{"FullName":"runtime.bool2int","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/stubs.go","UniqueName":"runtime.bool2int","Inlined":true,"Display":["runtime.bool2int","bool2int"],"Places":[{"Stack":24,"Pos":9},{"Stack":146,"Pos":10}],"Self":20000000,"Color":666841},{"FullName":"golang.zx2c4.com/wireguard/conn.(*StdNetBind).putMessages","FileName":"/Users/woojer/Desktop/wireguard-go/conn/bind_std.go","UniqueName":"golang.zx2c4.com/wireguard/conn.(*StdNetBind).putMessages","Inlined":false,"Display":["conn.(*StdNetBind).putMessages","(*StdNetBind).putMessages","putMessages"],"Places":[{"Stack":27,"Pos":4},{"Stack":60,"Pos":4},{"Stack":78,"Pos":4},{"Stack":100,"Pos":4},{"Stack":129,"Pos":4},{"Stack":152,"Pos":4},{"Stack":163,"Pos":4},{"Stack":190,"Pos":4},{"Stack":206,"Pos":4}],"Self":110000000,"Color":36975},{"FullName":"golang.zx2c4.com/wireguard/conn.sockaddrAnyToUDPAddr","FileName":"/Users/woojer/Desktop/wireguard-go/conn/bind_std_batch_darwin.go","UniqueName":"golang.zx2c4.com/wireguard/conn.sockaddrAnyToUDPAddr","Inlined":false,"Display":["conn.sockaddrAnyToUDPAddr","sockaddrAnyToUDPAddr"],"Places":[{"Stack":28,"Pos":5},{"Stack":38,"Pos":5},{"Stack":227,"Pos":5}],"Self":0,"Color":36975},{"FullName":"runtime.(*mcache).nextFree","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/malloc.go","UniqueName":"runtime.(*mcache).nextFree","Inlined":false,"Display":["runtime.(*mcache).nextFree","(*mcache).nextFree","nextFree"],"Places":[{"Stack":28,"Pos":9},{"Stack":43,"Pos":8},{"Stack":48,"Pos":9},{"Stack":87,"Pos":7},{"Stack":92,"Pos":7},{"Stack":170,"Pos":9},{"Stack":231,"Pos":7}],"Self":0,"Color":666841},{"FullName":"runtime.(*mcache).refill","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mcache.go","UniqueName":"runtime.(*mcache).refill","Inlined":false,"Display":["runtime.(*mcache).refill","(*mcache).refill","refill"],"Places":[{"Stack":28,"Pos":10},{"Stack":43,"Pos":9},{"Stack":48,"Pos":10},{"Stack":87,"Pos":8},{"Stack":92,"Pos":8},{"Stack":170,"Pos":10},{"Stack":231,"Pos":8}],"Self":10000000,"Color":666841},{"FullName":"runtime.(*mcentral).cacheSpan","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mcentral.go","UniqueName":"runtime.(*mcentral).cacheSpan","Inlined":false,"Display":["runtime.(*mcentral).cacheSpan","(*mcentral).cacheSpan","cacheSpan"],"Places":[{"Stack":28,"Pos":11},{"Stack":43,"Pos":10},{"Stack":48,"Pos":11},{"Stack":87,"Pos":9},{"Stack":92,"Pos":9},{"Stack":170,"Pos":11}],"Self":0,"Color":666841},{"FullName":"runtime.(*mcentral).grow","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mcentral.go","UniqueName":"runtime.(*mcentral).grow","Inlined":false,"Display":["runtime.(*mcentral).grow","(*mcentral).grow","grow"],"Places":[{"Stack":28,"Pos":12},{"Stack":43,"Pos":11},{"Stack":48,"Pos":12},{"Stack":87,"Pos":10},{"Stack":92,"Pos":10},{"Stack":170,"Pos":12}],"Self":0,"Color":666841},{"FullName":"runtime.(*mspan).initHeapBits","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mbitmap.go","UniqueName":"runtime.(*mspan).initHeapBits","Inlined":false,"Display":["runtime.(*mspan).initHeapBits","(*mspan).initHeapBits","initHeapBits"],"Places":[{"Stack":28,"Pos":13},{"Stack":43,"Pos":12},{"Stack":48,"Pos":13},{"Stack":87,"Pos":11},{"Stack":92,"Pos":11},{"Stack":170,"Pos":13}],"Self":10000000,"Color":666841},{"FullName":"runtime.memclrNoHeapPointers","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/memclr_arm64.s","UniqueName":"runtime.memclrNoHeapPointers","Inlined":false,"Display":["runtime.memclrNoHeapPointers","memclrNoHeapPointers"],"Places":[{"Stack":28,"Pos":14},{"Stack":47,"Pos":9},{"Stack":48,"Pos":14},{"Stack":87,"Pos":12},{"Stack":92,"Pos":12},{"Stack":170,"Pos":14}],"Self":160000000,"Color":666841},{"FullName":"golang.org/x/crypto/internal/poly1305.mul64","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/internal/poly1305/sum_generic.go","UniqueName":"golang.org/x/crypto/internal/poly1305.mul64","Inlined":true,"Display":["poly1305.mul64","mul64"],"Places":[{"Stack":31,"Pos":9},{"Stack":150,"Pos":9},{"Stack":186,"Pos":9}],"Self":70000000,"Color":507098},{"FullName":"golang.zx2c4.com/wireguard/device.(*Device).GetInboundElement","FileName":"/Users/woojer/Desktop/wireguard-go/device/pools.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Device).GetInboundElement","Inlined":true,"Display":["device.(*Device).GetInboundElement","(*Device).GetInboundElement","GetInboundElement"],"Places":[{"Stack":37,"Pos":2},{"Stack":120,"Pos":2},{"Stack":241,"Pos":2}],"Self":0,"Color":447576},{"FullName":"golang.zx2c4.com/wireguard/device.(*WaitPool).Get","FileName":"/Users/woojer/Desktop/wireguard-go/device/pools.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*WaitPool).Get","Inlined":false,"Display":["device.(*WaitPool).Get","(*WaitPool).Get","Get"],"Places":[{"Stack":37,"Pos":3},{"Stack":84,"Pos":3},{"Stack":89,"Pos":3},{"Stack":91,"Pos":3},{"Stack":120,"Pos":3},{"Stack":161,"Pos":3},{"Stack":185,"Pos":3},{"Stack":241,"Pos":3}],"Self":10000000,"Color":447576},{"FullName":"sync.(*Pool).Get","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/pool.go","UniqueName":"sync.(*Pool).Get","Inlined":false,"Display":["sync.(*Pool).Get","(*Pool).Get","Get"],"Places":[{"Stack":37,"Pos":4},{"Stack":84,"Pos":4},{"Stack":89,"Pos":4},{"Stack":91,"Pos":4},{"Stack":161,"Pos":4},{"Stack":185,"Pos":4},{"Stack":241,"Pos":4}],"Self":20000000,"Color":968565},{"FullName":"runtime.makeslice","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/slice.go","UniqueName":"runtime.makeslice","Inlined":false,"Display":["runtime.makeslice","makeslice"],"Places":[{"Stack":38,"Pos":6},{"Stack":47,"Pos":6}],"Self":0,"Color":666841},{"FullName":"runtime.mallocgcTiny","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/malloc.go","UniqueName":"runtime.mallocgcTiny","Inlined":false,"Display":["runtime.mallocgcTiny","mallocgcTiny"],"Places":[{"Stack":38,"Pos":8},{"Stack":62,"Pos":6},{"Stack":99,"Pos":6},{"Stack":149,"Pos":8},{"Stack":187,"Pos":8},{"Stack":213,"Pos":8},{"Stack":221,"Pos":6}],"Self":50000000,"Color":666841},{"FullName":"runtime.mapIterNext","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/map_swiss.go","UniqueName":"runtime.mapIterNext","Inlined":false,"Display":["runtime.mapIterNext","mapIterNext"],"Places":[{"Stack":46,"Pos":2},{"Stack":66,"Pos":2}],"Self":0,"Color":666841},{"FullName":"internal/runtime/maps.(*Iter).Next","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/runtime/maps/table.go","UniqueName":"internal/runtime/maps.(*Iter).Next","Inlined":false,"Display":["maps.(*Iter).Next","(*Iter).Next","Next"],"Places":[{"Stack":46,"Pos":3},{"Stack":66,"Pos":3},{"Stack":165,"Pos":3}],"Self":40000000,"Color":685825},{"FullName":"golang.zx2c4.com/wireguard/device.(*Device).PutMessageBuffer","FileName":"/Users/woojer/Desktop/wireguard-go/device/pools.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Device).PutMessageBuffer","Inlined":true,"Display":["device.(*Device).PutMessageBuffer","(*Device).PutMessageBuffer","PutMessageBuffer"],"Places":[{"Stack":47,"Pos":2},{"Stack":111,"Pos":2}],"Self":0,"Color":447576},{"FullName":"golang.zx2c4.com/wireguard/device.(*WaitPool).Put","FileName":"/Users/woojer/Desktop/wireguard-go/device/pools.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*WaitPool).Put","Inlined":false,"Display":["device.(*WaitPool).Put","(*WaitPool).Put","Put"],"Places":[{"Stack":47,"Pos":3},{"Stack":111,"Pos":3}],"Self":0,"Color":447576},{"FullName":"sync.(*Pool).Put","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/pool.go","UniqueName":"sync.(*Pool).Put","Inlined":false,"Display":["sync.(*Pool).Put","(*Pool).Put","Put"],"Places":[{"Stack":47,"Pos":4},{"Stack":111,"Pos":4}],"Self":0,"Color":968565},{"FullName":"sync.(*poolChain).pushHead","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/poolqueue.go","UniqueName":"sync.(*poolChain).pushHead","Inlined":false,"Display":["sync.(*poolChain).pushHead","(*poolChain).pushHead","pushHead"],"Places":[{"Stack":47,"Pos":5}],"Self":0,"Color":968565},{"FullName":"runtime.mallocgcSmallScanHeader","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/malloc.go","UniqueName":"runtime.mallocgcSmallScanHeader","Inlined":false,"Display":["runtime.mallocgcSmallScanHeader","mallocgcSmallScanHeader"],"Places":[{"Stack":47,"Pos":8}],"Self":0,"Color":666841},{"FullName":"golang.org/x/crypto/internal/poly1305.(*MAC).Verify","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/internal/poly1305/poly1305.go","UniqueName":"golang.org/x/crypto/internal/poly1305.(*MAC).Verify","Inlined":false,"Display":["poly1305.(*MAC).Verify","(*MAC).Verify","Verify"],"Places":[{"Stack":59,"Pos":5}],"Self":10000000,"Color":507098},{"FullName":"internal/runtime/maps.(*Iter).nextDirIdx","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/runtime/maps/table.go","UniqueName":"internal/runtime/maps.(*Iter).nextDirIdx","Inlined":true,"Display":["maps.(*Iter).nextDirIdx","(*Iter).nextDirIdx","nextDirIdx"],"Places":[{"Stack":66,"Pos":4}],"Self":10000000,"Color":685825},{"FullName":"runtime.entersyscall_sysmon","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.entersyscall_sysmon","Inlined":false,"Display":["runtime.entersyscall_sysmon","entersyscall_sysmon"],"Places":[{"Stack":67,"Pos":2}],"Self":0,"Color":666841},{"FullName":"golang.zx2c4.com/wireguard/device.(*Peer).SetEndpointFromPacket","FileName":"/Users/woojer/Desktop/wireguard-go/device/peer.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Peer).SetEndpointFromPacket","Inlined":false,"Display":["device.(*Peer).SetEndpointFromPacket","(*Peer).SetEndpointFromPacket","SetEndpointFromPacket"],"Places":[{"Stack":69,"Pos":2},{"Stack":107,"Pos":2}],"Self":10000000,"Color":447576},{"FullName":"golang.org/x/crypto/chacha20.NewUnauthenticatedCipher","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/chacha20/chacha_generic.go","UniqueName":"golang.org/x/crypto/chacha20.NewUnauthenticatedCipher","Inlined":true,"Display":["chacha20.NewUnauthenticatedCipher","NewUnauthenticatedCipher"],"Places":[{"Stack":72,"Pos":5},{"Stack":75,"Pos":5},{"Stack":175,"Pos":5}],"Self":0,"Color":774195},{"FullName":"golang.org/x/crypto/chacha20.newUnauthenticatedCipher","FileName":"/Users/woojer/go/pkg/mod/golang.org/x/crypto@v0.37.0/chacha20/chacha_generic.go","UniqueName":"golang.org/x/crypto/chacha20.newUnauthenticatedCipher","Inlined":false,"Display":["chacha20.newUnauthenticatedCipher","newUnauthenticatedCipher"],"Places":[{"Stack":72,"Pos":6},{"Stack":75,"Pos":6},{"Stack":175,"Pos":6}],"Self":50000000,"Color":774195},{"FullName":"sync.(*Mutex).Unlock","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/mutex.go","UniqueName":"sync.(*Mutex).Unlock","Inlined":true,"Display":["sync.(*Mutex).Unlock","(*Mutex).Unlock","Unlock"],"Places":[{"Stack":81,"Pos":2},{"Stack":83,"Pos":2},{"Stack":137,"Pos":2}],"Self":0,"Color":968565},{"FullName":"internal/sync.(*Mutex).Unlock","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/sync/mutex.go","UniqueName":"internal/sync.(*Mutex).Unlock","Inlined":true,"Display":["sync.(*Mutex).Unlock","(*Mutex).Unlock","Unlock"],"Places":[{"Stack":81,"Pos":3},{"Stack":83,"Pos":3},{"Stack":107,"Pos":4},{"Stack":137,"Pos":3}],"Self":10000000,"Color":466988},{"FullName":"internal/sync.(*Mutex).unlockSlow","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/sync/mutex.go","UniqueName":"internal/sync.(*Mutex).unlockSlow","Inlined":false,"Display":["sync.(*Mutex).unlockSlow","(*Mutex).unlockSlow","unlockSlow"],"Places":[{"Stack":81,"Pos":4},{"Stack":83,"Pos":4},{"Stack":137,"Pos":4}],"Self":0,"Color":466988},{"FullName":"internal/sync.runtime_Semrelease","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sema.go","UniqueName":"internal/sync.runtime_Semrelease","Inlined":false,"Display":["sync.runtime_Semrelease","runtime_Semrelease"],"Places":[{"Stack":81,"Pos":5},{"Stack":83,"Pos":5},{"Stack":137,"Pos":5}],"Self":0,"Color":466988},{"FullName":"runtime.semrelease1","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sema.go","UniqueName":"runtime.semrelease1","Inlined":false,"Display":["runtime.semrelease1","semrelease1"],"Places":[{"Stack":81,"Pos":6},{"Stack":83,"Pos":6},{"Stack":137,"Pos":6}],"Self":10000000,"Color":666841},{"FullName":"runtime.mput","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.mput","Inlined":false,"Display":["runtime.mput","mput"],"Places":[{"Stack":82,"Pos":6}],"Self":0,"Color":666841},{"FullName":"runtime.checkdead","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.checkdead","Inlined":false,"Display":["runtime.checkdead","checkdead"],"Places":[{"Stack":82,"Pos":7}],"Self":10000000,"Color":666841},{"FullName":"golang.zx2c4.com/wireguard/device.(*Device).GetInboundElementsContainer","FileName":"/Users/woojer/Desktop/wireguard-go/device/pools.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Device).GetInboundElementsContainer","Inlined":true,"Display":["device.(*Device).GetInboundElementsContainer","(*Device).GetInboundElementsContainer","GetInboundElementsContainer"],"Places":[{"Stack":84,"Pos":2},{"Stack":91,"Pos":2}],"Self":0,"Color":447576},{"FullName":"sync.(*Pool).pin","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/pool.go","UniqueName":"sync.(*Pool).pin","Inlined":false,"Display":["sync.(*Pool).pin","(*Pool).pin","pin"],"Places":[{"Stack":84,"Pos":5},{"Stack":111,"Pos":5}],"Self":20000000,"Color":968565},{"FullName":"sync.(*Mutex).Lock","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/mutex.go","UniqueName":"sync.(*Mutex).Lock","Inlined":true,"Display":["sync.(*Mutex).Lock","(*Mutex).Lock","Lock"],"Places":[{"Stack":86,"Pos":2},{"Stack":145,"Pos":2},{"Stack":155,"Pos":2},{"Stack":166,"Pos":2},{"Stack":180,"Pos":2}],"Self":0,"Color":968565},{"FullName":"internal/sync.(*Mutex).Lock","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/sync/mutex.go","UniqueName":"internal/sync.(*Mutex).Lock","Inlined":true,"Display":["sync.(*Mutex).Lock","(*Mutex).Lock","Lock"],"Places":[{"Stack":86,"Pos":3},{"Stack":145,"Pos":3},{"Stack":155,"Pos":3},{"Stack":166,"Pos":3},{"Stack":180,"Pos":3}],"Self":10000000,"Color":466988},{"FullName":"internal/sync.(*Mutex).lockSlow","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/sync/mutex.go","UniqueName":"internal/sync.(*Mutex).lockSlow","Inlined":false,"Display":["sync.(*Mutex).lockSlow","(*Mutex).lockSlow","lockSlow"],"Places":[{"Stack":86,"Pos":4},{"Stack":155,"Pos":4},{"Stack":166,"Pos":4},{"Stack":180,"Pos":4}],"Self":10000000,"Color":466988},{"FullName":"golang.zx2c4.com/wireguard/device.(*Device).GetMessageBuffer","FileName":"/Users/woojer/Desktop/wireguard-go/device/pools.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Device).GetMessageBuffer","Inlined":true,"Display":["device.(*Device).GetMessageBuffer","(*Device).GetMessageBuffer","GetMessageBuffer"],"Places":[{"Stack":89,"Pos":2},{"Stack":161,"Pos":2},{"Stack":185,"Pos":2}],"Self":0,"Color":447576},{"FullName":"sync.(*poolChain).popHead","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/poolqueue.go","UniqueName":"sync.(*poolChain).popHead","Inlined":false,"Display":["sync.(*poolChain).popHead","(*poolChain).popHead","popHead"],"Places":[{"Stack":89,"Pos":5},{"Stack":161,"Pos":5}],"Self":0,"Color":968565},{"FullName":"sync.(*poolDequeue).popHead","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/poolqueue.go","UniqueName":"sync.(*poolDequeue).popHead","Inlined":false,"Display":["sync.(*poolDequeue).popHead","(*poolDequeue).popHead","popHead"],"Places":[{"Stack":89,"Pos":6},{"Stack":161,"Pos":6}],"Self":10000000,"Color":968565},{"FullName":"sync/atomic.(*Uint64).CompareAndSwap","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/atomic/type.go","UniqueName":"sync/atomic.(*Uint64).CompareAndSwap","Inlined":true,"Display":["atomic.(*Uint64).CompareAndSwap","(*Uint64).CompareAndSwap","CompareAndSwap"],"Places":[{"Stack":89,"Pos":7}],"Self":10000000,"Color":157918},{"FullName":"sync.(*Pool).getSlow","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/pool.go","UniqueName":"sync.(*Pool).getSlow","Inlined":false,"Display":["sync.(*Pool).getSlow","(*Pool).getSlow","getSlow"],"Places":[{"Stack":91,"Pos":5},{"Stack":185,"Pos":5}],"Self":0,"Color":968565},{"FullName":"sync.(*poolChain).popTail","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/poolqueue.go","UniqueName":"sync.(*poolChain).popTail","Inlined":false,"Display":["sync.(*poolChain).popTail","(*poolChain).popTail","popTail"],"Places":[{"Stack":91,"Pos":6},{"Stack":185,"Pos":6}],"Self":0,"Color":968565},{"FullName":"sync.(*poolDequeue).popTail","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/poolqueue.go","UniqueName":"sync.(*poolDequeue).popTail","Inlined":false,"Display":["sync.(*poolDequeue).popTail","(*poolDequeue).popTail","popTail"],"Places":[{"Stack":91,"Pos":7},{"Stack":185,"Pos":7}],"Self":10000000,"Color":968565},{"FullName":"runtime.(*timers).check","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/time.go","UniqueName":"runtime.(*timers).check","Inlined":false,"Display":["runtime.(*timers).check","(*timers).check","check"],"Places":[{"Stack":94,"Pos":6},{"Stack":104,"Pos":5},{"Stack":174,"Pos":5},{"Stack":212,"Pos":5}],"Self":10000000,"Color":666841},{"FullName":"runtime.pthread_mutex_lock","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sys_darwin.go","UniqueName":"runtime.pthread_mutex_lock","Inlined":false,"Display":["runtime.pthread_mutex_lock","pthread_mutex_lock"],"Places":[{"Stack":96,"Pos":9},{"Stack":110,"Pos":8},{"Stack":234,"Pos":9}],"Self":30000000,"Color":666841},{"FullName":"runtime.mapIterStart","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/map_swiss.go","UniqueName":"runtime.mapIterStart","Inlined":false,"Display":["runtime.mapIterStart","mapIterStart"],"Places":[{"Stack":98,"Pos":2},{"Stack":105,"Pos":2},{"Stack":165,"Pos":2},{"Stack":181,"Pos":2},{"Stack":188,"Pos":2},{"Stack":191,"Pos":2}],"Self":0,"Color":666841},{"FullName":"internal/runtime/maps.(*Iter).Init","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/runtime/maps/table.go","UniqueName":"internal/runtime/maps.(*Iter).Init","Inlined":false,"Display":["maps.(*Iter).Init","(*Iter).Init","Init"],"Places":[{"Stack":98,"Pos":3},{"Stack":105,"Pos":3},{"Stack":181,"Pos":3},{"Stack":188,"Pos":3},{"Stack":191,"Pos":3}],"Self":0,"Color":685825},{"FullName":"internal/runtime/maps.rand","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/rand.go","UniqueName":"internal/runtime/maps.rand","Inlined":false,"Display":["maps.rand","rand"],"Places":[{"Stack":98,"Pos":4},{"Stack":105,"Pos":4},{"Stack":181,"Pos":4},{"Stack":188,"Pos":4},{"Stack":191,"Pos":4}],"Self":10000000,"Color":685825},{"FullName":"runtime.rand","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/rand.go","UniqueName":"runtime.rand","Inlined":false,"Display":["runtime.rand","rand"],"Places":[{"Stack":98,"Pos":5},{"Stack":105,"Pos":5},{"Stack":188,"Pos":5},{"Stack":191,"Pos":5}],"Self":20000000,"Color":666841},{"FullName":"internal/chacha8rand.(*State).Next","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/chacha8rand/chacha8.go","UniqueName":"internal/chacha8rand.(*State).Next","Inlined":true,"Display":["chacha8rand.(*State).Next","(*State).Next","Next"],"Places":[{"Stack":98,"Pos":6},{"Stack":191,"Pos":6}],"Self":20000000,"Color":763257},{"FullName":"runtime.nextFreeFast","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/malloc.go","UniqueName":"runtime.nextFreeFast","Inlined":true,"Display":["runtime.nextFreeFast","nextFreeFast"],"Places":[{"Stack":99,"Pos":7},{"Stack":101,"Pos":8},{"Stack":187,"Pos":9}],"Self":30000000,"Color":666841},{"FullName":"internal/poll.(*FD).writeLock","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/poll/fd_mutex.go","UniqueName":"internal/poll.(*FD).writeLock","Inlined":true,"Display":["poll.(*FD).writeLock","(*FD).writeLock","writeLock"],"Places":[{"Stack":103,"Pos":6}],"Self":0,"Color":815401},{"FullName":"internal/poll.(*fdMutex).rwlock","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/poll/fd_mutex.go","UniqueName":"internal/poll.(*fdMutex).rwlock","Inlined":false,"Display":["poll.(*fdMutex).rwlock","(*fdMutex).rwlock","rwlock"],"Places":[{"Stack":103,"Pos":7}],"Self":10000000,"Color":815401},{"FullName":"sync.(*Mutex).Unlock","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/mutex.go","UniqueName":"sync.(*Mutex).Unlock#113","Inlined":false,"Display":["sync.(*Mutex).Unlock","(*Mutex).Unlock","Unlock"],"Places":[{"Stack":107,"Pos":3}],"Self":0,"Color":968565},{"FullName":"runtime.(*randomEnum).position","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.(*randomEnum).position","Inlined":true,"Display":["runtime.(*randomEnum).position","(*randomEnum).position","position"],"Places":[{"Stack":112,"Pos":6}],"Self":20000000,"Color":666841},{"FullName":"runtime.walltime","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sys_darwin.go","UniqueName":"runtime.walltime","Inlined":false,"Display":["runtime.walltime","walltime"],"Places":[{"Stack":116,"Pos":5}],"Self":20000000,"Color":666841},{"FullName":"runtime.checkRunqsNoP","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.checkRunqsNoP","Inlined":false,"Display":["runtime.checkRunqsNoP","checkRunqsNoP"],"Places":[{"Stack":122,"Pos":5},{"Stack":151,"Pos":5}],"Self":10000000,"Color":666841},{"FullName":"runtime.netpollBreak","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/netpoll_kqueue.go","UniqueName":"runtime.netpollBreak","Inlined":true,"Display":["runtime.netpollBreak","netpollBreak"],"Places":[{"Stack":125,"Pos":5}],"Self":0,"Color":666841},{"FullName":"runtime.wakeNetpoll","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/netpoll_kqueue_event.go","UniqueName":"runtime.wakeNetpoll","Inlined":false,"Display":["runtime.wakeNetpoll","wakeNetpoll"],"Places":[{"Stack":125,"Pos":6}],"Self":0,"Color":666841},{"FullName":"runtime.heapSetTypeNoHeader","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mbitmap.go","UniqueName":"runtime.heapSetTypeNoHeader","Inlined":true,"Display":["runtime.heapSetTypeNoHeader","heapSetTypeNoHeader"],"Places":[{"Stack":130,"Pos":7},{"Stack":183,"Pos":8}],"Self":10000000,"Color":666841},{"FullName":"runtime.(*mspan).writeHeapBitsSmall","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mbitmap.go","UniqueName":"runtime.(*mspan).writeHeapBitsSmall","Inlined":false,"Display":["runtime.(*mspan).writeHeapBitsSmall","(*mspan).writeHeapBitsSmall","writeHeapBitsSmall"],"Places":[{"Stack":130,"Pos":8}],"Self":10000000,"Color":666841},{"FullName":"runtime.(*semaRoot).dequeue","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sema.go","UniqueName":"runtime.(*semaRoot).dequeue","Inlined":false,"Display":["runtime.(*semaRoot).dequeue","(*semaRoot).dequeue","dequeue"],"Places":[{"Stack":137,"Pos":7}],"Self":10000000,"Color":666841},{"FullName":"runtime.acquirem","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/runtime1.go","UniqueName":"runtime.acquirem","Inlined":true,"Display":["runtime.acquirem","acquirem"],"Places":[{"Stack":140,"Pos":7}],"Self":10000000,"Color":666841},{"FullName":"golang.zx2c4.com/wireguard/device.(*Peer).timersAnyAuthenticatedPacketReceived","FileName":"/Users/woojer/Desktop/wireguard-go/device/timers.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Peer).timersAnyAuthenticatedPacketReceived","Inlined":false,"Display":["device.(*Peer).timersAnyAuthenticatedPacketReceived","(*Peer).timersAnyAuthenticatedPacketReceived","timersAnyAuthenticatedPacketReceived"],"Places":[{"Stack":144,"Pos":2}],"Self":0,"Color":447576},{"FullName":"golang.zx2c4.com/wireguard/device.(*Timer).Del","FileName":"/Users/woojer/Desktop/wireguard-go/device/timers.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Timer).Del","Inlined":false,"Display":["device.(*Timer).Del","(*Timer).Del","Del"],"Places":[{"Stack":144,"Pos":3}],"Self":0,"Color":447576},{"FullName":"time.(*Timer).Stop","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/time/sleep.go","UniqueName":"time.(*Timer).Stop","Inlined":true,"Display":["time.(*Timer).Stop","(*Timer).Stop","Stop"],"Places":[{"Stack":144,"Pos":4}],"Self":10000000,"Color":286771},{"FullName":"runtime.runqempty","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.runqempty","Inlined":true,"Display":["runtime.runqempty","runqempty"],"Places":[{"Stack":151,"Pos":6}],"Self":20000000,"Color":666841},{"FullName":"sync.(*RWMutex).RLock","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/rwmutex.go","UniqueName":"sync.(*RWMutex).RLock","Inlined":true,"Display":["sync.(*RWMutex).RLock","(*RWMutex).RLock","RLock"],"Places":[{"Stack":154,"Pos":3}],"Self":0,"Color":968565},{"FullName":"sync/atomic.(*Int32).Add","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/atomic/type.go","UniqueName":"sync/atomic.(*Int32).Add","Inlined":true,"Display":["atomic.(*Int32).Add","(*Int32).Add","Add"],"Places":[{"Stack":154,"Pos":4}],"Self":10000000,"Color":157918},{"FullName":"internal/sync.runtime_SemacquireMutex","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sema.go","UniqueName":"internal/sync.runtime_SemacquireMutex","Inlined":false,"Display":["sync.runtime_SemacquireMutex","runtime_SemacquireMutex"],"Places":[{"Stack":155,"Pos":5}],"Self":0,"Color":466988},{"FullName":"runtime.semacquire1","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sema.go","UniqueName":"runtime.semacquire1","Inlined":false,"Display":["runtime.semacquire1","semacquire1"],"Places":[{"Stack":155,"Pos":6}],"Self":10000000,"Color":666841},{"FullName":"golang.zx2c4.com/wireguard/replay.(*Filter).ValidateCounter","FileName":"/Users/woojer/Desktop/wireguard-go/replay/replay.go","UniqueName":"golang.zx2c4.com/wireguard/replay.(*Filter).ValidateCounter","Inlined":false,"Display":["replay.(*Filter).ValidateCounter","(*Filter).ValidateCounter","ValidateCounter"],"Places":[{"Stack":158,"Pos":2}],"Self":20000000,"Color":432575},{"FullName":"golang.zx2c4.com/wireguard/device.(*Peer).timersDataReceived","FileName":"/Users/woojer/Desktop/wireguard-go/device/timers.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Peer).timersDataReceived","Inlined":false,"Display":["device.(*Peer).timersDataReceived","(*Peer).timersDataReceived","timersDataReceived"],"Places":[{"Stack":159,"Pos":2}],"Self":0,"Color":447576},{"FullName":"golang.zx2c4.com/wireguard/device.(*Peer).timersActive","FileName":"/Users/woojer/Desktop/wireguard-go/device/timers.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Peer).timersActive","Inlined":true,"Display":["device.(*Peer).timersActive","(*Peer).timersActive","timersActive"],"Places":[{"Stack":159,"Pos":3}],"Self":0,"Color":447576},{"FullName":"golang.zx2c4.com/wireguard/device.(*Device).isUp","FileName":"/Users/woojer/Desktop/wireguard-go/device/device.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Device).isUp","Inlined":true,"Display":["device.(*Device).isUp","(*Device).isUp","isUp"],"Places":[{"Stack":159,"Pos":4}],"Self":0,"Color":447576},{"FullName":"golang.zx2c4.com/wireguard/device.(*Device).deviceState","FileName":"/Users/woojer/Desktop/wireguard-go/device/device.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Device).deviceState","Inlined":true,"Display":["device.(*Device).deviceState","(*Device).deviceState","deviceState"],"Places":[{"Stack":159,"Pos":5}],"Self":10000000,"Color":447576},{"FullName":"internal/poll.(*pollDesc).prepareRead","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/poll/fd_poll_runtime.go","UniqueName":"internal/poll.(*pollDesc).prepareRead","Inlined":true,"Display":["poll.(*pollDesc).prepareRead","(*pollDesc).prepareRead","prepareRead"],"Places":[{"Stack":164,"Pos":8}],"Self":0,"Color":815401},{"FullName":"internal/poll.(*pollDesc).prepare","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/poll/fd_poll_runtime.go","UniqueName":"internal/poll.(*pollDesc).prepare","Inlined":false,"Display":["poll.(*pollDesc).prepare","(*pollDesc).prepare","prepare"],"Places":[{"Stack":164,"Pos":9}],"Self":0,"Color":815401},{"FullName":"internal/poll.runtime_pollReset","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/netpoll.go","UniqueName":"internal/poll.runtime_pollReset","Inlined":false,"Display":["poll.runtime_pollReset","runtime_pollReset"],"Places":[{"Stack":164,"Pos":10}],"Self":0,"Color":815401},{"FullName":"runtime.netpollcheckerr","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/netpoll.go","UniqueName":"runtime.netpollcheckerr","Inlined":true,"Display":["runtime.netpollcheckerr","netpollcheckerr"],"Places":[{"Stack":164,"Pos":11}],"Self":10000000,"Color":666841},{"FullName":"internal/sync.runtime_nanotime","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sema.go","UniqueName":"internal/sync.runtime_nanotime","Inlined":false,"Display":["sync.runtime_nanotime","runtime_nanotime"],"Places":[{"Stack":166,"Pos":5},{"Stack":180,"Pos":5}],"Self":0,"Color":466988},{"FullName":"runtime.libcCall","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/sys_libc.go","UniqueName":"runtime.libcCall","Inlined":false,"Display":["runtime.libcCall","libcCall"],"Places":[{"Stack":166,"Pos":8}],"Self":10000000,"Color":666841},{"FullName":"runtime.checkTimersNoP","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.checkTimersNoP","Inlined":false,"Display":["runtime.checkTimersNoP","checkTimersNoP"],"Places":[{"Stack":171,"Pos":5},{"Stack":222,"Pos":5}],"Self":10000000,"Color":666841},{"FullName":"runtime.(*timers).wakeTime","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/time.go","UniqueName":"runtime.(*timers).wakeTime","Inlined":true,"Display":["runtime.(*timers).wakeTime","(*timers).wakeTime","wakeTime"],"Places":[{"Stack":171,"Pos":6},{"Stack":212,"Pos":6}],"Self":20000000,"Color":666841},{"FullName":"runtime.parkunlock_c","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.parkunlock_c","Inlined":false,"Display":["runtime.parkunlock_c","parkunlock_c"],"Places":[{"Stack":177,"Pos":3}],"Self":0,"Color":666841},{"FullName":"runtime.unlock","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/lock_spinbit.go","UniqueName":"runtime.unlock","Inlined":true,"Display":["runtime.unlock","unlock"],"Places":[{"Stack":177,"Pos":4}],"Self":0,"Color":666841},{"FullName":"runtime.unlockWithRank","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/lockrank_off.go","UniqueName":"runtime.unlockWithRank","Inlined":true,"Display":["runtime.unlockWithRank","unlockWithRank"],"Places":[{"Stack":177,"Pos":5}],"Self":0,"Color":666841},{"FullName":"runtime.unlock2","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/lock_spinbit.go","UniqueName":"runtime.unlock2","Inlined":false,"Display":["runtime.unlock2","unlock2"],"Places":[{"Stack":177,"Pos":6}],"Self":10000000,"Color":666841},{"FullName":"sync/atomic.StorePointer","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/atomic_pointer.go","UniqueName":"sync/atomic.StorePointer","Inlined":false,"Display":["atomic.StorePointer","StorePointer"],"Places":[{"Stack":185,"Pos":8}],"Self":10000000,"Color":157918},{"FullName":"runtime.duffcopy","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/duff_arm64.s","UniqueName":"runtime.duffcopy","Inlined":false,"Display":["runtime.duffcopy","duffcopy"],"Places":[{"Stack":190,"Pos":5}],"Self":20000000,"Color":666841},{"FullName":"runtime.acquireSudog","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.acquireSudog","Inlined":false,"Display":["runtime.acquireSudog","acquireSudog"],"Places":[{"Stack":194,"Pos":4}],"Self":0,"Color":666841},{"FullName":"runtime.releasem","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/runtime1.go","UniqueName":"runtime.releasem","Inlined":true,"Display":["runtime.releasem","releasem"],"Places":[{"Stack":194,"Pos":5}],"Self":10000000,"Color":666841},{"FullName":"runtime.(*pageAlloc).scavenge.func1","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mgcscavenge.go","UniqueName":"runtime.(*pageAlloc).scavenge.func1","Inlined":false,"Display":["runtime.(*pageAlloc).scavenge.func1","(*pageAlloc).scavenge.func1","scavenge.func1","func1"],"Places":[{"Stack":197,"Pos":2}],"Self":0,"Color":666841},{"FullName":"runtime.(*pageAlloc).scavengeOne","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mgcscavenge.go","UniqueName":"runtime.(*pageAlloc).scavengeOne","Inlined":false,"Display":["runtime.(*pageAlloc).scavengeOne","(*pageAlloc).scavengeOne","scavengeOne"],"Places":[{"Stack":197,"Pos":3}],"Self":0,"Color":666841},{"FullName":"runtime.sysUnused","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mem.go","UniqueName":"runtime.sysUnused","Inlined":true,"Display":["runtime.sysUnused","sysUnused"],"Places":[{"Stack":197,"Pos":4}],"Self":0,"Color":666841},{"FullName":"runtime.sysUnusedOS","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/mem_darwin.go","UniqueName":"runtime.sysUnusedOS","Inlined":true,"Display":["runtime.sysUnusedOS","sysUnusedOS"],"Places":[{"Stack":197,"Pos":5}],"Self":0,"Color":666841},{"FullName":"runtime.entersyscall","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.entersyscall","Inlined":false,"Display":["runtime.entersyscall","entersyscall"],"Places":[{"Stack":198,"Pos":10},{"Stack":232,"Pos":8}],"Self":0,"Color":666841},{"FullName":"runtime.reentersyscall","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.reentersyscall","Inlined":false,"Display":["runtime.reentersyscall","reentersyscall"],"Places":[{"Stack":198,"Pos":11},{"Stack":232,"Pos":9}],"Self":0,"Color":666841},{"FullName":"runtime.save","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.save","Inlined":false,"Display":["runtime.save","save"],"Places":[{"Stack":198,"Pos":12},{"Stack":232,"Pos":10}],"Self":20000000,"Color":666841},{"FullName":"runtime.netpollready","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/netpoll.go","UniqueName":"runtime.netpollready","Inlined":false,"Display":["runtime.netpollready","netpollready"],"Places":[{"Stack":202,"Pos":6}],"Self":10000000,"Color":666841},{"FullName":"runtime.mapdelete_fast64","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/runtime/maps/runtime_fast64_swiss.go","UniqueName":"runtime.mapdelete_fast64","Inlined":false,"Display":["runtime.mapdelete_fast64","mapdelete_fast64"],"Places":[{"Stack":203,"Pos":2}],"Self":0,"Color":666841},{"FullName":"internal/runtime/maps.(*Map).Delete","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/internal/runtime/maps/map.go","UniqueName":"internal/runtime/maps.(*Map).Delete","Inlined":false,"Display":["maps.(*Map).Delete","(*Map).Delete","Delete"],"Places":[{"Stack":203,"Pos":3}],"Self":10000000,"Color":685825},{"FullName":"runtime.casgstatus","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/runtime/proc.go","UniqueName":"runtime.casgstatus","Inlined":false,"Display":["runtime.casgstatus","casgstatus"],"Places":[{"Stack":205,"Pos":3}],"Self":10000000,"Color":666841},{"FullName":"sync.(*RWMutex).RUnlock","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/sync/rwmutex.go","UniqueName":"sync.(*RWMutex).RUnlock","Inlined":false,"Display":["sync.(*RWMutex).RUnlock","(*RWMutex).RUnlock","RUnlock"],"Places":[{"Stack":215,"Pos":3}],"Self":10000000,"Color":968565},{"FullName":"golang.zx2c4.com/wireguard/device.(*Peer).RoutineSequentialSender","FileName":"/Users/woojer/Desktop/wireguard-go/device/send.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Peer).RoutineSequentialSender","Inlined":false,"Display":["device.(*Peer).RoutineSequentialSender","(*Peer).RoutineSequentialSender","RoutineSequentialSender"],"Places":[{"Stack":242,"Pos":1}],"Self":0,"Color":447576},{"FullName":"golang.zx2c4.com/wireguard/device.(*Peer).SendBuffers","FileName":"/Users/woojer/Desktop/wireguard-go/device/peer.go","UniqueName":"golang.zx2c4.com/wireguard/device.(*Peer).SendBuffers","Inlined":false,"Display":["device.(*Peer).SendBuffers","(*Peer).SendBuffers","SendBuffers"],"Places":[{"Stack":242,"Pos":2}],"Self":0,"Color":447576},{"FullName":"golang.zx2c4.com/wireguard/conn.(*StdNetBind).Send","FileName":"/Users/woojer/Desktop/wireguard-go/conn/bind_std.go","UniqueName":"golang.zx2c4.com/wireguard/conn.(*StdNetBind).Send","Inlined":false,"Display":["conn.(*StdNetBind).Send","(*StdNetBind).Send","Send"],"Places":[{"Stack":242,"Pos":3}],"Self":0,"Color":36975},{"FullName":"golang.zx2c4.com/wireguard/conn.(*StdNetBind).send","FileName":"/Users/woojer/Desktop/wireguard-go/conn/bind_std.go","UniqueName":"golang.zx2c4.com/wireguard/conn.(*StdNetBind).send","Inlined":false,"Display":["conn.(*StdNetBind).send","(*StdNetBind).send","send"],"Places":[{"Stack":242,"Pos":4}],"Self":0,"Color":36975},{"FullName":"golang.zx2c4.com/wireguard/conn.(*darwinBatchConn).WriteBatch","FileName":"/Users/woojer/Desktop/wireguard-go/conn/bind_std_batch_darwin.go","UniqueName":"golang.zx2c4.com/wireguard/conn.(*darwinBatchConn).WriteBatch","Inlined":false,"Display":["conn.(*darwinBatchConn).WriteBatch","(*darwinBatchConn).WriteBatch","WriteBatch"],"Places":[{"Stack":242,"Pos":5}],"Self":0,"Color":36975},{"FullName":"net.(*rawConn).Write","FileName":"/opt/homebrew/Cellar/go/1.25.0/libexec/src/net/rawconn.go","UniqueName":"net.(*rawConn).Write","Inlined":false,"Display":["net.(*rawConn).Write","(*rawConn).Write","Write"],"Places":[{"Stack":242,"Pos":7}],"Self":0,"Color":1018528}]}, ["","golang.zx2c4.com/wireguard/device.(*Device).RoutineReceiveIncoming","golang.zx2c4.com/wireguard/conn.(*StdNetBind).Open.(*StdNetBind).makeReceiveIPv4.func1","golang.zx2c4.com/wireguard/conn.(*StdNetBind).receiveIP","golang.zx2c4.com/wireguard/conn.(*darwinBatchConn).ReadBatch","golang.zx2c4.com/wireguard/darwinmsgx.RecvmsgX","net.(*rawConn).Read","internal/poll.(*FD).RawRead","golang.zx2c4.com/wireguard/darwinmsgx.RecvmsgX.func1","syscall.Syscall6","golang.zx2c4.com/wireguard/device.(*Peer).RoutineSequentialReceiver","golang.zx2c4.com/wireguard/tun.(*NativeTun).Write","golang.zx2c4.com/wireguard/darwinmsgx.SendmsgX","os.(*rawConn).Write","internal/poll.(*FD).RawWrite","golang.zx2c4.com/wireguard/darwinmsgx.SendmsgX.func1","runtime.systemstack","runtime.(*mheap).alloc.func1","runtime.(*mheap).allocSpan","runtime.sysUsed","runtime.sysUsedOS","runtime.madvise","runtime.mcall","runtime.park_m","runtime.schedule","runtime.findRunnable","runtime.netpoll","runtime.kevent","runtime.stopm","runtime.mPark","runtime.notesleep","runtime.semasleep","runtime.pthread_cond_wait","runtime.send.goready.func1","runtime.ready","runtime.wakep","runtime.startm","runtime.notewakeup","runtime.semawakeup","runtime.pthread_cond_signal","runtime.resetspinning","runtime.stealWork","runtime.runqsteal","runtime.runqgrab","runtime.usleep","golang.zx2c4.com/wireguard/device.(*Device).RoutineDecryption","golang.org/x/crypto/chacha20poly1305.(*chacha20poly1305).Open","golang.org/x/crypto/chacha20poly1305.(*chacha20poly1305).open","golang.org/x/crypto/chacha20poly1305.(*chacha20poly1305).openGeneric","golang.org/x/crypto/chacha20.(*Cipher).XORKeyStream","golang.org/x/crypto/chacha20.(*Cipher).xorKeyStreamBlocks","golang.org/x/crypto/chacha20.xorKeyStreamVX","runtime.chanrecv2","runtime.chanrecv","runtime.lock","runtime.lockWithRank","runtime.lock2","runtime.osyield","golang.org/x/crypto/chacha20poly1305.writeWithPadding","golang.org/x/crypto/internal/poly1305.(*MAC).Write","golang.org/x/crypto/internal/poly1305.(*macGeneric).Write","golang.org/x/crypto/internal/poly1305.updateGeneric","golang.zx2c4.com/wireguard/device.(*IndexTable).Lookup","runtime.mapaccess1_fast32","runtime.readyWithTime.goready.func1","runtime.pthread_mutex_unlock","time.Now","time.runtimeNow","time.now","runtime.nanotime","runtime.nanotime1","runtime.chansend1","runtime.chansend","runtime.send","runtime.goready","os.(*File).SyscallConn","os.newRawConn","runtime.newobject","runtime.mallocgc","runtime.mallocgcSmallScanNoHeader","runtime.makeSpanClass","runtime.bool2int","golang.zx2c4.com/wireguard/conn.(*StdNetBind).putMessages","golang.zx2c4.com/wireguard/conn.sockaddrAnyToUDPAddr","runtime.(*mcache).nextFree","runtime.(*mcache).refill","runtime.(*mcentral).cacheSpan","runtime.(*mcentral).grow","runtime.(*mspan).initHeapBits","runtime.memclrNoHeapPointers","golang.org/x/crypto/internal/poly1305.mul64","golang.zx2c4.com/wireguard/device.(*Device).GetInboundElement","golang.zx2c4.com/wireguard/device.(*WaitPool).Get","sync.(*Pool).Get","runtime.makeslice","runtime.mallocgcTiny","runtime.mapIterNext","internal/runtime/maps.(*Iter).Next","golang.zx2c4.com/wireguard/device.(*Device).PutMessageBuffer","golang.zx2c4.com/wireguard/device.(*WaitPool).Put","sync.(*Pool).Put","sync.(*poolChain).pushHead","runtime.mallocgcSmallScanHeader","golang.org/x/crypto/internal/poly1305.(*MAC).Verify","internal/runtime/maps.(*Iter).nextDirIdx","runtime.entersyscall_sysmon","golang.zx2c4.com/wireguard/device.(*Peer).SetEndpointFromPacket","golang.org/x/crypto/chacha20.NewUnauthenticatedCipher","golang.org/x/crypto/chacha20.newUnauthenticatedCipher","sync.(*Mutex).Unlock","internal/sync.(*Mutex).Unlock","internal/sync.(*Mutex).unlockSlow","internal/sync.runtime_Semrelease","runtime.semrelease1","runtime.mput","runtime.checkdead","golang.zx2c4.com/wireguard/device.(*Device).GetInboundElementsContainer","sync.(*Pool).pin","sync.(*Mutex).Lock","internal/sync.(*Mutex).Lock","internal/sync.(*Mutex).lockSlow","golang.zx2c4.com/wireguard/device.(*Device).GetMessageBuffer","sync.(*poolChain).popHead","sync.(*poolDequeue).popHead","sync/atomic.(*Uint64).CompareAndSwap","sync.(*Pool).getSlow","sync.(*poolChain).popTail","sync.(*poolDequeue).popTail","runtime.(*timers).check","runtime.pthread_mutex_lock","runtime.mapIterStart","internal/runtime/maps.(*Iter).Init","internal/runtime/maps.rand","runtime.rand","internal/chacha8rand.(*State).Next","runtime.nextFreeFast","internal/poll.(*FD).writeLock","internal/poll.(*fdMutex).rwlock","sync.(*Mutex).Unlock","runtime.(*randomEnum).position","runtime.walltime","runtime.checkRunqsNoP","runtime.netpollBreak","runtime.wakeNetpoll","runtime.heapSetTypeNoHeader","runtime.(*mspan).writeHeapBitsSmall","runtime.(*semaRoot).dequeue","runtime.acquirem","golang.zx2c4.com/wireguard/device.(*Peer).timersAnyAuthenticatedPacketReceived","golang.zx2c4.com/wireguard/device.(*Timer).Del","time.(*Timer).Stop","runtime.runqempty","sync.(*RWMutex).RLock","sync/atomic.(*Int32).Add","internal/sync.runtime_SemacquireMutex","runtime.semacquire1","golang.zx2c4.com/wireguard/replay.(*Filter).ValidateCounter","golang.zx2c4.com/wireguard/device.(*Peer).timersDataReceived","golang.zx2c4.com/wireguard/device.(*Peer).timersActive","golang.zx2c4.com/wireguard/device.(*Device).isUp","golang.zx2c4.com/wireguard/device.(*Device).deviceState","internal/poll.(*pollDesc).prepareRead","internal/poll.(*pollDesc).prepare","internal/poll.runtime_pollReset","runtime.netpollcheckerr","internal/sync.runtime_nanotime","runtime.libcCall","runtime.checkTimersNoP","runtime.(*timers).wakeTime","runtime.parkunlock_c","runtime.unlock","runtime.unlockWithRank","runtime.unlock2","sync/atomic.StorePointer","runtime.duffcopy","runtime.acquireSudog","runtime.releasem","runtime.(*pageAlloc).scavenge.func1","runtime.(*pageAlloc).scavengeOne","runtime.sysUnused","runtime.sysUnusedOS","runtime.entersyscall","runtime.reentersyscall","runtime.save","runtime.netpollready","runtime.mapdelete_fast64","internal/runtime/maps.(*Map).Delete","runtime.casgstatus","sync.(*RWMutex).RUnlock","golang.zx2c4.com/wireguard/device.(*Peer).RoutineSequentialSender","golang.zx2c4.com/wireguard/device.(*Peer).SendBuffers","golang.zx2c4.com/wireguard/conn.(*StdNetBind).Send","golang.zx2c4.com/wireguard/conn.(*StdNetBind).send","golang.zx2c4.com/wireguard/conn.(*darwinBatchConn).WriteBatch","net.(*rawConn).Write"]);
+  </script>
+</body>
+</html>

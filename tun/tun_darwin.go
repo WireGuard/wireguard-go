@@ -15,9 +15,18 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/unix"
+	"golang.zx2c4.com/wireguard/darwinmsgx"
 )
 
-const utunControlName = "com.apple.net.utun_control"
+const (
+	utunControlName = "com.apple.net.utun_control"
+
+	sysprotoControl          = 2  // SYSPROTO_CONTROL
+	utunOptMaxPendingPackets = 16 // setsockopt option name (UTUN_OPT_MAX_PENDING_PACKETS)
+	utunMaxPendingPackets    = 256
+	utunRecvBufferSize       = 4 << 20 // 4 MiB
+	batchSize                = 32
+)
 
 type NativeTun struct {
 	name        string
@@ -26,6 +35,8 @@ type NativeTun struct {
 	errors      chan error
 	routeSocket int
 	closeOnce   sync.Once
+	readmsghdrs [batchSize]darwinmsgx.MsghdrX
+	readiov     [batchSize]unix.Iovec
 }
 
 func (tun *NativeTun) routineRouteListener(tunIfindex int) {
@@ -165,6 +176,15 @@ func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 
 	go tun.routineRouteListener(tunIfindex)
 
+	if err := tun.setMaxPendingPackets(utunMaxPendingPackets); err != nil {
+		tun.Close()
+		return nil, err
+	}
+	if err := tun.setRecvBuffer(utunRecvBufferSize); err != nil {
+		tun.Close()
+		return nil, err
+	}
+
 	if mtu > 0 {
 		err = tun.setMTU(mtu)
 		if err != nil {
@@ -205,17 +225,36 @@ func (tun *NativeTun) Read(bufs [][]byte, sizes []int, offset int) (int, error) 
 	// TODO: the BSDs look very similar in Read() and Write(). They should be
 	// collapsed, with platform-specific files containing the varying parts of
 	// their implementations.
+	if offset < 4 {
+		return 0, io.ErrShortBuffer
+	}
+
 	select {
 	case err := <-tun.errors:
 		return 0, err
 	default:
-		buf := bufs[0][offset-4:]
-		n, err := tun.tunFile.Read(buf[:])
-		if n < 4 {
+		for i, buf := range bufs {
+			buf = buf[offset-4:]
+			tun.readiov[i].Base = &buf[0]
+			tun.readiov[i].Len = uint64(len(buf))
+			tun.readmsghdrs[i] = darwinmsgx.MsghdrX{
+				Msghdr: unix.Msghdr{
+					Iov:    &tun.readiov[i],
+					Iovlen: 1,
+				},
+			}
+		}
+
+		conn, err := tun.tunFile.SyscallConn()
+		if err != nil {
 			return 0, err
 		}
-		sizes[0] = n - 4
-		return 1, err
+		received, err := darwinmsgx.RecvmsgX(conn, tun.readmsghdrs[:len(bufs)])
+		for i := range received {
+			// Don't include AF header in buffer
+			sizes[i] = int(tun.readmsghdrs[i].DataLen) - 4
+		}
+		return received, err
 	}
 }
 
@@ -223,6 +262,10 @@ func (tun *NativeTun) Write(bufs [][]byte, offset int) (int, error) {
 	if offset < 4 {
 		return 0, io.ErrShortBuffer
 	}
+
+	l := len(bufs)
+	msghdrs := make([]darwinmsgx.MsghdrX, l)
+	iovecs := make([]unix.Iovec, l)
 	for i, buf := range bufs {
 		buf = buf[offset-4:]
 		buf[0] = 0x00
@@ -236,11 +279,21 @@ func (tun *NativeTun) Write(bufs [][]byte, offset int) (int, error) {
 		default:
 			return i, unix.EAFNOSUPPORT
 		}
-		if _, err := tun.tunFile.Write(buf); err != nil {
-			return i, err
+		iovecs[i].Base = &buf[0]
+		iovecs[i].Len = uint64(len(buf))
+		msghdrs[i] = darwinmsgx.MsghdrX{
+			Msghdr: unix.Msghdr{
+				Iov:    &iovecs[i],
+				Iovlen: 1,
+			},
 		}
 	}
-	return len(bufs), nil
+
+	conn, err := tun.tunFile.SyscallConn()
+	if err != nil {
+		return 0, err
+	}
+	return darwinmsgx.SendmsgX(conn, msghdrs)
 }
 
 func (tun *NativeTun) Close() error {
@@ -258,6 +311,28 @@ func (tun *NativeTun) Close() error {
 		return err1
 	}
 	return err2
+}
+
+func (tun *NativeTun) setMaxPendingPackets(n int) error {
+	var err error
+	tun.operateOnFd(func(fd uintptr) {
+		err = unix.SetsockoptInt(int(fd), sysprotoControl, utunOptMaxPendingPackets, n)
+	})
+	if err != nil {
+		return fmt.Errorf("set UTUN_OPT_MAX_PENDING_PACKETS: %w", err)
+	}
+	return nil
+}
+
+func (tun *NativeTun) setRecvBuffer(n int) error {
+	var err error
+	tun.operateOnFd(func(fd uintptr) {
+		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_RCVBUF, n)
+	})
+	if err != nil {
+		return fmt.Errorf("set SO_RCVBUF: %w", err)
+	}
+	return nil
 }
 
 func (tun *NativeTun) setMTU(n int) error {
@@ -304,7 +379,7 @@ func (tun *NativeTun) MTU() (int, error) {
 }
 
 func (tun *NativeTun) BatchSize() int {
-	return 1
+	return batchSize
 }
 
 func socketCloexec(family, sotype, proto int) (fd int, err error) {

@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/pprof"
 	"strconv"
 
 	"golang.org/x/sys/unix"
@@ -30,6 +31,7 @@ const (
 	ENV_WG_TUN_FD             = "WG_TUN_FD"
 	ENV_WG_UAPI_FD            = "WG_UAPI_FD"
 	ENV_WG_PROCESS_FOREGROUND = "WG_PROCESS_FOREGROUND"
+	ENV_WG_CPUPROFILE         = "WG_CPUPROFILE" // write CPU profile to this path
 )
 
 func printUsage() {
@@ -248,6 +250,9 @@ func main() {
 
 	logger.Verbosef("UAPI listener started")
 
+	stopProfile := startOptionalCPUProfile(logger)
+	defer stopProfile()
+
 	// wait for program to terminate
 
 	signal.Notify(term, unix.SIGTERM)
@@ -265,4 +270,28 @@ func main() {
 	device.Close()
 
 	logger.Verbosef("Shutting down")
+}
+
+// startOptionalCPUProfile enables WG_CPUPROFILE when set (local benches only).
+func startOptionalCPUProfile(logger *device.Logger) (stop func()) {
+	stop = func() {}
+	path := os.Getenv(ENV_WG_CPUPROFILE)
+	if path == "" {
+		return stop
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		logger.Errorf("WG_CPUPROFILE: %v", err)
+		return stop
+	}
+	if err := pprof.StartCPUProfile(f); err != nil {
+		logger.Errorf("StartCPUProfile: %v", err)
+		f.Close()
+		return stop
+	}
+	logger.Verbosef("CPU profiling to %s", path)
+	return func() {
+		pprof.StopCPUProfile()
+		f.Close()
+	}
 }
