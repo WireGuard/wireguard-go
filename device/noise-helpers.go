@@ -98,11 +98,10 @@ func (sk *NoisePrivateKey) publicKey() (pk NoisePublicKey) {
 var errInvalidPublicKey = errors.New("invalid public key")
 
 func (sk *NoisePrivateKey) sharedSecret(pk NoisePublicKey) (ss [NoisePublicKeySize]byte, err error) {
-	apk := (*[NoisePublicKeySize]byte)(&pk)
-	ask := (*[NoisePrivateKeySize]byte)(sk)
-	curve25519.ScalarMult(&ss, ask, apk)
-	if isZero(ss[:]) {
+	p, err := curve25519.X25519(sk[:], pk[:])
+	if err != nil {
 		return ss, errInvalidPublicKey
 	}
+	copy(ss[:], p)
 	return ss, nil
 }

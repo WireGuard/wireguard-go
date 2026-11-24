@@ -42,7 +42,7 @@ func Test_coalesceMessages(t *testing.T) {
 		{
 			name: "one message no coalesce",
 			buffs: [][]byte{
-				make([]byte, 1, 1),
+				make([]byte, 1),
 			},
 			wantLens: []int{1},
 			wantGSO:  []int{0},
@@ -51,7 +51,7 @@ func Test_coalesceMessages(t *testing.T) {
 			name: "two messages equal len coalesce",
 			buffs: [][]byte{
 				make([]byte, 1, 2),
-				make([]byte, 1, 1),
+				make([]byte, 1),
 			},
 			wantLens: []int{2},
 			wantGSO:  []int{1},
@@ -60,7 +60,7 @@ func Test_coalesceMessages(t *testing.T) {
 			name: "two messages unequal len coalesce",
 			buffs: [][]byte{
 				make([]byte, 2, 3),
-				make([]byte, 1, 1),
+				make([]byte, 1),
 			},
 			wantLens: []int{3},
 			wantGSO:  []int{2},
@@ -69,8 +69,8 @@ func Test_coalesceMessages(t *testing.T) {
 			name: "three messages second unequal len coalesce",
 			buffs: [][]byte{
 				make([]byte, 2, 3),
-				make([]byte, 1, 1),
-				make([]byte, 2, 2),
+				make([]byte, 1),
+				make([]byte, 2),
 			},
 			wantLens: []int{3, 2},
 			wantGSO:  []int{2, 0},
@@ -79,8 +79,8 @@ func Test_coalesceMessages(t *testing.T) {
 			name: "three messages limited cap coalesce",
 			buffs: [][]byte{
 				make([]byte, 2, 4),
-				make([]byte, 2, 2),
-				make([]byte, 2, 2),
+				make([]byte, 2),
+				make([]byte, 2),
 			},
 			wantLens: []int{4, 2},
 			wantGSO:  []int{2, 0},

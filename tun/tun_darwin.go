@@ -87,7 +87,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 	if name != "utun" {
 		_, err := fmt.Sscanf(name, "utun%d", &ifIndex)
 		if err != nil || ifIndex < 0 {
-			return nil, fmt.Errorf("Interface name must be utun[0-9]*")
+			return nil, fmt.Errorf("interface name must be utun[0-9]*")
 		}
 	}
 

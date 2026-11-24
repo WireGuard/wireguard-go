@@ -7,10 +7,11 @@ package device
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"io"
-	"math/rand"
+	mrand "math/rand/v2"
 	"net/netip"
 	"os"
 	"runtime"
@@ -224,11 +225,11 @@ func TestUpDown(t *testing.T) {
 					if err := d.Up(); err != nil {
 						t.Errorf("failed up bring up device: %v", err)
 					}
-					time.Sleep(time.Duration(rand.Intn(int(time.Nanosecond * (0x10000 - 1)))))
+					time.Sleep(mrand.N(time.Nanosecond * (0x10000 - 1)))
 					if err := d.Down(); err != nil {
 						t.Errorf("failed to bring down device: %v", err)
 					}
-					time.Sleep(time.Duration(rand.Intn(int(time.Nanosecond * (0x10000 - 1)))))
+					time.Sleep(mrand.N(time.Nanosecond * (0x10000 - 1)))
 				}
 			}(pair[i].dev)
 		}
