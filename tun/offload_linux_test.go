@@ -6,6 +6,7 @@
 package tun
 
 import (
+	"errors"
 	"net/netip"
 	"testing"
 
@@ -256,6 +257,28 @@ func Test_handleVirtioRead(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestGSOSplitReturnsPopulatedCountOnOverflow(t *testing.T) {
+	hdr := virtioNetHdr{
+		flags:      unix.VIRTIO_NET_HDR_F_NEEDS_CSUM,
+		gsoType:    unix.VIRTIO_NET_HDR_GSO_UDP_L4,
+		gsoSize:    100,
+		hdrLen:     28,
+		csumStart:  20,
+		csumOffset: 6,
+	}
+	in := udp4Packet(ip4PortA, ip4PortB, 200)[offset:]
+	out := [][]byte{make([]byte, 256)}
+	sizes := make([]int, len(out))
+
+	count, err := gsoSplit(in, hdr, out, sizes, 0, false)
+	if !errors.Is(err, ErrTooManySegments) {
+		t.Fatalf("gsoSplit error = %v, want %v", err, ErrTooManySegments)
+	}
+	if count != len(out) {
+		t.Fatalf("gsoSplit returned %d populated buffers, want %d", count, len(out))
 	}
 }
 
