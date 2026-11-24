@@ -58,6 +58,11 @@ func CreateNetTUN(localAddresses, dnsServers []netip.Addr, mtu int) (tun.Device,
 		TransportProtocols: []stack.TransportProtocolFactory{tcp.NewProtocol, udp.NewProtocol, icmp.NewProtocol6, icmp.NewProtocol4},
 		HandleLocal:        true,
 	}
+	return CreateNetTUNwithOptions(localAddresses, dnsServers, mtu, opts)
+}
+
+func CreateNetTUNwithOptions(localAddresses, dnsServers []netip.Addr, mtu int, stackOptions stack.Options) (tun.Device, *Net, error) {
+	opts := stackOptions
 	dev := &netTun{
 		ep:             channel.New(1024, uint32(mtu), ""),
 		stack:          stack.New(opts),
@@ -279,6 +284,14 @@ func (net *Net) DialUDP(laddr, raddr *net.UDPAddr) (*gonet.UDPConn, error) {
 
 func (net *Net) ListenUDP(laddr *net.UDPAddr) (*gonet.UDPConn, error) {
 	return net.DialUDP(laddr, nil)
+}
+
+func (net *Net) Stack() *stack.Stack {
+	return net.stack
+}
+
+func (net *Net) Endpoint() *channel.Endpoint {
+	return net.ep
 }
 
 type PingConn struct {
