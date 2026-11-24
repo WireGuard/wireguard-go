@@ -107,7 +107,7 @@ func (c *ChannelBind) makeReceiveFunc(ch chan []byte) conn.ReceiveFunc {
 	}
 }
 
-func (c *ChannelBind) Send(bufs [][]byte, ep conn.Endpoint) error {
+func (c *ChannelBind) Send(bufs [][]byte, services []conn.Service, ep conn.Endpoint) error {
 	for _, b := range bufs {
 		select {
 		case <-c.closeSignal:

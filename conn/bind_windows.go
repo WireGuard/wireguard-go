@@ -81,7 +81,7 @@ func NewDefaultBind() Bind { return NewWinRingBind() }
 
 func NewWinRingBind() Bind {
 	if !winrio.Initialize() {
-		return NewStdNetBind()
+		return NewStdNetBind([]ControlFn{})
 	}
 	return new(WinRingBind)
 }
@@ -486,7 +486,7 @@ func (bind *afWinRingBind) Send(buf []byte, nend *WinRingEndpoint, isOpen *atomi
 	return winrio.SendEx(bind.rq, dataBuffer, 1, nil, addressBuffer, nil, nil, 0, 0)
 }
 
-func (bind *WinRingBind) Send(bufs [][]byte, endpoint Endpoint) error {
+func (bind *WinRingBind) Send(bufs [][]byte, services []Service, endpoint Endpoint) error {
 	nend, ok := endpoint.(*WinRingEndpoint)
 	if !ok {
 		return ErrWrongEndpointType
