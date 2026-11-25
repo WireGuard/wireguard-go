@@ -529,6 +529,17 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) (peer *Peer) 
 	)
 
 	ok := func() bool {
+		// lock private key for reading
+		//
+		// This has to be taken before the handshake lock, not after.
+		// SetPrivateKey holds staticIdentity for writing and then takes a
+		// peer's handshake for writing, by way of ExpireCurrentKeypairs, so
+		// acquiring the two in the opposite order here lets a rekey that
+		// races an inbound handshake response deadlock the device.
+
+		device.staticIdentity.RLock()
+		defer device.staticIdentity.RUnlock()
+
 		// lock handshake state
 
 		handshake.mutex.RLock()
@@ -537,11 +548,6 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) (peer *Peer) 
 		if handshake.state != handshakeInitiationCreated {
 			return false
 		}
-
-		// lock private key for reading
-
-		device.staticIdentity.RLock()
-		defer device.staticIdentity.RUnlock()
 
 		// finish 3-way DH
 
